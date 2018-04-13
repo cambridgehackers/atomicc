@@ -58,8 +58,10 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
 if (trace_assign) printf("[%s:%d] start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
     int ind = value->value.find('[');
     assignList[target] = AssignItem{value, type, (ind != -1)};
-    if (!refList[target].pin)
-        refList[target] = RefItem{0, type, type != "", PIN_ALIAS};
+    if (!refList[target].pin) {
+        printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
+        exit(-1);
+    }
     }
 }
 
@@ -173,7 +175,10 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
 printf("[%s:%d] set %s = %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str());
         uint64_t offset = fitem.offset;
         uint64_t upper = offset + convertType(fitem.type) - 1;
-        if (!refList[fitem.name].pin)
+        if (refList[fitem.name].pin) {
+printf("[%s:%d] alreadyexist\n", __FUNCTION__, __LINE__);
+exit(-1);
+}
             refList[fitem.name] = RefItem{0, fitem.type, out != 0, fitem.alias ? PIN_ALIAS : pin};
         if (fitem.alias)
             setAssign(fitem.name, allocExpr(fldName + "[" + autostr(offset) + ":" + autostr(upper) + "]"), fitem.type);
@@ -182,8 +187,9 @@ printf("[%s:%d] set %s = %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fite
         else
             setAssign(fitem.name, allocExpr(fldName + "[" + autostr(offset) + ":" + autostr(upper) + "]"), fitem.type);
     }
-    if (itemList->operands.size())
+    if (itemList->operands.size()) {
         setAssign(fldName, allocExpr("{", itemList), type);
+    }
 }
 
 static void addRead(MetaSet &list, ACCExpr *cond)
@@ -327,13 +333,23 @@ static std::list<ModData> modLine;
     }
     fprintf(OStr, ");\n");
     modLine.clear();
+    for (auto FI : IR->method) {
+        std::string methodName = FI.first;
+        MethodInfo *MI = FI.second;
+        if (MI->rule) {
+            std::string type = MI->type;
+            refList[methodName] = RefItem{1, type, true, PIN_MODULE}; // both RDY and ENA must be generated
+        }
+    }
     for (auto item: IR->softwareName)
         fprintf(OStr, "// software: %s\n", item.c_str());
     iterField(IR, CBAct {
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
-            if (startswith(itemIR->name, "l_struct_OC_"))
+            if (startswith(itemIR->name, "l_struct_OC_")) {
+                refList[fldName] = RefItem{0, item.type, 1, PIN_ALIAS};
                 expandStruct(IR, fldName, item.type, 1, true, PIN_REG);
+            }
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine);
             }
@@ -367,12 +383,10 @@ static std::list<ModData> modLine;
         if (!endswith(methodName, "__RDY"))
             walkRead(MI, MI->guard, nullptr);
         setAssign(methodName, MI->guard, MI->type);  // collect the text of the return value into a single 'assign'
-        if (MI->rule) {
-            std::string type = MI->type;
-            refList[methodName] = RefItem{1, type, true, PIN_MODULE}; // both RDY and ENA must be generated
-        }
-        for (auto item: MI->alloca)
+        for (auto item: MI->alloca) {
+            refList[item.first] = RefItem{0, item.second, true, PIN_ALIAS};
             expandStruct(IR, item.first, item.second, 1, true, PIN_WIRE);
+        }
         for (auto info: MI->letList) {
             walkRead(MI, info.cond, nullptr);
             walkRead(MI, info.value, info.cond);
