@@ -374,7 +374,7 @@ static std::list<ModData> modLine;
     for (auto mitem: modLine)
         if (!mitem.moduleStart) {
             wireList[mitem.value] = mitem.type;
-            //expandStruct(IR, mitem.value, mitem.type, wireList, 0/*mitem.out*/, false);
+            expandStruct(IR, mitem.value, mitem.type, wireList, mitem.out, false);
         }
 
     for (auto IC : IR->interfaceConnect)
@@ -583,6 +583,15 @@ exit(-1);
     for (auto item: wireList)
         if (refList[item.first].count)
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second) + item.first).c_str());
+    bool seen = false;
+    for (auto item: assignList)
+        if (item.second.value && refList[item.first].count && item.second.noReplace) {
+            if (!seen)
+                fprintf(OStr, "    // Alias assigments for struct/union elements\n");
+            seen = true;
+            fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
+            refList[item.first].count = 0;
+        }
     std::string endStr;
     for (auto item: modNew) {
         if (item.moduleStart) {
@@ -606,7 +615,7 @@ exit(-1);
                 fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
             refList[item.first].count = 0;
         }
-    bool seen = false;
+    seen = false;
     for (auto item: assignList)
         if (item.second.value && refList[item.first].count) {
             if (!seen)
