@@ -37,7 +37,7 @@ typedef struct {
     std::string type;
     bool        noReplace;
 } AssignItem;
-enum {PIN_NONE, PIN_MODULE, PIN_OBJECT, PIN_DATA, PIN_ALIAS, PIN_REG, PIN_WIRE};
+enum {PIN_NONE, PIN_MODULE, PIN_OBJECT, PIN_DATA, PIN_REG, PIN_WIRE};
 typedef struct {
     int         count;
     std::string type;
@@ -45,6 +45,7 @@ typedef struct {
     int         pin;
 } RefItem;
 static int trace_assign;//= 1;
+static int trace_expand;//= 1;
 
 static std::map<std::string, RefItem> refList;
 static std::map<std::string, AssignItem> assignList;
@@ -54,14 +55,21 @@ typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
+    bool tDir = refList[target].out;
     if (value) {
 if (trace_assign) printf("[%s:%d] start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
     int ind = value->value.find('[');
-    assignList[target] = AssignItem{value, type, (ind != -1)};
+    bool noReplace = (ind != -1);
+    assert(tDir || noReplace);
+    assignList[target] = AssignItem{value, type, noReplace};
     if (!refList[target].pin) {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         exit(-1);
     }
+if (isIdChar(value->value[0]) && !noReplace) {
+bool sDir = refList[value->value].out;
+printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
+}
     }
 }
 
@@ -172,6 +180,7 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
     std::list<FieldItem> fieldList;
     getFieldList(fieldList, fldName, type, force);
     for (auto fitem : fieldList) {
+if (trace_expand)
 printf("[%s:%d] set %s = %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str());
         uint64_t offset = fitem.offset;
         uint64_t upper = offset + convertType(fitem.type) - 1;
@@ -179,7 +188,7 @@ printf("[%s:%d] set %s = %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fite
 printf("[%s:%d] alreadyexist\n", __FUNCTION__, __LINE__);
 exit(-1);
 }
-            refList[fitem.name] = RefItem{0, fitem.type, out != 0, fitem.alias ? PIN_ALIAS : pin};
+            refList[fitem.name] = RefItem{0, fitem.type, out != 0, fitem.alias ? PIN_WIRE : pin};
         if (fitem.alias)
             setAssign(fitem.name, allocExpr(fldName + "[" + autostr(offset) + ":" + autostr(upper) + "]"), fitem.type);
         else if (out)
@@ -218,10 +227,9 @@ static void walkRef (ACCExpr *expr)
         int ind = item.find('[');
         if (ind != -1)
             item = item.substr(0,ind);
+        else {
+        assert(refList[item].pin);
         refList[item].count++;
-        if (!refList[item].pin) {
-printf("[%s:%d] WWWWWWWWWWWWW MISSING REFITEM %s\n", __FUNCTION__, __LINE__, item.c_str());
-exit(-1);
         }
     }
     for (auto item: expr->operands)
@@ -327,7 +335,7 @@ static std::list<ModData> modLine;
             fprintf(OStr, "%s (\n    input CLK,\n    input nRST", mitem.value.c_str());
         else {
             fprintf(OStr, "%s %s%s", dirStr[mitem.out], sizeProcess(mitem.type).c_str(), mitem.value.c_str());
-            expandStruct(IR, mitem.value, mitem.type, mitem.out, false, PIN_ALIAS);
+            expandStruct(IR, mitem.value, mitem.type, mitem.out, false, PIN_WIRE);
         }
         sep = ",\n    ";
     }
@@ -336,10 +344,8 @@ static std::list<ModData> modLine;
     for (auto FI : IR->method) {
         std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
-        if (MI->rule) {
-            std::string type = MI->type;
-            refList[methodName] = RefItem{1, type, true, PIN_MODULE}; // both RDY and ENA must be generated
-        }
+        if (MI->rule)
+            refList[methodName] = RefItem{1, MI->type, true, PIN_MODULE}; // both RDY and ENA must be generated
     }
     for (auto item: IR->softwareName)
         fprintf(OStr, "// software: %s\n", item.c_str());
@@ -347,7 +353,7 @@ static std::list<ModData> modLine;
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
             if (startswith(itemIR->name, "l_struct_OC_")) {
-                refList[fldName] = RefItem{0, item.type, 1, PIN_ALIAS};
+                refList[fldName] = RefItem{0, item.type, 1, PIN_WIRE};
                 expandStruct(IR, fldName, item.type, 1, true, PIN_REG);
             }
             else
@@ -359,7 +365,7 @@ static std::list<ModData> modLine;
           });
     for (auto mitem: modLine)
         if (!mitem.moduleStart)
-            expandStruct(IR, mitem.value, mitem.type, mitem.out, false, PIN_ALIAS);
+            expandStruct(IR, mitem.value, mitem.type, mitem.out, false, PIN_WIRE);
 
     for (auto IC : IR->interfaceConnect)
         for (auto FI : lookupIR(IC.type)->method) {
@@ -384,7 +390,7 @@ static std::list<ModData> modLine;
             walkRead(MI, MI->guard, nullptr);
         setAssign(methodName, MI->guard, MI->type);  // collect the text of the return value into a single 'assign'
         for (auto item: MI->alloca) {
-            refList[item.first] = RefItem{0, item.second, true, PIN_ALIAS};
+            refList[item.first] = RefItem{0, item.second, true, PIN_WIRE};
             expandStruct(IR, item.first, item.second, 1, true, PIN_WIRE);
         }
         for (auto info: MI->letList) {
@@ -560,8 +566,13 @@ exit(-1);
         }
     }
     for (auto item: refList)
-        if (refList[item.first].count && (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_ALIAS))
+        if (item.second.count && (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT)) {
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
+if (item.second.out) {
+printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
+//exit(-1);
+}
+        }
     bool seen = false;
     for (auto item: assignList)
         if (item.second.value && refList[item.first].count && item.second.noReplace) {
@@ -590,13 +601,10 @@ exit(-1);
         if (item.second.out && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT)) {
             if (!assignList[item.first].value)
                 fprintf(OStr, "    // assign %s = MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE;\n", item.first.c_str());
-            else if (item.second.count)
+            else if (item.second.count) // must have value != ""
                 fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
             refList[item.first].count = 0;
         }
-else if (item.second.pin == PIN_MODULE && item.second.count) {
-printf("[%s:%d] JJJJJJJ name %s out %d\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.out);
-}
     seen = false;
     for (auto item: assignList)
         if (item.second.value && refList[item.first].count) {
