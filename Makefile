@@ -17,7 +17,7 @@
 
 #/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/
 all:
-	clang++  \
+	@clang++  \
     -g \
     -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
     -fPIC \
