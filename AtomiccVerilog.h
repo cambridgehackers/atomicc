@@ -53,13 +53,11 @@ static std::map<std::string, AssignItem> assignList;
 typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
 #define CBAct ^ ModuleIR * (FieldElement &item, std::string fldName)
 
-static void setAssign(std::string target, ACCExpr *value, std::string type)
+static void setAssign(std::string target, ACCExpr *value, std::string type, bool noReplace = false)
 {
     bool tDir = refList[target].out;
     if (value) {
 if (trace_assign) printf("[%s:%d] start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
-    int ind = value->value.find('[');
-    bool noReplace = (ind != -1);
     assert(tDir || noReplace);
     assignList[target] = AssignItem{value, type, noReplace};
     if (!refList[target].pin) {
@@ -180,25 +178,22 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
     std::list<FieldItem> fieldList;
     getFieldList(fieldList, fldName, type, force);
     for (auto fitem : fieldList) {
-if (trace_expand)
-printf("[%s:%d] set %s = %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str());
         uint64_t offset = fitem.offset;
         uint64_t upper = offset + convertType(fitem.type) - 1;
         if (refList[fitem.name].pin) {
 printf("[%s:%d] alreadyexist\n", __FUNCTION__, __LINE__);
 exit(-1);
 }
-            refList[fitem.name] = RefItem{0, fitem.type, out != 0, fitem.alias ? PIN_WIRE : pin};
-        if (fitem.alias)
-            setAssign(fitem.name, allocExpr(fldName + "[" + autostr(offset) + ":" + autostr(upper) + "]"), fitem.type);
-        else if (out)
+if (trace_expand)
+printf("[%s:%d] set %s = %s out %d alias %d , %s[%d : %d]\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, fldName.c_str(), (int)offset, (int)upper);
+        refList[fitem.name] = RefItem{0, fitem.type, out != 0, fitem.alias ? PIN_WIRE : pin};
+        if (!fitem.alias && out)
             itemList->operands.push_back(allocExpr(fitem.name));
         else
-            setAssign(fitem.name, allocExpr(fldName + "[" + autostr(offset) + ":" + autostr(upper) + "]"), fitem.type);
+            setAssign(fitem.name, allocExpr(fldName + "[" + autostr(offset) + ":" + autostr(upper) + "]"), fitem.type, true);
     }
-    if (itemList->operands.size()) {
+    if (itemList->operands.size())
         setAssign(fldName, allocExpr("{", itemList), type);
-    }
 }
 
 static void addRead(MetaSet &list, ACCExpr *cond)
@@ -519,7 +514,10 @@ printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_
         for (auto info: FI.second->storeList) {
             walkRead(MI, info.cond, nullptr);
             walkRead(MI, info.value, info.cond);
-    ACCExpr *expr = info.dest;
+    ACCExpr *destt = info.dest;
+    destt = str2tree(walkTree(destt, nullptr));
+    walkRef(destt);
+    ACCExpr *expr = destt;
     if (expr->value == "?") {
         int i = 0;
         for (auto item: expr->operands)
@@ -528,10 +526,12 @@ printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_
                 break;
             }
     }
+if (expr->value != "{") {
 std::string destType = findType(expr->value);
 if (destType == "") {
-printf("[%s:%d] typenotfound %s\n", __FUNCTION__, __LINE__, tree2str(info.dest).c_str());
+printf("[%s:%d] typenotfound %s\n", __FUNCTION__, __LINE__, tree2str(destt).c_str());
 exit(-1);
+}
 }
             hasAlways = true;
             if (!alwaysSeen)
@@ -539,7 +539,7 @@ exit(-1);
             alwaysSeen = true;
             if (info.cond)
                 alwaysLines.push_back("    if (" + walkTree(info.cond, nullptr) + ")");
-            alwaysLines.push_back("    " + tree2str(info.dest) + " <= " + walkTree(info.value, nullptr) + ";");
+            alwaysLines.push_back("    " + tree2str(destt) + " <= " + walkTree(info.value, nullptr) + ";");
         }
         if (alwaysSeen)
             alwaysLines.push_back("end; // End of " + FI.first);
