@@ -21,6 +21,7 @@
 static std::string lexString;
 static unsigned lexIndex;
 static char lexChar;
+static bool lexAllowRange;
 static ACCExpr *repeatGet1Token;
 
 static bool isIdChar(char ch)
@@ -51,8 +52,9 @@ static bool checkOperand(std::string s)
 
 static inline void dumpExpr(std::string tag, ACCExpr *next)
 {
-    printf("DE: %s %p %s\n", tag.c_str(), next, next->value.c_str());
+    printf("DE: %s %p %s\n", tag.c_str(), next, next ? next->value.c_str() : "");
     int i = 0;
+    if (next)
     for (auto item: next->operands) {
         dumpExpr(tag + "_" + autostr(i), item);
         i++;
@@ -146,10 +148,17 @@ static ACCExpr *get1Token(void)
         lexChar = lexString[lexIndex++];
     if(lexIndex > lexString.length() || lexChar == 0)
         return nullptr;
-    if (isIdChar(lexChar))
+    if (isIdChar(lexChar)) {
         do {
             getNext();
         } while (isIdChar(lexChar) || isdigit(lexChar));
+        if (lexAllowRange && lexChar == '[') {
+            do {
+                getNext();
+            } while (lexChar != ']');
+            getNext();
+        }
+    }
     else if (isdigit(lexChar))
         do {
             getNext();
@@ -341,10 +350,11 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
     return head;
 }
 
-static ACCExpr *str2tree(std::string arg)
+static ACCExpr *str2tree(std::string arg, bool allowRangeParam = false)
 {
     lexString = arg;
     lexIndex = 0;
     lexChar = lexString[lexIndex++];
+    lexAllowRange = allowRangeParam;
     return getExprList(get1Token(), "", true);
 }
