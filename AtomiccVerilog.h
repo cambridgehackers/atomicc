@@ -73,7 +73,7 @@ printf("[%s:%d] ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ replace %s -
     bool tDir = refList[target].out;
     if (value) {
 if (trace_assign || !tDir) printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
-    assert(tDir || noReplace);
+    //assert(tDir || noReplace);
     if (!refList[target].pin) {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         exit(-1);
@@ -87,7 +87,7 @@ printf("[%s:%d] duplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, 
 printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
 //exit(-1);
 }
-    assignList[target] = AssignItem{value, type, false};
+    assignList[target] = AssignItem{value, type, noReplace};
     }
 }
 
@@ -223,12 +223,9 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s\n", __
         if (!fitem.alias && out)
             itemList->operands.push_back(allocExpr(fitem.name));
         else if (out)
-{
-replaceTarget[fitem.name] = fnew;
-            //setAssign(fnew, allocExpr(fitem.name), fitem.type, true);
-}
+            replaceTarget[fitem.name] = fnew;
         else
-            setAssign(fitem.name, allocExpr(fnew), fitem.type, true);
+            setAssign(fitem.name, allocExpr(fnew), fitem.type);
     }
     if (itemList->operands.size())
         setAssign(fldName, allocExpr("{", itemList), type);
@@ -383,7 +380,7 @@ static std::list<ModData> modLine;
         std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
         if (MI->rule)
-            refList[methodName] = RefItem{1, MI->type, true, PIN_MODULE}; // both RDY and ENA must be generated
+            refList[methodName] = RefItem{1, MI->type, true, PIN_WIRE}; // both RDY and ENA must be generated
     }
     for (auto item: IR->softwareName)
         fprintf(OStr, "// software: %s\n", item.c_str());
@@ -424,9 +421,12 @@ static std::list<ModData> modLine;
     for (auto FI : IR->method) {
         std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
-        if (!endswith(methodName, "__RDY"))
+        if (!endswith(methodName, "__RDY")) {
             walkRead(MI, MI->guard, nullptr);
-        setAssign(methodName, MI->guard, MI->type);  // collect the text of the return value into a single 'assign'
+            if (MI->rule)
+                setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1", true);
+        }
+        setAssign(methodName, MI->guard, MI->type, MI->rule);  // collect the text of the return value into a single 'assign'
         for (auto item: MI->alloca) {
             refList[item.first] = RefItem{0, item.second, true, PIN_WIRE};
             expandStruct(IR, item.first, item.second, 1, true, PIN_WIRE);
@@ -689,12 +689,8 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             printf("[%s:%d] PINNOTALLOC %s\n", __FUNCTION__, __LINE__, item.first.c_str());
         }
     }
-    bool seen = false;
     for (auto item: assignList)
         if (item.second.value && refList[item.first].count && item.second.noReplace) {
-            if (!seen)
-                fprintf(OStr, "    // Alias assigments for struct/union elements\n");
-            seen = true;
             fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
             refList[item.first].count = 0;
         }
@@ -726,7 +722,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             refList[item.first].count = 0;
         }
     }
-    seen = false;
+    bool seen = false;
     for (auto item: assignList) {
         std::string temp = item.first;
         int ind = temp.find('[');
