@@ -578,12 +578,27 @@ printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_
             }
         }
 
+    // last chance to optimize out single assigns to output ports
+    std::map<std::string, std::string> mapPort;
+    for (auto item: assignList)
+        if (refList[item.first].out && refList[item.first].pin == PIN_MODULE
+          && item.second.value && isIdChar(item.second.value->value[0])) {
+            mapPort[item.second.value->value] = item.first;
+        }
     // process assignList replacements, mark referenced items
     std::list<ModData> modNew;
     for (auto mitem: modLine) {
         std::string val = mitem.value;
-        if (!mitem.moduleStart)
+        if (!mitem.moduleStart) {
             val = walkTree(allocExpr(mitem.value), nullptr);
+            std::string temp = mapPort[val];
+            if (temp != "") {
+printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
+                refList[val].count = 0;
+                refList[temp].count = 0;
+                val = temp;
+            }
+        }
         modNew.push_back(ModData{val, mitem.type, mitem.moduleStart, mitem.out});
     }
     std::list<std::string> alwaysLines;
