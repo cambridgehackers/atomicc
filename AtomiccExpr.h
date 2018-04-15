@@ -162,7 +162,8 @@ static ACCExpr *get1Token(void)
     else if (isdigit(lexChar))
         do {
             getNext();
-        } while (isdigit(lexChar) || lexChar == '.');
+        } while (isdigit(lexChar) || lexChar == '.' || lexChar == '\'' || lexChar == 'b'
+            || lexChar == 'h' || lexChar == 'd' || lexChar == 'o');
     else if (lexChar == '+' || lexChar == '-' || lexChar == '*' || lexChar == '&' || lexChar == '|')
         do {
             getNext();

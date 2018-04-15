@@ -14,6 +14,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+#include <stdlib.h> // atol
 #include "AtomiccIR.h"
 
 typedef struct {
@@ -45,12 +46,19 @@ typedef struct {
     bool        out;
     int         pin;
 } RefItem;
+typedef struct {
+    uint64_t    upper;
+    ACCExpr    *value;
+    std::string type;
+} BitfieldPart;
+
 static int trace_assign;//= 1;
 static int trace_expand;//= 1;
 
 static std::map<std::string, RefItem> refList;
 static std::map<std::string, AssignItem> assignList;
 static std::map<std::string, std::string> replaceTarget;
+static std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
 
 typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
 #define CBAct ^ ModuleIR * (FieldElement &item, std::string fldName)
@@ -191,7 +199,7 @@ static void getFieldList(std::list<FieldItem> &fieldList, std::string name, std:
         fieldList.push_back(FieldItem{name, base, type, alias, offset});
     if (trace_expand && init)
         for (auto fitem: fieldList) {
-printf("[%s:%d] FFFFF name %s base %s type %s %s offset %d\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.base.c_str(), fitem.type.c_str(), fitem.alias ? "ALIAS" : "", fitem.offset);
+printf("[%s:%d] FFFFF name %s base %s type %s %s offset %d\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.base.c_str(), fitem.type.c_str(), fitem.alias ? "ALIAS" : "", (int)fitem.offset);
         }
 }
 
@@ -353,6 +361,7 @@ static std::list<ModData> modLine;
 
     assignList.clear();
     replaceTarget.clear();
+    bitfieldList.clear();
     modLine.clear();
     generateModuleSignature(IR, "", modLine);
     // Generate module header
@@ -518,6 +527,43 @@ printf("[%s:%d] infmuxVL[%s] = cond '%s' tree '%s'\n", __FUNCTION__, __LINE__, (
             head = prevValue;
         setAssign(item.first, head, refList[item.first].type);
     }
+
+    // gather bitfield assigns together
+    for (auto item: assignList) {
+        int ind = item.first.find('[');
+        uint64_t lower, upper;
+        if (ind != -1) {
+            lower = atol(item.first.substr(ind+1).c_str());
+            std::string temp = item.first.substr(0, ind);
+            ind = item.first.find(':');
+            if (ind != -1) {
+                upper = atol(item.first.substr(ind+1).c_str());
+                if (item.second.value)
+                    bitfieldList[temp][lower] = BitfieldPart{upper, item.second.value, item.second.type};
+            }
+        }
+    }
+    // concatenate bitfield assigns
+    for (auto item: bitfieldList) {
+        std::string type = refList[item.first].type;
+        uint64_t size = convertType(type), current = 0;
+printf("[%s:%d] BBBSTART %s type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), type.c_str());
+        ACCExpr *newVal = allocExpr(",");
+        for (auto bitem: item.second) {
+            uint64_t diff = bitem.first - current;
+            if (diff > 0)
+                newVal->operands.push_back(allocExpr(autostr(diff) + "'d0"));
+            newVal->operands.push_back(bitem.second.value);
+            current = bitem.second.upper + 1;
+printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bitem.first, (int)bitem.second.upper, tree2str(bitem.second.value).c_str());
+            assignList[item.first + "[" + autostr(bitem.first) + ":" + autostr(bitem.second.upper) + "]"].value = nullptr;
+        }
+        size -= current;
+        if (size > 0)
+            newVal->operands.push_back(allocExpr(autostr(size) + "'d0"));
+        setAssign(item.first, allocExpr("{", newVal), type);
+    }
+
     // recursively process all replacements internal to the list of 'setAssign' items
     for (auto item: assignList)
         if (item.second.value) {
