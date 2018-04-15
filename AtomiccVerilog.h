@@ -161,14 +161,21 @@ static MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
     return NULL;
 }
 
-static void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool force = true, uint64_t offset = 0, bool alias = false, bool init = true)
+static void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force = true, uint64_t offset = 0, bool alias = false, bool init = true)
 {
     if (init)
         fieldList.clear();
     if (ModuleIR *IR = lookupIR(type)) {
         if (IR->unionList.size() > 0) {
-            for (auto item: IR->unionList)
-                getFieldList(fieldList, name + MODULE_SEPARATOR + item.name, name, item.type, true, 0, true, false);
+            for (auto item: IR->unionList) {
+                uint64_t toff = offset;
+                std::string tname;
+                if (out) {
+                    toff = 0;
+                    tname = name;
+                }
+                getFieldList(fieldList, name + MODULE_SEPARATOR + item.name, tname, item.type, out, true, toff, true, false);
+            }
             for (auto item: IR->fields) {
                 fieldList.push_back(FieldItem{name, base, item.type, alias, offset}); // aggregate data
                 offset += convertType(item.type);
@@ -176,7 +183,7 @@ static void getFieldList(std::list<FieldItem> &fieldList, std::string name, std:
         }
         else
             for (auto item: IR->fields) {
-                getFieldList(fieldList, name + MODULE_SEPARATOR + item.fldName, base, item.type, true, offset, alias, false);
+                getFieldList(fieldList, name + MODULE_SEPARATOR + item.fldName, base, item.type, out, true, offset, alias, false);
                 offset += convertType(item.type);
             }
     }
@@ -192,7 +199,7 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
 {
     ACCExpr *itemList = allocExpr(",");
     std::list<FieldItem> fieldList;
-    getFieldList(fieldList, fldName, "", type, force);
+    getFieldList(fieldList, fldName, "", type, out != 0, force);
     for (auto fitem : fieldList) {
         uint64_t offset = fitem.offset;
         uint64_t upper = offset + convertType(fitem.type) - 1;
@@ -419,7 +426,7 @@ static std::list<ModData> modLine;
             walkRead(MI, info.cond, nullptr);
             walkRead(MI, info.value, info.cond);
             std::list<FieldItem> fieldList;
-            getFieldList(fieldList, "", "", info.type, true);
+            getFieldList(fieldList, "", "", info.type, false, true);
             for (auto fitem : fieldList) {
                 std::string dest = info.dest->value + fitem.name;
                 std::string src = info.value->value + fitem.name;
