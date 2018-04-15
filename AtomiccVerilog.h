@@ -591,6 +591,7 @@ printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         bool alwaysSeen = false;
+        std::map<std::string, std::list<std::string>> condLines;
         for (auto info: FI.second->storeList) {
             walkRead(MI, info.cond, nullptr);
             walkRead(MI, info.value, info.cond);
@@ -606,7 +607,7 @@ printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_
                 break;
             }
     }
-if (expr->value != "{") {
+if (expr->value != "{") { // }
 std::string destType = findType(expr->value);
 if (destType == "") {
 printf("[%s:%d] typenotfound %s\n", __FUNCTION__, __LINE__, tree2str(destt).c_str());
@@ -617,9 +618,25 @@ exit(-1);
             if (!alwaysSeen)
                 alwaysLines.push_back("if (" + FI.first + ") begin");
             alwaysSeen = true;
+            std::string cond;
             if (info.cond)
-                alwaysLines.push_back("    if (" + walkTree(info.cond, nullptr) + ")");
-            alwaysLines.push_back("    " + tree2str(destt) + " <= " + walkTree(info.value, nullptr) + ";");
+                cond = "    if (" + walkTree(info.cond, nullptr) + ")";
+            condLines[cond].push_back("    " + tree2str(destt) + " <= " + walkTree(info.value, nullptr) + ";");
+        }
+        for (auto item: condLines) {
+            std::string endStr;
+            std::string temp = item.first;
+            if (item.first != "") {
+                if (item.second.size() > 1) {
+                    temp += " begin";
+                    endStr = "    end;";
+                }
+                alwaysLines.push_back(temp);
+            }
+            for (auto citem: item.second)
+                alwaysLines.push_back(citem);
+            if (endStr != "")
+                alwaysLines.push_back(endStr);
         }
         if (alwaysSeen)
             alwaysLines.push_back("end; // End of " + FI.first);
