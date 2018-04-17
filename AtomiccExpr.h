@@ -246,9 +246,13 @@ static ACCExpr *cleanupExpr(ACCExpr *expr)
                  checkName = item->operands.front()->value;
              else if (item->value == "!=" && checkName == item->operands.front()->value)
                  continue;
+             else if (item->value == "1" && ret->operands.size() > 1)
+                 continue;
              nret->operands.push_back(item);
         }
         ret = nret;
+        if (ret->operands.size() == 1)
+            ret = ret->operands.front();
     }
     return ret;
 }

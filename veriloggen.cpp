@@ -90,15 +90,15 @@ if (trace_assign || !tDir) printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FU
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         exit(-1);
     }
-if (isIdChar(value->value[0]) && !noReplace) {
-bool sDir = refList[value->value].out;
-printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
-}
-if (assignList[target].type != "") {
-printf("[%s:%d] duplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
-printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
-//exit(-1);
-}
+    if (isIdChar(value->value[0]) && !noReplace) {
+        bool sDir = refList[value->value].out;
+        printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
+    }
+    if (assignList[target].type != "") {
+        printf("[%s:%d] duplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
+        printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
+        //exit(-1);
+    }
     assignList[target] = AssignItem{value, type, noReplace};
     }
 }
@@ -968,8 +968,26 @@ printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sna
         fprintf(OStr, "%s\n", item.c_str());
 }
 
-void generateModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStrVH, FILE *OStrV)
-{
+int main(int argc, char **argv) {
+printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
+    if (argc != 2) {
+        printf("[%s:%d] veriloggen <outputFileStem>\n", __FUNCTION__, __LINE__);
+        exit(-1);
+    }
+    std::string OutputDir = argv[1];
+printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
+    FILE *OStrIRread = fopen((OutputDir + ".generated.IR").c_str(), "r");
+    FILE *OStrV = fopen((OutputDir + ".generated.v").c_str(), "w");
+    FILE *OStrVH = fopen((OutputDir + ".generated.vh").c_str(), "w");
+    fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", OutputDir.c_str());
+    std::string myName = OutputDir;
+    int ind = myName.rfind('/');
+    if (ind > 0)
+        myName = myName.substr(0, ind);
+    myName += "_GENERATED_";
+    fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n\n", myName.c_str(), myName.c_str());
+    std::list<ModuleIR *> irSeq;
+    readModuleIR(irSeq, OStrIRread);
     for (auto IR : irSeq) {
         for (auto item: IR->method) {
             std::string methodName = item.first;
@@ -1012,19 +1030,9 @@ void generateModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStrVH, FILE *OStrV)
             for (auto item: MI->callList) {
                 ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
                 if (item->cond) {
-                    ACCExpr *icon = invertExpr(item->cond);
-                    if (icon->value != "|")
-                        icon = allocExpr("|", icon);
-                    icon->operands.push_back(tempCond);
-                    tempCond = icon;
+                    tempCond = allocExpr("|", invertExpr(item->cond), tempCond);
                 }
-                if (MIRdy->guard->value == "1")
-                    MIRdy->guard = tempCond;
-                else {
-                    if (MIRdy->guard->value != "&")
-                        MIRdy->guard = allocExpr("&", MIRdy->guard);
-                    MIRdy->guard->operands.push_back(tempCond);
-                }
+                MIRdy->guard = cleanupExpr(allocExpr("&", MIRdy->guard, tempCond));
             }
         }
         // Only generate verilog for modules derived from Module
@@ -1032,29 +1040,6 @@ void generateModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStrVH, FILE *OStrV)
         // now generate the verilog header file '.vh'
         metaGenerate(IR, OStrVH);
     }
-}
-
-int main(int argc, char **argv) {
-printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
-    if (argc != 2) {
-        printf("[%s:%d] veriloggen <outputFileStem>\n", __FUNCTION__, __LINE__);
-        exit(-1);
-    }
-    std::string OutputDir = argv[1];
-printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
-    FILE *OStrIRread = fopen((OutputDir + ".generated.IR").c_str(), "r");
-    FILE *OStrV = fopen((OutputDir + ".generated.v").c_str(), "w");
-    FILE *OStrVH = fopen((OutputDir + ".generated.vh").c_str(), "w");
-    fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", OutputDir.c_str());
-    std::string myName = OutputDir;
-    int ind = myName.rfind('/');
-    if (ind > 0)
-        myName = myName.substr(0, ind);
-    myName += "_GENERATED_";
-    fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n\n", myName.c_str(), myName.c_str());
-    std::list<ModuleIR *> irSeq;
-    readModuleIR(irSeq, OStrIRread);
-    generateModuleIR(irSeq, OStrVH, OStrV);
     fprintf(OStrVH, "`endif\n");
     return 0;
 }
