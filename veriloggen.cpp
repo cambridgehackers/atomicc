@@ -357,10 +357,23 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
         }
 }
 
+static ACCExpr *walkRemoveParam (ACCExpr *expr)
+{
+    ACCExpr *newExpr = allocExpr(expr->value);
+    std::string item = expr->value;
+    if (isIdChar(item[0])) {
+printf("[%s:%d] CHECCCKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK %s %d\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].pin);
+        //assert(refList[item].pin);
+    }
+    for (auto item: expr->operands)
+        newExpr->operands.push_back(walkRemoveParam(item));
+    return newExpr;
+}
+
 /*
  * Generate *.v and *.vh for a Verilog module
  */
-void generateModuleDef(ModuleIR *IR, FILE *OStr)
+static void generateModuleDef(ModuleIR *IR, FILE *OStr)
 {
 static std::list<ModData> modLine;
     std::map<std::string, ACCExpr *> enableList;
@@ -435,6 +448,19 @@ static std::list<ModData> modLine;
         }
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
+    for (auto FI : IR->method) {
+        std::string methodName = FI.first;
+        MethodInfo *MI = FI.second;
+        // lift guards from called method interfaces
+        if (!endswith(methodName, "__RDY"))
+        if (MethodInfo *MIRdy = IR->method[getRdyName(methodName)])
+        for (auto item: MI->callList) {
+            ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
+            if (item->cond)
+                tempCond = allocExpr("|", invertExpr(walkRemoveParam(item->cond)), tempCond);
+            MIRdy->guard = cleanupExpr(allocExpr("&", MIRdy->guard, tempCond));
+        }
+    }
     for (auto FI : IR->method) {
         std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
@@ -989,6 +1015,7 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
     std::list<ModuleIR *> irSeq;
     readModuleIR(irSeq, OStrIRread);
     for (auto IR : irSeq) {
+        // expand all subscript calculations before processing the module
         for (auto item: IR->method) {
             std::string methodName = item.first;
             MethodInfo *MI = item.second;
@@ -1005,6 +1032,8 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
             }
             for (auto item: MI->callList)
                 walkSubscript(IR, item->cond);
+            // subscript processing for calls requires that we defactor the entire call,
+            // not just add a condition expression into the tree
             for (auto item: MI->callList) {
                 int size = -1;
                 ACCExpr *cond = item->cond, *subscript = nullptr;
@@ -1024,18 +1053,8 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
                     expr->value = fieldName + "0" + post;
                 }
             }
-            // lift guards from called method interfaces
-            if (!endswith(methodName, "__RDY"))
-            if (MethodInfo *MIRdy = IR->method[getRdyName(methodName)])
-            for (auto item: MI->callList) {
-                ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
-                if (item->cond) {
-                    tempCond = allocExpr("|", invertExpr(item->cond), tempCond);
-                }
-                MIRdy->guard = cleanupExpr(allocExpr("&", MIRdy->guard, tempCond));
-            }
         }
-        // Only generate verilog for modules derived from Module
+        // Generate verilog
         generateModuleDef(IR, OStrV);
         // now generate the verilog header file '.vh'
         metaGenerate(IR, OStrVH);
