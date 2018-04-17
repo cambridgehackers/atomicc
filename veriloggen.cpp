@@ -20,6 +20,9 @@
 static std::string getRdyName(std::string basename);
 #include "AtomiccReadIR.h"
 
+static int trace_assign;//= 1;
+static int trace_expand;//= 1;
+
 typedef struct {
     std::string value;
     std::string type;
@@ -54,9 +57,6 @@ typedef struct {
     ACCExpr    *value;
     std::string type;
 } BitfieldPart;
-
-static int trace_assign;//= 1;
-static int trace_expand;//= 1;
 
 static std::map<std::string, RefItem> refList;
 static std::map<std::string, AssignItem> assignList;
@@ -211,7 +211,7 @@ static void getFieldList(std::list<FieldItem> &fieldList, std::string name, std:
         fieldList.push_back(FieldItem{name, base, type, alias, offset});
     if (trace_expand && init)
         for (auto fitem: fieldList) {
-printf("[%s:%d] FFFFF name %s base %s type %s %s offset %d\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.base.c_str(), fitem.type.c_str(), fitem.alias ? "ALIAS" : "", (int)fitem.offset);
+printf("%s: name %s base %s type %s %s offset %d\n", __FUNCTION__, fitem.name.c_str(), fitem.base.c_str(), fitem.type.c_str(), fitem.alias ? "ALIAS" : "", (int)fitem.offset);
         }
 }
 
@@ -425,8 +425,13 @@ static std::list<ModData> modLine;
                 setAssign(tstr, allocExpr(sstr), FI.second->type);
             tstr = tstr.substr(0, tstr.length()-5) + MODULE_SEPARATOR;
             sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
-            for (auto info: FI.second->params)
-                setAssign(sstr + info.name, allocExpr(tstr + info.name), info.type);
+            for (auto info: FI.second->params) {
+                std::string sparm = sstr + info.name, tparm = tstr + info.name;
+                if (refList[sparm].out)
+                    setAssign(sparm, allocExpr(tparm), info.type);
+                else
+                    setAssign(tparm, allocExpr(sparm), info.type);
+            }
         }
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
