@@ -204,14 +204,22 @@ static ACCExpr *getRHS(ACCExpr *expr)
 
 static ACCExpr *invertExpr(ACCExpr *expr)
 {
+    if (!expr)
+        return allocExpr("1");
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
     if (v == "^" && getRHS(expr)->value == "1")
         return lhs;
-    if (v == "==")
+    if (v == "==") {
+        if (expr->operands.size() == 1)
+            return allocExpr("0");
         return allocExpr("!=", lhs, getRHS(expr));
-    if (v == "!=")
+    }
+    if (v == "!=") {
+        if (expr->operands.size() == 1)
+            return allocExpr("1");
         return allocExpr("==", lhs, getRHS(expr));
+    }
     if (v == "&" || v == "|") {
         ACCExpr *temp = allocExpr(v == "&" ? "|" : "&");
         for (auto item: expr->operands)
@@ -242,6 +250,10 @@ static ACCExpr *cleanupExpr(ACCExpr *expr)
         ACCExpr *nret = allocExpr(ret->value);
         std::string checkName;
         for (auto item: ret->operands) {
+             if (item->value == "0") {
+                 nret = item;
+                 break;
+             }
              if (item->value == "==")
                  checkName = item->operands.front()->value;
              else if (item->value == "!=" && checkName == item->operands.front()->value)
@@ -251,9 +263,23 @@ static ACCExpr *cleanupExpr(ACCExpr *expr)
              nret->operands.push_back(item);
         }
         ret = nret;
-        if (ret->operands.size() == 1)
-            ret = ret->operands.front();
     }
+    if (ret->value == "|") {
+        ACCExpr *nret = allocExpr(ret->value);
+        std::string checkName;
+        for (auto item: ret->operands) {
+             if (item->value == "1") {
+                 nret = item;
+                 break;
+             }
+             else if (item->value == "0" && ret->operands.size() > 1)
+                 continue;
+             nret->operands.push_back(item);
+        }
+        ret = nret;
+    }
+    if (ret->operands.size() == 1 && (ret->value == "&" || ret->value == "|"))
+        ret = ret->operands.front();
     return ret;
 }
 

@@ -45,7 +45,7 @@ typedef struct {
     std::string type;
     bool        noReplace;
 } AssignItem;
-enum {PIN_NONE, PIN_MODULE, PIN_OBJECT, PIN_DATA, PIN_REG, PIN_WIRE, PIN_ALIAS};
+enum {PIN_NONE, PIN_MODULE, PIN_OBJECT, PIN_REG, PIN_WIRE, PIN_ALIAS};
 typedef struct {
     int         count;
     std::string type;
@@ -362,11 +362,19 @@ static ACCExpr *walkRemoveParam (ACCExpr *expr)
     ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
     if (isIdChar(item[0])) {
-printf("[%s:%d] CHECCCKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK %s %d\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].pin);
+        int pin = refList[item].pin;
+printf("[%s:%d] CHECCCKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK %s %d\n", __FUNCTION__, __LINE__, item.c_str(), pin);
+        if (pin != PIN_OBJECT && pin != PIN_REG) {
+printf("[%s:%d] reject use of non-state item\n", __FUNCTION__, __LINE__);
+            return NULL;
+        }
         //assert(refList[item].pin);
     }
-    for (auto item: expr->operands)
-        newExpr->operands.push_back(walkRemoveParam(item));
+    for (auto item: expr->operands) {
+        ACCExpr *operand = walkRemoveParam(item);
+        if (operand)
+            newExpr->operands.push_back(operand);
+    }
     return newExpr;
 }
 
