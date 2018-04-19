@@ -889,6 +889,80 @@ static ACCExpr *cloneReplaceTree (ACCExpr *expr, ACCExpr *target)
     return newExpr;
 }
 
+static ModuleIR *allocIR(std::string name)
+{
+    ModuleIR *IR = new ModuleIR;
+    IR->name = name;
+    mapIndex[IR->name] = IR;
+    return IR;
+}
+
+static void processInterfaces(void)
+{
+    for (auto mapp: mapIndex) {
+        ModuleIR *IR = mapp.second;
+        if (!startswith(IR->name, "l_serialize_"))
+            continue;
+        std::string prefix = "__" + IR->name + "_";
+        auto inter = IR->interfaces.front();
+        ModuleIR *IIR = lookupIR(inter.type);
+        IR->fields.clear();
+        IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_32", 0, false});
+        ModuleIR *unionIR = allocIR(prefix + "UNION");
+        IR->fields.push_back(FieldElement{"data", -1, unionIR->name, 0, false});
+printf("[%s:%d] %s inter %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), inter.fldName.c_str());
+        int counter = 1;
+        uint64_t maxDataLength = 0;
+        for (auto FI: IIR->method) {
+            std::string methodName = FI.first;
+            MethodInfo *MI = FI.second;
+            if (endswith(methodName, "__RDY"))
+                continue;
+            if (!endswith(methodName, "__ENA")) {
+printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
+exit(-1);
+                continue;
+            }
+            methodName = methodName.substr(0, methodName.length()-5);
+printf("[%s:%d] method %s %d:\n", __FUNCTION__, __LINE__, methodName.c_str(), counter);
+            ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
+            unionIR->unionList.push_back(UnionItem{methodName, variant->name});
+            uint64_t dataLength = 0;
+            for (auto param: MI->params) {
+printf("[%s:%d]        param %s type %s\n", __FUNCTION__, __LINE__, param.name.c_str(), param.type.c_str());
+                variant->fields.push_back(FieldElement{param.name, -1, param.type, 0, false});
+                dataLength += convertType(param.type);
+            }
+printf("varlen %d\n", (int)dataLength);
+            if (dataLength > maxDataLength)
+                maxDataLength = dataLength;
+            counter++;
+        }
+printf("maxlen %d\n", (int)maxDataLength);
+        unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), 0, false});
+    }
+}
+#if 0
+-EMODULE l_struct_OC_EchoRequest_data {
+-    FIELD INTEGER_32 tag
+-    FIELD l_union_OC_anon data
+-}
+-EMODULE l_union_OC_anon {
+-    UNION l_struct_OC_anon say
+-    UNION l_struct_OC_anon_OC_0 say2
+-    FIELD INTEGER_96 DATA
+-}
+-EMODULE l_struct_OC_anon {
+-    FIELD INTEGER_32 meth
+-    FIELD INTEGER_32 v
+-}
+-EMODULE l_struct_OC_anon_OC_0 {
+-    FIELD INTEGER_32 meth
+-    FIELD INTEGER_32 v
+-    FIELD INTEGER_32 v2
+-}
+#endif
+
 static void metaGenerate(ModuleIR *IR, FILE *OStr)
 {
     std::map<std::string, int> exclusiveSeen;
@@ -1022,6 +1096,7 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
     fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n\n", myName.c_str(), myName.c_str());
     std::list<ModuleIR *> irSeq;
     readModuleIR(irSeq, OStrIRread);
+    processInterfaces();
     for (auto IR : irSeq) {
         // expand all subscript calculations before processing the module
         for (auto item: IR->method) {
