@@ -897,49 +897,100 @@ static ModuleIR *allocIR(std::string name)
     return IR;
 }
 
-static void processInterfaces(void)
+static void processSerialize(ModuleIR *IR)
+{
+    std::string prefix = "__" + IR->name + "_";
+    auto inter = IR->interfaces.front();
+    ModuleIR *IIR = lookupIR(inter.type);
+    IR->fields.clear();
+    IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_32", 0, false});
+    ModuleIR *unionIR = allocIR(prefix + "UNION");
+    IR->fields.push_back(FieldElement{"data", -1, unionIR->name, 0, false});
+printf("[%s:%d] %s inter %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), inter.fldName.c_str());
+    int counter = 1;
+    uint64_t maxDataLength = 0;
+    for (auto FI: IIR->method) {
+        std::string methodName = FI.first;
+        MethodInfo *MI = FI.second;
+        if (endswith(methodName, "__RDY"))
+            continue;
+        if (!endswith(methodName, "__ENA")) {
+printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
+exit(-1);
+            continue;
+        }
+        methodName = methodName.substr(0, methodName.length()-5);
+printf("[%s:%d] method %s %d:\n", __FUNCTION__, __LINE__, methodName.c_str(), counter);
+        ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
+        unionIR->unionList.push_back(UnionItem{methodName, variant->name});
+        uint64_t dataLength = 0;
+        for (auto param: MI->params) {
+printf("[%s:%d]    param %s type %s\n", __FUNCTION__, __LINE__, param.name.c_str(), param.type.c_str());
+            variant->fields.push_back(FieldElement{param.name, -1, param.type, 0, false});
+            dataLength += convertType(param.type);
+        }
+printf("varlen %d\n", (int)dataLength);
+        if (dataLength > maxDataLength)
+            maxDataLength = dataLength;
+        counter++;
+    }
+printf("maxlen %d\n", (int)maxDataLength);
+    unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), 0, false});
+}
+
+static void processInterfaces(std::list<ModuleIR *> &irSeq)
 {
     for (auto mapp: mapIndex) {
         ModuleIR *IR = mapp.second;
         if (!startswith(IR->name, "l_serialize_"))
             continue;
-        std::string prefix = "__" + IR->name + "_";
-        auto inter = IR->interfaces.front();
-        ModuleIR *IIR = lookupIR(inter.type);
-        IR->fields.clear();
-        IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_32", 0, false});
-        ModuleIR *unionIR = allocIR(prefix + "UNION");
-        IR->fields.push_back(FieldElement{"data", -1, unionIR->name, 0, false});
-printf("[%s:%d] %s inter %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), inter.fldName.c_str());
-        int counter = 1;
-        uint64_t maxDataLength = 0;
-        for (auto FI: IIR->method) {
-            std::string methodName = FI.first;
-            MethodInfo *MI = FI.second;
-            if (endswith(methodName, "__RDY"))
-                continue;
-            if (!endswith(methodName, "__ENA")) {
-printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
-exit(-1);
-                continue;
+        processSerialize(IR);
+    }
+    for (auto mapp: mapIndex) {
+        ModuleIR *IR = mapp.second;
+        if (startswith(IR->name, "l_module_OC_M2P")) {
+            for (auto inter: IR->interfaces) {
+                if (inter.fldName == "unused")
+                    continue;
+printf("[%s:%d] Meth2Pipe %s: %s %s ptr %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), inter.fldName.c_str(), inter.type.c_str(), inter.isPtr);
             }
-            methodName = methodName.substr(0, methodName.length()-5);
-printf("[%s:%d] method %s %d:\n", __FUNCTION__, __LINE__, methodName.c_str(), counter);
-            ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
-            unionIR->unionList.push_back(UnionItem{methodName, variant->name});
-            uint64_t dataLength = 0;
-            for (auto param: MI->params) {
-printf("[%s:%d]        param %s type %s\n", __FUNCTION__, __LINE__, param.name.c_str(), param.type.c_str());
-                variant->fields.push_back(FieldElement{param.name, -1, param.type, 0, false});
-                dataLength += convertType(param.type);
-            }
-printf("varlen %d\n", (int)dataLength);
-            if (dataLength > maxDataLength)
-                maxDataLength = dataLength;
-            counter++;
+#if 0
+-MODULE l_module_OC_EchoIndicationOutput {
+-    INTERFACE l_ainterface_OC_EchoIndication method
+-    INTERFACE/Ptr l_ainterface_OC_PipeIn_OC_1 pipe
+-    METHOD method$heard2__ENA ( INTEGER_32 meth , INTEGER_32 v , INTEGER_32 v2 ) {
+-        ALLOCA l_struct_OC_EchoIndication_data method$heard2__ENA$data
+-        LET INTEGER_32 :method$heard2__ENA$data$tag = 2
+-        LET INTEGER_32 :method$heard2__ENA$data$data$heard2$meth = method$heard2$meth
+-        LET INTEGER_32 :method$heard2__ENA$data$data$heard2$v = method$heard2$v
+-        LET INTEGER_32 :method$heard2__ENA$data$data$heard2$v2 = method$heard2$v2
+-        CALL/Action :pipe$enq__ENA{method$heard2__ENA$data}
+-    }
+-    METHOD method$heard__ENA ( INTEGER_32 meth , INTEGER_32 v ) {
+-        ALLOCA l_struct_OC_EchoIndication_data method$heard__ENA$data
+-        LET INTEGER_32 :method$heard__ENA$data$tag = 1
+-        LET INTEGER_32 :method$heard__ENA$data$data$heard$meth = method$heard$meth
+-        LET INTEGER_32 :method$heard__ENA$data$data$heard$v = method$heard$v
+-        CALL/Action :pipe$enq__ENA{method$heard__ENA$data}
+-    }
+-}
+#endif
         }
-printf("maxlen %d\n", (int)maxDataLength);
-        unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), 0, false});
+        if (startswith(IR->name, "l_module_OC_P2M")) {
+            for (auto inter: IR->interfaces) {
+printf("[%s:%d] Pipe2Meth %s: %s %s ptr %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), inter.fldName.c_str(), inter.type.c_str(), inter.isPtr);
+            }
+#if 0
+-MODULE l_module_OC_EchoIndicationInput {
+-    INTERFACE l_ainterface_OC_PipeIn_OC_1 pipe
+-    INTERFACE/Ptr l_ainterface_OC_EchoIndication method
+-    METHOD pipe$enq__ENA ( l_struct_OC_EchoIndication_data v ) {
+-        CALL/Action ((pipe$enq$v$tag) == 1):method$heard__ENA{pipe$enq$v$data$heard$meth,pipe$enq$v$data$heard$v}
+-        CALL/Action ((pipe$enq$v$tag) == 2):method$heard2__ENA{pipe$enq$v$data$heard2$meth,pipe$enq$v$data$heard2$v,pipe$enq$data$heard2$v2}
+-    }
+-}
+#endif
+        }
     }
 }
 #if 0
@@ -1096,7 +1147,7 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
     fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n\n", myName.c_str(), myName.c_str());
     std::list<ModuleIR *> irSeq;
     readModuleIR(irSeq, OStrIRread);
-    processInterfaces();
+    processInterfaces(irSeq);
     for (auto IR : irSeq) {
         // expand all subscript calculations before processing the module
         for (auto item: IR->method) {
