@@ -66,7 +66,7 @@ static std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
 typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
 #define CBAct ^ ModuleIR * (FieldElement &item, std::string fldName)
 
-std::string getRdyName(std::string basename)
+static std::string getRdyName(std::string basename)
 {
     std::string rdyName = basename;
     if (endswith(rdyName, "__ENA"))
@@ -906,7 +906,6 @@ static void processSerialize(ModuleIR *IR)
     IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_32", 0, false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
     IR->fields.push_back(FieldElement{"data", -1, unionIR->name, 0, false});
-printf("[%s:%d] %s inter %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), inter.fldName.c_str());
     int counter = 1;
     uint64_t maxDataLength = 0;
     for (auto FI: IIR->method) {
@@ -920,99 +919,159 @@ exit(-1);
             continue;
         }
         methodName = methodName.substr(0, methodName.length()-5);
-printf("[%s:%d] method %s %d:\n", __FUNCTION__, __LINE__, methodName.c_str(), counter);
         ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
         unionIR->unionList.push_back(UnionItem{methodName, variant->name});
         uint64_t dataLength = 0;
         for (auto param: MI->params) {
-printf("[%s:%d]    param %s type %s\n", __FUNCTION__, __LINE__, param.name.c_str(), param.type.c_str());
             variant->fields.push_back(FieldElement{param.name, -1, param.type, 0, false});
             dataLength += convertType(param.type);
         }
-printf("varlen %d\n", (int)dataLength);
         if (dataLength > maxDataLength)
             maxDataLength = dataLength;
         counter++;
     }
-printf("maxlen %d\n", (int)maxDataLength);
     unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), 0, false});
+}
+
+static void dumpModule(std::string name, ModuleIR *IR)
+{
+printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s name %s\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
+    for (auto FI: IR->method) {
+        std::string methodName = FI.first;
+        MethodInfo *MI = FI.second;
+        printf("method %s(", methodName.c_str());
+        std::string sep;
+        for (auto param: MI->params) {
+            printf("%s%s %s", sep.c_str(), param.type.c_str(), param.name.c_str());
+            sep = ", ";
+        }
+        printf(") = %s\n", tree2str(MI->guard).c_str());
+        for (auto item: MI->callList)
+            printf("  call%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
+    }
+}
+static void processM2P(ModuleIR *IR)
+{
+    ModuleIR *IIR = nullptr, *HIR = nullptr;
+    std::string host, target;
+    for (auto inter: IR->interfaces) {
+        if (inter.isPtr) {
+            IIR = lookupIR(inter.type);
+            target = inter.fldName;
+        }
+        else {
+            HIR = lookupIR(inter.type);
+            host = inter.fldName;
+            IR->name = "l_module" + inter.type.substr(12) + "Output";
+        }
+    }
+    int counter = 1;
+    for (auto FI: HIR->method) {
+        std::string methodName = host + MODULE_SEPARATOR + FI.first;
+        MethodInfo *MI = FI.second;
+        MethodInfo *MInew = new MethodInfo{nullptr};
+        IR->method[methodName] = MInew;
+        MInew->type = MI->type;
+        MInew->guard = MI->guard;
+        if (endswith(methodName, "__RDY"))
+            continue;
+        if (!endswith(methodName, "__ENA")) {
+printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
+exit(-1);
+            continue;
+        }
+        std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
+        std::string call = "{ " + autostr(counter);
+        uint64_t dataLength = 0;
+        for (auto param: MI->params) {
+            MInew->params.push_back(param);
+            dataLength += convertType(param.type);
+            call += " , " + paramPrefix + param.name;
+        }
+        call += "}";
+        MInew->callList.push_back(new CallListElement{
+             allocExpr(target + "$enq__ENA", allocExpr("{", allocExpr(call))), nullptr, true});
+        counter++;
+    }
+    dumpModule("M2P", IR);
+}
+
+static void processP2M(ModuleIR *IR)
+{
+    ModuleIR *IIR = nullptr, *HIR = nullptr;
+    std::string host, target;
+    for (auto inter: IR->interfaces) {
+        if (inter.isPtr) {
+            IIR = lookupIR(inter.type);
+            target = inter.fldName;
+            IR->name = "l_module" + inter.type.substr(12) + "Input";
+        }
+        else {
+            HIR = lookupIR(inter.type);
+            host = inter.fldName;
+        }
+    }
+    for (auto FI: HIR->method) {
+        std::string methodName = FI.first;
+        MethodInfo *MI = FI.second;
+printf("[%s:%d] P2Mhifmethod %s\n", __FUNCTION__, __LINE__, methodName.c_str());
+        MethodInfo *MInew = new MethodInfo{nullptr};
+        IR->method[host + MODULE_SEPARATOR + methodName] = MInew;
+        for (auto param: MI->params)
+            MInew->params.push_back(param);
+        MInew->type = MI->type;
+        MInew->guard = MI->guard;
+    }
+    MethodInfo *MInew = IR->method[host + MODULE_SEPARATOR + "enq__ENA"];
+    int counter = 1;
+    for (auto FI: IIR->method) {
+        uint64_t offset = 32;
+        std::string methodName = FI.first;
+        std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
+        MethodInfo *MI = FI.second;
+        if (endswith(methodName, "__RDY"))
+            continue;
+        ACCExpr *paramList = allocExpr(",");
+        ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr("{", paramList));
+        for (auto param: MI->params) {
+            uint64_t upper = offset + convertType(param.type);
+            paramList->operands.push_back(allocExpr(host + "$enq$v[" + autostr(offset) + ":" + autostr(upper-1) + "]"));
+            offset = upper;
+        }
+        if (!endswith(methodName, "__ENA")) {
+printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
+exit(-1);
+            continue;
+        }
+        MInew->callList.push_back(new CallListElement{call, allocExpr("==", allocExpr(host + "$enq$v[0:31]"),
+                 allocExpr(autostr(counter))), true});
+        counter++;
+    }
+    dumpModule("P2M", IR);
 }
 
 static void processInterfaces(std::list<ModuleIR *> &irSeq)
 {
     for (auto mapp: mapIndex) {
         ModuleIR *IR = mapp.second;
-        if (!startswith(IR->name, "l_serialize_"))
-            continue;
-        processSerialize(IR);
-    }
-    for (auto mapp: mapIndex) {
-        ModuleIR *IR = mapp.second;
-        if (startswith(IR->name, "l_module_OC_M2P")) {
-            for (auto inter: IR->interfaces) {
-                if (inter.fldName == "unused")
-                    continue;
-printf("[%s:%d] Meth2Pipe %s: %s %s ptr %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), inter.fldName.c_str(), inter.type.c_str(), inter.isPtr);
-            }
-#if 0
--MODULE l_module_OC_EchoIndicationOutput {
--    INTERFACE l_ainterface_OC_EchoIndication method
--    INTERFACE/Ptr l_ainterface_OC_PipeIn_OC_1 pipe
--    METHOD method$heard2__ENA ( INTEGER_32 meth , INTEGER_32 v , INTEGER_32 v2 ) {
--        ALLOCA l_struct_OC_EchoIndication_data method$heard2__ENA$data
--        LET INTEGER_32 :method$heard2__ENA$data$tag = 2
--        LET INTEGER_32 :method$heard2__ENA$data$data$heard2$meth = method$heard2$meth
--        LET INTEGER_32 :method$heard2__ENA$data$data$heard2$v = method$heard2$v
--        LET INTEGER_32 :method$heard2__ENA$data$data$heard2$v2 = method$heard2$v2
--        CALL/Action :pipe$enq__ENA{method$heard2__ENA$data}
--    }
--    METHOD method$heard__ENA ( INTEGER_32 meth , INTEGER_32 v ) {
--        ALLOCA l_struct_OC_EchoIndication_data method$heard__ENA$data
--        LET INTEGER_32 :method$heard__ENA$data$tag = 1
--        LET INTEGER_32 :method$heard__ENA$data$data$heard$meth = method$heard$meth
--        LET INTEGER_32 :method$heard__ENA$data$data$heard$v = method$heard$v
--        CALL/Action :pipe$enq__ENA{method$heard__ENA$data}
--    }
--}
-#endif
-        }
+        if (startswith(IR->name, "l_serialize_"))
+            processSerialize(IR);
         if (startswith(IR->name, "l_module_OC_P2M")) {
+            irSeq.push_back(IR);
+            processP2M(IR);
+        }
+        if (startswith(IR->name, "l_module_OC_M2P")) {
+            irSeq.push_back(IR);
+            std::list<FieldElement> temp;
             for (auto inter: IR->interfaces) {
-printf("[%s:%d] Pipe2Meth %s: %s %s ptr %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), inter.fldName.c_str(), inter.type.c_str(), inter.isPtr);
+                if (inter.fldName != "unused")
+                    temp.push_back(inter);
             }
-#if 0
--MODULE l_module_OC_EchoIndicationInput {
--    INTERFACE l_ainterface_OC_PipeIn_OC_1 pipe
--    INTERFACE/Ptr l_ainterface_OC_EchoIndication method
--    METHOD pipe$enq__ENA ( l_struct_OC_EchoIndication_data v ) {
--        CALL/Action ((pipe$enq$v$tag) == 1):method$heard__ENA{pipe$enq$v$data$heard$meth,pipe$enq$v$data$heard$v}
--        CALL/Action ((pipe$enq$v$tag) == 2):method$heard2__ENA{pipe$enq$v$data$heard2$meth,pipe$enq$v$data$heard2$v,pipe$enq$data$heard2$v2}
--    }
--}
-#endif
+            IR->interfaces = temp;
+            processM2P(IR);
         }
     }
 }
-#if 0
--EMODULE l_struct_OC_EchoRequest_data {
--    FIELD INTEGER_32 tag
--    FIELD l_union_OC_anon data
--}
--EMODULE l_union_OC_anon {
--    UNION l_struct_OC_anon say
--    UNION l_struct_OC_anon_OC_0 say2
--    FIELD INTEGER_96 DATA
--}
--EMODULE l_struct_OC_anon {
--    FIELD INTEGER_32 meth
--    FIELD INTEGER_32 v
--}
--EMODULE l_struct_OC_anon_OC_0 {
--    FIELD INTEGER_32 meth
--    FIELD INTEGER_32 v
--    FIELD INTEGER_32 v2
--}
-#endif
 
 static void metaGenerate(ModuleIR *IR, FILE *OStr)
 {

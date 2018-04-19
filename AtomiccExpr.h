@@ -67,7 +67,7 @@ static std::string tree2str(const ACCExpr *arg)
     if (!arg)
         return "";
     std::string sep, op = arg->value;
-    if (isParenChar(op[0])) {
+    if (isParenChar(op[0]) || isIdChar(op[0])) {
         ret += op + " ";
         op = "";
     }
