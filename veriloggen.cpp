@@ -226,7 +226,7 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
         std::string base = fldName;
         if (fitem.base != "")
             base = fitem.base;
-        std::string fnew = base + "[" + autostr(offset) + ":" + autostr(upper) + "]";
+        std::string fnew = base + "[" + autostr(upper) + ":" + autostr(offset) + "]";
 if (trace_expand)
 printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, (int)upper, fnew.c_str());
         assert (!refList[fitem.name].pin);
@@ -607,7 +607,7 @@ printf("[%s:%d] BBBSTART %s type %s\n", __FUNCTION__, __LINE__, item.first.c_str
             newVal->operands.push_back(bitem.second.value);
             current = bitem.second.upper + 1;
 printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bitem.first, (int)bitem.second.upper, tree2str(bitem.second.value).c_str());
-            assignList[item.first + "[" + autostr(bitem.first) + ":" + autostr(bitem.second.upper) + "]"].value = nullptr;
+            assignList[item.first + "[" + autostr(bitem.second.upper) + ":" + autostr(bitem.first) + "]"].value = nullptr;
         }
         size -= current;
         if (size > 0)
@@ -954,10 +954,20 @@ static void processM2P(ModuleIR *IR)
 {
     ModuleIR *IIR = nullptr, *HIR = nullptr;
     std::string host, target;
+    uint64_t pipeArgSize = -1;
     for (auto inter: IR->interfaces) {
         if (inter.isPtr) {
             IIR = lookupIR(inter.type);
             target = inter.fldName;
+            for (auto FI: IIR->method) {
+                MethodInfo *MI = FI.second;
+                if (!endswith(FI.first, "__RDY")) {
+                    std::string type = MI->params.front().type;
+                    processSerialize(lookupIR(type));
+                    pipeArgSize = convertType(type);
+                }
+            }
+                
         }
         else {
             HIR = lookupIR(inter.type);
@@ -981,16 +991,17 @@ exit(-1);
             continue;
         }
         std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
-        std::string call = "{ " + autostr(counter);
-        uint64_t dataLength = 0;
+        std::string call;
+        uint64_t dataLength = 32; // include length of tag
         for (auto param: MI->params) {
             MInew->params.push_back(param);
             dataLength += convertType(param.type);
-            call += " , " + paramPrefix + param.name;
+            call = paramPrefix + param.name + ", " + call;
         }
-        call += "}";
+        if (pipeArgSize > dataLength)
+            call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
         MInew->callList.push_back(new CallListElement{
-             allocExpr(target + "$enq__ENA", allocExpr("{", allocExpr(call))), nullptr, true});
+             allocExpr(target + "$enq__ENA", allocExpr("{", allocExpr("{ " + call + "32'd" + autostr(counter) + "}"))), nullptr, true});
         counter++;
     }
     dumpModule("M2P", IR);
@@ -1035,7 +1046,7 @@ printf("[%s:%d] P2Mhifmethod %s\n", __FUNCTION__, __LINE__, methodName.c_str());
         ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr("{", paramList));
         for (auto param: MI->params) {
             uint64_t upper = offset + convertType(param.type);
-            paramList->operands.push_back(allocExpr(host + "$enq$v[" + autostr(offset) + ":" + autostr(upper-1) + "]"));
+            paramList->operands.push_back(allocExpr(host + "$enq$v[" + autostr(upper-1) + ":" + autostr(offset) + "]"));
             offset = upper;
         }
         if (!endswith(methodName, "__ENA")) {
@@ -1043,8 +1054,8 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
 exit(-1);
             continue;
         }
-        MInew->callList.push_back(new CallListElement{call, allocExpr("==", allocExpr(host + "$enq$v[0:31]"),
-                 allocExpr(autostr(counter))), true});
+        MInew->callList.push_back(new CallListElement{call, allocExpr("==", allocExpr(host + "$enq$v[31:0]"),
+                 allocExpr("32'd" + autostr(counter))), true});
         counter++;
     }
     dumpModule("P2M", IR);
