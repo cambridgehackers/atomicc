@@ -299,6 +299,14 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
                 updateWidth(item, leftLen);
         }
     }
+    if (ret->value == "!=") {
+        ACCExpr *rhs = getRHS(ret);
+        if (ret->operands.front()->value == "0" && rhs->value == "^" && getRHS(rhs)->value == "1") {
+            ret->value = "==";
+            ret->operands.pop_back();
+            ret->operands.push_back(rhs->operands.front());
+        }
+    }
     return ret;
 }
 

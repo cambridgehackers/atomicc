@@ -167,7 +167,7 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 if (foundIf || (!foundOpenBrace && checkItem("if"))) {
                     MIRdy->guard = getExpression();
                     std::string v = MIRdy->guard->value;
-                    if (v != "1" && v != "==" && v != "!=" && v != "^" && v != "&" && v != "|")
+                    if (v != "1" && v != "==" && v != "!=" && v != "&" && v != "|")
                         MIRdy->guard = allocExpr("!=", allocExpr("0"), MIRdy->guard);
                 }
                 else

@@ -101,8 +101,10 @@ if (trace_assign //|| !tDir
         printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
     }
     if (assignList[target].type != "") {
+if (trace_assign) {
         printf("[%s:%d] duplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
+}
         //exit(-1);
     }
     assignList[target] = AssignItem{value, type, noReplace};
@@ -479,6 +481,7 @@ static std::list<ModData> modLine;
     for (auto FI : IR->method) {
         std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
+        MI->guard = cleanupExpr(MI->guard);
         if (!endswith(methodName, "__RDY")) {
             walkRead(MI, MI->guard, nullptr);
             if (MI->rule)
