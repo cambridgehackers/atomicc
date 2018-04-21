@@ -82,12 +82,14 @@ static void setAssign(std::string target, ACCExpr *value, std::string type, bool
 {
     std::string temp = replaceTarget[target];
     if (temp != "") {
+        if (trace_assign)
 printf("[%s:%d] ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ replace %s -> %s\n", __FUNCTION__, __LINE__, target.c_str(), temp.c_str());
         target = temp;
     }
     bool tDir = refList[target].out;
     if (value) {
-if (trace_assign || !tDir) printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
+if (trace_assign //|| !tDir
+) printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
     //assert(tDir || noReplace);
     if (!refList[target].pin) {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
@@ -95,6 +97,7 @@ if (trace_assign || !tDir) printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FU
     }
     if (isIdChar(value->value[0]) && !noReplace) {
         bool sDir = refList[value->value].out;
+        if (trace_assign)
         printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
     }
     if (assignList[target].type != "") {
@@ -276,6 +279,7 @@ static void walkRef (ACCExpr *expr)
         int ind = item.find('[');
         if (ind != -1)
 {
+if (trace_assign)
 printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
             refList[item.substr(0,ind)].count++;
 }
@@ -366,9 +370,9 @@ static ACCExpr *walkRemoveParam (ACCExpr *expr)
     std::string item = expr->value;
     if (isIdChar(item[0])) {
         int pin = refList[item].pin;
-printf("[%s:%d] CHECCCKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK %s %d\n", __FUNCTION__, __LINE__, item.c_str(), pin);
         if (pin != PIN_OBJECT && pin != PIN_REG) {
-printf("[%s:%d] reject use of non-state item\n", __FUNCTION__, __LINE__);
+if (trace_assign)
+printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, item.c_str(), pin);
             return NULL;
         }
         //assert(refList[item].pin);
@@ -523,7 +527,7 @@ dumpExpr("READCALL", value);
                 tempCond = temp;
             }
             std::string calledName = value->value;
-printf("[%s:%d] CALLLLLL '%s'\n", __FUNCTION__, __LINE__, calledName.c_str());
+//printf("[%s:%d] CALLLLLL '%s'\n", __FUNCTION__, __LINE__, calledName.c_str());
             if (!value->operands.size() || value->operands.front()->value != "{") {
                 printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
                 exit(-1);
@@ -543,11 +547,11 @@ printf("[%s:%d] CALLLLLL '%s'\n", __FUNCTION__, __LINE__, calledName.c_str());
             std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
             int argCount = CI->params.size();
             ACCExpr *param = value->operands.front()->operands.front();
-printf("[%s:%d] param '%s'\n", __FUNCTION__, __LINE__, tree2str(param).c_str());
+//printf("[%s:%d] param '%s'\n", __FUNCTION__, __LINE__, tree2str(param).c_str());
 //dumpExpr("param", param);
             auto setParam = [&] (ACCExpr *item) -> void {
                 if(argCount-- > 0) {
-printf("[%s:%d] infmuxVL[%s] = cond '%s' tree '%s'\n", __FUNCTION__, __LINE__, (pname + AI->name).c_str(), tree2str(tempCond).c_str(), tree2str(item).c_str());
+//printf("[%s:%d] infmuxVL[%s] = cond '%s' tree '%s'\n", __FUNCTION__, __LINE__, (pname + AI->name).c_str(), tree2str(tempCond).c_str(), tree2str(item).c_str());
                     muxValueList[pname + AI->name].push_back(MuxValueEntry{tempCond, item});
                     //typeList[pname + AI->name] = AI->type;
                     AI++;
@@ -758,7 +762,7 @@ exit(-1);
         if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT) {
         if (refList[temp].count) {
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
-if (item.second.out) {
+if (trace_assign && item.second.out) {
 printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
 //exit(-1);
 }
@@ -1212,16 +1216,18 @@ printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sna
 int main(int argc, char **argv)
 {
     bool noVerilator = false;
-noVerilator = true;
+//noVerilator = true;
 printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
-    if (argc == 3 && argv[1] == "-n") {
+    int argIndex = 1;
+    if (argc == 3 && !strcmp(argv[argIndex], "-n")) {
+        argIndex++;
         noVerilator = true;
     }
-    if (argc != 2) {
+    if (argc - 1 != argIndex) {
         printf("[%s:%d] veriloggen <outputFileStem>\n", __FUNCTION__, __LINE__);
         exit(-1);
     }
-    std::string OutputDir = argv[1];
+    std::string OutputDir = argv[argIndex];
 printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
     FILE *OStrIRread = fopen((OutputDir + ".generated.IR").c_str(), "r");
     FILE *OStrV = fopen((OutputDir + ".generated.v").c_str(), "w");
@@ -1290,8 +1296,8 @@ printf("[%s:%d]\n", __FUNCTION__, __LINE__);
     std::string commandLine = "verilator --cc " + OutputDir + ".generated.v";
     int ret = system(commandLine.c_str());
 printf("[%s:%d] RETURN from '%s' %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), ret);
-    if (ret)
-        return -1; // force error return to be propagated
+    //if (ret)
+        //return -1; // force error return to be propagated
     }
     return 0;
 }
