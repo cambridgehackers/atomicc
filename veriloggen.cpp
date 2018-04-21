@@ -16,9 +16,7 @@
 */
 #include <stdio.h>
 #include <stdlib.h> // atol
-#include "AtomiccExpr.h"
-static std::string getRdyName(std::string basename);
-#include "AtomiccReadIR.h"
+#include "AtomiccIR.h"
 
 static int trace_assign;//= 1;
 static int trace_expand;//= 1;
@@ -65,6 +63,11 @@ static std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
 
 typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
 #define CBAct ^ ModuleIR * (FieldElement &item, std::string fldName)
+static std::string getRdyName(std::string basename);
+static uint64_t convertType(std::string arg);
+
+#include "AtomiccExpr.h"
+#include "AtomiccReadIR.h"
 
 static std::string getRdyName(std::string basename)
 {
@@ -483,39 +486,45 @@ static std::list<ModData> modLine;
             expandStruct(IR, item.first, item.second, 1, true, PIN_WIRE);
         }
         for (auto info: MI->letList) {
-            walkRead(MI, info.cond, nullptr);
-            walkRead(MI, info.value, info.cond);
+            ACCExpr *cond = cleanupExpr(info.cond);
+            ACCExpr *value = cleanupExpr(info.value);
+            if (isdigit(value->value[0]))
+                updateWidth(value, convertType(info.type));
+            walkRead(MI, cond, nullptr);
+            walkRead(MI, value, cond);
             std::list<FieldItem> fieldList;
             getFieldList(fieldList, "", "", info.type, false, true);
             for (auto fitem : fieldList) {
                 std::string dest = info.dest->value + fitem.name;
-                std::string src = info.value->value + fitem.name;
-                muxValueList[dest].push_back(MuxValueEntry{info.cond, allocExpr(src)});
+                std::string src = value->value + fitem.name;
+                muxValueList[dest].push_back(MuxValueEntry{cond, allocExpr(src)});
             }
         }
         for (auto info: MI->callList) {
-            if (isIdChar(info->value->value[0]) && info->value->operands.size() && info->value->operands.front()->value == "{")
-                MI->meta[MetaInvoke][info->value->value].insert(tree2str(info->cond));
+            ACCExpr *cond = cleanupExpr(info->cond);
+            ACCExpr *value = cleanupExpr(info->value);
+            if (isIdChar(value->value[0]) && value->operands.size() && value->operands.front()->value == "{")
+                MI->meta[MetaInvoke][value->value].insert(tree2str(cond));
             else {
-                printf("[%s:%d] called method name not found %s\n", __FUNCTION__, __LINE__, tree2str(info->value).c_str());
-dumpExpr("READCALL", info->value);
+                printf("[%s:%d] called method name not found %s\n", __FUNCTION__, __LINE__, tree2str(value).c_str());
+dumpExpr("READCALL", value);
                     exit(-1);
             }
-            walkRead(MI, info->cond, nullptr);
-            walkRead(MI, info->value, info->cond);
+            walkRead(MI, cond, nullptr);
+            walkRead(MI, value, cond);
             if (!info->isAction)
                 continue;
             ACCExpr *tempCond = allocExpr(methodName);
-            if (info->cond) {
-                ACCExpr *temp = info->cond;
+            if (cond) {
+                ACCExpr *temp = cond;
                 if (temp->value != "&")
                     temp = allocExpr("&", temp);
                 temp->operands.push_back(tempCond);
                 tempCond = temp;
             }
-            std::string calledName = info->value->value;
+            std::string calledName = value->value;
 printf("[%s:%d] CALLLLLL '%s'\n", __FUNCTION__, __LINE__, calledName.c_str());
-            if (!info->value->operands.size() || info->value->operands.front()->value != "{") {
+            if (!value->operands.size() || value->operands.front()->value != "{") {
                 printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
                 exit(-1);
             }
@@ -533,7 +542,7 @@ printf("[%s:%d] CALLLLLL '%s'\n", __FUNCTION__, __LINE__, calledName.c_str());
             auto AI = CI->params.begin();
             std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
             int argCount = CI->params.size();
-            ACCExpr *param = info->value->operands.front()->operands.front();
+            ACCExpr *param = value->operands.front()->operands.front();
 printf("[%s:%d] param '%s'\n", __FUNCTION__, __LINE__, tree2str(param).c_str());
 //dumpExpr("param", param);
             auto setParam = [&] (ACCExpr *item) -> void {
@@ -659,8 +668,11 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
         bool alwaysSeen = false;
         std::map<std::string, std::list<std::string>> condLines;
         for (auto info: FI.second->storeList) {
-            walkRead(MI, info.cond, nullptr);
-            walkRead(MI, info.value, info.cond);
+            ACCExpr *cond = cleanupExpr(info.cond);
+            ACCExpr *value = //cleanupExpr
+(info.value);
+            walkRead(MI, cond, nullptr);
+            walkRead(MI, value, cond);
     ACCExpr *destt = info.dest;
     destt = str2tree(walkTree(destt, nullptr), true);
     walkRef(destt);
@@ -684,10 +696,10 @@ exit(-1);
             if (!alwaysSeen)
                 alwaysLines.push_back("if (" + FI.first + ") begin");
             alwaysSeen = true;
-            std::string cond;
-            if (info.cond)
-                cond = "    if (" + walkTree(info.cond, nullptr) + ")";
-            condLines[cond].push_back("    " + tree2str(destt) + " <= " + walkTree(info.value, nullptr) + ";");
+            std::string condStr;
+            if (cond)
+                condStr = "    if (" + walkTree(cond, nullptr) + ")";
+            condLines[condStr].push_back("    " + tree2str(destt) + " <= " + walkTree(value, nullptr) + ";");
         }
         for (auto item: condLines) {
             std::string endStr;
@@ -1197,8 +1209,14 @@ printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sna
         fprintf(OStr, "%s\n", item.c_str());
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
+    bool noVerilator = false;
+noVerilator = true;
 printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
+    if (argc == 3 && argv[1] == "-n") {
+        noVerilator = true;
+    }
     if (argc != 2) {
         printf("[%s:%d] veriloggen <outputFileStem>\n", __FUNCTION__, __LINE__);
         exit(-1);
@@ -1264,5 +1282,16 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
         metaGenerate(IR, OStrVH);
     }
     fprintf(OStrVH, "`endif\n");
+    fclose(OStrIRread);
+    fclose(OStrV);
+    fclose(OStrVH);
+printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+    if (!noVerilator) {
+    std::string commandLine = "verilator --cc " + OutputDir + ".generated.v";
+    int ret = system(commandLine.c_str());
+printf("[%s:%d] RETURN from '%s' %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), ret);
+    if (ret)
+        return -1; // force error return to be propagated
+    }
     return 0;
 }

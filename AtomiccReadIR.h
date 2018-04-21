@@ -14,7 +14,6 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-#include "AtomiccIR.h"
 
 static char buf[MAX_READ_LINE];
 static char *bufp;
@@ -165,8 +164,12 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 MethodInfo *MIRdy = new MethodInfo{nullptr};
                 MIRdy->rule = MI->rule;
                 MIRdy->type = "INTEGER_1";
-                if (foundIf || (!foundOpenBrace && checkItem("if")))
+                if (foundIf || (!foundOpenBrace && checkItem("if"))) {
                     MIRdy->guard = getExpression();
+                    std::string v = MIRdy->guard->value;
+                    if (v != "1" && v != "==" && v != "!=" && v != "^" && v != "&" && v != "|")
+                        MIRdy->guard = allocExpr("!=", allocExpr("0"), MIRdy->guard);
+                }
                 else
                     MIRdy->guard = allocExpr("1");
                 IR->method[getRdyName(methodName)] = MIRdy;

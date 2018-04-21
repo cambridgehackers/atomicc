@@ -14,8 +14,6 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-#include "AtomiccIR.h"
-
 #define MAX_EXPR_DEPTH 20
 
 static std::string lexString;
@@ -229,6 +227,12 @@ static ACCExpr *invertExpr(ACCExpr *expr)
     return allocExpr("^", expr, allocExpr("1"));
 }
 
+static void updateWidth(ACCExpr *item, int len)
+{
+    if (len > 0 && item->value.find("'") == std::string::npos)
+        item->value = autostr(len) + "'d" + item->value;
+}
+
 static ACCExpr *cleanupExpr(ACCExpr *expr)
 {
     if (!expr)
@@ -280,6 +284,21 @@ static ACCExpr *cleanupExpr(ACCExpr *expr)
     }
     if (ret->operands.size() == 1 && (ret->value == "&" || ret->value == "|"))
         ret = ret->operands.front();
+    if (ret->value == "==") {
+        int leftLen = -1;
+        for (auto item: ret->operands) {
+            if (isIdChar(item->value[0])) {
+                if(!refList[item->value].pin) {
+printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str());
+//exit(-1);
+                }
+                else
+                    leftLen = convertType(refList[item->value].type);
+            }
+            else if (isdigit(item->value[0]))
+                updateWidth(item, leftLen);
+        }
+    }
     return ret;
 }
 
