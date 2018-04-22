@@ -241,7 +241,7 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s\n", __
         refList[fitem.name] = RefItem{0, fitem.type, out != 0, fitem.alias ? PIN_WIRE : pin};
         refList[fnew] = RefItem{0, fitem.type, out != 0, PIN_ALIAS};
         if (!fitem.alias && out)
-            itemList->operands.push_back(allocExpr(fitem.name));
+            itemList->operands.push_front(allocExpr(fitem.name));
         else if (out)
             replaceTarget[fitem.name] = fnew;
         else
