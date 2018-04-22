@@ -186,7 +186,7 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                             ACCExpr *dest = getExpression();
                             ParseCheck(checkItem("="), "store = missing");
                             ACCExpr *expr = str2tree(bufp);
-                            MI->storeList.push_back(StoreListElement{dest, expr, cond});
+                            MI->storeList.push_back(new StoreListElement{dest, expr, cond});
                         }
                         else if (checkItem("LET")) {
                             std::string type = getToken();
@@ -195,7 +195,7 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                             ACCExpr *dest = getExpression();
                             ParseCheck(checkItem("="), "store = missing");
                             ACCExpr *expr = str2tree(bufp);
-                            MI->letList.push_back(LetListElement{dest, expr, cond, type});
+                            MI->letList.push_back(new LetListElement{dest, expr, cond, type});
                         }
                         else if (checkItem("CALL")) {
                             bool isAction = checkItem("/Action");

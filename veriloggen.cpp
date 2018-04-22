@@ -493,16 +493,16 @@ static std::list<ModData> modLine;
             expandStruct(IR, item.first, item.second, 1, true, PIN_WIRE);
         }
         for (auto info: MI->letList) {
-            ACCExpr *cond = cleanupExpr(info.cond);
-            ACCExpr *value = cleanupExpr(info.value);
+            ACCExpr *cond = cleanupExpr(info->cond);
+            ACCExpr *value = cleanupExpr(info->value);
             if (isdigit(value->value[0]))
-                updateWidth(value, convertType(info.type));
+                updateWidth(value, convertType(info->type));
             walkRead(MI, cond, nullptr);
             walkRead(MI, value, cond);
             std::list<FieldItem> fieldList;
-            getFieldList(fieldList, "", "", info.type, false, true);
+            getFieldList(fieldList, "", "", info->type, false, true);
             for (auto fitem : fieldList) {
-                std::string dest = info.dest->value + fitem.name;
+                std::string dest = info->dest->value + fitem.name;
                 std::string src = value->value + fitem.name;
                 muxValueList[dest].push_back(MuxValueEntry{cond, allocExpr(src)});
             }
@@ -675,12 +675,12 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
         bool alwaysSeen = false;
         std::map<std::string, std::list<std::string>> condLines;
         for (auto info: FI.second->storeList) {
-            ACCExpr *cond = cleanupExpr(info.cond);
+            ACCExpr *cond = cleanupExpr(info->cond);
             ACCExpr *value = //cleanupExpr
-(info.value);
+(info->value);
             walkRead(MI, cond, nullptr);
             walkRead(MI, value, cond);
-    ACCExpr *destt = info.dest;
+    ACCExpr *destt = info->dest;
     destt = str2tree(walkTree(destt, nullptr), true);
     walkRef(destt);
     ACCExpr *expr = destt;
@@ -1159,7 +1159,7 @@ static void metaGenerate(ModuleIR *IR, FILE *OStr)
                     for (auto item: bm[MetaRead])
                         // if the current method reads a state element that
                         // is written by another method, add it to the 'before' list
-                        if (item.first == inneritem.dest->value) {
+                        if (item.first == inneritem->dest->value) {
 printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %s\n", __FUNCTION__, __LINE__, innermethodName.c_str(), item.first.c_str(), innerFI.first.c_str(), methodName.c_str());
                             metaBefore[innermethodName] = "; :";
                             break;
@@ -1167,7 +1167,7 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
                     for (auto item: IR->method[methodName]->storeList)
                         // if the current method writes a state element that
                         // is written by another method, add it to the 'conflict' list
-                        if (tree2str(item.dest) == tree2str(inneritem.dest)) {
+                        if (tree2str(item->dest) == tree2str(inneritem->dest)) {
                             metaConflict[innermethodName] = "; ";
                             break;
                         }
@@ -1252,19 +1252,23 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
             MethodInfo *MI = item.second;
             walkSubscript(IR, MI->guard);
             for (auto item: MI->storeList) {
-                walkSubscript(IR, item.cond);
-                walkSubscript(IR, item.dest);
-                walkSubscript(IR, item.value);
+                walkSubscript(IR, item->cond);
+                walkSubscript(IR, item->value);
             }
             for (auto item: MI->letList) {
-                walkSubscript(IR, item.cond);
-                walkSubscript(IR, item.dest);
-                walkSubscript(IR, item.value);
+                walkSubscript(IR, item->cond);
+                walkSubscript(IR, item->value);
             }
             for (auto item: MI->callList)
                 walkSubscript(IR, item->cond);
-            // subscript processing for calls requires that we defactor the entire call,
+            // subscript processing for calls/assigns requires that we defactor the entire statement,
             // not just add a condition expression into the tree
+            for (auto item: MI->storeList) {
+                walkSubscript(IR, item->dest);
+            }
+            for (auto item: MI->letList) {
+                walkSubscript(IR, item->dest);
+            }
             for (auto item: MI->callList) {
                 int size = -1;
                 ACCExpr *cond = item->cond, *subscript = nullptr;
@@ -1299,8 +1303,8 @@ printf("[%s:%d]\n", __FUNCTION__, __LINE__);
     std::string commandLine = "verilator --cc " + OutputDir + ".generated.v";
     int ret = system(commandLine.c_str());
 printf("[%s:%d] RETURN from '%s' %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), ret);
-    //if (ret)
-        //return -1; // force error return to be propagated
+    if (ret)
+        return -1; // force error return to be propagated
     }
     return 0;
 }
