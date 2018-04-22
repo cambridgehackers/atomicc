@@ -22,6 +22,7 @@ static int trace_assign;//= 1;
 static int trace_expand;//= 1;
 
 typedef struct {
+    std::string argName;
     std::string value;
     std::string type;
     bool        moduleStart;
@@ -350,15 +351,15 @@ printf("[%s:%d] reference to '%s', but could not locate RRRRRRRRRRRRRRRRRRRRRRRR
 static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam)
 {
     auto checkWire = [&](std::string name, std::string type, int dir) -> void {
-        refList[name] = RefItem{dir != 0 && instance == "", type, dir != 0, instance == "" ? PIN_MODULE : PIN_OBJECT};
-        modParam.push_back(ModData{name, type, false, dir});
+        refList[instance + name] = RefItem{dir != 0 && instance == "", type, dir != 0, instance == "" ? PIN_MODULE : PIN_OBJECT};
+        modParam.push_back(ModData{name, instance + name, type, false, dir});
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
-    modParam.push_back(ModData{IR->name + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, 0});
+    modParam.push_back(ModData{"", IR->name + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, 0});
     for (auto item : IR->interfaces)
         for (auto FI: lookupIR(item.type)->method) {
             MethodInfo *MI = FI.second;
-            std::string name = instance + item.fldName + MODULE_SEPARATOR + FI.first;
+            std::string name = item.fldName + MODULE_SEPARATOR + FI.first;
             bool out = (instance != "") ^ item.isPtr;
             checkWire(name, MI->type, out ^ (MI->type != ""));
             for (auto pitem: MI->params)
@@ -409,7 +410,7 @@ static std::list<ModData> modLine;
         static const char *dirStr[] = {"input", "output"};
         fprintf(OStr, "%s", sep.c_str());
         if (mitem.moduleStart)
-            fprintf(OStr, "%s (\n    input CLK,\n    input nRST", mitem.value.c_str());
+            fprintf(OStr, "%s (input CLK, input nRST", mitem.value.c_str());
         else {
             fprintf(OStr, "%s %s%s", dirStr[mitem.out], sizeProcess(mitem.type).c_str(), mitem.value.c_str());
             expandStruct(IR, mitem.value, mitem.type, mitem.out, false, PIN_WIRE);
@@ -666,7 +667,7 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
                 val = temp;
             }
         }
-        modNew.push_back(ModData{val, mitem.type, mitem.moduleStart, mitem.out});
+        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.out});
     }
     std::list<std::string> alwaysLines;
     bool hasAlways = false;
@@ -782,11 +783,11 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
     std::string endStr;
     for (auto item: modNew) {
         if (item.moduleStart) {
-            fprintf(OStr, "%s (\n        CLK,\n        nRST,", (endStr + "    " + item.value).c_str());
+            fprintf(OStr, "%s (.CLK(CLK), .nRST(nRST),", (endStr + "    " + item.value).c_str());
             sep = "";
         }
         else {
-            fprintf(OStr, "%s", (sep + "\n        " + item.value).c_str());
+            fprintf(OStr, "%s", (sep + "\n        ." + item.argName + "(" + item.value + ")").c_str());
             sep = ",";
         }
         endStr = ");\n";
