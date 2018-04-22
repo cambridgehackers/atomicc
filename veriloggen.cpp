@@ -1219,7 +1219,7 @@ printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sna
 int main(int argc, char **argv)
 {
     bool noVerilator = false;
-//noVerilator = true;
+noVerilator = true;
 printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     int argIndex = 1;
     if (argc == 3 && !strcmp(argv[argIndex], "-n")) {
@@ -1263,30 +1263,41 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
                 walkSubscript(IR, item->cond);
             // subscript processing for calls/assigns requires that we defactor the entire statement,
             // not just add a condition expression into the tree
-            for (auto item: MI->storeList) {
-                walkSubscript(IR, item->dest);
-            }
-            for (auto item: MI->letList) {
-                walkSubscript(IR, item->dest);
-            }
-            for (auto item: MI->callList) {
+            auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> void {
                 int size = -1;
-                ACCExpr *cond = item->cond, *subscript = nullptr;
+                ACCExpr *cond = *condp, *subscript = nullptr;
                 std::string fieldName, post;
-                if (ACCExpr *expr = findSubscript(IR, item->value, size, fieldName, &subscript, post)) {
+                if (ACCExpr *expr = findSubscript(IR, expandArg, size, fieldName, &subscript, post)) {
                     for (int ind = 0; ind < size; ind++) {
                         ACCExpr *newCond = allocExpr("==", subscript, allocExpr(autostr(ind)));
                         if (cond)
                             newCond = allocExpr("&", cond, newCond);
                         expr->value = fieldName + autostr(ind) + post;
                         if (ind == 0)
-                            item->cond = newCond;
-                        else
-                            MI->callList.push_back(new CallListElement{
-                                cloneReplaceTree(item->value, expr), newCond, item->isAction});
+                            *condp = newCond;
+                        else {
+                            ACCExpr *newExpand = cloneReplaceTree(expandArg, expr);
+                            if (sort == 1)
+                                MI->storeList.push_back(new StoreListElement{newExpand, value, newCond});
+                            else if (sort == 1)
+                                MI->letList.push_back(new LetListElement{newExpand, value, newCond, type});
+                            else if (sort == 3)
+                                MI->callList.push_back(new CallListElement{newExpand, newCond, isAction});
+                        }
                     }
                     expr->value = fieldName + "0" + post;
                 }
+            };
+            for (auto item: MI->storeList) {
+                //walkSubscript(IR, item->dest);
+                expandTree(1, &item->cond, item->dest, false, item->value);
+            }
+            for (auto item: MI->letList) {
+                //walkSubscript(IR, item->dest);
+                expandTree(2, &item->cond, item->dest, false, item->value, item->type);
+            }
+            for (auto item: MI->callList) {
+                expandTree(3, &item->cond, item->value, item->isAction);
             }
         }
         // Generate verilog
