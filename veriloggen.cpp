@@ -992,7 +992,7 @@ static void processM2P(ModuleIR *IR)
         else {
             HIR = lookupIR(inter.type);
             host = inter.fldName;
-            IR->name = "l_module" + inter.type.substr(12) + "Output";
+            IR->name = "l_module" + inter.type.substr(12) + "___M2P";
         }
     }
     int counter = 1;
@@ -1035,7 +1035,7 @@ static void processP2M(ModuleIR *IR)
         if (inter.isPtr) {
             IIR = lookupIR(inter.type);
             target = inter.fldName;
-            IR->name = "l_module" + inter.type.substr(12) + "Input";
+            IR->name = "l_module" + inter.type.substr(12) + "___P2M";
         }
         else {
             HIR = lookupIR(inter.type);
