@@ -43,26 +43,7 @@ convenient sequence in a location where both the concrete instances
 for A and B are visible.
 
 ****************************************************
-Another use pattern of __connect is just a temporary hack:
-Interface ExampleRequest {
-    void say(void);
-};
-
-__module A {
-     ExampleRequest callIn;
-     // processing, etc
-}
-
-__module CWrapper {
-    ExampleRequest request;
-    A consumer;
-    __connect request = consumer.callIn;
-}
-
-This is a short-term hack to export interfaces from contained objects,
-almost identical to the same usage pattern in BSV.   After playing
-around with it, it really is nonsensical and should be replaced
-shortly with:
+To export interfaces from contained objects:
 
 __module CWrapper {
     A consumer;
@@ -73,8 +54,15 @@ CWrapper just forwards the interface 'request' down into the instance 'consumer'
 
 __rule
 
-integer bit width
+integer bit width: __int(A)
 
 ready/valid signalling
 
 scheduling
+   Scheduling is done by building a graph:
+       1) Nodes are rules/guards.
+       2) For all state elements, insert a directed links from each node that writes the state element to every node that reads it.
+       3) "priority" statements in source text can be used to break cycles, if necessary.
+   For SC to hold, this graph must have no cycles, since we would then be unable to guarantee "read before write".
+
+

@@ -923,10 +923,11 @@ static void processSerialize(ModuleIR *IR)
     auto inter = IR->interfaces.front();
     ModuleIR *IIR = lookupIR(inter.type);
     IR->fields.clear();
-    IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_32", 0, false});
+    IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", 0, false});
+    IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_16", 0, false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
     IR->fields.push_back(FieldElement{"data", -1, unionIR->name, 0, false});
-    int counter = 1;
+    int counter = 0;  // start method number at 0
     uint64_t maxDataLength = 0;
     for (auto FI: IIR->method) {
         std::string methodName = FI.first;
@@ -995,7 +996,7 @@ static void processM2P(ModuleIR *IR)
             IR->name = "l_module" + inter.type.substr(12) + "___M2P";
         }
     }
-    int counter = 1;
+    int counter = 0;  // start method number at 0
     for (auto FI: HIR->method) {
         std::string methodName = host + MODULE_SEPARATOR + FI.first;
         MethodInfo *MI = FI.second;
@@ -1021,7 +1022,8 @@ exit(-1);
         if (pipeArgSize > dataLength)
             call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
         MInew->callList.push_back(new CallListElement{
-             allocExpr(target + "$enq__ENA", allocExpr("{", allocExpr("{ " + call + "32'd" + autostr(counter) + "}"))), nullptr, true});
+             allocExpr(target + "$enq__ENA", allocExpr("{", allocExpr("{ " + call
+                 + "16'd" + autostr(counter) + ", 16'd" + autostr(dataLength/32) + "}"))), nullptr, true});
         counter++;
     }
     dumpModule("M2P", IR);
@@ -1054,7 +1056,7 @@ printf("[%s:%d] P2Mhifmethod %s\n", __FUNCTION__, __LINE__, methodName.c_str());
         MInew->guard = MI->guard;
     }
     MethodInfo *MInew = IR->method[host + MODULE_SEPARATOR + "enq__ENA"];
-    int counter = 1;
+    int counter = 0;  // start method number at 0
     for (auto FI: IIR->method) {
         uint64_t offset = 32;
         std::string methodName = FI.first;
@@ -1074,8 +1076,8 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
 exit(-1);
             continue;
         }
-        MInew->callList.push_back(new CallListElement{call, allocExpr("==", allocExpr(host + "$enq$v[31:0]"),
-                 allocExpr("32'd" + autostr(counter))), true});
+        MInew->callList.push_back(new CallListElement{call, allocExpr("==", allocExpr(host + "$enq$v[31:16]"),
+                 allocExpr("16'd" + autostr(counter))), true});
         counter++;
     }
     dumpModule("P2M", IR);
