@@ -1219,6 +1219,99 @@ printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sna
         fprintf(OStr, "%s\n", item.c_str());
 }
 
+static const char *jsonPrefix = 
+    "{\n"
+    "    \"bsvdefines\": [ ],\n"
+    "    \"globaldecls\": [\n"
+    "        { \"dtype\": \"TypeDef\",\n"
+    "            \"tdtype\": { \"name\": \"Bit\", \"params\": [ { \"name\": \"32\" } ] },\n"
+    "            \"tname\": \"SpecialTypeForSendingFd\"\n"
+    "        },\n"
+    "        { \"dtype\": \"TypeDef\",\n"
+    "            \"tdtype\": {\n"
+    "                \"elements\": [ %s ],\n"
+    "                \"name\": \"IfcNames\",\n"
+    "                \"type\": \"Enum\"\n"
+    "            },\n"
+    "            \"tname\": \"IfcNames\"\n"
+    "        }\n"
+    "    ],\n"
+    "    \"interfaces\": [";
+static ModuleIR *extractInterface(ModuleIR *IR, std::string interfaceName, bool &outbound)
+{
+    std::string type;
+    for (auto iitem: IR->interfaces) {
+        if (iitem.fldName == interfaceName) {
+            type = iitem.type;
+            outbound = iitem.isPtr;
+            break;
+        }
+    }
+    if (ModuleIR *exportedInterface = lookupIR(type))
+    if (MethodInfo *PMI = exportedInterface->method["enq__ENA"]) // must be a pipein
+    if (ModuleIR *data = lookupIR(PMI->params.front().type))
+        return lookupIR(data->interfaces.front().type);
+    return nullptr;
+}
+static void jsonPrepare(std::list<ModuleIR *> &irSeq, FILE *OStrJ)
+{
+    std::map<std::string, int> enumNames;
+    
+    for (auto IR: irSeq) {
+        for (auto interfaceName: IR->softwareName) {
+            bool outbound = false;
+            if (ModuleIR *inter = extractInterface(IR, interfaceName, outbound))
+                enumNames[inter->name + (outbound ? "H2S" : "S2H")] = 1;
+        }
+    }
+    int counter = 5;
+    std::string enumList, sep;
+    for (auto item: enumNames) {
+        enumList += sep + "[ \"" + item.first + "\", \"" + autostr(counter++) + "\" ]";
+        sep = ",";
+    }
+    fprintf(OStrJ, jsonPrefix, enumList.c_str());
+//"[ \"IfcNames_EchoIndicationH2S\", \"5\" ], [ \"IfcNames_EchoRequestS2H\", \"6\" ]");
+}
+static std::string jsonSep;
+static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
+{
+    for (auto interfaceName: IR->softwareName) {
+        fprintf(OStrJ, "%s\n        { \"cdecls\": [", jsonSep.c_str());
+        bool outbound = false;
+        if (ModuleIR *inter = extractInterface(IR, interfaceName, outbound)) {
+            std::map<std::string, MethodInfo *> reorderList;
+            for (auto FI : inter->method) {
+                std::string methodName = FI.first;
+                MethodInfo *MI = FI.second;
+                if (!endswith(methodName, "__ENA"))
+                    continue;
+                reorderList[methodName.substr(0, methodName.length()-5)] = MI;
+            }
+            std::string msep;
+            for (auto item: reorderList) {
+                std::string methodName = item.first;
+                MethodInfo *MI = item.second;
+                std::string psep;
+                fprintf(OStrJ, "%s\n                { \"dname\": \"%s\", \"dparams\": [",
+                     msep.c_str(), methodName.c_str());
+                for (auto pitem: MI->params) {
+                     fprintf(OStrJ, "%s\n                        { \"pname\": \"%s\", "
+                         "\"ptype\": { \"name\": \"Bit\", \"params\": [ { "
+                         "\"name\": \"%d\" } ] } }",
+                         psep.c_str(), pitem.name.c_str(), (int)convertType(pitem.type));
+                     psep = ",";
+                }
+                fprintf(OStrJ, "\n                    ] }");
+                msep = ",";
+            }
+            fprintf(OStrJ, "\n            ], \"direction\": \"%d\", \"cname\": \"%s\" }",
+                outbound, inter->name.c_str());
+            jsonSep = ",";
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     bool noVerilator = false;
@@ -1238,6 +1331,7 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
     FILE *OStrIRread = fopen((OutputDir + ".generated.IR").c_str(), "r");
     FILE *OStrV = fopen((OutputDir + ".generated.v").c_str(), "w");
     FILE *OStrVH = fopen((OutputDir + ".generated.vh").c_str(), "w");
+    FILE *OStrJ = fopen((OutputDir + ".generated.json").c_str(), "w");
     fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", OutputDir.c_str());
     std::string myName = OutputDir;
     int ind = myName.rfind('/');
@@ -1248,6 +1342,7 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
     std::list<ModuleIR *> irSeq;
     readModuleIR(irSeq, OStrIRread);
     processInterfaces(irSeq);
+    jsonPrepare(irSeq, OStrJ);
     for (auto IR : irSeq) {
         // expand all subscript calculations before processing the module
         for (auto item: IR->method) {
@@ -1307,11 +1402,14 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
         generateModuleDef(IR, OStrV);
         // now generate the verilog header file '.vh'
         metaGenerate(IR, OStrVH);
+        jsonGenerate(IR, OStrJ);
     }
     fprintf(OStrVH, "`endif\n");
     fclose(OStrIRread);
     fclose(OStrV);
     fclose(OStrVH);
+    fprintf(OStrJ, "\n    ]\n}\n");
+    fclose(OStrJ);
 printf("[%s:%d]\n", __FUNCTION__, __LINE__);
     if (!noVerilator) {
     std::string commandLine = "verilator --cc " + OutputDir + ".generated.v";
