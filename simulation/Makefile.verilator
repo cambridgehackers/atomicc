@@ -45,7 +45,7 @@ CXX=$(TOOLCHAIN)g++
 CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR)/cpp
 CFLAGS = $(CFLAGS_COMMON)
 
-include $(DTOP)/rulec.generated.filelist
+-include $(DTOP)/rulec.generated.filelist
 PORTAL_INFRA := portal.c transportHardware.c transportSocket.c portalPrintf.c poller.cpp sock_utils.c timer.c
 SOURCES := $(addprefix $(CONNECTALDIR)/cpp/, $(PORTAL_INFRA)) \
       $(addprefix $(DTOP)/, $(GENERATED_CPP) $(PROJECT_CPP))
