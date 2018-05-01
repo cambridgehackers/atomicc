@@ -14,8 +14,8 @@ To build
     git clone git://github.com/cambridgehackers/atomicc-examples
     git clone git://github.com/cambridgehackers/llvm
     git clone git://github.com/cambridgehackers/clang
-    cd clang; git checkout remotes/origin/release_37atomicc1 -b release_37atomicc1
-    cd ../llvm; git checkout remotes/origin/release_37atomicc1 -b release_37atomicc1
+    cd clang; git checkout remotes/origin/release_50atomicc1 -b release_50atomicc1
+    cd ../llvm; git checkout remotes/origin/release_50atomicc1 -b release_50atomicc1
 
 1) build source
     cd llvm 
