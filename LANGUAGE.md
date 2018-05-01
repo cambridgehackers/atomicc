@@ -2,11 +2,10 @@
 #AtomicC Language Reference
 
 ## Introduction
-
 The design is separated into modules that can export and import interfaces to other modules.
 Each source language module compiles into a single verilog module.  Modules are independantly
 compiled, depending only on the interface definitions for referenced modules.
-Rreferencing modules do not depend on the internal implementation of referenced modules,
+Referencing modules do not depend on the internal implementation of referenced modules,
 even if they textually exist in the same compilation unit.
 
 To permit reasonable analysis of the program behavior, rules (transctions) can only be
@@ -15,13 +14,14 @@ single clock cycle, in practice this means that we have to prove at compilation 
 all possible executions can always be considered as some linear sequentially ordered instantiation
 within a cycle.
 
-## Additions to C++ syntax :
+## Additions to C++ syntax
 
 ### __module, __emodule
-   A module is defined using the keyword "__module", resulting in generation of verilog.
-   It includes local state elements, interfaces exported, interfaces imported
-   and rules for clustering operations into atomic units.
-   Example:
+A module is defined using the keyword "__module", resulting in generation of verilog.
+It includes local state elements, interfaces exported, interfaces imported
+and rules for clustering operations into atomic units.
+
+Example:
 >        __module Echo {
 >            EchoRequest      request;               // exported interface
 >            EchoIndication   *indication;           // imported interface
@@ -37,18 +37,20 @@ within a cycle.
 >            }
 >        };
 
-   To reference a separately compiled module, use "__emodule".  These external
-   module definitions only need to include the exported/imported interfaces.
-   Example:
+To reference a separately compiled module, use "__emodule".  These external
+module definitions only need to include the exported/imported interfaces.
+
+Example:
 >        __module EchoResponder {
 >            EchoIndication   indication;           // exported interface
 >        };
 
 ### __interface
-    This defines a list of methods that are exposed from an object.  Instead of using object
-    inheritance to define reusable interfaces, they are defined/exported explicitly by
-    objects, allowing fine-grained specification of interface method visibility.
-    Example:
+This defines a list of methods that are exposed from an object.  Instead of using object
+inheritance to define reusable interfaces, they are defined/exported explicitly by
+objects, allowing fine-grained specification of interface method visibility.
+
+Example:
 >        __interface EchoRequest {
 >            void say(__int(32) v);
 >            void say2(__int(16) a, __int(16) b);
@@ -57,9 +59,10 @@ within a cycle.
 ### guard clauses on methods
 
 ### __connect
+The __connect statement should be used to connect exported interface declarations
+with imported interface references between objects within a module declaration.
 
-the __connect statement should be between declarations like:
-
+Example:
 >        __interface ExampleRequest {
 >            void say(__int(32) v);
 >        };
@@ -86,9 +89,9 @@ In AtomicC, the interfaces are stitched together outside in any
 convenient sequence in a location where both the concrete instances
 for A and B are visible.
 
-****************************************************
-To export interfaces from contained objects:
+### To export interfaces from contained objects:
 
+Example:
 >        __module CWrapper {
 >            A consumer;
 >            ExampleRequest request = A.callIn;
@@ -113,7 +116,6 @@ CWrapper just forwards the interface 'request' down into the instance 'consumer'
     are asserted.
 
 ### Scheduling
-
 Each rule has a set of state elements that it reads and another set of element that it writes.
 Valid sequential orderings require that every state element must be logically read before it is logically
 written ("read before write").
