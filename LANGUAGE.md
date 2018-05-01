@@ -50,6 +50,9 @@ This defines a list of methods that are exposed from an object.  Instead of usin
 inheritance to define reusable interfaces, they are defined/exported explicitly by
 objects, allowing fine-grained specification of interface method visibility.
 
+References to an object can only be done through interface methods.  State element
+declarations inside an object (member variables) are private.
+
 Example:
 >        __interface EchoRequest {
 >            void say(__int(32) v);
@@ -59,7 +62,7 @@ Example:
 ### guard clauses on methods
 
 ### __connect
-The __connect statement should be used to connect exported interface declarations
+The __connect statement allows exported interface declarations to be connected
 with imported interface references between objects within a module declaration.
 
 Example:
@@ -86,7 +89,7 @@ Example:
     In BSV, the declaration for B requires the interface be passed in as
     an interface parameter (forcing a textual ordering to the source code
     declaration sequence).
-    <b>
+    <br>
     In AtomicC, the interfaces are stitched together outside in any
     convenient sequence in a location where both the concrete instances
     for A and B are visible.
