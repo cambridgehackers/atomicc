@@ -1,5 +1,5 @@
 
-VERILOG_PATH = ../verilog $(SIMDIR)/verilog ../
+VERILOG_PATH = $(DTOP)/verilog $(SIMDIR)/verilog $(DTOP)/
 VERILATOR_ARGS= -O3 -CFLAGS "-I$(CONNECTALDIR)/cpp -I$(DTOP)/jni -O " -LDFLAGS "-O " \
     -Wno-fatal -exe --profile-cfuncs --output-split 20000 $(VERILOG_PATH:%=-y %) \
     -DDerivedClockPeriod=4 -DMainClockPeriod=4
@@ -7,7 +7,7 @@ VERILATOR_ARGS= -O3 -CFLAGS "-I$(CONNECTALDIR)/cpp -I$(DTOP)/jni -O " -LDFLAGS "
 SIM_CXX_COMMON = $(addprefix $(CONNECTALDIR)/cpp/, sock_utils.c portalPrintf.c)
 SIM_OBJECTS = $(addprefix lib/, $(addsuffix .o, $(basename $(notdir $(SIM_CXX_COMMON)))))
 
-all: prepare_dir bin/ubuntu.exe bin/libconnectal-sim.so vlsim
+build: prepare_dir bin/ubuntu.exe bin/libconnectal-sim.so vlsim
 
 define SIM_CXX_RULE
 $1/$(notdir $(basename $3)).o: $3
@@ -20,7 +20,7 @@ run:
 	./bin/ubuntu.exe
 
 prepare_dir:
-	@mkdir -p bin lib obj jni
+	@mkdir -p bin lib
 
 bin/libconnectal-sim.so: $(SIM_OBJECTS)
 	$(CXX) -O -g -shared -fpic $(SIM_CXXFLAGS) -g -o bin/libconnectal-sim.so $(SIM_OBJECTS)
@@ -28,7 +28,7 @@ bin/libconnectal-sim.so: $(SIM_OBJECTS)
 obj_dir/vlsim.mk: bin/libconnectal-sim.so
 	rm -fr obj_dir
 	verilator -o vlsim --prefix vlsim $(VERILATOR_ARGS) -cc \
-	    --top-module mkVsimTop ../verilog/mkVsimTop.v \
+	    --top-module mkVsimTop $(DTOP)/verilog/mkVsimTop.v \
 	    $(SIMDIR)/cpp/verilatortop.cpp -LDFLAGS -L$(PWD)/bin
 
 obj_dir/vlsim: obj_dir/vlsim.mk
@@ -38,11 +38,11 @@ obj_dir/vlsim: obj_dir/vlsim.mk
 vlsim: obj_dir/vlsim
 
 clean:
-	rm -rf obj_dir/ bin/ lib/ obj/ SWSOCK[0-9] jni
+	rm -rf obj_dir/ bin/ lib/ SWSOCK[0-9]
 
 CC=$(TOOLCHAIN)gcc
 CXX=$(TOOLCHAIN)g++
-CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR) -I$(CONNECTALDIR)/cpp
+CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR)/cpp
 CFLAGS = $(CFLAGS_COMMON)
 
 include $(DTOP)/rulec.generated.filelist
