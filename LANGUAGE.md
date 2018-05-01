@@ -81,13 +81,15 @@ Example:
 >            __connect producer.callOut = consumer.callIn;
 >        };
 
-The declaration for 'A' is just like BSV.
-In BSV, the declaration for B requires the interface be passed in as
-an interface parameter (forcing a textual ordering to the source code
-declaration sequence).
-In AtomicC, the interfaces are stitched together outside in any
-convenient sequence in a location where both the concrete instances
-for A and B are visible.
+* Comparision with BSV
+    The declaration for 'A' is just like BSV.
+    In BSV, the declaration for B requires the interface be passed in as
+    an interface parameter (forcing a textual ordering to the source code
+    declaration sequence).
+    <b>
+    In AtomicC, the interfaces are stitched together outside in any
+    convenient sequence in a location where both the concrete instances
+    for A and B are visible.
 
 ### To export interfaces from contained objects:
 
@@ -107,13 +109,14 @@ CWrapper just forwards the interface 'request' down into the instance 'consumer'
 
 ### Execution control
 #### Asymmetric (ready/enable signalling)
-    A method/rule is invoked by asserting the "enable" signal.  This signal can only be
-    asserted if the "ready" signal was valid, allowing the called module to restrict
-    permissible execution sequences.
+A method/rule is invoked by asserting the "enable" signal.  This signal can only be
+asserted if the "ready" signal was valid, allowing the called module to restrict
+permissible execution sequences.
+
 #### Symmetric (ready/valid signalling)
-    Both caller/callee have "able to be executed" signals.  Execution is deemed to take
-    place in each cycle where both "ready" (from the callee) and "valid" (from the caller)
-    are asserted.
+Both caller/callee have "able to be executed" signals.  Execution is deemed to take
+place in each cycle where both "ready" (from the callee) and "valid" (from the caller)
+are asserted.
 
 ### Scheduling
 Each rule has a set of state elements that it reads and another set of element that it writes.
