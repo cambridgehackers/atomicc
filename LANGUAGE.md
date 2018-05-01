@@ -8,7 +8,7 @@ compiled, depending only on the interface definitions for referenced modules.
 Referencing modules do not depend on the internal implementation of referenced modules,
 even if they textually exist in the same compilation unit.
 
-To permit reasonable analysis of the program behavior, rules (transctions) can only be
+To permit reasonable analysis of the program behavior, rules (transactions) can only be
 executed in a "sequentially consistent" manner.  Since concurrent rules are all executed in a
 single clock cycle, in practice this means that we have to prove at compilation time that
 all possible executions can always be considered as some linear sequentially ordered instantiation
