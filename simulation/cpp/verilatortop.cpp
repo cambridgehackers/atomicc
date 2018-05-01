@@ -39,7 +39,23 @@
 #endif
 
 #define MAX_REQUEST_LENGTH 1000
-void memdump(unsigned char *p, int len, const char *title);
+static void memdump(unsigned char *p, int len, const char *title)
+{
+int i;
+
+    i = 0;
+    while (len > 0) {
+        if (!(i & 0xf)) {
+            if (i > 0)
+                fprintf(stderr, "\n");
+            fprintf(stderr, "%s: ",title);
+        }
+        fprintf(stderr, "%02x ", *p++);
+        i++;
+        len--;
+    }
+    fprintf(stderr, "\n");
+}
 
 bool dump_vcd = false;
 const char *vcd_file_name = "dump.vcd";
