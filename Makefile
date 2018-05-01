@@ -19,6 +19,7 @@
 all:
 	@clang++  \
     -g \
+    -fblocks \
     -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
     -fPIC \
     -fvisibility-inlines-hidden \
@@ -39,4 +40,5 @@ all:
     -fno-exceptions \
     -fno-rtti \
     -I. -I../llvm/lib/Target/Atomicc \
+    -lBlocksRuntime \
     -o veriloggen veriloggen.cpp

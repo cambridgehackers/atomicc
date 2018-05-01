@@ -16,6 +16,8 @@
 */
 #include <stdio.h>
 #include <stdlib.h> // atol
+#include <string.h>
+#include <assert.h>
 #include "AtomiccIR.h"
 
 static int trace_assign;//= 1;
