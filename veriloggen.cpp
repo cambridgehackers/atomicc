@@ -1248,30 +1248,21 @@ static ModuleIR *extractInterface(ModuleIR *IR, std::string interfaceName, bool 
         }
     }
     if (ModuleIR *exportedInterface = lookupIR(type))
+    if (exportedInterface->method.find("enq__ENA") != exportedInterface->method.end())
     if (MethodInfo *PMI = exportedInterface->method["enq__ENA"]) // must be a pipein
     if (ModuleIR *data = lookupIR(PMI->params.front().type))
         return lookupIR(data->interfaces.front().type);
     return nullptr;
 }
-static void jsonPrepare(std::list<ModuleIR *> &irSeq, FILE *OStrJ)
+static void jsonPrepare(std::list<ModuleIR *> &irSeq, std::map<std::string, bool> &softwareNameList, FILE *OStrJ)
 {
-    std::map<std::string, int> enumNames;
-    
     for (auto IR: irSeq) {
         for (auto interfaceName: IR->softwareName) {
             bool outbound = false;
             if (ModuleIR *inter = extractInterface(IR, interfaceName, outbound))
-                enumNames[inter->name + (outbound ? "H2S" : "S2H")] = 1;
+                softwareNameList[inter->name.substr(strlen("l_ainterface_OC_"))] = outbound;
         }
     }
-    int counter = 5;
-    std::string enumList, sep;
-    for (auto item: enumNames) {
-        enumList += sep + "[ \"" + item.first + "\", \"" + autostr(counter++) + "\" ]";
-        sep = ",";
-    }
-    fprintf(OStrJ, jsonPrefix, enumList.c_str());
-//"[ \"IfcNames_EchoIndicationH2S\", \"5\" ], [ \"IfcNames_EchoRequestS2H\", \"6\" ]");
 }
 static std::string jsonSep;
 static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
@@ -1306,7 +1297,7 @@ static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
                 msep = ",";
             }
             fprintf(OStrJ, "\n            ], \"direction\": \"%d\", \"cname\": \"%s\" }",
-                outbound, inter->name.c_str());
+                outbound, inter->name.substr(strlen("l_ainterface_OC_")).c_str());
             jsonSep = ",";
         }
     }
@@ -1331,7 +1322,7 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
     FILE *OStrIRread = fopen((OutputDir + ".generated.IR").c_str(), "r");
     FILE *OStrV = fopen((OutputDir + ".generated.v").c_str(), "w");
     FILE *OStrVH = fopen((OutputDir + ".generated.vh").c_str(), "w");
-    FILE *OStrJ = fopen((OutputDir + ".generated.json").c_str(), "w");
+    FILE *OStrJ = nullptr;
     fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", OutputDir.c_str());
     std::string myName = OutputDir;
     int ind = myName.rfind('/');
@@ -1342,7 +1333,19 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
     std::list<ModuleIR *> irSeq;
     readModuleIR(irSeq, OStrIRread);
     processInterfaces(irSeq);
-    jsonPrepare(irSeq, OStrJ);
+    std::map<std::string, bool> softwareNameList;
+    jsonPrepare(irSeq, softwareNameList, OStrJ);
+    if (softwareNameList.size() > 0) {
+        int counter = 5;
+        std::string enumList, sep;
+        for (auto item: softwareNameList) {
+            std::string name = "IfcNames_" + item.first + (item.second ? "H2S" : "S2H");
+            enumList += sep + "[ \"" + name + "\", \"" + autostr(counter++) + "\" ]";
+            sep = ", ";
+        }
+        OStrJ = fopen((OutputDir + ".generated.json").c_str(), "w");
+        fprintf(OStrJ, jsonPrefix, enumList.c_str());
+    }
     for (auto IR : irSeq) {
         // expand all subscript calculations before processing the module
         for (auto item: IR->method) {
@@ -1402,21 +1405,41 @@ printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
         generateModuleDef(IR, OStrV);
         // now generate the verilog header file '.vh'
         metaGenerate(IR, OStrVH);
-        jsonGenerate(IR, OStrJ);
+        if (OStrJ)
+            jsonGenerate(IR, OStrJ);
     }
     fprintf(OStrVH, "`endif\n");
     fclose(OStrIRread);
     fclose(OStrV);
     fclose(OStrVH);
-    fprintf(OStrJ, "\n    ]\n}\n");
-    fclose(OStrJ);
+    if (OStrJ) {
+        fprintf(OStrJ, "\n    ]\n}\n");
+        fclose(OStrJ);
+        std::string commandLine(argv[0]);
+        int ind = commandLine.rfind("/");
+        if (ind == -1)
+            commandLine = "";
+        else
+            commandLine = commandLine.substr(0,ind+1);
+        commandLine += "scripts/atomiccCppgen.py " + OutputDir + ".generated.json";
+        int ret = system(commandLine.c_str());
+        printf("[%s:%d] RETURN from '%s' %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), ret);
+        if (ret)
+            return -1; // force error return to be propagated
+        FILE *OStrFL = fopen((OutputDir + ".generated.filelist").c_str(), "w");
+        std::string flist = "GENERATED_CPP = jni/GeneratedCppCallbacks.cpp \\\n   ";
+        for (auto item: softwareNameList)
+             flist += " jni/" + item.first + ".c";
+        fprintf(OStrFL, "%s\n", flist.c_str());
+        fclose(OStrFL);
+    }
 printf("[%s:%d]\n", __FUNCTION__, __LINE__);
     if (!noVerilator) {
-    std::string commandLine = "verilator --cc " + OutputDir + ".generated.v";
-    int ret = system(commandLine.c_str());
-printf("[%s:%d] RETURN from '%s' %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), ret);
-    if (ret)
-        return -1; // force error return to be propagated
+        std::string commandLine = "verilator --cc " + OutputDir + ".generated.v";
+        int ret = system(commandLine.c_str());
+        printf("[%s:%d] RETURN from '%s' %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), ret);
+        if (ret)
+            return -1; // force error return to be propagated
     }
     return 0;
 }
