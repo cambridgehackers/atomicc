@@ -8,22 +8,25 @@ during build.
 
 To build
 
-0)
-
+0) get sources
     sudo apt-get install libffi-dev libblocksruntime-dev clang
+    git clone git://github.com/cambridgehackers/atomicc
+    git clone git://github.com/cambridgehackers/atomicc-examples
     git clone git://github.com/cambridgehackers/llvm
     git clone git://github.com/cambridgehackers/clang
     cd clang; git checkout remotes/origin/release_37atomicc1 -b release_37atomicc1
     cd ../llvm; git checkout remotes/origin/release_37atomicc1 -b release_37atomicc1
 
-1) cd llvm 
-
+1) build source
+    cd llvm 
     mkdir build
     cd build
-    source ../configure_atomicc
+    bash ../configure_atomicc
     make -j10
+    cd ../atomicc
+    make
 
-2) cd atomicc/examples/rulec
+2) cd atomicc-examples/examples/rulec
 
     make 
     make build
@@ -33,6 +36,8 @@ To build
 
     ls *.generated.*
 
+###############################################################
+############ Other maintenence information ###########
 To update to newer llvm releases:
 
     git clone git@github.com:cambridgehackers/llvm
