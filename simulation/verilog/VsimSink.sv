@@ -20,13 +20,8 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-module VsimSink(CLK, RST_N, RDY_data, EN_data, data);
-   parameter width = 64;
-   input CLK;
-   input RST_N;
-   output RDY_data;
-   input EN_data;
-   output [width-1:0] data;
+module VsimSink #(parameter width = 64) (input CLK, input RST_N,
+   output RDY_data, input EN_data, output [width-1:0] data);
 
    wire    last, valid;
    wire    [31:0] beat;

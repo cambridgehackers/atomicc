@@ -20,14 +20,9 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-module VsimSource(CLK, RST_N, EN_data, data_v, data_length, RDY_data);
-   parameter width = 64;
-   input CLK;
-   input RST_N;
-   input EN_data;
-   input [width-1:0] data_v;
-   input [15:0] data_length;
-   output RDY_data;
+module VsimSource #(parameter width = 64) (input CLK, input RST_N,
+   input EN_data, input [width-1:0] data_v, input [15:0] data_length, output RDY_data);
+
    wire sourceLast;
    reg [width-1 : 0] outgoingData;
    reg indicationState;
