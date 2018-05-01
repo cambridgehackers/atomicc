@@ -23,7 +23,7 @@ To build
     cd build
     bash ../configure_atomicc
     make -j10
-    cd ../atomicc
+    cd ../../atomicc
     make
 
 2) cd atomicc-examples/examples/rulec
