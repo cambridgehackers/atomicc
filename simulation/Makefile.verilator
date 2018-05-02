@@ -42,7 +42,7 @@ clean:
 
 CC=$(TOOLCHAIN)gcc
 CXX=$(TOOLCHAIN)g++
-CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR)/cpp
+CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR) -I$(CONNECTALDIR)/cpp -D__ATOMICC__
 CFLAGS = $(CFLAGS_COMMON)
 
 -include $(DTOP)/rulec.generated.filelist

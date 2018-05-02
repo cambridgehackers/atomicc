@@ -10,6 +10,7 @@ To build
 
 0) get sources
     sudo apt-get install libffi-dev libblocksruntime-dev clang
+    sudo apt-get install gcc-multilib g++-multilib
     git clone git://github.com/cambridgehackers/atomicc
     git clone git://github.com/cambridgehackers/atomicc-examples
     git clone git://github.com/cambridgehackers/llvm
