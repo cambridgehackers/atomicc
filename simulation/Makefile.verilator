@@ -1,5 +1,5 @@
 
-VERILOG_PATH = $(DTOP)/verilog $(SIMDIR)/verilog $(DTOP)/
+VERILOG_PATH = $(DTOP)/verilog $(SIMDIR)/verilog $(DTOP)/generated
 VERILATOR_ARGS= -O3 -CFLAGS "-I$(CONNECTALDIR)/cpp -I$(DTOP)/jni -O " -LDFLAGS "-O " \
     -Wno-fatal -exe --profile-cfuncs --output-split 20000 $(VERILOG_PATH:%=-y %) \
     -DDerivedClockPeriod=4 -DMainClockPeriod=4
@@ -45,7 +45,6 @@ CXX=$(TOOLCHAIN)g++
 CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR) -I$(CONNECTALDIR)/cpp -D__ATOMICC__
 CFLAGS = $(CFLAGS_COMMON)
 
--include $(DTOP)/rulec.generated.filelist
 PORTAL_INFRA := portal.c transportHardware.c transportSocket.c portalPrintf.c poller.cpp sock_utils.c timer.c
 SOURCES := $(addprefix $(CONNECTALDIR)/cpp/, $(PORTAL_INFRA)) \
       $(addprefix $(DTOP)/, $(GENERATED_CPP) $(PROJECT_CPP))
