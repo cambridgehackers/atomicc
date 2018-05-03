@@ -22,6 +22,7 @@
 
 static int trace_assign;//= 1;
 static int trace_expand;//= 1;
+std::string generatedDirectory = "generated/";
 
 typedef struct {
     std::string argName;
@@ -1319,14 +1320,15 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
         printf("[%s:%d] veriloggen <outputFileStem>\n", __FUNCTION__, __LINE__);
         exit(-1);
     }
-    std::string OutputDir = argv[argIndex];
-printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, OutputDir.c_str());
+    std::string stemName = argv[argIndex];
+    std::string OutputDir = generatedDirectory + stemName;
+printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, stemName.c_str());
     FILE *OStrIRread = fopen((OutputDir + ".generated.IR").c_str(), "r");
     FILE *OStrV = fopen((OutputDir + ".generated.v").c_str(), "w");
     FILE *OStrVH = fopen((OutputDir + ".generated.vh").c_str(), "w");
     FILE *OStrJ = nullptr;
-    fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", OutputDir.c_str());
-    std::string myName = OutputDir;
+    fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", stemName.c_str());
+    std::string myName = stemName;
     int ind = myName.rfind('/');
     if (ind > 0)
         myName = myName.substr(0, ind);
