@@ -22,7 +22,6 @@
 
 static int trace_assign;//= 1;
 static int trace_expand;//= 1;
-std::string generatedDirectory = "generated/";
 
 typedef struct {
     std::string argName;
@@ -1320,18 +1319,16 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
         printf("[%s:%d] veriloggen <outputFileStem>\n", __FUNCTION__, __LINE__);
         exit(-1);
     }
-    std::string stemName = argv[argIndex];
-    std::string OutputDir = generatedDirectory + stemName;
-printf("[%s:%d] stem %s\n", __FUNCTION__, __LINE__, stemName.c_str());
+    std::string OutputDir = argv[argIndex];
+    std::string myName = OutputDir;
+    int ind = myName.rfind('/');
+    if (ind > 0)
+        myName = myName.substr(ind+1);
     FILE *OStrIRread = fopen((OutputDir + ".generated.IR").c_str(), "r");
     FILE *OStrV = fopen((OutputDir + ".generated.v").c_str(), "w");
     FILE *OStrVH = fopen((OutputDir + ".generated.vh").c_str(), "w");
     FILE *OStrJ = nullptr;
-    fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", stemName.c_str());
-    std::string myName = stemName;
-    int ind = myName.rfind('/');
-    if (ind > 0)
-        myName = myName.substr(0, ind);
+    fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
     myName += "_GENERATED_";
     fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n\n", myName.c_str(), myName.c_str());
     std::list<ModuleIR *> irSeq;
