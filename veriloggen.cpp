@@ -571,12 +571,6 @@ dumpExpr("READCALL", value);
                     setParam(param);
             }
         }
-        for (auto info: MI->printfList) {
-            ACCExpr *cond = cleanupExpr(info->cond);
-            ACCExpr *value = cleanupExpr(info->value);
-printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
-dumpExpr("PRINTF", value);
-        }
     }
     for (auto item: enableList)
         setAssign(item.first, item.second, "INTEGER_1");
@@ -716,6 +710,23 @@ exit(-1);
             if (cond)
                 condStr = "    if (" + walkTree(cond, nullptr) + ")";
             condLines[condStr].push_back("    " + tree2str(destt) + " <= " + walkTree(value, nullptr) + ";");
+        }
+        for (auto info: MI->printfList) {
+            ACCExpr *cond = cleanupExpr(info->cond);
+            ACCExpr *value = cleanupExpr(info->value);
+printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
+dumpExpr("PRINTF", value);
+            value = value->operands.front();
+            value->value = "(";
+            ACCExpr *format = value->operands.front();
+            if (format->value == ",")
+                format = format->operands.front();
+            if (endswith(format->value, "\\n\""))
+                format->value = format->value.substr(0, format->value.length()-3) + "\"";
+            std::string condStr;
+            if (cond)
+                condStr = "    if (" + walkTree(cond, nullptr) + ")";
+            condLines[condStr].push_back("    $display" + walkTree(value, nullptr) + ";");
         }
         for (auto item: condLines) {
             std::string endStr;
