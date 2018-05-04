@@ -25,13 +25,24 @@ static ACCExpr *getExpression(void)
 {
     const char *startp = bufp;
     int level = 0;
+    bool inQuote = false;
     while (*bufp == ' ')
         bufp++;
     while (*bufp && ((*bufp != ' ' && *bufp != ':' && *bufp != ',') || level != 0)) {
-        if (*bufp == '(')
+        if (inQuote) {
+            if (*bufp == '"')
+                inQuote = false;
+            if (*bufp == '\\')
+                bufp++;
+        }
+        else {
+        if (*bufp == '"')
+            inQuote = true;
+        else if (*bufp == '(')
             level++;
         else if (*bufp == ')')
             level--;
+        }
         bufp++;
     }
     while (*bufp == ' ')
@@ -203,6 +214,12 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                             ParseCheck(checkItem(":"), "':' missing");
                             ACCExpr *expr = str2tree(bufp);
                             MI->callList.push_back(new CallListElement{expr, cond, isAction});
+                        }
+                        else if (checkItem("PRINTF")) {
+                            ACCExpr *cond = getExpression();
+                            ParseCheck(checkItem(":"), "':' missing");
+                            ACCExpr *expr = str2tree(bufp);
+                            MI->printfList.push_back(new CallListElement{expr, cond, false});
                         }
                         else
                             ParseCheck(false, "unknown method item");

@@ -571,6 +571,12 @@ dumpExpr("READCALL", value);
                     setParam(param);
             }
         }
+        for (auto info: MI->printfList) {
+            ACCExpr *cond = cleanupExpr(info->cond);
+            ACCExpr *value = cleanupExpr(info->value);
+printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
+dumpExpr("PRINTF", value);
+        }
     }
     for (auto item: enableList)
         setAssign(item.first, item.second, "INTEGER_1");
@@ -1363,6 +1369,8 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
             }
             for (auto item: MI->callList)
                 walkSubscript(IR, item->cond);
+            for (auto item: MI->printfList)
+                walkSubscript(IR, item->cond);
             // subscript processing for calls/assigns requires that we defactor the entire statement,
             // not just add a condition expression into the tree
             auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> void {
@@ -1385,22 +1393,21 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
                                 MI->letList.push_back(new LetListElement{newExpand, value, newCond, type});
                             else if (sort == 3)
                                 MI->callList.push_back(new CallListElement{newExpand, newCond, isAction});
+                            else if (sort == 4)
+                                MI->printfList.push_back(new CallListElement{newExpand, newCond, isAction});
                         }
                     }
                     expr->value = fieldName + "0" + post;
                 }
             };
-            for (auto item: MI->storeList) {
-                //walkSubscript(IR, item->dest);
+            for (auto item: MI->storeList)
                 expandTree(1, &item->cond, item->dest, false, item->value);
-            }
-            for (auto item: MI->letList) {
-                //walkSubscript(IR, item->dest);
+            for (auto item: MI->letList)
                 expandTree(2, &item->cond, item->dest, false, item->value, item->type);
-            }
-            for (auto item: MI->callList) {
+            for (auto item: MI->callList)
                 expandTree(3, &item->cond, item->value, item->isAction);
-            }
+            for (auto item: MI->printfList)
+                expandTree(4, &item->cond, item->value, item->isAction);
         }
         // Generate verilog
         generateModuleDef(IR, OStrV);

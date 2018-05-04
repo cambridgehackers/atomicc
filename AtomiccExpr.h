@@ -45,7 +45,7 @@ static std::string treePost(const ACCExpr *arg)
 
 static bool checkOperand(std::string s)
 {
-    return isIdChar(s[0]) || isdigit(s[0]) || s == "(" || s == "{";
+    return isIdChar(s[0]) || isdigit(s[0]) || s == "(" || s == "{" || s[0] == '"';
 }
 
 static inline void dumpExpr(std::string tag, ACCExpr *next)
@@ -174,6 +174,14 @@ static ACCExpr *get1Token(void)
         || lexChar == ']' || lexChar == '}' || lexChar == ')' || lexChar == '^'
         || lexChar == ',' || lexChar == '?' || lexChar == ':' || lexChar == ';')
         getNext();
+    else if (lexChar == '"') {
+        do {
+            if (lexChar == '\\')
+                getNext();
+            getNext();
+        } while (lexChar != '"');
+        getNext();
+    }
     else {
         printf("[%s:%d] lexString '%s' unknown lexChar %c %x\n", __FUNCTION__, __LINE__, lexString.c_str(), lexChar, lexChar);
         exit(-1);
