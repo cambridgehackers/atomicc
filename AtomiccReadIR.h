@@ -93,6 +93,14 @@ static std::string getToken()
     return ret;
 }
 
+void addMethod(ModuleIR *IR, MethodInfo *MI)
+{
+    std::string methodName = MI->name;
+    if (endswith(methodName, "__ENA"))
+        methodName = methodName.substr(0, methodName.length()-5);
+    IR->method[methodName] = MI;
+}
+
 void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
@@ -153,7 +161,7 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                     MI->rule = true;
                 std::string methodName = getToken();
                 MI->name = methodName;
-                IR->method[methodName] = MI;
+                addMethod(IR, MI);
                 if (checkItem("(")) {
                     bool first = true;
                     while (!checkItem(")")) {
@@ -176,7 +184,7 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 std::string rdyName = getRdyName(methodName);
                 MethodInfo *MIRdy = new MethodInfo{nullptr};
                 MIRdy->name = rdyName;
-                IR->method[rdyName] = MIRdy;
+                addMethod(IR, MIRdy);
                 MIRdy->rule = MI->rule;
                 MIRdy->type = "INTEGER_1";
                 if (foundIf || (!foundOpenBrace && checkItem("if"))) {
