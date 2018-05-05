@@ -171,6 +171,19 @@ static ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
     return nullptr;
 }
 
+static MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
+{
+    if (IR->method.find(name) == IR->method.end()) {
+        if (IR->method.find(name + "__ENA") != IR->method.end())
+            name += "__ENA";
+        else if (endswith(name, "__ENA") && IR->method.find(name + "__ENA") != IR->method.end())
+            name = name.substr(0, name.length()-5);
+        else
+            return nullptr;
+    }
+    return IR->method[name];
+}
+
 static MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
 {
     std::string fieldName;
@@ -188,8 +201,8 @@ static MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
     };
     for (auto item: searchIR->interfaces)
         if (item.fldName == fieldName)
-            return lookupIR(item.type)->method[searchStr];
-    return NULL;
+            return lookupMethod(lookupIR(item.type), searchStr);
+    return nullptr;
 }
 
 static void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force = true, uint64_t offset = 0, bool alias = false, bool init = true)
@@ -361,7 +374,7 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
     for (auto item : IR->interfaces)
         for (auto FI: lookupIR(item.type)->method) {
             MethodInfo *MI = FI.second;
-            std::string name = item.fldName + MODULE_SEPARATOR + FI.first;
+            std::string name = item.fldName + MODULE_SEPARATOR + MI->name;
             bool out = (instance != "") ^ item.isPtr;
             checkWire(name, MI->type, out ^ (MI->type != ""));
             for (auto pitem: MI->params)
@@ -378,7 +391,7 @@ static ACCExpr *walkRemoveParam (ACCExpr *expr)
         if (pin != PIN_OBJECT && pin != PIN_REG) {
 if (trace_assign)
 printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, item.c_str(), pin);
-            return NULL;
+            return nullptr;
         }
         //assert(refList[item].pin);
     }
@@ -422,8 +435,8 @@ static std::list<ModData> modLine;
     fprintf(OStr, ");\n");
     modLine.clear();
     for (auto FI : IR->method) {
-        std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
         if (MI->rule)
             refList[methodName] = RefItem{1, MI->type, true, PIN_WIRE}; // both RDY and ENA must be generated
     }
@@ -449,16 +462,17 @@ static std::list<ModData> modLine;
 
     for (auto IC : IR->interfaceConnect)
         for (auto FI : lookupIR(IC.type)->method) {
-            std::string tstr = IC.target + MODULE_SEPARATOR + FI.first,
-                        sstr = IC.source + MODULE_SEPARATOR + FI.first;
+            MethodInfo *MI = FI.second;
+            std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
+                        sstr = IC.source + MODULE_SEPARATOR + MI->name;
 //printf("[%s:%d] IFCCC %s/%d %s/%d\n", __FUNCTION__, __LINE__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (refList[sstr].out)
-                setAssign(sstr, allocExpr(tstr), FI.second->type);
+                setAssign(sstr, allocExpr(tstr), MI->type);
             else
-                setAssign(tstr, allocExpr(sstr), FI.second->type);
+                setAssign(tstr, allocExpr(sstr), MI->type);
             tstr = tstr.substr(0, tstr.length()-5) + MODULE_SEPARATOR;
             sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
-            for (auto info: FI.second->params) {
+            for (auto info: MI->params) {
                 std::string sparm = sstr + info.name, tparm = tstr + info.name;
                 if (refList[sparm].out)
                     setAssign(sparm, allocExpr(tparm), info.type);
@@ -469,11 +483,11 @@ static std::list<ModData> modLine;
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
     for (auto FI : IR->method) {
-        std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
-        if (MethodInfo *MIRdy = IR->method[getRdyName(methodName)])
+        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
         for (auto item: MI->callList) {
             ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
             if (item->cond)
@@ -482,8 +496,8 @@ static std::list<ModData> modLine;
         }
     }
     for (auto FI : IR->method) {
-        std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
         MI->guard = cleanupExpr(MI->guard);
         if (!endswith(methodName, "__RDY")) {
             walkRead(MI, MI->guard, nullptr);
@@ -675,9 +689,10 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
     bool hasAlways = false;
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
         bool alwaysSeen = false;
         std::map<std::string, std::list<std::string>> condLines;
-        for (auto info: FI.second->storeList) {
+        for (auto info: MI->storeList) {
             ACCExpr *cond = cleanupExpr(info->cond);
             ACCExpr *value = //cleanupExpr
 (info->value);
@@ -704,7 +719,7 @@ exit(-1);
 }
             hasAlways = true;
             if (!alwaysSeen)
-                alwaysLines.push_back("if (" + FI.first + ") begin");
+                alwaysLines.push_back("if (" + MI->name + ") begin");
             alwaysSeen = true;
             std::string condStr;
             if (cond)
@@ -744,7 +759,7 @@ dumpExpr("PRINTF", value);
                 alwaysLines.push_back(endStr);
         }
         if (alwaysSeen)
-            alwaysLines.push_back("end; // End of " + FI.first);
+            alwaysLines.push_back("end; // End of " + MI->name);
     }
 
     // Now extend 'was referenced' from assignList items actually referenced
@@ -949,8 +964,8 @@ static void processSerialize(ModuleIR *IR)
     int counter = 0;  // start method number at 0
     uint64_t maxDataLength = 0;
     for (auto FI: IIR->method) {
-        std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
         if (endswith(methodName, "__RDY"))
             continue;
         if (!endswith(methodName, "__ENA")) {
@@ -977,8 +992,8 @@ static void dumpModule(std::string name, ModuleIR *IR)
 {
 printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s name %s\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
     for (auto FI: IR->method) {
-        std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
         printf("method %s(", methodName.c_str());
         std::string sep;
         for (auto param: MI->params) {
@@ -1001,8 +1016,11 @@ static void processM2P(ModuleIR *IR)
             target = inter.fldName;
             for (auto FI: IIR->method) {
                 MethodInfo *MI = FI.second;
-                if (!endswith(FI.first, "__RDY")) {
+                std::string methodName = MI->name;
+printf("[%s:%d] methodname %s\n", __FUNCTION__, __LINE__, MI->name.c_str());
+                if (!endswith(methodName, "__RDY")) {
                     std::string type = MI->params.front().type;
+printf("[%s:%d] type %s\n", __FUNCTION__, __LINE__, type.c_str());
                     processSerialize(lookupIR(type));
                     pipeArgSize = convertType(type);
                 }
@@ -1017,9 +1035,10 @@ static void processM2P(ModuleIR *IR)
     }
     int counter = 0;  // start method number at 0
     for (auto FI: HIR->method) {
-        std::string methodName = host + MODULE_SEPARATOR + FI.first;
         MethodInfo *MI = FI.second;
+        std::string methodName = host + MODULE_SEPARATOR + MI->name;
         MethodInfo *MInew = new MethodInfo{nullptr};
+        MInew->name = methodName;
         IR->method[methodName] = MInew;
         MInew->type = MI->type;
         MInew->guard = MI->guard;
@@ -1064,23 +1083,27 @@ static void processP2M(ModuleIR *IR)
         }
     }
     for (auto FI: HIR->method) {
-        std::string methodName = FI.first;
         MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
 printf("[%s:%d] P2Mhifmethod %s\n", __FUNCTION__, __LINE__, methodName.c_str());
         MethodInfo *MInew = new MethodInfo{nullptr};
-        IR->method[host + MODULE_SEPARATOR + methodName] = MInew;
+        MInew->name = host + MODULE_SEPARATOR + methodName;
+        IR->method[MInew->name] = MInew;
+printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
         for (auto param: MI->params)
             MInew->params.push_back(param);
         MInew->type = MI->type;
         MInew->guard = MI->guard;
     }
-    MethodInfo *MInew = IR->method[host + MODULE_SEPARATOR + "enq__ENA"];
+    MethodInfo *MInew = lookupMethod(IR, host + MODULE_SEPARATOR + "enq");
+printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEPARATOR + "enq__ENA").c_str(), MInew);
+assert(MInew);
     int counter = 0;  // start method number at 0
     for (auto FI: IIR->method) {
         uint64_t offset = 32;
-        std::string methodName = FI.first;
-        std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
         MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
         if (endswith(methodName, "__RDY"))
             continue;
         ACCExpr *paramList = allocExpr(",");
@@ -1125,6 +1148,7 @@ static void processInterfaces(std::list<ModuleIR *> &irSeq)
     }
 }
 
+#if 1
 static void metaGenerate(ModuleIR *IR, FILE *OStr)
 {
     std::map<std::string, int> exclusiveSeen;
@@ -1150,7 +1174,129 @@ static void metaGenerate(ModuleIR *IR, FILE *OStr)
         } while(--vecCount > 0);
     }
     for (auto FI : IR->method) {
-        std::string methodName = FI.first;
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        std::string gtemp = "; " + tree2str(MI->guard) + ";";
+        if (endswith(methodName, "__RDY"))
+            metaList.push_back("//METAGUARD; "
+                + methodName.substr(0, methodName.length()-5) + gtemp);
+        else if (endswith(methodName, "__READY"))
+            metaList.push_back("//METAGUARDV; "
+                + methodName.substr(0, methodName.length()-7) + gtemp);
+        else {
+            // For each method/rule of the current class,
+            // gather up metadata generated by processFunction
+            MetaRef *bm = MI->meta;
+            std::string temp;
+            for (auto titem: bm[MetaInvoke])
+                for (auto item: titem.second)
+                    temp += item + ":" + titem.first + ";";
+            if (temp != "")
+                metaList.push_back("//METAINVOKE; " + methodName + "; " + temp);
+            std::map<std::string,std::string> metaBefore;
+            std::map<std::string,std::string> metaConflict;
+            for (auto innerFI : IR->method) {
+                MethodInfo *innerMI = innerFI.second;
+                std::string innermethodName = innerMI->name;
+                MetaRef *innerbm = innerMI->meta;
+                std::string tempConflict;
+                if (innermethodName == methodName)
+                    continue;
+                // scan all other rule/methods of this class
+                for (auto inneritem: innerMI->storeList) {
+                    for (auto item: bm[MetaRead])
+                        // if the current method reads a state element that
+                        // is written by another method, add it to the 'before' list
+                        if (item.first == inneritem->dest->value) {
+printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %s\n", __FUNCTION__, __LINE__, innermethodName.c_str(), item.first.c_str(), innermethodName.c_str(), methodName.c_str());
+                            metaBefore[innermethodName] = "; :";
+                            break;
+                        }
+                    for (auto item: MI->storeList)
+                        // if the current method writes a state element that
+                        // is written by another method, add it to the 'conflict' list
+                        if (tree2str(item->dest) == tree2str(inneritem->dest)) {
+                            metaConflict[innermethodName] = "; ";
+                            break;
+                        }
+                }
+                for (auto inneritem: innerbm[MetaInvoke]) {
+                    for (auto item: bm[MetaInvoke])
+                        if (item.first == inneritem.first) {
+//printf("[%s:%d] conflict methodName %s innermethodName %s item %s\n", __FUNCTION__, __LINE__, methodName.c_str(), innermethodName.c_str(), item.first.c_str());
+                            metaConflict[innermethodName] = "; ";
+                            break;
+                        }
+                }
+            }
+            std::string metaStr;
+            for (auto item: metaConflict)
+                 if (item.second != "" && !exclusiveSeen[item.first])
+                     metaStr += item.second + item.first;
+            exclusiveSeen[methodName] = 1;
+            if (metaStr != "")
+                metaList.push_back("//METAEXCLUSIVE; " + methodName + metaStr);
+            metaStr = "";
+            for (auto item: metaBefore)
+                 if (item.second != "")
+                     metaStr += item.second + item.first;
+            if (metaStr != "")
+                metaList.push_back("//METABEFORE; " + methodName + metaStr);
+        }
+    }
+    std::string ruleNames;
+    for (auto FI : IR->method) {
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        if (MI->rule && endswith(methodName, "__ENA"))
+            ruleNames += "; " + methodName.substr(0, methodName.length()-5);
+    }
+    if (ruleNames != "")
+        metaList.push_back("//METARULES" + ruleNames);
+    for (auto item: IR->interfaceConnect) {
+        std::string tname = item.target;
+        std::string sname = item.source;
+printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
+        for (auto FI: lookupIR(item.type)->method) {
+            MethodInfo *MI = FI.second;
+            std::string methodName = MI->name;
+            metaList.push_back("//METACONNECT; " + tname + MODULE_SEPARATOR + MI->name
+                                              + "; " + sname + MODULE_SEPARATOR + MI->name);
+        }
+    }
+    for (auto item : IR->priority)
+        metaList.push_back("//METAPRIORITY; " + item.first + "; " + item.second);
+    for (auto item : metaList)
+        fprintf(OStr, "%s\n", item.c_str());
+}
+#else
+static void metaGenerate(ModuleIR *IR, FILE *OStr)
+{
+    std::map<std::string, int> exclusiveSeen;
+    std::list<std::string>     metaList;
+    // write out metadata comments at end of the file
+    metaList.push_front("//METASTART; " + IR->name);
+    for (auto item: IR->interfaces)
+        if (item.isPtr)
+        metaList.push_back("//METAEXTERNAL; " + item.fldName + "; " + lookupIR(item.type)->name + ";");
+    for (auto item: IR->fields) {
+        int64_t vecCount = item.vecCount;
+        int dimIndex = 0;
+        if (lookupIR(item.type))
+        do {
+            std::string fldName = item.fldName;
+            if (vecCount != -1)
+                fldName += autostr(dimIndex++);
+            if (item.isPtr)
+                metaList.push_back("//METAEXTERNAL; " + fldName + "; " + lookupIR(item.type)->name + ";");
+            else if (!startswith(lookupIR(item.type)->name, "l_struct_OC_")
+                 && !startswith(lookupIR(item.type)->name, "l_ainterface"))
+                metaList.push_back("//METAINTERNAL; " + fldName + "; " + lookupIR(item.type)->name + ";");
+        } while(--vecCount > 0);
+    }
+    for (auto FI : IR->method) {
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
         std::string gtemp = "; " + tree2str(IR->method[methodName]->guard) + ";";
         if (endswith(methodName, "__RDY"))
             metaList.push_back("//METAGUARD; "
@@ -1171,7 +1317,8 @@ static void metaGenerate(ModuleIR *IR, FILE *OStr)
             std::map<std::string,std::string> metaBefore;
             std::map<std::string,std::string> metaConflict;
             for (auto innerFI : IR->method) {
-                std::string innermethodName = innerFI.first;
+                MethodInfo *innerMI = innerFI.second;
+                std::string innermethodName = innerMI->name;
                 MetaRef *innerbm = IR->method[innermethodName]->meta;
                 std::string tempConflict;
                 if (innermethodName == methodName)
@@ -1182,7 +1329,7 @@ static void metaGenerate(ModuleIR *IR, FILE *OStr)
                         // if the current method reads a state element that
                         // is written by another method, add it to the 'before' list
                         if (item.first == inneritem->dest->value) {
-printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %s\n", __FUNCTION__, __LINE__, innermethodName.c_str(), item.first.c_str(), innerFI.first.c_str(), methodName.c_str());
+printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %s\n", __FUNCTION__, __LINE__, innermethodName.c_str(), item.first.c_str(), innermethodName.c_str(), methodName.c_str());
                             metaBefore[innermethodName] = "; :";
                             break;
                         }
@@ -1219,24 +1366,31 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
         }
     }
     std::string ruleNames;
-    for (auto item : IR->method)
-        if (item.second->rule && endswith(item.first, "__ENA"))
-            ruleNames += "; " + item.first.substr(0, item.first.length()-5);
+    for (auto FI : IR->method) {
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        if (FI.second->rule && endswith(methodName, "__ENA"))
+            ruleNames += "; " + methodName.substr(0, methodName.length()-5);
+    }
     if (ruleNames != "")
         metaList.push_back("//METARULES" + ruleNames);
     for (auto item: IR->interfaceConnect) {
         std::string tname = item.target;
         std::string sname = item.source;
 printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
-        for (auto mitem: lookupIR(item.type)->method)
-            metaList.push_back("//METACONNECT; " + tname + MODULE_SEPARATOR + mitem.first
-                                              + "; " + sname + MODULE_SEPARATOR + mitem.first);
+        for (auto FI: lookupIR(item.type)->method) {
+            MethodInfo *MI = FI.second;
+            std::string methodName = MI->name;
+            metaList.push_back("//METACONNECT; " + tname + MODULE_SEPARATOR + methodName
+                                              + "; " + sname + MODULE_SEPARATOR + methodName);
+        }
     }
     for (auto item : IR->priority)
         metaList.push_back("//METAPRIORITY; " + item.first + "; " + item.second);
     for (auto item : metaList)
         fprintf(OStr, "%s\n", item.c_str());
 }
+#endif
 
 static const char *jsonPrefix = 
     "{\n"
@@ -1267,8 +1421,7 @@ static ModuleIR *extractInterface(ModuleIR *IR, std::string interfaceName, bool 
         }
     }
     if (ModuleIR *exportedInterface = lookupIR(type))
-    if (exportedInterface->method.find("enq__ENA") != exportedInterface->method.end())
-    if (MethodInfo *PMI = exportedInterface->method["enq__ENA"]) // must be a pipein
+    if (MethodInfo *PMI = lookupMethod(exportedInterface, "enq")) // must be a pipein
     if (ModuleIR *data = lookupIR(PMI->params.front().type))
         return lookupIR(data->interfaces.front().type);
     return nullptr;
@@ -1292,16 +1445,16 @@ static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
         if (ModuleIR *inter = extractInterface(IR, interfaceName, outbound)) {
             std::map<std::string, MethodInfo *> reorderList;
             for (auto FI : inter->method) {
-                std::string methodName = FI.first;
                 MethodInfo *MI = FI.second;
+                std::string methodName = MI->name;
                 if (!endswith(methodName, "__ENA"))
                     continue;
                 reorderList[methodName.substr(0, methodName.length()-5)] = MI;
             }
             std::string msep;
             for (auto item: reorderList) {
-                std::string methodName = item.first;
                 MethodInfo *MI = item.second;
+                std::string methodName = item.first; // reorderList, not method!!
                 std::string psep;
                 fprintf(OStrJ, "%s\n                { \"dname\": \"%s\", \"dparams\": [",
                      msep.c_str(), methodName.c_str());
@@ -1342,7 +1495,15 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     if (ind > 0)
         myName = myName.substr(ind+1);
     FILE *OStrIRread = fopen((OutputDir + ".generated.IR").c_str(), "r");
+    if (!OStrIRread) {
+        printf("veriloggen: unable to open '%s'\n", (OutputDir + ".generated.IR").c_str());
+        exit(-1);
+    }
     FILE *OStrV = fopen((OutputDir + ".generated.v").c_str(), "w");
+    if (!OStrV) {
+        printf("veriloggen: unable to open '%s'\n", (OutputDir + ".generated.v").c_str());
+        exit(-1);
+    }
     FILE *OStrVH = fopen((OutputDir + ".generated.vh").c_str(), "w");
     FILE *OStrJ = nullptr;
     fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
@@ -1367,8 +1528,8 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     for (auto IR : irSeq) {
         // expand all subscript calculations before processing the module
         for (auto item: IR->method) {
-            std::string methodName = item.first;
             MethodInfo *MI = item.second;
+            std::string methodName = MI->name;
             walkSubscript(IR, MI->guard);
             for (auto item: MI->storeList) {
                 walkSubscript(IR, item->cond);

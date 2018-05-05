@@ -152,6 +152,8 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 if (checkItem("/Rule"))
                     MI->rule = true;
                 std::string methodName = getToken();
+                MI->name = methodName;
+                IR->method[methodName] = MI;
                 if (checkItem("(")) {
                     bool first = true;
                     while (!checkItem(")")) {
@@ -171,8 +173,10 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 }
                 if (checkItem("="))
                     MI->guard = getExpression();
-                IR->method[methodName] = MI;
+                std::string rdyName = getRdyName(methodName);
                 MethodInfo *MIRdy = new MethodInfo{nullptr};
+                MIRdy->name = rdyName;
+                IR->method[rdyName] = MIRdy;
                 MIRdy->rule = MI->rule;
                 MIRdy->type = "INTEGER_1";
                 if (foundIf || (!foundOpenBrace && checkItem("if"))) {
@@ -183,7 +187,6 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 }
                 else
                     MIRdy->guard = allocExpr("1");
-                IR->method[getRdyName(methodName)] = MIRdy;
                 if (foundOpenBrace || checkItem("{")) {
                     while (readLine() && !checkItem("}")) {
                         if (checkItem("ALLOCA")) {
