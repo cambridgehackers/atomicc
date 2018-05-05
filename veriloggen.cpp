@@ -690,37 +690,31 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
-        bool alwaysSeen = false;
         std::map<std::string, std::list<std::string>> condLines;
         for (auto info: MI->storeList) {
             ACCExpr *cond = cleanupExpr(info->cond);
-            ACCExpr *value = //cleanupExpr
-(info->value);
+            ACCExpr *value = (info->value);
             walkRead(MI, cond, nullptr);
             walkRead(MI, value, cond);
-    ACCExpr *destt = info->dest;
-    destt = str2tree(walkTree(destt, nullptr), true);
-    walkRef(destt);
-    ACCExpr *expr = destt;
-    if (expr->value == "?") {
-        int i = 0;
-        for (auto item: expr->operands)
-            if (i++ == 1) {
-                expr = item;
-                break;
+            ACCExpr *destt = info->dest;
+            destt = str2tree(walkTree(destt, nullptr), true);
+            walkRef(destt);
+            ACCExpr *expr = destt;
+            if (expr->value == "?") {
+                int i = 0;
+                for (auto item: expr->operands)
+                    if (i++ == 1) {
+                        expr = item;
+                        break;
+                    }
             }
-    }
-if (expr->value != "{") { // }
-std::string destType = findType(expr->value);
-if (destType == "") {
-printf("[%s:%d] typenotfound %s\n", __FUNCTION__, __LINE__, tree2str(destt).c_str());
-exit(-1);
-}
-}
-            hasAlways = true;
-            if (!alwaysSeen)
-                alwaysLines.push_back("if (" + MI->name + ") begin");
-            alwaysSeen = true;
+            if (expr->value != "{") { // }
+                std::string destType = findType(expr->value);
+                if (destType == "") {
+                printf("[%s:%d] typenotfound %s\n", __FUNCTION__, __LINE__, tree2str(destt).c_str());
+                exit(-1);
+                }
+            }
             std::string condStr;
             if (cond)
                 condStr = "    if (" + walkTree(cond, nullptr) + ")";
@@ -730,6 +724,7 @@ exit(-1);
             ACCExpr *cond = cleanupExpr(info->cond);
             ACCExpr *value = cleanupExpr(info->value);
 printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
+dumpExpr("PRINTCOND", cond);
 dumpExpr("PRINTF", value);
             value = value->operands.front();
             value->value = "(";
@@ -743,6 +738,8 @@ dumpExpr("PRINTF", value);
                 condStr = "    if (" + walkTree(cond, nullptr) + ")";
             condLines[condStr].push_back("    $display" + walkTree(value, nullptr) + ";");
         }
+        if (condLines.size())
+            alwaysLines.push_back("if (" + MI->name + ") begin");
         for (auto item: condLines) {
             std::string endStr;
             std::string temp = item.first;
@@ -758,7 +755,7 @@ dumpExpr("PRINTF", value);
             if (endStr != "")
                 alwaysLines.push_back(endStr);
         }
-        if (alwaysSeen)
+        if (condLines.size())
             alwaysLines.push_back("end; // End of " + MI->name);
     }
 
