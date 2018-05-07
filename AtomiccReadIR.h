@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2018 John Ankcorn
+   Copyright (C) 2018, The Connectal Project
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of version 2 of the GNU General Public License as
@@ -19,7 +19,6 @@ static char buf[MAX_READ_LINE];
 static char *bufp;
 static int lineNumber = 0;
 static FILE *OStrGlobal;
-static std::map<std::string, ModuleIR *> mapIndex;
 
 static ACCExpr *getExpression(void)
 {
@@ -93,14 +92,6 @@ static std::string getToken()
     return ret;
 }
 
-void addMethod(ModuleIR *IR, MethodInfo *MI)
-{
-    std::string methodName = MI->name;
-    if (endswith(methodName, "__ENA"))
-        methodName = methodName.substr(0, methodName.length()-5);
-    IR->method[methodName] = MI;
-}
-
 void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
@@ -156,11 +147,12 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 IR->interfaces.push_back(FieldElement{fldName, vecCount, type, arrayLen, isPtr});
             }
             else if (checkItem("METHOD")) {
-                MethodInfo *MI = new MethodInfo{nullptr};
+                bool rule = false;
                 if (checkItem("/Rule"))
-                    MI->rule = true;
+                    rule = true;
                 std::string methodName = getToken();
-                MI->name = methodName;
+                MethodInfo *MI = allocMethod(methodName);
+                MI->rule = rule;
                 addMethod(IR, MI);
                 if (checkItem("(")) {
                     bool first = true;
@@ -182,8 +174,7 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 if (checkItem("="))
                     MI->guard = getExpression();
                 std::string rdyName = getRdyName(methodName);
-                MethodInfo *MIRdy = new MethodInfo{nullptr};
-                MIRdy->name = rdyName;
+                MethodInfo *MIRdy = allocMethod(rdyName);
                 addMethod(IR, MIRdy);
                 MIRdy->rule = MI->rule;
                 MIRdy->type = "INTEGER_1";

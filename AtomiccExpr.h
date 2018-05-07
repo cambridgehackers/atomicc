@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2018 John Ankcorn
+   Copyright (C) 2018, The Connectal Project
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of version 2 of the GNU General Public License as
@@ -22,7 +22,7 @@ static char lexChar;
 static bool lexAllowRange;
 static ACCExpr *repeatGet1Token;
 
-static bool isIdChar(char ch)
+bool isIdChar(char ch)
 {
     return isalpha(ch) || ch == '_' || ch == '$';
 }
@@ -59,7 +59,7 @@ static inline void dumpExpr(std::string tag, ACCExpr *next)
     }
 }
 
-static std::string tree2str(const ACCExpr *arg)
+std::string tree2str(const ACCExpr *arg)
 {
     std::string ret;
     if (!arg)
@@ -87,7 +87,7 @@ static std::string tree2str(const ACCExpr *arg)
     return ret;
 }
 
-static ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr)
+ACCExpr *allocExpr(std::string value, ACCExpr *argl, ACCExpr *argr)
 {
     ACCExpr *ret = new ACCExpr;
     ret->value = value;

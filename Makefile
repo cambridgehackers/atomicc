@@ -1,5 +1,5 @@
 #
-#   Copyright (C) 2018 John Ankcorn
+#   Copyright (C) 2018 The Connectal Project
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of version 2 of the GNU General Public License as
@@ -15,7 +15,9 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-#/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/
+SOURCES = veriloggen.cpp util.cpp processInterfaces.cpp \
+    generateSoftware.cpp metaGen.cpp preprocessIR.cpp
+
 all:
 	@clang++  \
     -g \
@@ -41,4 +43,4 @@ all:
     -fno-rtti \
     -I. -I../llvm/lib/Target/Atomicc \
     -lBlocksRuntime \
-    -o veriloggen veriloggen.cpp
+    -o veriloggen $(SOURCES)
