@@ -15,7 +15,8 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-SOURCES = veriloggen.cpp util.cpp processInterfaces.cpp \
+SOURCES = main.cpp verilog.cpp util.cpp processInterfaces.cpp \
+    AtomiccExpr.cpp AtomiccReadIR.cpp \
     generateSoftware.cpp metaGen.cpp preprocessIR.cpp
 
 all:

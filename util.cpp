@@ -211,3 +211,13 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s name %s\n", __FUNCTION__, __LINE__, name.
             printf("  call%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
     }
 }
+
+std::string findType(std::string name)
+{
+//printf("[%s:%d] name %s\n", __FUNCTION__, __LINE__, name.c_str());
+    if (refList.find(name) != refList.end())
+        return refList[name].type;
+printf("[%s:%d] reference to '%s', but could not locate RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR \n", __FUNCTION__, __LINE__, name.c_str());
+    exit(-1);
+    return "";
+}

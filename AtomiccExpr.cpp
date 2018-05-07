@@ -14,6 +14,12 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+#include <stdio.h>
+#include <stdlib.h> // atol
+#include <string.h>
+#include <assert.h>
+#include "AtomiccIR.h"
+#include "common.h"
 #define MAX_EXPR_DEPTH 20
 
 static std::string lexString;
@@ -27,12 +33,12 @@ bool isIdChar(char ch)
     return isalpha(ch) || ch == '_' || ch == '$';
 }
 
-static bool isParenChar(char ch)
+bool isParenChar(char ch)
 {
     return ch == '[' || ch == '(' || ch == '{';
 }
 
-static std::string treePost(const ACCExpr *arg)
+std::string treePost(const ACCExpr *arg)
 {
     if (arg->value == "[")
         return " ]";
@@ -43,12 +49,12 @@ static std::string treePost(const ACCExpr *arg)
     return "";
 }
 
-static bool checkOperand(std::string s)
+bool checkOperand(std::string s)
 {
     return isIdChar(s[0]) || isdigit(s[0]) || s == "(" || s == "{" || s[0] == '"';
 }
 
-static inline void dumpExpr(std::string tag, ACCExpr *next)
+void dumpExpr(std::string tag, ACCExpr *next)
 {
     printf("DE: %s %p %s\n", tag.c_str(), next, next ? next->value.c_str() : "");
     int i = 0;
@@ -208,7 +214,7 @@ static ACCExpr *getRHS(ACCExpr *expr)
      return nullptr;
 }
 
-static ACCExpr *invertExpr(ACCExpr *expr)
+ACCExpr *invertExpr(ACCExpr *expr)
 {
     if (!expr)
         return allocExpr("1");
@@ -235,13 +241,13 @@ static ACCExpr *invertExpr(ACCExpr *expr)
     return allocExpr("^", expr, allocExpr("1"));
 }
 
-static void updateWidth(ACCExpr *item, int len)
+void updateWidth(ACCExpr *item, int len)
 {
     if (len > 0 && item->value.find("'") == std::string::npos)
         item->value = autostr(len) + "'d" + item->value;
 }
 
-static ACCExpr *cleanupExpr(ACCExpr *expr)
+ACCExpr *cleanupExpr(ACCExpr *expr)
 {
     if (!expr)
         return expr;
@@ -416,7 +422,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
     return head;
 }
 
-static ACCExpr *str2tree(std::string arg, bool allowRangeParam = false)
+ACCExpr *str2tree(std::string arg, bool allowRangeParam)
 {
     lexString = arg;
     lexIndex = 0;

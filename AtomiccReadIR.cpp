@@ -14,6 +14,12 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+#include <stdio.h>
+#include <stdlib.h> // atol
+#include <string.h>
+#include <assert.h>
+#include "AtomiccIR.h"
+#include "common.h"
 
 static char buf[MAX_READ_LINE];
 static char *bufp;
@@ -92,7 +98,7 @@ static std::string getToken()
     return ret;
 }
 
-void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
+static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
     while (readLine()) {
@@ -232,4 +238,15 @@ void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 ParseCheck(false, "unknown module item");
         }
     }
+}
+
+void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir)
+{
+    FILE *OStrIRread = fopen((OutputDir + ".IR").c_str(), "r");
+    if (!OStrIRread) {
+        printf("veriloggen: unable to open '%s'\n", (OutputDir + ".IR").c_str());
+        exit(-1);
+    }
+    readModuleIR(irSeq, OStrIRread);
+    fclose(OStrIRread);
 }

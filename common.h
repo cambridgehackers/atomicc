@@ -73,23 +73,38 @@ ModuleIR *allocIR(std::string name);
 MethodInfo *allocMethod(std::string name);
 void addMethod(ModuleIR *IR, MethodInfo *MI);
 void dumpModule(std::string name, ModuleIR *IR);
+std::string findType(std::string name);
 
-// AtomiccExpr.h
+// AtomiccExpr.cpp
 std::string tree2str(const ACCExpr *arg);
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr);
 bool isIdChar(char ch);
+void dumpExpr(std::string tag, ACCExpr *next);
+ACCExpr *cleanupExpr(ACCExpr *expr);
+ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
+bool isParenChar(char ch);
+std::string treePost(const ACCExpr *arg);
+bool checkOperand(std::string s);
+ACCExpr *invertExpr(ACCExpr *expr);
+void updateWidth(ACCExpr *item, int len);
+
+// AtomiccReadIR.cpp
+void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);
 
 // processInterfaces
 void processInterfaces(std::list<ModuleIR *> &irSeq);
 
 // generateSoftware
-int jsonPrepare(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName);
+int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName);
 
 // metaGen.cpp
-void metaGenerate(ModuleIR *IR, FILE *OStr);
+void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir);
 
 // preprocessIR.cpp
 void preprocessIR(std::list<ModuleIR *> &irSeq);
+
+// verilogGen
+void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir);
 
 extern int trace_assign;
 extern int trace_expand;

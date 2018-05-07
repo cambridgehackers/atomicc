@@ -21,7 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-void metaGenerate(ModuleIR *IR, FILE *OStr)
+static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
 {
     std::map<std::string, int> exclusiveSeen;
     std::list<std::string>     metaList;
@@ -140,4 +140,15 @@ printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sna
         metaList.push_back("//METAPRIORITY; " + item.first + "; " + item.second);
     for (auto item : metaList)
         fprintf(OStr, "%s\n", item.c_str());
+}
+
+void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
+{
+    myName += "_GENERATED_";
+    FILE *OStrVH = fopen((OutputDir + ".vh").c_str(), "w");
+    fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n\n", myName.c_str(), myName.c_str());
+    for (auto IR : irSeq)
+        metaGenerateModule(IR, OStrVH); // now generate the verilog header file '.vh'
+    fprintf(OStrVH, "`endif\n");
+    fclose(OStrVH);
 }

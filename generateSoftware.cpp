@@ -94,7 +94,7 @@ static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
     }
 }
 
-int jsonPrepare(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName)
+int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName)
 {
     FILE *OStrJ = nullptr;
     std::map<std::string, bool> softwareNameList;
