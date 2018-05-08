@@ -386,6 +386,50 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
     fprintf(OStr, "endmodule \n\n");
 }
 
+static ACCExpr *printfArgs(ACCExpr *value)
+{
+dumpExpr("PRINTFLL", value);
+    value->value = "(";   // change from '{'
+    ACCExpr *listp = value, *next = value->operands.front(), *fitem = nullptr;
+    std::string format;
+    if (next->value == ",")
+        listp = next;
+    int index = 0;
+    next = allocExpr("");
+    for (auto item: listp->operands) {
+        if (!fitem) {
+            fitem = item;
+            format = fitem->value;
+            if (endswith(format, "\\n\""))
+                format = format.substr(0, format.length()-3) + "\"";
+        }
+        else {
+            while (format[index] != '%' && index < format.length())
+                index++;
+            std::string val = item->value;
+            if (index < format.length()-1) {
+                if (format[index + 1] == 's' && val[0] == '"') {
+                    val = val.substr(1, val.length()-2);
+                    format = format.substr(0, index) + val + format.substr(index + 2);
+                    index += val.length();
+                    continue;
+                }
+                if (format[index + 1] == 'd' && isdigit(val[0])) {
+                    format = format.substr(0, index) + val + format.substr(index + 2);
+                    index += val.length();
+                    continue;
+                }
+            }
+        }
+        next->operands.push_back(item);
+    }
+    listp->operands.clear();
+    listp->operands = next->operands;
+    if (fitem)
+        fitem->value = format;
+    return value;
+}
+
 static void processMethod(MethodInfo *MI)
 {
     std::string methodName = MI->name;
@@ -420,18 +464,11 @@ static void processMethod(MethodInfo *MI)
         condLines[condStr].push_back("    " + tree2str(destt) + " <= " + walkTree(value, nullptr) + ";");
     }
     for (auto info: MI->printfList) {
-        ACCExpr *cond = cleanupExpr(info->cond);
-        ACCExpr *value = cleanupExpr(info->value);
 printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
-dumpExpr("PRINTCOND", cond);
-dumpExpr("PRINTF", value);
-        value = value->operands.front();
-        value->value = "(";
-        ACCExpr *format = value->operands.front();
-        if (format->value == ",")
-            format = format->operands.front();
-        if (endswith(format->value, "\\n\""))
-            format->value = format->value.substr(0, format->value.length()-3) + "\"";
+        ACCExpr *cond = cleanupExpr(info->cond);
+        ACCExpr *value = printfArgs(cleanupExpr(info->value)->operands.front());
+//dumpExpr("PRINTCOND", cond);
+//dumpExpr("PRINTF", value);
         std::string condStr;
         if (cond)
             condStr = "    if (" + walkTree(cond, nullptr) + ")";
