@@ -59,8 +59,12 @@ uint64_t convertType(std::string arg)
     }
     if (auto IR = lookupIR(bp)) {
         uint64_t total = 0;
-        for (auto item: IR->fields)
-            total += convertType(item.type);
+        for (auto item: IR->fields) {
+            uint64_t thisSize = convertType(item.type);
+            if (item.vecCount != -1)
+                thisSize *= item.vecCount;
+            total += thisSize;
+        }
         return total;
     }
     printf("[%s:%d] convertType FAILED '%s'\n", __FUNCTION__, __LINE__, bp);
