@@ -15,27 +15,11 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 #include <stdio.h>
-//#include <stdlib.h> // atol
+#include <stdlib.h> // atol
 #include <string.h>
 #include <assert.h>
 #include "AtomiccIR.h"
 #include "common.h"
-
-#if 0
-static int trace_assign;//= 1;
-static int trace_expand;//= 1;
-
-static std::map<std::string, RefItem> refList;
-static std::map<std::string, AssignItem> assignList;
-static std::map<std::string, std::string> replaceTarget;
-static std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
-
-static std::string getRdyName(std::string basename);
-static uint64_t convertType(std::string arg);
-
-#include "AtomiccExpr.h"
-#include "AtomiccReadIR.h"
-#endif
 
 std::string getRdyName(std::string basename)
 {
@@ -67,8 +51,12 @@ uint64_t convertType(std::string arg)
     };
     if (checkT("INTEGER_"))
         return atoi(bp);
-    if (checkT("ARRAY_"))
-        return convertType(bp);
+    if (checkT("ARRAY_")) {
+        uint64_t arr = atoi(bp);
+        while (isdigit(*bp) || *bp == '_')
+            bp++;
+        return arr * convertType(bp);
+    }
     if (auto IR = lookupIR(bp)) {
         uint64_t total = 0;
         for (auto item: IR->fields)
@@ -96,6 +84,7 @@ ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
             std::string fldName = item.fldName;
             if (vecCount != -1)
                 fldName += autostr(dimIndex++);
+printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
             if (auto ret = (cbWorker)(item, fldName))
                 return ret;
         } while(--vecCount > 0);
@@ -137,34 +126,34 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
     return nullptr;
 }
 
-void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force, uint64_t offset, bool alias, bool init)
+void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force, uint64_t aoffset, bool alias, bool init)
 {
+printf("[%s:%d] entry %s\n", __FUNCTION__, __LINE__, name.c_str());
+    __block uint64_t offset = aoffset;
+    std::string sname = name + MODULE_SEPARATOR;
     if (init)
         fieldList.clear();
     if (ModuleIR *IR = lookupIR(type)) {
-        if (IR->unionList.size() > 0) {
-            for (auto item: IR->unionList) {
-                uint64_t toff = offset;
-                std::string tname;
-                if (out) {
-                    toff = 0;
-                    tname = name;
-                }
-                getFieldList(fieldList, name + MODULE_SEPARATOR + item.name, tname, item.type, out, true, toff, true, false);
+        for (auto item: IR->unionList) {
+            uint64_t toff = offset;
+            std::string tname;
+            if (out) {
+                toff = 0;
+                tname = name;
             }
-            for (auto item: IR->fields) {
-                fieldList.push_back(FieldItem{name, base, item.type, alias, offset}); // aggregate data
-                offset += convertType(item.type);
-            }
+            getFieldList(fieldList, sname + item.name, tname, item.type, out, true, toff, true, false);
         }
-        else
-            for (auto item: IR->fields) {
-                getFieldList(fieldList, name + MODULE_SEPARATOR + item.fldName, base, item.type, out, true, offset, alias, false);
-                offset += convertType(item.type);
-            }
+        iterField(IR, CBAct {
+          getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
+          offset += convertType(item.type);
+          return nullptr;
+          });
     }
     else if (force)
+{
+printf("[%s:%d] getadd %s\n", __FUNCTION__, __LINE__, name.c_str());
         fieldList.push_back(FieldItem{name, base, type, alias, offset});
+}
     if (trace_expand && init)
         for (auto fitem: fieldList) {
 printf("%s: name %s base %s type %s %s offset %d\n", __FUNCTION__, fitem.name.c_str(), fitem.base.c_str(), fitem.type.c_str(), fitem.alias ? "ALIAS" : "", (int)fitem.offset);

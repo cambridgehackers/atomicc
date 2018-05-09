@@ -130,27 +130,21 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
             }
             else if (checkItem("FIELD")) {
                 int64_t     vecCount = -1;
-                unsigned    arrayLen = 0;
                 bool        isPtr = checkItem("/Ptr");
                 if (checkItem("/Count"))
                     vecCount = atoi(getToken().c_str());
-                if (checkItem("/Array"))
-                    arrayLen = atoi(getToken().c_str());
                 std::string type = getToken();
                 std::string fldName = getToken();
-                IR->fields.push_back(FieldElement{fldName, vecCount, type, arrayLen, isPtr});
+                IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr});
             }
             else if (checkItem("INTERFACE")) {
                 int64_t     vecCount = -1;
-                unsigned    arrayLen = 0;
                 bool        isPtr = checkItem("/Ptr");
                 if (checkItem("/Count"))
                     vecCount = atoi(getToken().c_str());
-                if (checkItem("/Array"))
-                    arrayLen = atoi(getToken().c_str());
                 std::string type = getToken();
                 std::string fldName = getToken();
-                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, arrayLen, isPtr});
+                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr});
             }
             else if (checkItem("METHOD")) {
                 bool rule = false;

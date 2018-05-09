@@ -394,7 +394,7 @@ dumpExpr("PRINTFLL", value);
     std::string format;
     if (next->value == ",")
         listp = next;
-    int index = 0;
+    unsigned index = 0;
     next = allocExpr("");
     for (auto item: listp->operands) {
         if (!fitem) {

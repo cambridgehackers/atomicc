@@ -27,10 +27,10 @@ static void processSerialize(ModuleIR *IR)
     auto inter = IR->interfaces.front();
     ModuleIR *IIR = lookupIR(inter.type);
     IR->fields.clear();
-    IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", 0, false});
-    IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_16", 0, false});
+    IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", false});
+    IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_16", false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
-    IR->fields.push_back(FieldElement{"data", -1, unionIR->name, 0, false});
+    IR->fields.push_back(FieldElement{"data", -1, unionIR->name, false});
     int counter = 0;  // start method number at 0
     uint64_t maxDataLength = 0;
     for (auto FI: IIR->method) {
@@ -48,14 +48,14 @@ exit(-1);
         unionIR->unionList.push_back(UnionItem{methodName, variant->name});
         uint64_t dataLength = 0;
         for (auto param: MI->params) {
-            variant->fields.push_back(FieldElement{param.name, -1, param.type, 0, false});
+            variant->fields.push_back(FieldElement{param.name, -1, param.type, false});
             dataLength += convertType(param.type);
         }
         if (dataLength > maxDataLength)
             maxDataLength = dataLength;
         counter++;
     }
-    unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), 0, false});
+    unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), false});
 }
 
 static void processM2P(ModuleIR *IR)
