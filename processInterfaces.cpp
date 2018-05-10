@@ -25,6 +25,7 @@ static void processSerialize(ModuleIR *IR)
 {
     std::string prefix = "__" + IR->name + "_";
     auto inter = IR->interfaces.front();
+printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     ModuleIR *IIR = lookupIR(inter.type);
     IR->fields.clear();
     IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", false});
@@ -60,30 +61,21 @@ exit(-1);
 
 static void processM2P(ModuleIR *IR)
 {
-    ModuleIR *IIR = nullptr, *HIR = nullptr;
+    ModuleIR *HIR = nullptr;
     std::string host, target;
     uint64_t pipeArgSize = -1;
     for (auto inter: IR->interfaces) {
-        if (inter.isPtr) {
-            IIR = lookupIR(inter.type);
+        if (inter.isPtr)
             target = inter.fldName;
-            for (auto FI: IIR->method) {
-                MethodInfo *MI = FI.second;
-                std::string methodName = MI->name;
-printf("[%s:%d] methodname %s\n", __FUNCTION__, __LINE__, MI->name.c_str());
-                if (!endswith(methodName, "__RDY")) {
-                    std::string type = MI->params.front().type;
-printf("[%s:%d] type %s\n", __FUNCTION__, __LINE__, type.c_str());
-                    processSerialize(lookupIR(type));
-                    pipeArgSize = convertType(type);
-                }
-            }
-                
-        }
         else {
             HIR = lookupIR(inter.type);
             host = inter.fldName;
-            IR->name = "l_module" + inter.type.substr(12) + "___M2P";
+            std::string iname = inter.type.substr(16);
+            IR->name = "l_module_OC_" + iname + "___M2P";
+            std::string type = "l_serialize_OC_M2P_MD_" + iname + "_OD__KD__KD_Data";
+printf("[%s:%d] IIIIIIIIIII iname %s IRNAME %s type %s\n", __FUNCTION__, __LINE__, iname.c_str(), IR->name.c_str(), type.c_str());
+            processSerialize(lookupIR(type));
+            pipeArgSize = convertType(type);
         }
     }
     int counter = 0;  // start method number at 0
@@ -127,7 +119,9 @@ static void processP2M(ModuleIR *IR)
         if (inter.isPtr) {
             IIR = lookupIR(inter.type);
             target = inter.fldName;
-            IR->name = "l_module" + inter.type.substr(12) + "___P2M";
+            std::string iname = inter.type.substr(16);
+            IR->name = "l_module_OC_" + iname + "___P2M";
+            std::string type = "l_serialize_OC_P2M_MD_" + iname + "_OD__KD__KD_Data";
         }
         else {
             HIR = lookupIR(inter.type);

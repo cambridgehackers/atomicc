@@ -49,10 +49,28 @@ static ModuleIR *extractInterface(ModuleIR *IR, std::string interfaceName, bool 
             break;
         }
     }
-    if (ModuleIR *exportedInterface = lookupIR(type))
-    if (MethodInfo *PMI = lookupMethod(exportedInterface, "enq")) // must be a pipein
-    if (ModuleIR *data = lookupIR(PMI->params.front().type))
-        return lookupIR(data->interfaces.front().type);
+    std::string other;
+    for (auto IC : IR->interfaceConnect) {
+        if (interfaceName == IC.target) {
+            other = IC.source;
+            break;
+        }
+        if (interfaceName == IC.source) {
+            other = IC.target;
+            break;
+        }
+    }
+    int ind = other.find(MODULE_SEPARATOR);
+    if (ind > 0)
+        other = other.substr(0, ind);
+    for (auto item: IR->fields) {
+        if (item.fldName == other) {
+            ModuleIR *IIR = lookupIR(item.type);
+            for (auto inter: IIR->interfaces)
+                 if (inter.fldName == "method")
+                     return lookupIR(inter.type);
+        }
+    }
     return nullptr;
 }
 static std::string jsonSep;

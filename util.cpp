@@ -132,7 +132,8 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
 
 void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force, uint64_t aoffset, bool alias, bool init)
 {
-printf("[%s:%d] entry %s\n", __FUNCTION__, __LINE__, name.c_str());
+    if (trace_expand)
+        printf("[%s:%d] entry %s\n", __FUNCTION__, __LINE__, name.c_str());
     __block uint64_t offset = aoffset;
     std::string sname = name + MODULE_SEPARATOR;
     if (init)
@@ -153,11 +154,11 @@ printf("[%s:%d] entry %s\n", __FUNCTION__, __LINE__, name.c_str());
           return nullptr;
           });
     }
-    else if (force)
-{
-printf("[%s:%d] getadd %s\n", __FUNCTION__, __LINE__, name.c_str());
+    else if (force) {
+        if (trace_expand)
+            printf("[%s:%d] getadd %s\n", __FUNCTION__, __LINE__, name.c_str());
         fieldList.push_back(FieldItem{name, base, type, alias, offset});
-}
+    }
     if (trace_expand && init)
         for (auto fitem: fieldList) {
 printf("%s: name %s base %s type %s %s offset %d\n", __FUNCTION__, fitem.name.c_str(), fitem.base.c_str(), fitem.type.c_str(), fitem.alias ? "ALIAS" : "", (int)fitem.offset);

@@ -114,17 +114,21 @@ static void walkRef (ACCExpr *expr)
 {
     std::string item = expr->value;
     if (isIdChar(item[0])) {
+        std::string base = item;
+        int ind = base.find("[");
+        if (ind > 0)
+            base = base.substr(0, ind);
         if (!refList[item].pin)
             printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
-        assert(refList[item].pin);
-        refList[item].count++;
-        int ind = item.find('[');
-        if (ind != -1)
+        if (base != item)
 {
 if (trace_assign)
 printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
-            refList[item.substr(0,ind)].count++;
+            //refList[item.substr(0,ind)].count++;
+item = base;
 }
+        assert(refList[item].pin);
+        refList[item].count++;
     }
     for (auto item: expr->operands)
         walkRef(item);
