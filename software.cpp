@@ -47,8 +47,10 @@ static ModuleIR *extractInterface(ModuleIR *IR, std::string interfaceName, bool 
             type = iitem.type;
             outbound = iitem.isPtr;
             break;
+            //return lookupIR(iitem.type);
         }
     }
+#if 1
     std::string other;
     for (auto IC : IR->interfaceConnect) {
         if (interfaceName == IC.target) {
@@ -71,15 +73,16 @@ static ModuleIR *extractInterface(ModuleIR *IR, std::string interfaceName, bool 
                      return lookupIR(inter.type);
         }
     }
+#endif
     return nullptr;
 }
 static std::string jsonSep;
 static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
 {
     for (auto interfaceName: IR->softwareName) {
-        fprintf(OStrJ, "%s\n        { \"cdecls\": [", jsonSep.c_str());
         bool outbound = false;
         if (ModuleIR *inter = extractInterface(IR, interfaceName, outbound)) {
+            fprintf(OStrJ, "%s\n        { \"cdecls\": [", jsonSep.c_str());
             std::map<std::string, MethodInfo *> reorderList;
             std::string msep;
             for (auto FI : inter->method) {
@@ -114,6 +117,29 @@ static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
 
 int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName)
 {
+#if 0
+< EMODULE l_module_OC_M2P {
+<     INTERFACE l_ainterface_OC_EchoIndication method
+<     INTERFACE/Ptr l_ainterface_OC_PipeIn pipe
+< }
+< EMODULE l_module_OC_P2M {
+<     INTERFACE l_ainterface_OC_PipeIn pipe
+<     INTERFACE/Ptr l_ainterface_OC_EchoRequest method
+< }
+<     INTERFACECONNECT lERI$method lEcho$request l_ainterface_OC_EchoRequest
+<     INTERFACECONNECT lEcho$indication lEIO$method l_ainterface_OC_EchoIndication
+<     INTERFACECONNECT request lERI$pipe l_ainterface_OC_PipeIn
+<     INTERFACECONNECT indication lEIO$pipe l_ainterface_OC_PipeIn
+<     FIELD l_module_OC_P2M lERI
+<     FIELD l_module_OC_M2P lEIO
+<     INTERFACE l_ainterface_OC_PipeIn request
+<     INTERFACE/Ptr l_ainterface_OC_PipeIn indication
+---
+>     INTERFACECONNECT request lEcho$request l_ainterface_OC_EchoRequest
+>     INTERFACECONNECT indication lEcho$indication l_ainterface_OC_EchoIndication
+>     INTERFACE l_ainterface_OC_EchoRequest request
+>     INTERFACE/Ptr l_ainterface_OC_EchoIndication indication
+#endif
     FILE *OStrJ = nullptr;
     std::map<std::string, bool> softwareNameList;
     for (auto IR: irSeq) {
