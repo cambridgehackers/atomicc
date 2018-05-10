@@ -81,6 +81,7 @@ static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
         bool outbound = false;
         if (ModuleIR *inter = extractInterface(IR, interfaceName, outbound)) {
             std::map<std::string, MethodInfo *> reorderList;
+            std::string msep;
             for (auto FI : inter->method) {
                 MethodInfo *MI = FI.second;
                 std::string methodName = MI->name;
@@ -88,7 +89,6 @@ static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
                     continue;
                 reorderList[methodName.substr(0, methodName.length()-5)] = MI;
             }
-            std::string msep;
             for (auto item: reorderList) {
                 MethodInfo *MI = item.second;
                 std::string methodName = item.first; // reorderList, not method!!
@@ -133,12 +133,8 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         }
         OStrJ = fopen((outName + ".json").c_str(), "w");
         fprintf(OStrJ, jsonPrefix, enumList.c_str());
-    }
-    for (auto IR : irSeq) {
-        if (OStrJ)
+        for (auto IR : irSeq)
             jsonGenerate(IR, OStrJ);
-    }
-    if (OStrJ) {
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
         std::string commandLine(exename);

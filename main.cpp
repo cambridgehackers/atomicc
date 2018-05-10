@@ -46,12 +46,12 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
         myName = myName.substr(ind+1);
 
     readIR(irSeq, OutputDir);
+    if (int ret = generateSoftware(irSeq, argv[0], OutputDir))
+        return ret;
     processInterfaces(irSeq);
     preprocessIR(irSeq);
     generateVerilog(irSeq, myName, OutputDir);
     generateMeta(irSeq, myName, OutputDir);
-    if (int ret = generateSoftware(irSeq, argv[0], OutputDir))
-        return ret;
 
     if (!noVerilator) {
         std::string commandLine = "verilator --cc " + OutputDir + ".v";
