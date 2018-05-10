@@ -21,6 +21,12 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+typedef struct {
+    FieldElement field;
+    ModuleIR *IR; // containing Module
+    ModuleIR *inter; // interface
+} SoftwareItem;
+
 static const char *jsonPrefix = 
     "{\n"
     "    \"bsvdefines\": [ ],\n"
@@ -39,80 +45,40 @@ static const char *jsonPrefix =
     "        }\n"
     "    ],\n"
     "    \"interfaces\": [";
-static ModuleIR *extractInterface(ModuleIR *IR, std::string interfaceName, bool &outbound)
-{
-    std::string type;
-    for (auto iitem: IR->interfaces) {
-        if (iitem.fldName == interfaceName) {
-            type = iitem.type;
-            outbound = iitem.isPtr;
-            break;
-            //return lookupIR(iitem.type);
-        }
-    }
-#if 1
-    std::string other;
-    for (auto IC : IR->interfaceConnect) {
-        if (interfaceName == IC.target) {
-            other = IC.source;
-            break;
-        }
-        if (interfaceName == IC.source) {
-            other = IC.target;
-            break;
-        }
-    }
-    int ind = other.find(MODULE_SEPARATOR);
-    if (ind > 0)
-        other = other.substr(0, ind);
-    for (auto item: IR->fields) {
-        if (item.fldName == other) {
-            ModuleIR *IIR = lookupIR(item.type);
-            for (auto inter: IIR->interfaces)
-                 if (inter.fldName == "method")
-                     return lookupIR(inter.type);
-        }
-    }
-#endif
-    return nullptr;
-}
+
+static std::map<std::string, SoftwareItem> softwareNameList;
 static std::string jsonSep;
-static void jsonGenerate(ModuleIR *IR, FILE *OStrJ)
+static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
 {
-    for (auto interfaceName: IR->softwareName) {
-        bool outbound = false;
-        if (ModuleIR *inter = extractInterface(IR, interfaceName, outbound)) {
-            fprintf(OStrJ, "%s\n        { \"cdecls\": [", jsonSep.c_str());
-            std::map<std::string, MethodInfo *> reorderList;
-            std::string msep;
-            for (auto FI : inter->method) {
-                MethodInfo *MI = FI.second;
-                std::string methodName = MI->name;
-                if (!endswith(methodName, "__ENA"))
-                    continue;
-                reorderList[methodName.substr(0, methodName.length()-5)] = MI;
-            }
-            for (auto item: reorderList) {
-                MethodInfo *MI = item.second;
-                std::string methodName = item.first; // reorderList, not method!!
-                std::string psep;
-                fprintf(OStrJ, "%s\n                { \"dname\": \"%s\", \"dparams\": [",
-                     msep.c_str(), methodName.c_str());
-                for (auto pitem: MI->params) {
-                     fprintf(OStrJ, "%s\n                        { \"pname\": \"%s\", "
-                         "\"ptype\": { \"name\": \"Bit\", \"params\": [ { "
-                         "\"name\": \"%d\" } ] } }",
-                         psep.c_str(), pitem.name.c_str(), (int)convertType(pitem.type));
-                     psep = ",";
-                }
-                fprintf(OStrJ, "\n                    ] }");
-                msep = ",";
-            }
-            fprintf(OStrJ, "\n            ], \"direction\": \"%d\", \"cname\": \"%s\" }",
-                outbound, inter->name.substr(strlen("l_ainterface_OC_")).c_str());
-            jsonSep = ",";
-        }
+    fprintf(OStrJ, "%s\n        { \"cdecls\": [", jsonSep.c_str());
+    std::map<std::string, MethodInfo *> reorderList;
+    std::string msep;
+    for (auto FI : swInfo.inter->method) {
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        if (!endswith(methodName, "__ENA"))
+            continue;
+        reorderList[methodName.substr(0, methodName.length()-5)] = MI;
     }
+    for (auto item: reorderList) {
+        MethodInfo *MI = item.second;
+        std::string methodName = item.first; // reorderList, not method!!
+        std::string psep;
+        fprintf(OStrJ, "%s\n                { \"dname\": \"%s\", \"dparams\": [",
+             msep.c_str(), methodName.c_str());
+        for (auto pitem: MI->params) {
+             fprintf(OStrJ, "%s\n                        { \"pname\": \"%s\", "
+                 "\"ptype\": { \"name\": \"Bit\", \"params\": [ { "
+                 "\"name\": \"%d\" } ] } }",
+                 psep.c_str(), pitem.name.c_str(), (int)convertType(pitem.type));
+             psep = ",";
+        }
+        fprintf(OStrJ, "\n                    ] }");
+        msep = ",";
+    }
+    fprintf(OStrJ, "\n            ], \"direction\": \"%d\", \"cname\": \"%s\" }",
+        swInfo.field.isPtr, aname.c_str());
+    jsonSep = ",";
 }
 
 int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName)
@@ -141,26 +107,28 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
 >     INTERFACE/Ptr l_ainterface_OC_EchoIndication indication
 #endif
     FILE *OStrJ = nullptr;
-    std::map<std::string, bool> softwareNameList;
     for (auto IR: irSeq) {
         for (auto interfaceName: IR->softwareName) {
-            bool outbound = false;
-            if (ModuleIR *inter = extractInterface(IR, interfaceName, outbound))
-                softwareNameList[inter->name.substr(strlen("l_ainterface_OC_"))] = outbound;
+            for (auto iitem: IR->interfaces) {
+                if (iitem.fldName == interfaceName) {
+                    ModuleIR *inter = lookupIR(iitem.type);
+                    softwareNameList[inter->name.substr(strlen("l_ainterface_OC_"))] = SoftwareItem{iitem, IR, inter};
+                }
+            }
         }
     }
     if (softwareNameList.size() > 0) {
         int counter = 5;
         std::string enumList, sep;
         for (auto item: softwareNameList) {
-            std::string name = "IfcNames_" + item.first + (item.second ? "H2S" : "S2H");
+            std::string name = "IfcNames_" + item.first + (item.second.field.isPtr ? "H2S" : "S2H");
             enumList += sep + "[ \"" + name + "\", \"" + autostr(counter++) + "\" ]";
             sep = ", ";
         }
         OStrJ = fopen((outName + ".json").c_str(), "w");
         fprintf(OStrJ, jsonPrefix, enumList.c_str());
-        for (auto IR : irSeq)
-            jsonGenerate(IR, OStrJ);
+        for (auto item: softwareNameList)
+            jsonGenerate(OStrJ, item.first, item.second);
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
         std::string commandLine(exename);
