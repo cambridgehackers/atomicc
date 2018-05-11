@@ -101,8 +101,12 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         ModuleIR *IR = allocIR("l_top");
         irSeq.push_back(IR);
         std::string dutType;
+        bool hasPrintf = false;
         for (auto item: softwareNameList) {
             dutType = item.second.IR->name;
+            for (auto iitem: item.second.IR->interfaces)
+                if (iitem.fldName == "printfp")
+                    hasPrintf = true;
             std::string name = "IfcNames_" + item.first + (item.second.field.isPtr ? "H2S" : "S2H");
             enumList += sep + "[ \"" + name + "\", \"" + autostr(counter++) + "\" ]";
             sep = ", ";
@@ -113,28 +117,74 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         FILE *OStrFL = fopen((outName + ".filelist").c_str(), "w");
         fprintf(OStrFL, "%s\n", flist.c_str());
         std::string localName = "DUT__" + dutType;
+        std::string muxName = "mux";
+        std::string muxTypeName = "l_module_OC_MuxPipe";
         std::string pipeName = "l_ainterface_OC_PipeIn";
         IR->fields.push_back(FieldElement{localName, -1, dutType, false});
+        if (hasPrintf) {
+            ModuleIR *muxDef = lookupIR(muxTypeName);
+printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
+            if (muxDef)
+                irSeq.push_back(muxDef); // HACK FOR NOW!!!!!!!!!!!!!!!!!!!!!!
+            else {
+                muxDef = allocIR(muxTypeName);
+                irSeq.push_back(muxDef);
+                muxDef->interfaces.push_back(FieldElement{"in", -1, pipeName, false});
+                muxDef->interfaces.push_back(FieldElement{"forward", -1, pipeName, false});
+                muxDef->interfaces.push_back(FieldElement{"out", -1, pipeName, true});
+                auto makeEnq = [&](std::string methodName) -> void {
+                    MethodInfo *MI = allocMethod(methodName);
+                    addMethod(muxDef, MI);
+                    MI->params.push_back(ParamElement{"v", "l_struct_OC_NOCData"});
+                    std::string call;
+                    MI->callList.push_back(new CallListElement{
+                        allocExpr("out$enq__ENA", allocExpr("{", allocExpr(
+                            methodName.substr(0, methodName.length()-5)
+                               + MODULE_SEPARATOR + "v"))),
+                        nullptr, true});
+                    MethodInfo *MIRdy = allocMethod(getRdyName(methodName));
+                    addMethod(muxDef, MIRdy);
+                    MIRdy->type = "INTEGER_1";
+                    MIRdy->guard = allocExpr("1");
+                };
+                makeEnq("forward$enq__ENA");
+                makeEnq("in$enq__ENA");
+dumpModule("MUX", muxDef);
+            }
+            IR->fields.push_back(FieldElement{muxName, -1, muxTypeName, false});
+        }
+        localName += MODULE_SEPARATOR;
+        muxName += MODULE_SEPARATOR;
         for (auto item: softwareNameList) {
             jsonGenerate(OStrJ, item.first, item.second);
             bool outcall = item.second.field.isPtr;
             std::string userTypeName = item.second.inter->name;
             std::string userInterface = item.second.field.fldName;
-            std::string fieldName = outcall ? "M2P" : "P2M" + ("__" + userInterface);
+            std::string fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             ModuleIR *ifcIR = allocIR("l_module_OC_" + fieldName);
             ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall});
             ifcIR->interfaces.push_back(FieldElement{"pipe", -1, pipeName, outcall});
             IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false});
             IR->interfaces.push_back(FieldElement{userInterface, -1, pipeName, outcall});
             IR->interfaceConnect.push_back(InterfaceConnectType{
-                localName + MODULE_SEPARATOR + userInterface,
+                localName + userInterface,
                 fieldName + MODULE_SEPARATOR + "method", userTypeName});
-            IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
-                fieldName + MODULE_SEPARATOR + "pipe", pipeName});
+            if (outcall && hasPrintf) {
+                IR->interfaceConnect.push_back(InterfaceConnectType{
+                    muxName + "in", fieldName + MODULE_SEPARATOR + "pipe", pipeName});
+                IR->interfaceConnect.push_back(InterfaceConnectType{
+                    muxName + "forward", localName + "printfp", pipeName});
+                IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
+                    muxName + "out", pipeName});
+            }
+            else
+                IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
+                    fieldName + MODULE_SEPARATOR + "pipe", pipeName});
         }
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
         fclose(OStrFL);
+dumpModule("TOP", IR);
         std::string commandLine(exename);
         int ind = commandLine.rfind("/");
         if (ind == -1)

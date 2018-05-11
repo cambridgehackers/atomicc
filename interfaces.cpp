@@ -88,6 +88,7 @@ dumpModule("M2P/HIR :" + host, HIR);
         }
     }
     int counter = 0;  // start method number at 0
+assert(HIR);
     for (auto FI: HIR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = host + MODULE_SEPARATOR + MI->name;
@@ -139,6 +140,7 @@ dumpModule("P2M/IIR :" + target, IIR);
 dumpModule("P2M/HIR :" + host, HIR);
         }
     }
+assert(HIR);
     for (auto FI: HIR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
@@ -188,17 +190,20 @@ void processInterfaces(std::list<ModuleIR *> &irSeq)
         if (startswith(IR->name, "l_serialize_"))
             processSerialize(IR);
         if (startswith(IR->name, "l_module_OC_P2M")) {
+dumpModule("P2M", IR);
             irSeq.push_back(IR);
             processP2M(IR);
         }
         if (startswith(IR->name, "l_module_OC_M2P")) {
             irSeq.push_back(IR);
             std::list<FieldElement> temp;
+dumpModule("M2Porig", IR);
             for (auto inter: IR->interfaces) {
                 if (inter.fldName != "unused")
                     temp.push_back(inter);
             }
             IR->interfaces = temp;
+dumpModule("M2P", IR);
             processM2P(IR);
         }
     }

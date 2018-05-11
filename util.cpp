@@ -190,6 +190,8 @@ void addMethod(ModuleIR *IR, MethodInfo *MI)
 
 void dumpModule(std::string name, ModuleIR *IR)
 {
+    if (!IR)
+        return;
 printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
     for (auto item: IR->fields) {
         std::string ret = "    FIELD";
