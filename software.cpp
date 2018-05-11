@@ -83,29 +83,6 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
 
 int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName)
 {
-#if 0
-< EMODULE l_module_OC_M2P {
-<     INTERFACE l_ainterface_OC_EchoIndication method
-<     INTERFACE/Ptr l_ainterface_OC_PipeIn pipe
-< }
-< EMODULE l_module_OC_P2M {
-<     INTERFACE l_ainterface_OC_PipeIn pipe
-<     INTERFACE/Ptr l_ainterface_OC_EchoRequest method
-< }
-<     INTERFACECONNECT lERI$method lEcho$request l_ainterface_OC_EchoRequest
-<     INTERFACECONNECT lEcho$indication lEIO$method l_ainterface_OC_EchoIndication
-<     INTERFACECONNECT request lERI$pipe l_ainterface_OC_PipeIn
-<     INTERFACECONNECT indication lEIO$pipe l_ainterface_OC_PipeIn
-<     FIELD l_module_OC_P2M lERI
-<     FIELD l_module_OC_M2P lEIO
-<     INTERFACE l_ainterface_OC_PipeIn request
-<     INTERFACE/Ptr l_ainterface_OC_PipeIn indication
----
->     INTERFACECONNECT request lEcho$request l_ainterface_OC_EchoRequest
->     INTERFACECONNECT indication lEcho$indication l_ainterface_OC_EchoIndication
->     INTERFACE l_ainterface_OC_EchoRequest request
->     INTERFACE/Ptr l_ainterface_OC_EchoIndication indication
-#endif
     FILE *OStrJ = nullptr;
     for (auto IR: irSeq) {
         for (auto interfaceName: IR->softwareName) {
@@ -148,6 +125,28 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
              flist += " jni/" + item.first + ".c";
         fprintf(OStrFL, "%s\n", flist.c_str());
         fclose(OStrFL);
+        ModuleIR *IR = allocIR("l_top");
+        irSeq.push_back(IR);
+        std::string localName = "lEcho";
+        for (auto item: softwareNameList) {
+            bool outcall = item.second.field.isPtr;
+            std::string userTypeName = item.second.inter->name;
+            std::string userInterface = item.second.field.fldName;
+            ModuleIR *ifcIR = allocIR(outcall ? "l_module_OC_M2P" : "l_module_OC_P2M");
+            std::string fieldName = outcall ? "lEIO" : "lERI";
+            ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall});
+            ifcIR->interfaces.push_back(FieldElement{"pipe", -1,
+                 "l_ainterface_OC_PipeIn", outcall});
+            IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false});
+            IR->interfaces.push_back(FieldElement{userInterface, -1,
+                 "l_ainterface_OC_PipeIn", outcall});
+            IR->interfaceConnect.push_back(InterfaceConnectType{
+                localName + MODULE_SEPARATOR + userInterface, fieldName + "$method",
+                userTypeName});
+            IR->interfaceConnect.push_back(InterfaceConnectType{
+                userInterface, fieldName + "$pipe", "l_ainterface_OC_PipeIn"});
+        }
+        IR->fields.push_back(FieldElement{localName, -1, "l_module_OC_Echo", false});
     }
     return 0;
 }

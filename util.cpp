@@ -190,20 +190,44 @@ void addMethod(ModuleIR *IR, MethodInfo *MI)
 
 void dumpModule(std::string name, ModuleIR *IR)
 {
-printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s name %s\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
+printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
+    for (auto item: IR->fields) {
+        std::string ret = "    FIELD";
+        if (item.isPtr)
+            ret += "/Ptr";
+        ret += " ";
+        if (item.vecCount != -1)
+            ret += "/Count " + autostr(item.vecCount);
+        ret += item.type + " " + item.fldName;
+        printf("%s\n", ret.c_str());
+    }
+    for (auto item: IR->interfaces) {
+        std::string ret = "    INTERFACE";
+        if (item.isPtr)
+            ret += "/Ptr";
+        ret += " ";
+        if (item.vecCount != -1)
+            ret += "/Count " + autostr(item.vecCount);
+        ret += item.type + " " + item.fldName;
+        printf("%s\n", ret.c_str());
+    }
+    for (auto item: IR->interfaceConnect)
+        printf("    INTERFACECONNECT %s %s %s\n", item.target.c_str(), item.source.c_str(), item.type.c_str());
     for (auto FI: IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
-        printf("method %s(", methodName.c_str());
+        printf("    METHOD %s(", methodName.c_str());
         std::string sep;
         for (auto param: MI->params) {
             printf("%s%s %s", sep.c_str(), param.type.c_str(), param.name.c_str());
             sep = ", ";
         }
-        printf(") = %s\n", tree2str(MI->guard).c_str());
+        printf(") = %s {\n", tree2str(MI->guard).c_str());
         for (auto item: MI->callList)
-            printf("  call%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
+            printf("      CALL%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
+        printf("       }\n");
     }
+printf("}\n");
 }
 
 std::string findType(std::string name)

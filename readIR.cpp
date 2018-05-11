@@ -104,12 +104,11 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
     while (readLine()) {
         bool ext = checkItem("EMODULE");
         ParseCheck(ext || checkItem("MODULE"), "Module header missing");
-        ModuleIR *IR = new ModuleIR;
+        std::string name = getToken();
+        ModuleIR *IR = allocIR(name);
         if (!ext)
             irSeq.push_back(IR);
-        IR->name = getToken();
         ParseCheck(checkItem("{"), "Module '{' missing");
-        mapIndex[IR->name] = IR;
         while (readLine() && !checkItem("}")) {
             if (checkItem("SOFTWARE")) {
                 IR->softwareName.push_back(getToken());

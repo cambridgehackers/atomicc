@@ -66,7 +66,10 @@ static void processM2P(ModuleIR *IR)
     uint64_t pipeArgSize = -1;
     for (auto inter: IR->interfaces) {
         if (inter.isPtr)
+{
             target = inter.fldName;
+dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
+}
         else {
             HIR = lookupIR(inter.type);
             host = inter.fldName;
@@ -76,6 +79,7 @@ static void processM2P(ModuleIR *IR)
 printf("[%s:%d] IIIIIIIIIII iname %s IRNAME %s type %s\n", __FUNCTION__, __LINE__, iname.c_str(), IR->name.c_str(), type.c_str());
             processSerialize(lookupIR(type));
             pipeArgSize = convertType(type);
+dumpModule("M2P/HIR :" + host, HIR);
         }
     }
     int counter = 0;  // start method number at 0
@@ -122,10 +126,12 @@ static void processP2M(ModuleIR *IR)
             std::string iname = inter.type.substr(16);
             IR->name = "l_module_OC_" + iname + "___P2M";
             std::string type = "l_serialize_OC_P2M_MD_" + iname + "_OD__KD__KD_Data";
+dumpModule("P2M/IIR :" + target, IIR);
         }
         else {
             HIR = lookupIR(inter.type);
             host = inter.fldName;
+dumpModule("P2M/HIR :" + host, HIR);
         }
     }
     for (auto FI: HIR->method) {
