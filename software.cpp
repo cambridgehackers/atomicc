@@ -97,17 +97,44 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
     if (softwareNameList.size() > 0) {
         int counter = 5;
         std::string enumList, sep;
+        std::string flist = "GENERATED_CPP = jni/GeneratedCppCallbacks.cpp \\\n   ";
+        ModuleIR *IR = allocIR("l_top");
+        irSeq.push_back(IR);
+        std::string dutType;
         for (auto item: softwareNameList) {
+            dutType = item.second.IR->name;
             std::string name = "IfcNames_" + item.first + (item.second.field.isPtr ? "H2S" : "S2H");
             enumList += sep + "[ \"" + name + "\", \"" + autostr(counter++) + "\" ]";
             sep = ", ";
+            flist += " jni/" + item.first + ".c";
         }
         OStrJ = fopen((outName + ".json").c_str(), "w");
         fprintf(OStrJ, jsonPrefix, enumList.c_str());
-        for (auto item: softwareNameList)
+        FILE *OStrFL = fopen((outName + ".filelist").c_str(), "w");
+        fprintf(OStrFL, "%s\n", flist.c_str());
+        std::string localName = "DUT__" + dutType;
+        std::string pipeName = "l_ainterface_OC_PipeIn";
+        IR->fields.push_back(FieldElement{localName, -1, dutType, false});
+        for (auto item: softwareNameList) {
             jsonGenerate(OStrJ, item.first, item.second);
+            bool outcall = item.second.field.isPtr;
+            std::string userTypeName = item.second.inter->name;
+            std::string userInterface = item.second.field.fldName;
+            std::string fieldName = outcall ? "M2P" : "P2M" + ("__" + userInterface);
+            ModuleIR *ifcIR = allocIR("l_module_OC_" + fieldName);
+            ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall});
+            ifcIR->interfaces.push_back(FieldElement{"pipe", -1, pipeName, outcall});
+            IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false});
+            IR->interfaces.push_back(FieldElement{userInterface, -1, pipeName, outcall});
+            IR->interfaceConnect.push_back(InterfaceConnectType{
+                localName + MODULE_SEPARATOR + userInterface,
+                fieldName + MODULE_SEPARATOR + "method", userTypeName});
+            IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
+                fieldName + MODULE_SEPARATOR + "pipe", pipeName});
+        }
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
+        fclose(OStrFL);
         std::string commandLine(exename);
         int ind = commandLine.rfind("/");
         if (ind == -1)
@@ -119,34 +146,6 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         printf("[%s:%d] RETURN from '%s' %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), ret);
         if (ret)
             return -1; // force error return to be propagated
-        FILE *OStrFL = fopen((outName + ".filelist").c_str(), "w");
-        std::string flist = "GENERATED_CPP = jni/GeneratedCppCallbacks.cpp \\\n   ";
-        for (auto item: softwareNameList)
-             flist += " jni/" + item.first + ".c";
-        fprintf(OStrFL, "%s\n", flist.c_str());
-        fclose(OStrFL);
-        ModuleIR *IR = allocIR("l_top");
-        irSeq.push_back(IR);
-        std::string localName = "lEcho";
-        for (auto item: softwareNameList) {
-            bool outcall = item.second.field.isPtr;
-            std::string userTypeName = item.second.inter->name;
-            std::string userInterface = item.second.field.fldName;
-            ModuleIR *ifcIR = allocIR(outcall ? "l_module_OC_M2P" : "l_module_OC_P2M");
-            std::string fieldName = outcall ? "lEIO" : "lERI";
-            ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall});
-            ifcIR->interfaces.push_back(FieldElement{"pipe", -1,
-                 "l_ainterface_OC_PipeIn", outcall});
-            IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false});
-            IR->interfaces.push_back(FieldElement{userInterface, -1,
-                 "l_ainterface_OC_PipeIn", outcall});
-            IR->interfaceConnect.push_back(InterfaceConnectType{
-                localName + MODULE_SEPARATOR + userInterface, fieldName + "$method",
-                userTypeName});
-            IR->interfaceConnect.push_back(InterfaceConnectType{
-                userInterface, fieldName + "$pipe", "l_ainterface_OC_PipeIn"});
-        }
-        IR->fields.push_back(FieldElement{localName, -1, "l_module_OC_Echo", false});
     }
     return 0;
 }

@@ -75,9 +75,14 @@ dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
             host = inter.fldName;
             std::string iname = inter.type.substr(16);
             IR->name = "l_module_OC_" + iname + "___M2P";
-            std::string type = "l_serialize_OC_M2P_MD_" + iname + "_OD__KD__KD_Data";
+            std::string type = "l_serialize_OC_" + iname + "__Data";
+            ModuleIR *II = lookupIR(type);
+            if (!II) {
+                II = allocIR(type);
+                II->interfaces.push_back(FieldElement{"ifc", -1, inter.type, false});
+            }
 printf("[%s:%d] IIIIIIIIIII iname %s IRNAME %s type %s\n", __FUNCTION__, __LINE__, iname.c_str(), IR->name.c_str(), type.c_str());
-            processSerialize(lookupIR(type));
+            processSerialize(II);
             pipeArgSize = convertType(type);
 dumpModule("M2P/HIR :" + host, HIR);
         }
