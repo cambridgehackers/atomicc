@@ -136,6 +136,7 @@ dumpModule("P2M/IIR :" + target, IIR);
         }
         else {
             HIR = lookupIR(inter.type);
+printf("[%s:%d] HIR type %s IR %p\n", __FUNCTION__, __LINE__, inter.type.c_str(), HIR);
             host = inter.fldName;
 dumpModule("P2M/HIR :" + host, HIR);
         }

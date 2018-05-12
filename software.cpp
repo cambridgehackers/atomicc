@@ -122,6 +122,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         std::string pipeName = "l_ainterface_OC_PipeIn";
         IR->fields.push_back(FieldElement{localName, -1, dutType, false});
         if (hasPrintf) {
+#if 0
             ModuleIR *muxDef = lookupIR(muxTypeName);
 printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
             if (muxDef)
@@ -151,6 +152,7 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
                 makeEnq("in$enq__ENA");
 dumpModule("MUX", muxDef);
             }
+#endif
             IR->fields.push_back(FieldElement{muxName, -1, muxTypeName, false});
         }
         localName += MODULE_SEPARATOR;

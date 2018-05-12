@@ -73,9 +73,9 @@ std::string tree2str(const ACCExpr *arg)
     std::string sep, op = arg->value;
     if (isParenChar(op[0]) || isIdChar(op[0])) {
         ret += op + " ";
-        op = "";
+        op = ",";
     }
-    if (!arg->operands.size())
+    else if (!arg->operands.size())
         ret += op;
     for (auto item: arg->operands) {
         ret += sep;
@@ -258,7 +258,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
          ACCExpr *titem = cleanupExpr(item);
-         if (titem->value != ret->value || ret->value == "?")
+         if (titem->value != ret->value || ret->value == "?" || isParenChar(ret->value[0]))
              ret->operands.push_back(titem);
          else
              for (auto oitem: titem->operands)

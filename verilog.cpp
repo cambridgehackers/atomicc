@@ -390,51 +390,68 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
     fprintf(OStr, "endmodule \n\n");
 }
 
+int exprSize(ACCExpr *expr)
+{
+    return 16;
+}
+
+typedef struct {
+    std::string format;
+    std::list<int> width;
+} PrintfInfo;
+static std::list<PrintfInfo> printfFormat;
+static int printfNumber = 1;
 static ACCExpr *printfArgs(ACCExpr *value)
 {
-dumpExpr("PRINTFLL", value);
-    value->value = "(";   // change from '{'
-    ACCExpr *listp = value, *next = value->operands.front(), *fitem = nullptr;
-    std::string format;
+    //value->value = "printfp$enq__ENA";
+    ACCExpr *listp = value->operands.front(); // get '{' node
+    ACCExpr *next = listp->operands.front();
     if (next->value == ",")
         listp = next;
+    ACCExpr *fitem = listp->operands.front();
+    listp->operands.pop_front();
+    std::string format = fitem->value;
+    if (endswith(format, "\\n\""))
+        format = format.substr(0, format.length()-3) + "\"";
+    std::list<int> width;
     unsigned index = 0;
-    next = allocExpr("");
+    next = allocExpr(",");
+    int total_length = 0;
     for (auto item: listp->operands) {
-        if (!fitem) {
-            fitem = item;
-            format = fitem->value;
-            if (endswith(format, "\\n\""))
-                format = format.substr(0, format.length()-3) + "\"";
-        }
-        else {
-            while (format[index] != '%' && index < format.length())
-                index++;
-            std::string val = item->value;
-            if (index < format.length()-1) {
-                if (format[index + 1] == 's' && val[0] == '"') {
-                    val = val.substr(1, val.length()-2);
-                    format = format.substr(0, index) + val + format.substr(index + 2);
-                    index += val.length();
-                    continue;
-                }
-                if (format[index + 1] == 'd' && isdigit(val[0])) {
-                    format = format.substr(0, index) + val + format.substr(index + 2);
-                    index += val.length();
-                    continue;
-                }
+        while (format[index] != '%' && index < format.length())
+            index++;
+        std::string val = item->value;
+        if (index < format.length()-1) {
+            if (format[index + 1] == 's' && val[0] == '"') {
+                val = val.substr(1, val.length()-2);
+                format = format.substr(0, index) + val + format.substr(index + 2);
+                index += val.length();
+                continue;
+            }
+            if (format[index + 1] == 'd' && isdigit(val[0])) {
+                format = format.substr(0, index) + val + format.substr(index + 2);
+                index += val.length();
+                continue;
             }
         }
+        int size = exprSize(item);
+        total_length += size;
+        width.push_back(size);
         next->operands.push_back(item);
     }
+    next->operands.push_back(allocExpr("16'd" + autostr(printfNumber++)));
+#define PRINTF_PORT 0x7fff
+    next->operands.push_back(allocExpr("16'd" + autostr(PRINTF_PORT)));
+    next->operands.push_back(allocExpr("16'd" + autostr((total_length + sizeof(int) * 8 - 1)/(sizeof(int) * 8) + 2)));
     listp->operands.clear();
     listp->operands = next->operands;
-    if (fitem)
-        fitem->value = format;
+    value = allocExpr("printfp$enq__ENA", allocExpr("{", allocExpr("{", next)));
+    printfFormat.push_back(PrintfInfo{format, width});
+dumpExpr("PRINTFLL", value);
     return value;
 }
 
-static void processMethod(MethodInfo *MI)
+static void processMethod(MethodInfo *MI, bool hasPrintf)
 {
     std::string methodName = MI->name;
     std::map<std::string, std::list<std::string>> condLines;
@@ -467,10 +484,17 @@ static void processMethod(MethodInfo *MI)
             condStr = "    if (" + walkTree(cond, nullptr) + ")";
         condLines[condStr].push_back("    " + tree2str(destt) + " <= " + walkTree(value, nullptr) + ";");
     }
+    if (!hasPrintf)
     for (auto info: MI->printfList) {
 printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
         ACCExpr *cond = cleanupExpr(info->cond);
-        ACCExpr *value = printfArgs(cleanupExpr(info->value)->operands.front());
+        ACCExpr *value = cleanupExpr(info->value)->operands.front();
+        value->value = "(";   // change from '{'
+        ACCExpr *listp = value->operands.front();
+        if (listp->value == ",")
+            listp = listp->operands.front();
+        if (endswith(listp->value, "\\n\""))
+            listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
 //dumpExpr("PRINTCOND", cond);
 //dumpExpr("PRINTF", value);
         std::string condStr;
@@ -505,6 +529,7 @@ printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
 static void generateModuleDef(ModuleIR *IR, FILE *OStr)
 {
 static std::list<ModData> modLine;
+    bool hasPrintf = false;
     std::map<std::string, ACCExpr *> enableList;
     refList.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
@@ -531,6 +556,9 @@ static std::list<ModData> modLine;
     }
     fprintf(OStr, ");\n");
     modLine.clear();
+    for (auto item: IR->interfaces)
+        if (item.fldName == "printfp")
+            hasPrintf = true;
 
     iterField(IR, CBAct {
             ModuleIR *itemIR = lookupIR(item.type);
@@ -551,6 +579,9 @@ static std::list<ModData> modLine;
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be generated for rules
             refList[methodName] = RefItem{1, MI->type, true, PIN_WIRE};
+        if (hasPrintf)
+            for (auto info: MI->printfList) // must be before callList processing
+                MI->callList.push_back(new CallListElement{printfArgs(info->value), info->cond, true});
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
@@ -726,7 +757,7 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
     }
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
-        processMethod(MI);
+        processMethod(MI, hasPrintf);
     }
     optimizeAssign();
     generateAssign(OStr);
@@ -743,4 +774,12 @@ void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::stri
     for (auto IR : irSeq)
         generateModuleDef(IR, OStrV); // Generate verilog
     fclose(OStrV);
+    FILE *OStrP = fopen((OutputDir + ".printf").c_str(), "w");
+    for (auto item: printfFormat) {
+        fprintf(OStrP, "ITEM %s: ", item.format.c_str());
+        for (auto witem: item.width)
+            fprintf(OStrP, "%d, ", witem);
+        fprintf(OStrP, "\n");
+    }
+    fclose(OStrP);
 }
