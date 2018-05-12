@@ -42,7 +42,8 @@ clean:
 
 CC=$(TOOLCHAIN)gcc
 CXX=$(TOOLCHAIN)g++
-CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR) -I$(CONNECTALDIR)/cpp -D__ATOMICC__
+CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR) -I$(CONNECTALDIR)/cpp -D__ATOMICC__ \
+    -std=c++11
 CFLAGS = $(CFLAGS_COMMON)
 
 PORTAL_INFRA := portal.c transportHardware.c transportSocket.c portalPrintf.c poller.cpp sock_utils.c timer.c

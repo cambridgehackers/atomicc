@@ -404,14 +404,13 @@ typedef struct {
 } PrintfInfo;
 static std::list<PrintfInfo> printfFormat;
 static int printfNumber = 1;
+#define PRINTF_PORT 0x7fff
 static ACCExpr *printfArgs(ACCExpr *value)
 {
     ACCExpr *listp = value->operands.front(); // get '{' node
     ACCExpr *fitem = listp->operands.front();
     listp->operands.pop_front();
     std::string format = fitem->value;
-    if (endswith(format, "\\n\""))
-        format = format.substr(0, format.length()-3) + "\"";
     std::list<int> width;
     unsigned index = 0;
     ACCExpr *next = allocExpr("{");
@@ -439,7 +438,6 @@ static ACCExpr *printfArgs(ACCExpr *value)
         next->operands.push_back(item);
     }
     next->operands.push_back(allocExpr("16'd" + autostr(printfNumber++)));
-#define PRINTF_PORT 0x7fff
     next->operands.push_back(allocExpr("16'd" + autostr(PRINTF_PORT)));
     next->operands.push_back(allocExpr("16'd" + autostr((total_length + sizeof(int) * 8 - 1)/(sizeof(int) * 8) + 2)));
     listp->operands.clear();
@@ -764,12 +762,14 @@ void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::stri
     for (auto IR : irSeq)
         generateModuleDef(IR, OStrV); // Generate verilog
     fclose(OStrV);
+    if (printfFormat.size()) {
     FILE *OStrP = fopen((OutputDir + ".printf").c_str(), "w");
     for (auto item: printfFormat) {
-        fprintf(OStrP, "ITEM %s: ", item.format.c_str());
+        fprintf(OStrP, "%s ", item.format.c_str());
         for (auto witem: item.width)
-            fprintf(OStrP, "%d, ", witem);
+            fprintf(OStrP, "%d ", witem);
         fprintf(OStrP, "\n");
     }
     fclose(OStrP);
+    }
 }
