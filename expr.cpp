@@ -251,6 +251,10 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
 {
     if (!expr)
         return expr;
+    if (expr->value == "(" && expr->operands.size() == 1)
+        expr = expr->operands.front();
+    if (expr->value == "{" && expr->operands.size() == 1 && expr->operands.front()->value == ",")
+        expr->operands = expr->operands.front()->operands;
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
     if (v == "^" && getRHS(expr)->value == "1")
@@ -415,8 +419,6 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
             else
                 head = TOP;
         }
-        if (head->value == "(" && head->operands.size() == 1)
-            head = head->operands.front();
     }
     head = cleanupExpr(head);
     return head;

@@ -21,6 +21,9 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+int trace_assign;//= 1;
+int trace_expand;//= 1;
+
 std::map<std::string, RefItem> refList;
 std::map<std::string, ModuleIR *> mapIndex;
 
@@ -65,7 +68,7 @@ if (trace_assign) {
 
 static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool force, int pin)
 {
-    ACCExpr *itemList = allocExpr(",");
+    ACCExpr *itemList = allocExpr("{");
     std::list<FieldItem> fieldList;
     getFieldList(fieldList, fldName, "", type, out != 0, force);
     for (auto fitem : fieldList) {
@@ -88,7 +91,7 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s\n", __
             setAssign(fitem.name, allocExpr(fnew), fitem.type);
     }
     if (itemList->operands.size())
-        setAssign(fldName, allocExpr("{", itemList), type);
+        setAssign(fldName, itemList, type);
 }
 
 static void addRead(MetaSet &list, ACCExpr *cond)
@@ -158,9 +161,9 @@ printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2s
         std::string sep, op = expr->value;
         if (isParenChar(op[0])) {
             ret += op + " ";
-            op = "";
+            op = ",";
         }
-        if (!expr->operands.size())
+        else if (!expr->operands.size())
             ret += op;
         for (auto item: expr->operands) {
             bool operand = checkOperand(item->value) || item->value == "," || item->value == "?" || expr->operands.size() == 1;
@@ -245,7 +248,7 @@ static void optimizeBitAssigns(void)
         std::string type = refList[item.first].type;
         uint64_t size = convertType(type), current = 0;
 printf("[%s:%d] BBBSTART %s type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), type.c_str());
-        ACCExpr *newVal = allocExpr(",");
+        ACCExpr *newVal = allocExpr("{");
         for (auto bitem: item.second) {
             uint64_t diff = bitem.first - current;
             if (diff > 0)
@@ -258,7 +261,7 @@ printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bi
         size -= current;
         if (size > 0)
             newVal->operands.push_back(allocExpr(autostr(size) + "'d0"));
-        setAssign(item.first, allocExpr("{", newVal), type);
+        setAssign(item.first, newVal, type);
     }
 
     // recursively process all replacements internal to the list of 'setAssign' items
@@ -403,11 +406,7 @@ static std::list<PrintfInfo> printfFormat;
 static int printfNumber = 1;
 static ACCExpr *printfArgs(ACCExpr *value)
 {
-    //value->value = "printfp$enq__ENA";
     ACCExpr *listp = value->operands.front(); // get '{' node
-    ACCExpr *next = listp->operands.front();
-    if (next->value == ",")
-        listp = next;
     ACCExpr *fitem = listp->operands.front();
     listp->operands.pop_front();
     std::string format = fitem->value;
@@ -415,7 +414,7 @@ static ACCExpr *printfArgs(ACCExpr *value)
         format = format.substr(0, format.length()-3) + "\"";
     std::list<int> width;
     unsigned index = 0;
-    next = allocExpr(",");
+    ACCExpr *next = allocExpr("{");
     int total_length = 0;
     for (auto item: listp->operands) {
         while (format[index] != '%' && index < format.length())
@@ -445,7 +444,7 @@ static ACCExpr *printfArgs(ACCExpr *value)
     next->operands.push_back(allocExpr("16'd" + autostr((total_length + sizeof(int) * 8 - 1)/(sizeof(int) * 8) + 2)));
     listp->operands.clear();
     listp->operands = next->operands;
-    value = allocExpr("printfp$enq__ENA", allocExpr("{", allocExpr("{", next)));
+    value = allocExpr("printfp$enq__ENA", allocExpr("{", next));
     printfFormat.push_back(PrintfInfo{format, width});
 dumpExpr("PRINTFLL", value);
     return value;
@@ -491,8 +490,6 @@ printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
         ACCExpr *value = cleanupExpr(info->value)->operands.front();
         value->value = "(";   // change from '{'
         ACCExpr *listp = value->operands.front();
-        if (listp->value == ",")
-            listp = listp->operands.front();
         if (endswith(listp->value, "\\n\""))
             listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
 //dumpExpr("PRINTCOND", cond);
@@ -666,23 +663,16 @@ dumpExpr("READCALL", value);
             auto AI = CI->params.begin();
             std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
             int argCount = CI->params.size();
-            ACCExpr *param = value->operands.front()->operands.front();
+            ACCExpr *param = value->operands.front();
 //printf("[%s:%d] param '%s'\n", __FUNCTION__, __LINE__, tree2str(param).c_str());
 //dumpExpr("param", param);
-            auto setParam = [&] (ACCExpr *item) -> void {
+            for (auto item: param->operands) {
                 if(argCount-- > 0) {
 //printf("[%s:%d] infmuxVL[%s] = cond '%s' tree '%s'\n", __FUNCTION__, __LINE__, (pname + AI->name).c_str(), tree2str(tempCond).c_str(), tree2str(item).c_str());
                     muxValueList[pname + AI->name].push_back(MuxValueEntry{tempCond, item});
                     //typeList[pname + AI->name] = AI->type;
                     AI++;
                 }
-            };
-            if (param) {
-                if (param->value == ",")
-                    for (auto item: param->operands)
-                        setParam(item);
-                else
-                    setParam(param);
             }
         }
     }

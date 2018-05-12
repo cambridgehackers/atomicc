@@ -21,9 +21,6 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-int trace_assign;//= 1;
-int trace_expand;//= 1;
-
 int main(int argc, char **argv)
 {
     std::list<ModuleIR *> irSeq;
