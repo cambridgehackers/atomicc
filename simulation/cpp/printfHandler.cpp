@@ -50,11 +50,20 @@ static void atomiccPrintfHandler(struct PortalInternal *p, unsigned int header)
     int len = header & 0xffff;
     int tmpfd;
     p->transport->recv(p, &p->map_base[1], len - 1, &tmpfd);
-unsigned short *data = ((unsigned short *)p->map_base) + 2;
-int findex = *data;
-printf("[%s:%d] header %x format %d = '%s'\n", __FUNCTION__, __LINE__, header, findex, printfFormat[findex].format.c_str());
-memdump((unsigned char *)p->map_base, len * sizeof(p->map_base[0]), "PRINTIND");
-assert(findex >= 0);
+    unsigned short *data = ((unsigned short *)p->map_base) + 2;
+    int printfNumber = *data++;
+    assert(printfNumber >= 0);
+    const char *format = printfFormat[printfNumber].format.c_str();
+    //printf("[%s:%d] header %x format %d = '%s'\n", __FUNCTION__, __LINE__, header, printfNumber, format);
+//memdump((unsigned char *)p->map_base, len * sizeof(p->map_base[0]), "PRINTIND");
+    int params[100], *pparam = params, *pdata = (int *)data;
+    for (auto item: printfFormat[printfNumber].width) {
+        memcpy(pparam, pdata, sizeof(*pparam));
+        pparam++;
+        pdata++;
+    }
+    printf(format, params[0], params[1], params[2], params[3],
+        params[4], params[5], params[6]);
 }
 
 void atomiccPrintfInit(const char *filename)
@@ -88,7 +97,12 @@ printf("[%s:%d] %s\n", __FUNCTION__, __LINE__, filename);
             exit(-1);
         }
         *bufp++ = 0;
-        printfFormat[printfNumber] = PrintfInfo{std::string(&buf[1])};
+        std::string format(&buf[1]);
+        int ind;
+        while ((ind = format.find("\\n")) != -1) {
+            format = format.substr(0,ind) + "\n" + format.substr(ind+2);
+        }
+        printfFormat[printfNumber] = PrintfInfo{format};
         while (*bufp) {
             while (*bufp == ' ')
                 bufp++;
@@ -97,7 +111,7 @@ printf("[%s:%d] %s\n", __FUNCTION__, __LINE__, filename);
             while(isdigit(*bufp))
                 bufp++;
         }
-        printf("[%s:%d] format %d = '%s'", __FUNCTION__, __LINE__, printfFormat[printfNumber].format.c_str());
+        //printf("[%s:%d] format %d = '%s'", __FUNCTION__, __LINE__, printfNumber, printfFormat[printfNumber].format.c_str());
         for (auto item: printfFormat[printfNumber].width)
              printf(" width=%d", item);
         printf("\n");
