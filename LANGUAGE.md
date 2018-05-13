@@ -136,3 +136,20 @@ written ("read before write").
 
 To permit rule scheduling to be dependent on the "enable" signals of methods and other rules, rules use "ready/valid" scheduling.
 
+## debugging with printf
+
+To aid debugging with a simulator, "printf" statements in __module declarations are
+translated to "$display" statements in the generated verilog.
+For debugging with synthesized hardware, "printf" statements are translated into
+indication packets sent through the NOC back to the software side host program.
+The format strings for the printf statements are placed into a generated file
+in generated/xxx.generated.printf along with a list of the bit lengths for each
+parameter to the printf.
+
+To use the NOC printf:
+   1) add the following line to the __module being tested:
+           __printf;
+   2) add a line similar to the following (with the 'xxx' replaced) to the test program:
+           atomiccPrintfInit("generated/rulec.generated.printf");
+
+That's it!
