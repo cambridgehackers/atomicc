@@ -53,7 +53,8 @@ static void atomiccPrintfHandler(struct PortalInternal *p, unsigned int header)
     unsigned short *data = ((unsigned short *)p->map_base) + 2;
     int printfNumber = *data++;
     assert(printfNumber >= 0);
-    const char *format = printfFormat[printfNumber].format.c_str();
+    std::string forstr = "RUNTIME: " + printfFormat[printfNumber].format;
+    const char *format = forstr.c_str();
     //printf("[%s:%d] header %x format %d = '%s'\n", __FUNCTION__, __LINE__, header, printfNumber, format);
 //memdump((unsigned char *)p->map_base, len * sizeof(p->map_base[0]), "PRINTIND");
     int params[100], *pparam = params, *pdata = (int *)data;
