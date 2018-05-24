@@ -36,50 +36,14 @@ else
 endif
 NDK_OBJCOPY=$(shell $(NDKPATH)ndk-which objcopy)
 
-ifneq ($(XILINX),)
-ifeq ($(OS),android)
 OBJCOPY?=$(NDK_OBJCOPY)
 BINFILE?=bin/mkTop.xdevcfg.bin.gz
-else #!android
-OBJCOPY?=$(TOOLCHAIN)objcopy
-BINFILE?=bin/mkTop.bin.gz
-endif #!android
-else #!XILINX
-OBJCOPY?= objcopy
-BINFILE?=bin/mkTop.sof.gz
-endif #!XILINX
-
 CONNECTAL_EXENAME?=ubuntu.exe
-CONNECTAL_EXENAME2?=ubuntu.exe2
-ifneq ($(CONNECTAL_SHARED),)
-EXENAME=connectal.so
-else
 EXENAME=$(CONNECTAL_EXENAME)
-endif
-EXENAME2=$(CONNECTAL_EXENAME2)
-
-ifeq ($(CONNECTAL_DEBUG),1)
-GDB=gdb
-GDB2=gdb
-else
-GDB= LD_PRELOAD=libSegFault.so SEGFAULT_USE_ALTSTACK=1 SEGFAULT_OUTPUT_NAME=bin/bsimexe-segv-output.txt
-GDB2= LD_PRELOAD=libSegFault.so SEGFAULT_USE_ALTSTACK=1 SEGFAULT_OUTPUT_NAME=bin/bsimexe2-segv-output.txt
-endif
-
-GDB_BSIM= LD_PRELOAD=libSegFault.so SEGFAULT_USE_ALTSTACK=1 SEGFAULT_OUTPUT_NAME=bin/bsim-segv-output.txt
-
 
 VIVADO=$(shell which vivado)
 export VIVADODIR=$(shell dirname $(shell dirname $(VIVADO))))
 VIVADOFLAGS= -notrace
-XVLOGFLAGS =
-
-ifeq ($(USE_BUILDCACHE),1)
-BUILDCACHE=$(shell cd $(CONNECTALDIR)/..; /bin/pwd)/buildcache/buildcache
-ifeq ("$(BUILDCACHE_CACHEDIR)", "")
-BUILDCACHE_CACHEDIR=$(shell cd $(CONNECTALDIR)/..; /bin/pwd)/fpgamake-cache
-endif
-endif
 
 VFILE=verilog/$(MKTOP).v
 
@@ -89,12 +53,6 @@ extratarget::
 # placeholder for variant targets
 
     exe: $(EXENAME)
-
-ubuntu.exe: prepare_bin_target
-	@echo "ubuntu.exe"
-	$(Q)cd jni; $(MAKE) --no-print-directory -f Ubuntu.mk ubuntu.exe
-	@cp -v jni/ubuntu.exe bin
-	@echo "ubuntu.exe done"
 
 ifneq ($(CONNECTAL_NOHARDWARE),1)
 BITS_DEPENDENCES ?= $(CONNECTAL_BITS_DEPENDENCES)
@@ -132,37 +90,7 @@ android.exe: prepare_bin_target
 	$(Q)if [ -f bin/mkTop.xdevcfg.bin.gz ]; then $(NDK_OBJCOPY) --remove-section fpgadata bin/android.exe; fi
 	$(Q)if [ -f bin/mkTop.xdevcfg.bin.gz ]; then $(NDK_OBJCOPY) --add-section fpgadata=bin/mkTop.xdevcfg.bin.gz bin/android.exe; fi
 
-RUN_SCRIPT?=$(CONNECTAL_RUN_SCRIPT)
-
-run:
-ifeq ($(CONNECTAL_SHARED),1)
-	$(RUN_BSC_LM_LICENSE_FILE) $(GDB) $(RUN_SCRIPT) ./bin/$(EXENAME2) $(RUN_ARGS); retcode=$$?; exit $$retcode
-else
-    ifeq ($(RUNSOURCE2),)
-	$(RUN_BSC_LM_LICENSE_FILE) $(GDB) $(RUN_SCRIPT) ./bin/$(EXENAME) $(RUN_ARGS); retcode=$$?; exit $$retcode
-    else
-	$(RUN_BSC_LM_LICENSE_FILE) $(GDB2) $(RUN_SCRIPT) ./bin/$(EXENAME2)& bsim2pid=$$!; $(RUN_SCRIPT) $(GDB) ./bin/$(EXENAME) $(RUN_ARGS); retcode=$$?; kill $$bsim2pid; exit $$retcode
-    endif
-endif # CONNECTAL_SHARED
-
-
-define SIM_C_RULE
-$1/$(notdir $(basename $3)).o: $3
-	mkdir -p $1
-	$(CC) -c $2 -o $1/$(notdir $(basename $3)).o $3
-endef
-define SIM_CXX_RULE
-$1/$(notdir $(basename $3)).o: $3
-	mkdir -p $1
-	$(CXX) -c $2 -o $1/$(notdir $(basename $3)).o $3
-endef
-
-$(foreach src, $(filter %.c, $(SIM_CXX_LOCAL) $(SIM_CXX_PROJECT)), $(eval $(call SIM_C_RULE, $(DTOP)/lib, $(SIM_CFLAGS), $(src))))
-$(foreach src, $(filter %.cpp, $(SIM_CXX_LOCAL) $(SIM_CXX_PROJECT)), $(eval $(call SIM_CXX_RULE, $(DTOP)/lib, $(SIM_CXXFLAGS), $(src))))
-SIM_OBJECTS = $(addprefix $(DTOP)/lib/, $(addsuffix .o, $(basename $(notdir $(SIM_CXX_LOCAL) $(SIM_CXX_PROJECT)))))
-
 VIVADODIR=$(realpath $(shell dirname $(VIVADO))/..)
-XSC_CFLAGS= -Wa,-W -fPIC -m64  -I"$(VIVADODIR)/data/xsim/include" -DSYSTEM_VERILOG -DBOARD_xsim -I$(CONNECTALDIR)/cpp -I$(CONNECTALDIR) -Ijni
 
 XVLOGDEFINES = $(subst -D,-d,$(BSVDEFINES))
 
@@ -175,63 +103,9 @@ VHDL_PRJ_FILE = $(wildcard $(addsuffix /xsim/vhdl.prj, $(XCIDIRS)))
 VLOG_PRJ_BLD  = $(addsuffix .bld, $(VLOG_PRJ_FILE))
 VHDL_PRJ_BLD  = $(addsuffix .bld, $(VHDL_PRJ_FILE))
 
-CVC64 ?= cvc64
-CVC_DEFINES = $(addprefix +define+, $(BSVDEFINES_LIST))
-CVC_TRACE_ARGS = +printstats +fstvars
-CVC_ARGS ?= 
-CVC_SOURCES = $(addprefix -v , $(wildcard $(BLUESPECDIR)/Verilog/*.v $(DTOP)/verilog/*.v))
-cvcsim: bin/cvcsim
-
-$(foreach src, $(filter %.c, $(SIM_CXX_LOCAL) $(SIM_CXX_PROJECT)), $(eval $(call SIM_C_RULE, vsim.dir/xsc, $(VSIM_CFLAGS), $(src))))
-$(foreach src, $(filter %.cpp, $(SIM_CXX_LOCAL) $(SIM_CXX_PROJECT)), $(eval $(call SIM_CXX_RULE, vsim.dir/xsc, $(VSIM_CXXFLAGS), $(src))))
-VSIM_OBJECTS = $(addprefix vsim.dir/xsc/, $(addsuffix .o, $(basename $(notdir $(SIM_CXX_LOCAL) $(SIM_CXX_PROJECT)))))
-
 SV_SEARCH_PATH = $(addprefix -y , $(VERILOG_PATH))
 SV_SEARCH_PATH += $(addprefix -y , $(addsuffix /submodules, $(VERILOG_PATH)))
 SV_SEARCH_PATH += $(addprefix -y , $(addsuffix /submodules/mentor, $(VERILOG_PATH)))
-VSIM_LIBRARY_FILES += $(addprefix -sv $(QUARTUSDIR)/eda/sim_lib/, altera_lnsim.sv)
-VSIM_LIBRARY_FILES += $(addprefix -v $(QUARTUSDIR)/eda/sim_lib/, altera_mf.v 220model.v sgate.v altera_primitives.v mentor/stratixv_atoms_ncrypt.v stratixv_atoms.v mentor/stratixv_hssi_atoms_ncrypt.v stratixv_hssi_atoms.v)
-VSIM_MISC_FILES = $(addprefix -sv , $(MODELSIM_FILES))
-
-vsim: verilog $(VSIM_OBJECTS)
-	rm -rf work
-	vlib work
-	vlog -timescale 1ns/1ps -dpiheader XsimTop.h $(VSIM_DEFINES) $(VSIM_SV) $(VSIM_LIBRARY_FILES) $(VSIM_MISC_FILES) +libext+.sv+.v $(SV_SEARCH_PATH) $(VERILOG_PATH:%=-y %) -sv verilog/*.v
-	$(CXX) $(CXXFLAGS_PROJECT) -O -g -I$(DTOP)/jni -shared -fPIC -g -o xsimtop.so $(VSIM_OBJECTS)
-
-obj/%.bvi: verilog/%.v
-	$(CONNECTALDIR)/scripts/extract-bvi-schedule.py -d obj verilog/$(*).v
-
-define BSV_BO_RULE
-$(1): $(2) $(3) $(4)
-	$(Q)mkdir -p $(DTOP)/obj verilog
-	@echo BSV_BO  [$(2)]
-	$(Q)MAKEFLAGS="" $(RUN_BSC) $(2)
-endef
-
-define BSV_V_RULE
-$(2): $(3) $(4) $(5)
-	$(Q)mkdir -p $(DTOP)/obj verilog
-	@echo BSCVERILOG [$(1)]
-	cd generatedbsv; MAKEFLAGS="" $(RUN_BSC) -g $(1) $(3)
-	$(Q)sed -i 's|// On .*|// timestamp removed|' verilog/*.v
-	$(Q)sed -i 's|Prelude_inst_changeSpecialWires|csw|g' verilog/*.v
-	$(Q)sed -i 's|  reg.*PROBE[,;]|(* mark_debug="true" *)&|' verilog/*.v 
-	$(Q)sed -i 's|  wire.*PROBE[,;]|(* mark_debug="true" *)&|' verilog/*.v 
-	$(Q)sed -i 's|  wire.*PROBE_VALID[,;]|(* mark_debug="true" *)&|' verilog/*.v 
-endef
-
-#jca include obj/Makefile
-
-$(VFILE): $(addprefix obj/, $(patsubst %.bsv, %.bo, $(notdir $(TOPBSVFILE))))
-	$(Q)mkdir -p verilog $(DTOP)/obj
-	@echo BSCVERILOG [$(VFILE)]
-	$(Q)cd generatedbsv; MAKEFLAGS="" $(RUN_BSC) -g $(MKTOP) $(TOPBSVFILE)
-	$(Q)sed -i 's|// On .*|// timestamp removed|' verilog/*.v
-	$(Q)sed -i 's|Prelude_inst_changeSpecialWires|csw|g' verilog/*.v
-	$(Q)sed -i 's|  reg.*PROBE[,;]|(* mark_debug="true" *)&|' verilog/*.v 
-	$(Q)sed -i 's|  wire.*PROBE[,;]|(* mark_debug="true" *)&|' verilog/*.v 
-	$(Q)sed -i 's|  wire.*PROBE_VALID[,;]|(* mark_debug="true" *)&|' verilog/*.v 
 
 verilog: $(VFILE)
 	@echo "verilog"

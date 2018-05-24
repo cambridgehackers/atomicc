@@ -1,31 +1,17 @@
 
 
-##    run: run the program
-##         pass parameters to software via 'make RUN_ARGS= run'
-RUN_ARGS?=
-
 export DTOP=$(PWD)
 CONNECTALDIR=$(DTOP)/../connectal
 
 BOARD=zybo
 MKTOP=mkZynqTop
 OS=android
-#TOOLCHAIN?=
 DUT=mkzynqtop
 
-#TRACE_PORTAL=TRACE_PORTAL
-#NumberOfUserTiles=1
-#SlaveDataBusWidth=32
-#SlaveControlAddrWidth=5
-#BurstLenSize=10
-#project_dir=$(DTOP)
-#MainClockPeriod=10
-#DerivedClockPeriod=5.000000
 XILINX=1
 ZYNQ=ZYNQ
 ZynqHostInterface=ZynqHostInterface
 PhysAddrWidth=32
-#NUMBER_OF_LEDS=4
 CONNECTAL_BITS_DEPENDENCES=hw/mkTop.bit
 CONNECTAL_RUN_SCRIPT=$(CONNECTALDIR)/scripts/run.android
 CONNECTAL_EXENAME=android.exe
@@ -45,3 +31,5 @@ hw/mkTop.bit: prepare_bin_target  fpgamake.mk
 	$(Q)mkdir -p hw
 	$(Q)$(MAKE) -f fpgamake.mk
 
+unneeded:
+	rm -rf Cache/ Impl/ Synth/ bin/ obj libs hw vivado* .Xil syntax.timestamp
