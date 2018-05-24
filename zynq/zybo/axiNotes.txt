@@ -1,0 +1,45 @@
+
+///////////////// Read ////////////////////////
+        ARADDR	  output [31:0]
+        ARBURST	  output [1:0]
+        ARCACHE	  output [3:0]
+        ARID	  output [11:0]
+        ARLEN	  output [3:0]
+        ARLOCK	  output [1:0]
+        ARPROT	  output [2:0]
+        ARQOS	  output [3:0]
+        ARSIZE	  output [1:0]
+        ARVALID	  output
+        ARREADY	  input
+
+        RDATA	  input [31:0]
+        RID	  input [11:0]
+        RLAST	  input
+        RRESP	  input [1:0]
+        RVALID	  input
+        RREADY	  output
+
+///////////////// Write ////////////////////////
+        AWADDR	  output [31:0]
+        AWBURST	  output [1:0]
+        AWCACHE	  output [3:0]
+        AWID	  output [11:0]
+        AWLEN	  output [3:0]
+        AWLOCK	  output [1:0]
+        AWPROT	  output [2:0]
+        AWQOS	  output [3:0]
+        AWSIZE	  output [1:0]
+        AWVALID	  output
+        AWREADY	  input
+
+        WDATA	  output [31:0]
+        WID	  output [11:0]
+        WLAST	  output
+        WSTRB	  output [3:0]
+        WVALID	  output
+        WREADY	  input
+
+        BID	  input [11:0]
+        BRESP	  input [1:0]
+        BVALID	  input
+        BREADY	  output
