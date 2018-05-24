@@ -1,10 +1,10 @@
 
 module mkConnectalTop( input  CLK, input  RST_N,
   input  [33 : 0] ReadReq, input  EN_ReadReq, output RDY_ReadReq,
-  input  EN_ReadData, output [38 : 0] ReadData, output RDY_ReadData,
+  input  EN_ReadData, output [46 : 0] ReadData, output RDY_ReadData,
   input  [33 : 0] WriteReq, input  EN_WriteReq, output RDY_WriteReq,
   input  [38 : 0] WriteData, input  EN_WriteData, output RDY_WriteData,
-  input  EN_WriteDone, output [5 : 0] WriteDone, output RDY_WriteDone,
+  input  EN_WriteDone, output [13 : 0] WriteDone, output RDY_WriteDone,
   output interrupt_0__read);
 
   reg ctrlPort_0_interruptEnableReg, ctrlPort_1_interruptEnableReg, CMRlastWriteDataSeen;
@@ -95,9 +95,11 @@ module mkConnectalTop( input  CLK, input  RST_N,
   FIFO2 #(.width(22), .guarded(1)) reqPortal(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({readAddrupdate, readburstCount, read_reqFifo_D_OUT[5:0], readFirstNext}), .ENQ(readAddr_EN),
         .D_OUT(reqPortal_D_OUT), .DEQ(RULEread), .FULL_N(reqPortal_FULL_N), .EMPTY_N(reqPortal_EMPTY_N));
+wire [38 : 0] ts_0_ReadData;
   FIFO2 #(.width(39), .guarded(1)) ReadDataFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({portalRControl ? reqInfo : requestValue, reqPortal_D_OUT[6:0]}), .ENQ(RULEread),
-        .D_OUT(ReadData), .DEQ(EN_ReadData), .FULL_N(ReadDataFifo_FULL_N), .EMPTY_N(RDY_ReadData));
+        .D_OUT(ts_0_ReadData), .DEQ(EN_ReadData && RDY_ReadData), .FULL_N(ReadDataFifo_FULL_N), .EMPTY_N(RDY_ReadData));
+  assign ReadData = { ts_0_ReadData[38:7], 9'd64, ts_0_ReadData[6:1] };
 
 //write
   reg writeFirst, writeLast;
@@ -140,8 +142,8 @@ module mkConnectalTop( input  CLK, input  RST_N,
   FIFO2 #(.width(22), .guarded(1)) writeFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({ writeAddrupdate, writeburstCount, write_reqFifo_D_OUT[5:0], writeFirstNext }), .ENQ(writeAddr_EN),
         .D_OUT(writeFifo_D_OUT), .DEQ(RULEwrite), .FULL_N(writeFifo_FULL_N), .EMPTY_N(writeFifo_EMPTY_N));
-  FIFO1 #(.width(6), .guarded(1)) CMRdoneFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
-        .D_IN(writeFifo_D_OUT[6:1]), .ENQ(reqdoneFifo_ENQ),
+  FIFO1 #(.width(14), .guarded(1)) CMRdoneFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
+        .D_IN( { 8'd0, writeFifo_D_OUT[6:1]}), .ENQ(reqdoneFifo_ENQ),
         .D_OUT(WriteDone), .DEQ(EN_WriteDone), .FULL_N(WriteDone_FULL_N), .EMPTY_N(RDY_WriteDone));
 
   always@(posedge CLK)

@@ -179,48 +179,14 @@ module mkZynqTop( input  CLK, input  RST_N,
         .PSPORB(FIXED_IO_ps_porb), .PSSRSTB(FIXED_IO_ps_srstb), .MIO(MIO));
 /* verilator lint_on PINMISSING */
 
-  wire [38 : 0] ts_0_ReadData, ts_0_WriteData;
-  wire [33 : 0] ts_0_ReadReq, ts_0_WriteReq;
-  wire [5 : 0] ts_0_WriteDone;
-  wire ts_0_RDY_ReadData, ts_0_RDY_ReadReq, ts_0_RDY_WriteData, ts_0_RDY_WriteDone, ts_0_RDY_WriteReq;
-  wire RULEwriteReq, RULEwriteDone, RULEwriteData;
-  wire bufferWriteReq_EMPTY_N, bufferWriteReq_FULL_N;
-  wire bufferWriteData_EMPTY_N, bufferWriteData_FULL_N;
-  wire bufferWriteDone_FULL_N, bufferReadData_FULL_N;
-  assign RULEwriteDone = !maxigp0BVALID && ts_0_RDY_WriteDone ;
-  assign RULEwriteReq = bufferWriteReq_EMPTY_N && ts_0_RDY_WriteReq ;
-  assign RULEwriteData = bufferWriteData_EMPTY_N && ts_0_RDY_WriteData;
-  assign maxigp0AWREADY = maxigp0AWVALID && !bufferWriteReq_EMPTY_N;
-  assign maxigp0WREADY = maxigp0WVALID && !bufferWriteData_EMPTY_N;
+  wire ts_0_RDY_WriteDone;
 
-  FIFO2 #(.width(14), .guarded(1)) bufferWriteDone(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
-        .D_IN( { 8'd0, ts_0_WriteDone }), .ENQ(RULEwriteDone),
-        .D_OUT(maxigp0BRESP), .DEQ(maxigp0BVALID && maxigp0BREADY ),
-        .FULL_N(bufferWriteDone_FULL_N), .EMPTY_N(maxigp0BVALID));
-  FIFO1 #(.width(34), .guarded(1)) bufferWriteReq(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
-        .D_IN({ maxigp0AWADDR[17:0], { 4'd0, maxigp0AWLEN + 4'd1, 2'd0 }, maxigp0AWID[5:0] }), .ENQ(maxigp0AWREADY),
-        .D_OUT(ts_0_WriteReq), .DEQ(RULEwriteReq), .FULL_N(bufferWriteReq_FULL_N), .EMPTY_N(bufferWriteReq_EMPTY_N));
-  FIFO2 #(.width(39), .guarded(1)) bufferWriteData(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
-        .D_IN({maxigp0WDATA, maxigp0WID[5:0], maxigp0WLAST }), .ENQ(maxigp0WREADY),
-        .D_OUT(ts_0_WriteData), .DEQ(RULEwriteData), .FULL_N(bufferWriteData_FULL_N), .EMPTY_N(bufferWriteData_EMPTY_N));
-
-  wire bufferReadReq_EMPTY_N, bufferReadReq_FULL_N, RULEreadReq, RULEreadData;
-  assign maxigp0ARREADY = maxigp0ARVALID && !bufferReadReq_EMPTY_N;
-  assign RULEreadReq = bufferReadReq_EMPTY_N && ts_0_RDY_ReadReq ;
-  assign RULEreadData = !maxigp0RVALID && ts_0_RDY_ReadData;
-
-  FIFO1 #(.width(34), .guarded(1)) bufferReadReq(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
-        .D_IN( { maxigp0ARADDR[17:0], { 4'd0, maxigp0ARLEN + 4'd1, 2'd0 }, maxigp0ARID[5:0] }), .ENQ(maxigp0ARREADY),
-        .D_OUT(ts_0_ReadReq), .DEQ(RULEreadReq), .FULL_N(bufferReadReq_FULL_N), .EMPTY_N(bufferReadReq_EMPTY_N));
-  FIFO2 #(.width(47), .guarded(1)) bufferReadData(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
-        .D_IN({ ts_0_ReadData[38:7], 9'd64, ts_0_ReadData[6:1] }), .ENQ(RULEreadData),
-        .D_OUT(maxigp0RDATA), .DEQ(maxigp0RVALID && maxigp0RREADY), .FULL_N(bufferReadData_FULL_N), .EMPTY_N(maxigp0RVALID));
-
+assign maxigp0BVALID = ts_0_RDY_WriteDone && maxigp0BREADY;
   mkConnectalTop ts_0(.CLK(ps7_fclk_0_c_O), .RST_N(ps7_freset_0_r_O),
-        .ReadReq(ts_0_ReadReq), .EN_ReadReq(RULEreadReq), .RDY_ReadReq(ts_0_RDY_ReadReq),
-        .ReadData(ts_0_ReadData), .EN_ReadData(RULEreadData), .RDY_ReadData(ts_0_RDY_ReadData),
-        .WriteReq(ts_0_WriteReq), .EN_WriteReq(RULEwriteReq), .RDY_WriteReq(ts_0_RDY_WriteReq),
-        .WriteData(ts_0_WriteData), .EN_WriteData(RULEwriteData), .RDY_WriteData(ts_0_RDY_WriteData),
-        .WriteDone(ts_0_WriteDone), .EN_WriteDone(RULEwriteDone), .RDY_WriteDone(ts_0_RDY_WriteDone),
+        .ReadReq({ maxigp0ARADDR[17:0], { 4'd0, maxigp0ARLEN + 4'd1, 2'd0 }, maxigp0ARID[5:0] }), .EN_ReadReq(maxigp0ARVALID), .RDY_ReadReq(maxigp0ARREADY),
+        .ReadData(maxigp0RDATA), .EN_ReadData(maxigp0RREADY), .RDY_ReadData(maxigp0RVALID),
+        .WriteReq({ maxigp0AWADDR[17:0], { 4'd0, maxigp0AWLEN + 4'd1, 2'd0 }, maxigp0AWID[5:0] }), .EN_WriteReq(maxigp0AWVALID && maxigp0AWREADY), .RDY_WriteReq(maxigp0AWREADY),
+        .WriteData({maxigp0WDATA, maxigp0WID[5:0], maxigp0WLAST }), .EN_WriteData(maxigp0WVALID && maxigp0WREADY), .RDY_WriteData(maxigp0WREADY),
+        .WriteDone(maxigp0BRESP), .EN_WriteDone(maxigp0BREADY), .RDY_WriteDone(ts_0_RDY_WriteDone),
         .interrupt_0__read(ts_0_interrupt_0__read));
 endmodule  // mkZynqTop
