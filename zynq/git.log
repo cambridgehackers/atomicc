@@ -1,0 +1,77 @@
+diff --git a/Makefile.connectal b/Makefile.connectal
+index e679652..85ee4ab 100644
+--- a/Makefile.connectal
++++ b/Makefile.connectal
+@@ -113,8 +113,8 @@ endif
+ INTERFACES += MemServerRequest MMURequest MemServerIndication MMUIndication
+ BSVFILES += $(CONNECTALDIR)/bsv/ConnectalMemory.bsv
+ ifneq ($(NUMBER_OF_MASTERS), 0)
+-CPPFILES += $(CONNECTALDIR)/cpp/dmaManager.c $(CONNECTALDIR)/cpp/platformMemory.cpp
+-CPPFILES2_dma = $(CONNECTALDIR)/cpp/dmaManager.c $(CONNECTALDIR)/cpp/platformMemory.cpp
++#CPPFILES += $(CONNECTALDIR)/cpp/dmaManager.c $(CONNECTALDIR)/cpp/platformMemory.cpp
++#CPPFILES2_dma = $(CONNECTALDIR)/cpp/dmaManager.c $(CONNECTALDIR)/cpp/platformMemory.cpp
+ endif
+ 
+ INTERFACES_cnoc = XsimMsgRequest XsimMsgIndication
+diff --git a/cpp/portal.h b/cpp/portal.h
+index 4b15268..144ab22 100644
+--- a/cpp/portal.h
++++ b/cpp/portal.h
+@@ -60,7 +60,7 @@ extern int noprogram;
+ // Other constants
+ #define MAX_TIMERS    50
+ #define MAX_CLIENT_FD 10
+-#define DEFAULT_TILE  1
++#define DEFAULT_TILE  0 //jca 1
+ 
+ /*
+  * Function vector for portal transport primitives used in generated C code
+diff --git a/examples/echo/Makefile b/examples/echo/Makefile
+index 68d5fd9..0a32b9f 100644
+--- a/examples/echo/Makefile
++++ b/examples/echo/Makefile
+@@ -1,3 +1,5 @@
++#PLATFORM_NUMBER_OF_MASTERS=0
++#NUMBER_OF_MASTERS=0
+ CONNECTALDIR?=../..
+ S2H_INTERFACES = EchoRequest:Echo.request
+ H2S_INTERFACES = Echo:EchoIndication
+diff --git a/examples/echo/testecho.cpp b/examples/echo/testecho.cpp
+index fb1536c..b7103d9 100644
+--- a/examples/echo/testecho.cpp
++++ b/examples/echo/testecho.cpp
+@@ -37,7 +37,7 @@ public:
+     }
+     virtual void heard2(uint16_t a, uint16_t b) {
+         sem_post(&sem_heard2);
+-        //printf("heard an echo2: %ld %ld\n", a, b);
++        printf("heard an echo2: %d %d\n", a, b);
+     }
+     EchoIndication(unsigned int id) : EchoIndicationWrapper(id) {}
+ };
+diff --git a/scripts/Makefile.connectal.application b/scripts/Makefile.connectal.application
+index b68eb28..3e7d69d 100644
+--- a/scripts/Makefile.connectal.application
++++ b/scripts/Makefile.connectal.application
+@@ -27,7 +27,7 @@ endif
+ 
+ include $(DTOP)/jni/Makefile.generated_files
+ 
+-PORTAL_INFRA := portal.c transportHardware.c transportSocket.c transportShared.c transportSerial.c portalJson.c portalPrintf.c poller.cpp sock_utils.c timer.c
++PORTAL_INFRA := portal.c transportHardware.c transportSocket.c portalJson.c portalPrintf.c poller.cpp sock_utils.c timer.c
+ PORTAL_SRC_FILES := $(addprefix $(CONNECTALDIR)/cpp/, $(PORTAL_INFRA)) \
+       $(addprefix $(DTOP)/jni/,  $(GENERATED_CPP))
+ 
+diff --git a/scripts/Makefile.connectal.build b/scripts/Makefile.connectal.build
+index a3cb266..ba6a8d6 100644
+--- a/scripts/Makefile.connectal.build
++++ b/scripts/Makefile.connectal.build
+@@ -140,7 +140,7 @@ endif
+ ifneq ($(BSC_LM_LICENSE_FILE),)
+ RUN_BSC_LM_LICENSE_FILE=LM_LICENSE_FILE=$(BSC_LM_LICENSE_FILE)
+ endif
+-RUN_BSC = $(RUN_BSC_LM_LICENSE_FILE) BUILDCACHE_CACHEDIR=$(BUILDCACHE_CACHEDIR) $(BUILDCACHE) bsc $(BSC_QUIET) $(BSCFLAGS_COMMON) $(BSCFLAGS_PROJECT) $(BSCFLAGS_EXTRA) -p +:$(BSVPATH)
++RUN_BSC = $(RUN_BSC_LM_LICENSE_FILE) BUILDCACHE_CACHEDIR=$(BUILDCACHE_CACHEDIR) $(BUILDCACHE) echo bsc $(BSC_QUIET) $(BSCFLAGS_COMMON) $(BSCFLAGS_PROJECT) $(BSCFLAGS_EXTRA) -p +:$(BSVPATH)
+ VFILE=verilog/$(MKTOP).v
+ 
+ all: exe bits extratarget
