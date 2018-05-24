@@ -1,0 +1,6 @@
+#
+set -x
+set -e
+~/git/connectal/scripts/power.py 192.168.2.79 pset 1 0
+sleep 2
+~/git/connectal/scripts/power.py 192.168.2.79 pset 1 1
