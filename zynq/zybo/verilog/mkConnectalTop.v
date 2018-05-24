@@ -208,8 +208,9 @@ module mkHACK(input CLK, input  RST_N,
     output RDY_indication,
     output RDY_requestEnq);
 
-  reg RDY_requestEnq, requestNotFull, RDY_indicationDeq, RDY_indicationData, indicationNotEmpty;
-  reg [31 : 0] indicationData;
+  reg RDY_requestEnq, requestNotFull;
+  wire RDY_indicationDeq, RDY_indicationData, indicationNotEmpty;
+  wire [31 : 0] indicationData;
 
   wire RDY_req0_enq, RDY_req1_enq, RDY_req2_enq, ind0_notEmpty, ind1_notEmpty;
   wire reqIntrStatus, indIntrStatus;
@@ -235,11 +236,11 @@ module mkHACK(input CLK, input  RST_N,
       2'd2: requestNotFull = req2_notFull;
       2'd3: requestNotFull = 1'b0 /* unspecified value */ ;
     endcase
-    indicationNotEmpty = selectIndication[0] ? ind1_notEmpty : ind0_notEmpty;
-    indicationData = selectIndication[0] ? ind1_first : ind0_first;
-    RDY_indicationData = selectIndication[0] ? RDY_ind1_first : RDY_ind0_first;
-    RDY_indicationDeq = selectIndication[0] ? RDY_ind1_deq : RDY_ind0_deq;
   end
+  assign indicationNotEmpty = selectIndication[0] ? ind1_notEmpty : ind0_notEmpty;
+  assign indicationData = selectIndication[0] ? ind1_first : ind0_first;
+  assign RDY_indicationData = selectIndication[0] ? RDY_ind1_first : RDY_ind0_first;
+  assign RDY_indicationDeq = selectIndication[0] ? RDY_ind1_deq : RDY_ind0_deq;
   assign RDY_indication = RDY_indicationDeq && RDY_indicationData;
   assign reqIntrChannel = reqIntrStatus ? (dutreqIntrChannel + 32'd1) : 32'd0;
   assign indIntrChannel = indIntrStatus ? (dutindIntrChannel + 32'd1) : 32'd0;
