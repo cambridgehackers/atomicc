@@ -1,10 +1,10 @@
 
 include $(CLEAR_VARS)
-DTOP?=/home/jca/git/connectal/examples/echo/zybo
-CONNECTALDIR?=/home/jca/git/connectal
+DTOP?=/home/jca/git/atomicc/zynq/zybo
+CONNECTALDIR?=/home/jca/git/atomicc/zynq/connectal
 LOCAL_ARM_MODE := arm
 include $(CONNECTALDIR)/scripts/Makefile.connectal.application
-LOCAL_SRC_FILES := /home/jca/git/connectal/examples/echo/testecho.cpp $(PORTAL_SRC_FILES)
+LOCAL_SRC_FILES := $(DTOP)/../testecho.cpp $(PORTAL_SRC_FILES)
 
 LOCAL_PATH :=
 LOCAL_MODULE := android.exe
