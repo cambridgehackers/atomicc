@@ -1,4 +1,4 @@
-module mkZynqTop( input  CLK, input  RST_N,
+module mkZynqTop( input  zzCLK, input  zzRST_N,
   inout  [14 : 0] DDR_Addr, inout  [2 : 0] DDR_BankAddr,
   inout  DDR_CAS_n, inout  DDR_CKE, inout  DDR_CS_n, inout  DDR_Clk_n, inout  DDR_Clk_p,
   inout  [3 : 0] DDR_DM, inout  [31 : 0] DDR_DQ,
@@ -54,7 +54,7 @@ module mkZynqTop( input  CLK, input  RST_N,
   wire maxigp0AWREADY, maxigp0WREADY, maxigp0BVALID, maxigp0ARREADY, maxigp0RVALID;
   wire [46 : 0] maxigp0RDATA;
   wire [13 : 0] maxigp0BRESP;
-  wire ts_0_interrupt_0__read;
+  wire interrupt_0__read;
 /* verilator lint_off PINMISSING */
   PS7 ps7_ps7_foo(.MAXIGP0ACLK(ps7_fclk_0_c_O),
         .MAXIGP1ACLK(ps7_fclk_0_c_O), .SAXIACPACLK(ps7_fclk_0_c_O), .SAXIGP0ACLK(ps7_fclk_0_c_O),
@@ -62,7 +62,7 @@ module mkZynqTop( input  CLK, input  RST_N,
         .SAXIHP2ACLK(ps7_fclk_0_c_O), .SAXIHP3ACLK(ps7_fclk_0_c_O),
         .DDRARB(0), .EMIOGPIOI(0), .EMIOI2C0SCLI(0), .EMIOI2C0SDAI(0), .EMIOI2C1SCLI(0),
         .EMIOI2C1SDAI(0), .EMIOSRAMINTIN(0), .EVENTEVENTI(0), .FCLKCLKTRIGN(0), .FPGAIDLEN(1),
-        .IRQF2P({ 19'b0, ts_0_interrupt_0__read}),
+        .IRQF2P({ 19'b0, interrupt_0__read}),
 
         .MAXIGP0ARADDR(maxigp0ARADDR), .MAXIGP0ARID(maxigp0ARID), .MAXIGP0ARLEN(maxigp0ARLEN),
         .MAXIGP0ARVALID(maxigp0ARVALID), .MAXIGP0ARREADY(maxigp0ARREADY),
@@ -179,45 +179,9 @@ module mkZynqTop( input  CLK, input  RST_N,
         .PSPORB(FIXED_IO_ps_porb), .PSSRSTB(FIXED_IO_ps_srstb), .MIO(MIO));
 /* verilator lint_on PINMISSING */
 
-  wire ts_0_RDY_WriteDone;
-
-assign maxigp0BVALID = ts_0_RDY_WriteDone && maxigp0BREADY;
   wire CLK, RST_N;
-  wire [33 : 0] ReadReq;
-  wire EN_ReadReq;
-  wire RDY_ReadReq;
-  wire EN_ReadData;
-  wire [46 : 0] ReadData;
-  wire RDY_ReadData;
-  wire [33 : 0] WriteReq;
-  wire EN_WriteReq;
-  wire RDY_WriteReq;
-  wire [38 : 0] WriteData;
-  wire EN_WriteData;
-  wire RDY_WriteData;
-  wire EN_WriteDone;
-  wire [13 : 0] WriteDone;
-  wire RDY_WriteDone;
-  wire interrupt_0__read;
-
   assign CLK = ps7_fclk_0_c_O;
   assign RST_N = ps7_freset_0_r_O;
-  assign ReadReq = { maxigp0ARADDR[17:0], { 4'd0, maxigp0ARLEN + 4'd1, 2'd0 }, maxigp0ARID[5:0] };
-  assign EN_ReadReq = maxigp0ARVALID;
-  assign RDY_ReadReq = maxigp0ARREADY;
-  assign ReadData = maxigp0RDATA;
-  assign EN_ReadData = maxigp0RREADY;
-  assign RDY_ReadData = maxigp0RVALID;
-  assign WriteReq = { maxigp0AWADDR[17:0], { 4'd0, maxigp0AWLEN + 4'd1, 2'd0 }, maxigp0AWID[5:0] };
-  assign EN_WriteReq = maxigp0AWVALID && maxigp0AWREADY;
-  assign RDY_WriteReq = maxigp0AWREADY;
-  assign WriteData = {maxigp0WDATA, maxigp0WID[5:0], maxigp0WLAST };
-  assign EN_WriteData = maxigp0WVALID && maxigp0WREADY;
-  assign RDY_WriteData = maxigp0WREADY;
-  assign WriteDone = maxigp0BRESP;
-  assign EN_WriteDone = maxigp0BREADY;
-  assign RDY_WriteDone = ts_0_RDY_WriteDone;
-  assign interrupt_0__read = ts_0_interrupt_0__read;
 
   reg ctrlPort_0_interruptEnableReg, ctrlPort_1_interruptEnableReg, CMRlastWriteDataSeen;
   reg readFirst, readLast, selectRIndReq, portalRControl, selectWIndReq, portalWControl;
@@ -284,19 +248,23 @@ assign maxigp0BVALID = ts_0_RDY_WriteDone && maxigp0BREADY;
     endcase
   end
 
-  assign RDY_ReadReq = !reqArs_EMPTY_N;
+  assign maxigp0ARREADY = !reqArs_EMPTY_N;
   assign readAddr_EN = read_reqFifo_EMPTY_N && reqPortal_FULL_N;
+  wire [15 : 0] readBottom;
+  assign readBottom = { { 4'd0, maxigp0ARLEN + 4'd1, 2'd0 }, maxigp0ARID[5:0] };
 
   FIFO1 #(.width(2), .guarded(1)) reqrs(.RST(RST_N), .CLK(CLK), .CLR(0),
-        .D_IN(ReadReq[22:21] - 2'd1), .ENQ(EN_ReadReq),
+        .D_IN(maxigp0ARADDR[6:5] - 2'd1), .ENQ(maxigp0ARVALID),
         .D_OUT(selectIndication), .DEQ(RULEread && (!selectRIndReq || reqPortal_D_OUT[0])), .FULL_N(reqrs_FULL_N), .EMPTY_N(reqrs_EMPTY_N));
+  wire [33 : 0] ReadReq;
+  assign ReadReq = { maxigp0ARADDR[17:0], readBottom};
   FIFO1 #(.width(21), .guarded(1)) reqArs(.RST(RST_N), .CLK(CLK), .CLR(0),
-        .D_IN(ReadReq[20:0]), .ENQ(EN_ReadReq),
+        .D_IN(ReadReq[20:0]), .ENQ(maxigp0ARVALID),
         .D_OUT(reqArs_D_OUT), .DEQ(reqArs_EMPTY_N), .FULL_N(reqArs_FULL_N), .EMPTY_N(reqArs_EMPTY_N));
   always@(posedge CLK) begin
-        if (EN_ReadReq) begin
-            portalRControl <= ReadReq[27:21] == 7'd0;
-            selectRIndReq <= ReadReq[28];
+        if (maxigp0ARVALID) begin
+            portalRControl <= maxigp0ARADDR[11:5] == 7'd0;
+            selectRIndReq <= maxigp0ARADDR[12];
         end
   end
   FIFO1 #(.width(21), .guarded(1)) read_reqFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
@@ -310,8 +278,8 @@ assign maxigp0BVALID = ts_0_RDY_WriteDone && maxigp0BREADY;
 wire [38 : 0] ts_0_ReadData;
   FIFO2 #(.width(39), .guarded(1)) ReadDataFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({portalRControl ? reqInfo : requestValue, reqPortal_D_OUT[6:0]}), .ENQ(RULEread),
-        .D_OUT(ts_0_ReadData), .DEQ(EN_ReadData && RDY_ReadData), .FULL_N(ReadDataFifo_FULL_N), .EMPTY_N(RDY_ReadData));
-  assign ReadData = { ts_0_ReadData[38:7], 9'd64, ts_0_ReadData[6:1] };
+        .D_OUT(ts_0_ReadData), .DEQ(maxigp0RREADY && maxigp0RVALID), .FULL_N(ReadDataFifo_FULL_N), .EMPTY_N(maxigp0RVALID));
+  assign maxigp0RDATA = { ts_0_ReadData[38:7], 9'd64, ts_0_ReadData[6:1] };
 
 //write
   reg writeFirst, writeLast;
@@ -325,27 +293,39 @@ wire [38 : 0] ts_0_ReadData;
   wire [20 : 0] write_reqFifo_D_OUT;
   wire [9 : 0] writeburstCount;
   wire [4 : 0] writeAddrupdate;
+  wire EN_WriteReq, EN_WriteData, RDY_WriteDone;
+  wire [38 : 0] WriteData;
+  wire [13 : 0] WriteDone;
 
+  wire [15: 0] writeBottom;
+  wire [33 : 0] WriteReq;
+
+  assign maxigp0BVALID = RDY_WriteDone && maxigp0BREADY;
+  assign writeBottom = {{ 4'd0, maxigp0AWLEN + 4'd1, 2'd0 }, maxigp0AWID[5:0] };
+  assign WriteReq = {maxigp0AWADDR[17:0], writeBottom};
+  assign EN_WriteReq = maxigp0AWVALID && maxigp0AWREADY;
   assign RULEwrite = reqwriteDataFifo_EMPTY_N && writeFifo_EMPTY_N && (!writeFifo_D_OUT[0] || WriteDone_FULL_N)
             && (!selectWIndReq || portalWControl || (reqws_EMPTY_N && RDY_requestEnq));
   assign writeAddr_EN = write_reqFifo_EMPTY_N && writeFifo_FULL_N ;
 
-  assign RDY_WriteReq = reqws_FULL_N && write_reqFifo_FULL_N;
-  assign RDY_WriteData = !CMRlastWriteDataSeen && reqwriteDataFifo_FULL_N ;
+  assign maxigp0AWREADY = reqws_FULL_N && write_reqFifo_FULL_N;
+  assign maxigp0WREADY = !CMRlastWriteDataSeen && reqwriteDataFifo_FULL_N ;
   assign reqdoneFifo_ENQ = RULEwrite && writeFifo_D_OUT[0];
   assign writeFirstNext = writeFirst ?  write_reqFifo_D_OUT[15:6] == 10'd4 : writeLast ;
   FIFO1 #(.width(21), .guarded(1)) write_reqFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN(WriteReq[20:0]), .ENQ(EN_WriteReq),
         .D_OUT(write_reqFifo_D_OUT), .DEQ(writeAddr_EN && writeFirstNext), .FULL_N(write_reqFifo_FULL_N), .EMPTY_N(write_reqFifo_EMPTY_N));
   FIFO1 #(.width(2), .guarded(1)) reqws(.RST(RST_N), .CLK(CLK), .CLR(0),
-        .D_IN(WriteReq[22:21] - 2'd1), .ENQ(EN_WriteReq),
+        .D_IN(maxigp0AWADDR[6:5] - 2'd1), .ENQ(EN_WriteReq),
         .D_OUT(selectRequest), .DEQ(reqdoneFifo_ENQ), .FULL_N(reqws_FULL_N), .EMPTY_N(reqws_EMPTY_N));
   always@(posedge CLK) begin
         if (EN_WriteReq) begin
-            portalWControl <= WriteReq[27:21] == 7'd0;
-            selectWIndReq <= WriteReq[28];
+            portalWControl <= maxigp0AWADDR[11:5] == 7'd0;
+            selectWIndReq <= maxigp0AWADDR[12];
         end
   end
+  assign WriteData = {maxigp0WDATA, maxigp0WID[5:0], maxigp0WLAST };
+  assign EN_WriteData = maxigp0WVALID && maxigp0WREADY;
   FIFO2 #(.width(39), .guarded(1)) reqwriteDataFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN(WriteData), .ENQ(EN_WriteData),
         .D_OUT(requestData), .DEQ(RULEwrite), .FULL_N(reqwriteDataFifo_FULL_N), .EMPTY_N(reqwriteDataFifo_EMPTY_N));
@@ -356,7 +336,7 @@ wire [38 : 0] ts_0_ReadData;
         .D_OUT(writeFifo_D_OUT), .DEQ(RULEwrite), .FULL_N(writeFifo_FULL_N), .EMPTY_N(writeFifo_EMPTY_N));
   FIFO1 #(.width(14), .guarded(1)) CMRdoneFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN( { 8'd0, writeFifo_D_OUT[6:1]}), .ENQ(reqdoneFifo_ENQ),
-        .D_OUT(WriteDone), .DEQ(EN_WriteDone), .FULL_N(WriteDone_FULL_N), .EMPTY_N(RDY_WriteDone));
+        .D_OUT(maxigp0BRESP), .DEQ(maxigp0BREADY), .FULL_N(WriteDone_FULL_N), .EMPTY_N(RDY_WriteDone));
 
   always@(posedge CLK)
   begin
