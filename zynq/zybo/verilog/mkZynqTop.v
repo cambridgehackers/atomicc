@@ -183,41 +183,43 @@ module mkZynqTop( input  CLK, input  RST_N,
   wire [33 : 0] ts_0_SRSReq, ts_0_SWSReq;
   wire [5 : 0] ts_0_SWSDone;
   wire ts_0_RDY_SRSData, ts_0_RDY_SRSReq, ts_0_RDY_SWSData, ts_0_RDY_SWSDone, ts_0_RDY_SWSReq;
-  wire RULE_SWSReq, RULEwriteDone, RULEwriteData;
-  wire bufferAws_EMPTY_N, bufferAws_FULL_N, bufferWData_EMPTY_N, bufferWData_FULL_N, bufferBdone_FULL_N, readResp_FULL_N;
+  wire RULEwriteReq, RULEwriteDone, RULEwriteData;
+  wire bufferWriteReq_EMPTY_N, bufferWriteReq_FULL_N;
+  wire bufferWriteData_EMPTY_N, bufferWriteData_FULL_N;
+  wire bufferWriteDone_FULL_N, bufferReadData_FULL_N;
   assign RULEwriteDone = !maxigp0BVALID && ts_0_RDY_SWSDone ;
-  assign RULE_SWSReq = bufferAws_EMPTY_N && ts_0_RDY_SWSReq ;
-  assign RULEwriteData = bufferWData_EMPTY_N && ts_0_RDY_SWSData;
-  assign maxigp0AWREADY = maxigp0AWVALID && !bufferAws_EMPTY_N;
-  assign maxigp0WREADY = maxigp0WVALID && !bufferWData_EMPTY_N;
+  assign RULEwriteReq = bufferWriteReq_EMPTY_N && ts_0_RDY_SWSReq ;
+  assign RULEwriteData = bufferWriteData_EMPTY_N && ts_0_RDY_SWSData;
+  assign maxigp0AWREADY = maxigp0AWVALID && !bufferWriteReq_EMPTY_N;
+  assign maxigp0WREADY = maxigp0WVALID && !bufferWriteData_EMPTY_N;
 
-  FIFO2 #(.width(14), .guarded(1)) bufferBdone(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
+  FIFO2 #(.width(14), .guarded(1)) bufferWriteDone(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
         .D_IN( { 8'd0, ts_0_SWSDone }), .ENQ(RULEwriteDone),
         .D_OUT(maxigp0BRESP), .DEQ(maxigp0BVALID && maxigp0BREADY ),
-        .FULL_N(bufferBdone_FULL_N), .EMPTY_N(maxigp0BVALID));
-  FIFO1 #(.width(34), .guarded(1)) bufferAws(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
+        .FULL_N(bufferWriteDone_FULL_N), .EMPTY_N(maxigp0BVALID));
+  FIFO1 #(.width(34), .guarded(1)) bufferWriteReq(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
         .D_IN({ maxigp0AWADDR[17:0], { 4'd0, maxigp0AWLEN + 4'd1, 2'd0 }, maxigp0AWID[5:0] }), .ENQ(maxigp0AWREADY),
-        .D_OUT(ts_0_SWSReq), .DEQ(RULE_SWSReq), .FULL_N(bufferAws_FULL_N), .EMPTY_N(bufferAws_EMPTY_N));
-  FIFO2 #(.width(39), .guarded(1)) bufferWData(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
+        .D_OUT(ts_0_SWSReq), .DEQ(RULEwriteReq), .FULL_N(bufferWriteReq_FULL_N), .EMPTY_N(bufferWriteReq_EMPTY_N));
+  FIFO2 #(.width(39), .guarded(1)) bufferWriteData(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
         .D_IN({maxigp0WDATA, maxigp0WID[5:0], maxigp0WLAST }), .ENQ(maxigp0WREADY),
-        .D_OUT(ts_0_SWSData), .DEQ(RULEwriteData), .FULL_N(bufferWData_FULL_N), .EMPTY_N(bufferWData_EMPTY_N));
+        .D_OUT(ts_0_SWSData), .DEQ(RULEwriteData), .FULL_N(bufferWriteData_FULL_N), .EMPTY_N(bufferWriteData_EMPTY_N));
 
-  wire bufferArs_EMPTY_N, bufferArs_FULL_N, RULE_SRSReq, RULE_getData;
-  assign maxigp0ARREADY = maxigp0ARVALID && !bufferArs_EMPTY_N;
-  assign RULE_SRSReq = bufferArs_EMPTY_N && ts_0_RDY_SRSReq ;
-  assign RULE_getData = !maxigp0RVALID && ts_0_RDY_SRSData;
+  wire bufferReadReq_EMPTY_N, bufferReadReq_FULL_N, RULEreadReq, RULEreadData;
+  assign maxigp0ARREADY = maxigp0ARVALID && !bufferReadReq_EMPTY_N;
+  assign RULEreadReq = bufferReadReq_EMPTY_N && ts_0_RDY_SRSReq ;
+  assign RULEreadData = !maxigp0RVALID && ts_0_RDY_SRSData;
 
-  FIFO1 #(.width(34), .guarded(1)) bufferArs(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
+  FIFO1 #(.width(34), .guarded(1)) bufferReadReq(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
         .D_IN( { maxigp0ARADDR[17:0], { 4'd0, maxigp0ARLEN + 4'd1, 2'd0 }, maxigp0ARID[5:0] }), .ENQ(maxigp0ARREADY),
-        .D_OUT(ts_0_SRSReq), .DEQ(RULE_SRSReq), .FULL_N(bufferArs_FULL_N), .EMPTY_N(bufferArs_EMPTY_N));
-  FIFO2 #(.width(47), .guarded(1)) readResp(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
-        .D_IN({ ts_0_SRSData[38:7], 9'd64, ts_0_SRSData[6:1] }), .ENQ(RULE_getData),
-        .D_OUT(maxigp0RDATA), .DEQ(maxigp0RVALID && maxigp0RREADY), .FULL_N(readResp_FULL_N), .EMPTY_N(maxigp0RVALID));
+        .D_OUT(ts_0_SRSReq), .DEQ(RULEreadReq), .FULL_N(bufferReadReq_FULL_N), .EMPTY_N(bufferReadReq_EMPTY_N));
+  FIFO2 #(.width(47), .guarded(1)) bufferReadData(.RST(ps7_freset_0_r_O), .CLK(ps7_fclk_0_c_O), .CLR(0),
+        .D_IN({ ts_0_SRSData[38:7], 9'd64, ts_0_SRSData[6:1] }), .ENQ(RULEreadData),
+        .D_OUT(maxigp0RDATA), .DEQ(maxigp0RVALID && maxigp0RREADY), .FULL_N(bufferReadData_FULL_N), .EMPTY_N(maxigp0RVALID));
 
   mkConnectalTop ts_0(.CLK(ps7_fclk_0_c_O), .RST_N(ps7_freset_0_r_O),
-        .SRSReq(ts_0_SRSReq), .EN_SRSReq(RULE_SRSReq), .RDY_SRSReq(ts_0_RDY_SRSReq),
-        .SRSData(ts_0_SRSData), .EN_SRSData(RULE_getData), .RDY_SRSData(ts_0_RDY_SRSData),
-        .SWSReq(ts_0_SWSReq), .EN_SWSReq(RULE_SWSReq), .RDY_SWSReq(ts_0_RDY_SWSReq),
+        .SRSReq(ts_0_SRSReq), .EN_SRSReq(RULEreadReq), .RDY_SRSReq(ts_0_RDY_SRSReq),
+        .SRSData(ts_0_SRSData), .EN_SRSData(RULEreadData), .RDY_SRSData(ts_0_RDY_SRSData),
+        .SWSReq(ts_0_SWSReq), .EN_SWSReq(RULEwriteReq), .RDY_SWSReq(ts_0_RDY_SWSReq),
         .SWSData(ts_0_SWSData), .EN_SWSData(RULEwriteData), .RDY_SWSData(ts_0_RDY_SWSData),
         .SWSDone(ts_0_SWSDone), .EN_SWSDone(RULEwriteDone), .RDY_SWSDone(ts_0_RDY_SWSDone),
         .interrupt_0__read(ts_0_interrupt_0__read));
