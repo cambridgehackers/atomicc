@@ -4,10 +4,7 @@ set -e
 verilator --lint-only \
         -Iextrav \
         -Iverilog \
-        -I../../../verilog/xilinx \
-        -I../../../verilog \
+        -I../connectal/verilog/xilinx \
+        -I../connectal/verilog \
         -I/scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog \
     verilog/mkZynqTop.v
-echo \
-    verilog/mkConnectalTop.v
-        #-I/afs/csail.mit.edu/group/csg/tools/tools_lx86/xilinx2015/vivado2015.2/Vivado/2015.2/data/verilog/src/unisims \
