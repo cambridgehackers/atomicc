@@ -191,7 +191,7 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
   wire indicationNotEmpty, requestNotFull;
   wire RDY_indication, RDY_requestEnq, ReadDataFifo_FULL_N;
   wire reqPortal_EMPTY_N, reqPortal_FULL_N, read_reqFifo_EMPTY_N, read_reqFifo_FULL_N;
-  wire reqArs_EMPTY_N, reqArs_FULL_N, reqrs_EMPTY_N, reqrs_FULL_N;
+  wire reqrs_EMPTY_N, reqrs_FULL_N;
   wire reqwriteDataFifo_EMPTY_N, reqwriteDataFifo_FULL_N, reqws_EMPTY_N;
   wire readFirstNext, readAddr_EN, RULEread;
   wire [38 : 0] reqRead_D_OUT;
@@ -200,7 +200,6 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
   wire [9 : 0] reqPortal_D_OUT_base;
   wire [5 : 0] reqPortal_D_OUT_id;
   wire reqPortal_D_OUT_last;
-  wire [20 : 0] reqArs_D_OUT;
   wire [4 : 0] read_reqFifo_D_OUT_addr;
   wire [9 : 0] read_reqFifo_D_OUT_count;
   wire [5 : 0] read_reqFifo_D_OUT_id;
@@ -253,24 +252,22 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
     endcase
   end
 
-  assign maxigp0ARREADY = !reqArs_EMPTY_N;
+  assign maxigp0ARREADY = !read_reqFifo_EMPTY_N;
   assign readAddr_EN = read_reqFifo_EMPTY_N && reqPortal_FULL_N;
 
   FIFO1 #(.width(2), .guarded(1)) reqrs(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN(maxigp0ARADDR[6:5] - 2'd1), .ENQ(maxigp0ARVALID),
         .D_OUT(selectIndication), .DEQ(RULEread && (!selectRIndReq || reqPortal_D_OUT_last)),
         .FULL_N(reqrs_FULL_N), .EMPTY_N(reqrs_EMPTY_N));
-  FIFO1 #(.width(21), .guarded(1)) reqArs(.RST(RST_N), .CLK(CLK), .CLR(0),
-        .D_IN({ maxigp0ARADDR[4:0], { 4'd0, maxigp0ARLEN + 4'd1, 2'd0 }, maxigp0ARID[5:0]}), .ENQ(maxigp0ARVALID),
-        .D_OUT(reqArs_D_OUT), .DEQ(reqArs_EMPTY_N), .FULL_N(reqArs_FULL_N), .EMPTY_N(reqArs_EMPTY_N));
+  wire [20 : 0] reqArs_D_OUT;
   always@(posedge CLK) begin
         if (maxigp0ARVALID) begin
             portalRControl <= maxigp0ARADDR[11:5] == 7'd0;
             selectRIndReq <= maxigp0ARADDR[12];
         end
   end
-  FIFO1 #(.width(21), .guarded(1)) read_reqFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
-        .D_IN(reqArs_D_OUT), .ENQ(reqArs_EMPTY_N && read_reqFifo_FULL_N),
+  FIFO1 #(.width(21), .guarded(1)) reqArs(.RST(RST_N), .CLK(CLK), .CLR(0),
+        .D_IN({ maxigp0ARADDR[4:0], { 4'd0, maxigp0ARLEN + 4'd1, 2'd0 }, maxigp0ARID[5:0]}), .ENQ(maxigp0ARVALID),
         .D_OUT({read_reqFifo_D_OUT_addr, read_reqFifo_D_OUT_count, read_reqFifo_D_OUT_id}),
         .DEQ(readAddr_EN && readFirstNext), .FULL_N(read_reqFifo_FULL_N), .EMPTY_N(read_reqFifo_EMPTY_N));
   assign readAddrupdate = readFirst ?  read_reqFifo_D_OUT_addr : readAddr ;
