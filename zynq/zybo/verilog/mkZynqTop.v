@@ -12,12 +12,8 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
   wire ps7_fclk_0_c_O, ps7_freset_0_r_O;
   wire [3 : 0] ps7_ps7_foo_FCLKCLK, ps7_ps7_foo_FCLKRESETN, maxigp0ARLEN, maxigp0AWLEN;
 
-  wire ps7_b2c_0_IN1, ps7_b2c_0_IN2, ps7_b2c_3_IN1, ps7_b2c_3_IN2, ps7_b2c_0_OUT1, ps7_b2c_0_OUT2;
-  assign ps7_b2c_0_IN1 = ps7_ps7_foo_FCLKCLK[0] ;
-  assign ps7_b2c_0_IN2 = ps7_ps7_foo_FCLKRESETN[0] ;
-  assign ps7_b2c_3_IN1 = ps7_ps7_foo_FCLKCLK[3] ;
-  assign ps7_b2c_3_IN2 = ps7_ps7_foo_FCLKRESETN[3] ;
-  CONNECTNET2 ps7_b2c_0(.IN1(ps7_b2c_0_IN1), .IN2(ps7_b2c_0_IN2), .OUT1(ps7_b2c_0_OUT1), .OUT2(ps7_b2c_0_OUT2));
+  wire ps7_b2c_0_OUT1, ps7_b2c_0_OUT2;
+  CONNECTNET2 ps7_b2c_0(.IN1(ps7_ps7_foo_FCLKCLK[0]), .IN2(ps7_ps7_foo_FCLKRESETN[0]), .OUT1(ps7_b2c_0_OUT1), .OUT2(ps7_b2c_0_OUT2));
   BUFG ps7_fclk_0_c(.I(ps7_b2c_0_OUT1), .O(ps7_fclk_0_c_O));
   BUFG ps7_freset_0_r(.I(ps7_b2c_0_OUT2), .O(ps7_freset_0_r_O));
   BUFG ps7_clockGen_clkout0buffer(.I(ps7_clockGen_pll_CLKOUT0), .O(ps7_clockGen_clkout0buffer_O));
@@ -205,15 +201,15 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
   wire [5 : 0] reqPortal_D_OUT_id;
   wire reqPortal_D_OUT_last;
   wire [20 : 0] reqArs_D_OUT;
-  wire [4 : 0] read_reqFifo_D_OUT_base;
-  wire [9 : 0] read_reqFifo_D_OUT_addr;
+  wire [4 : 0] read_reqFifo_D_OUT_addr;
+  wire [9 : 0] read_reqFifo_D_OUT_count;
   wire [5 : 0] read_reqFifo_D_OUT_id;
   wire [9 : 0] readburstCount;
   wire [4 : 0] readAddrupdate;
   wire [1 : 0] selectIndication, selectRequest;
 
   assign interrupt_0__read = (indIntrChannel != 0 && ctrlPort_0_interruptEnableReg) || (reqIntrChannel != 0 && ctrlPort_1_interruptEnableReg );
-  assign readFirstNext = readFirst ? read_reqFifo_D_OUT_addr == 4  : readLast ;
+  assign readFirstNext = readFirst ? read_reqFifo_D_OUT_count == 4  : readLast ;
   assign RULEread = reqPortal_EMPTY_N && ReadDataFifo_FULL_N && (selectRIndReq ?
         (((portalRControl || reqPortal_D_OUT_addr != 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
        : ((portalRControl || reqPortal_D_OUT_addr != 0 || RDY_indication) && reqrs_EMPTY_N));
@@ -235,24 +231,24 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
     case (reqPortal_D_OUT_addr)
       0: reqInfo = {31'd0,  reqIntrChannel != 0};
       4: reqInfo = {31'd0, ctrlPort_1_interruptEnableReg};
-      8: reqInfo = 32'd1;
+      8: reqInfo = 1;
       5'h0C: reqInfo = reqIntrChannel;
-      5'h10: reqInfo = 32'd6;
-      5'h14: reqInfo = 32'd2;
-      5'h18: reqInfo = 32'd0;
-      5'h1C: reqInfo = 32'd0;
+      5'h10: reqInfo = 6;
+      5'h14: reqInfo = 2;
+      5'h18: reqInfo = 0;
+      5'h1C: reqInfo = 0;
       default: reqInfo = 32'h005A05A0;
     endcase
     else
     case (reqPortal_D_OUT_addr)
       0: reqInfo = {31'd0,  indIntrChannel != 0};
       4: reqInfo = {31'd0, ctrlPort_0_interruptEnableReg};
-      8: reqInfo = 32'd1;
+      8: reqInfo = 1;
       5'h0C: reqInfo = indIntrChannel;
-      5'h10: reqInfo = 32'd5;
-      5'h14: reqInfo = 32'd2;
-      5'h18: reqInfo = 32'd0;
-      5'h1C: reqInfo = 32'd0;
+      5'h10: reqInfo = 5;
+      5'h14: reqInfo = 2;
+      5'h18: reqInfo = 0;
+      5'h1C: reqInfo = 0;
       default: reqInfo = 32'h005A05A0;
     endcase
   end
@@ -262,7 +258,8 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
 
   FIFO1 #(.width(2), .guarded(1)) reqrs(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN(maxigp0ARADDR[6:5] - 2'd1), .ENQ(maxigp0ARVALID),
-        .D_OUT(selectIndication), .DEQ(RULEread && (!selectRIndReq || reqPortal_D_OUT_last)), .FULL_N(reqrs_FULL_N), .EMPTY_N(reqrs_EMPTY_N));
+        .D_OUT(selectIndication), .DEQ(RULEread && (!selectRIndReq || reqPortal_D_OUT_last)),
+        .FULL_N(reqrs_FULL_N), .EMPTY_N(reqrs_EMPTY_N));
   FIFO1 #(.width(21), .guarded(1)) reqArs(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({ maxigp0ARADDR[4:0], { 4'd0, maxigp0ARLEN + 4'd1, 2'd0 }, maxigp0ARID[5:0]}), .ENQ(maxigp0ARVALID),
         .D_OUT(reqArs_D_OUT), .DEQ(reqArs_EMPTY_N), .FULL_N(reqArs_FULL_N), .EMPTY_N(reqArs_EMPTY_N));
@@ -274,18 +271,19 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
   end
   FIFO1 #(.width(21), .guarded(1)) read_reqFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN(reqArs_D_OUT), .ENQ(reqArs_EMPTY_N && read_reqFifo_FULL_N),
-        .D_OUT({read_reqFifo_D_OUT_base, read_reqFifo_D_OUT_addr, read_reqFifo_D_OUT_id}), .DEQ(readAddr_EN && readFirstNext), .FULL_N(read_reqFifo_FULL_N), .EMPTY_N(read_reqFifo_EMPTY_N));
-  assign readAddrupdate = readFirst ?  read_reqFifo_D_OUT_base : readAddr ;
-  assign readburstCount = readFirst ?  { 2'd0, read_reqFifo_D_OUT_addr[9:2] } : readCount ;
+        .D_OUT({read_reqFifo_D_OUT_addr, read_reqFifo_D_OUT_count, read_reqFifo_D_OUT_id}),
+        .DEQ(readAddr_EN && readFirstNext), .FULL_N(read_reqFifo_FULL_N), .EMPTY_N(read_reqFifo_EMPTY_N));
+  assign readAddrupdate = readFirst ?  read_reqFifo_D_OUT_addr : readAddr ;
+  assign readburstCount = readFirst ?  { 2'd0, read_reqFifo_D_OUT_count[9:2] } : readCount ;
   FIFO2 #(.width(22), .guarded(1)) reqPortal(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({readAddrupdate, readburstCount, read_reqFifo_D_OUT_id, readFirstNext}), .ENQ(readAddr_EN),
-        .D_OUT({reqPortal_D_OUT_addr, reqPortal_D_OUT_base, reqPortal_D_OUT_id, reqPortal_D_OUT_last}), .DEQ(RULEread), .FULL_N(reqPortal_FULL_N), .EMPTY_N(reqPortal_EMPTY_N));
-wire [31 : 0] ts_0_ReadData_data;
+        .D_OUT({reqPortal_D_OUT_addr, reqPortal_D_OUT_base, reqPortal_D_OUT_id, reqPortal_D_OUT_last}),
+        .DEQ(RULEread), .FULL_N(reqPortal_FULL_N), .EMPTY_N(reqPortal_EMPTY_N));
 wire [5 : 0] ts_0_ReadData_id;
   FIFO2 #(.width(38), .guarded(1)) ReadDataFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({portalRControl ? reqInfo : requestValue, reqPortal_D_OUT_id}), .ENQ(RULEread),
-        .D_OUT({ts_0_ReadData_data, ts_0_ReadData_id}), .DEQ(maxigp0RREADY && maxigp0RVALID), .FULL_N(ReadDataFifo_FULL_N), .EMPTY_N(maxigp0RVALID));
-  assign maxigp0RDATA = ts_0_ReadData_data;
+        .D_OUT({maxigp0RDATA, ts_0_ReadData_id}), .DEQ(maxigp0RREADY && maxigp0RVALID),
+        .FULL_N(ReadDataFifo_FULL_N), .EMPTY_N(maxigp0RVALID));
   assign maxigp0RRESP = 2'b0;
   assign maxigp0RLAST = 1'b1;
   assign maxigp0RID = {6'b0, ts_0_ReadData_id};
@@ -299,7 +297,8 @@ wire [5 : 0] ts_0_ReadData_id;
   wire writeFifo_EMPTY_N, writeFifo_FULL_N, write_reqFifo_EMPTY_N, write_reqFifo_FULL_N, reqdoneFifo_ENQ;
   wire [27 : 0] ctrlAws_D_OUT;
   wire [4 : 0] writeFifo_D_OUT_addr;
-  wire [15 : 0] writeFifo_D_OUT;
+  wire [9 : 0] writeFifo_D_OUT_count;
+  wire [5 : 0] writeFifo_D_OUT_id;
   wire writeFifo_D_OUT_last;
   wire [9 : 0] write_reqFifo_D_OUT_base;
   wire [4 : 0] write_reqFifo_D_OUT_addr;
@@ -320,7 +319,8 @@ wire [5 : 0] ts_0_ReadData_id;
   assign writeFirstNext = writeFirst ?  write_reqFifo_D_OUT_base == 4 : writeLast ;
   FIFO1 #(.width(21), .guarded(1)) write_reqFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({maxigp0AWADDR[4:0], { 4'd0, maxigp0AWLEN + 4'd1, 2'd0 }, maxigp0AWID[5:0] }), .ENQ(EN_WriteReq),
-        .D_OUT({write_reqFifo_D_OUT_addr, write_reqFifo_D_OUT_base, write_reqFifo_D_OUT_id}), .DEQ(writeAddr_EN && writeFirstNext), .FULL_N(write_reqFifo_FULL_N), .EMPTY_N(write_reqFifo_EMPTY_N));
+        .D_OUT({write_reqFifo_D_OUT_addr, write_reqFifo_D_OUT_base, write_reqFifo_D_OUT_id}),
+        .DEQ(writeAddr_EN && writeFirstNext), .FULL_N(write_reqFifo_FULL_N), .EMPTY_N(write_reqFifo_EMPTY_N));
   FIFO1 #(.width(2), .guarded(1)) reqws(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN(maxigp0AWADDR[6:5] - 2'd1), .ENQ(EN_WriteReq),
         .D_OUT(selectRequest), .DEQ(reqdoneFifo_ENQ), .FULL_N(reqws_FULL_N), .EMPTY_N(reqws_EMPTY_N));
@@ -338,9 +338,10 @@ wire [5 : 0] ts_0_ReadData_id;
   assign writeburstCount = writeFirst ?  { 2'd0, write_reqFifo_D_OUT_base[9:2] } : writeCount ;
   FIFO2 #(.width(22), .guarded(1)) writeFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({ writeAddrupdate, writeburstCount, write_reqFifo_D_OUT_id, writeFirstNext }), .ENQ(writeAddr_EN),
-        .D_OUT({writeFifo_D_OUT_addr, writeFifo_D_OUT, writeFifo_D_OUT_last}), .DEQ(RULEwrite), .FULL_N(writeFifo_FULL_N), .EMPTY_N(writeFifo_EMPTY_N));
+        .D_OUT({writeFifo_D_OUT_addr, writeFifo_D_OUT_count, writeFifo_D_OUT_id, writeFifo_D_OUT_last}),
+        .DEQ(RULEwrite), .FULL_N(writeFifo_FULL_N), .EMPTY_N(writeFifo_EMPTY_N));
   FIFO1 #(.width(14), .guarded(1)) CMRdoneFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
-        .D_IN( { 8'd0, writeFifo_D_OUT[5:0]}), .ENQ(reqdoneFifo_ENQ),
+        .D_IN( { 8'd0, writeFifo_D_OUT_id}), .ENQ(reqdoneFifo_ENQ),
         .D_OUT(maxigp0BRESP), .DEQ(maxigp0BREADY), .FULL_N(WriteDone_FULL_N), .EMPTY_N(RDY_WriteDone));
 
   always@(posedge CLK)
@@ -385,13 +386,15 @@ wire [5 : 0] ts_0_ReadData_id;
       end
   end
 mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
-    .selectIndication(selectIndication), .selectRequest(selectRequest),
-    .requestEnqV(requestData),
-    .EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
     .EN_request(RULEwrite && !portalWControl && selectWIndReq),
-    .reqIntrChannel(reqIntrChannel), .indIntrChannel(indIntrChannel),
-    .requestNotFull(requestNotFull),
-    .indicationNotEmpty(indicationNotEmpty), .indicationData(indicationData),
+    .requestEnqV(requestData),
+    .RDY_requestEnq(RDY_requestEnq),
+    .selectRequest(selectRequest), .requestNotFull(requestNotFull),
+
+    .EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
+    .indicationData(indicationData),
     .RDY_indication(RDY_indication),
-    .RDY_requestEnq(RDY_requestEnq));
+    .selectIndication(selectIndication), .indicationNotEmpty(indicationNotEmpty),
+
+    .reqIntrChannel(reqIntrChannel), .indIntrChannel(indIntrChannel));
 endmodule  // mkZynqTop
