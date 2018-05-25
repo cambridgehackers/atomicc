@@ -213,19 +213,19 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
   wire [1 : 0] selectIndication, selectRequest;
 
   assign interrupt_0__read = (indIntrChannel != 0 && ctrlPort_0_interruptEnableReg) || (reqIntrChannel != 0 && ctrlPort_1_interruptEnableReg );
-  assign readFirstNext = readFirst ? read_reqFifo_D_OUT_addr == 10'd4  : readLast ;
+  assign readFirstNext = readFirst ? read_reqFifo_D_OUT_addr == 4  : readLast ;
   assign RULEread = reqPortal_EMPTY_N && ReadDataFifo_FULL_N && (selectRIndReq ?
-        (((portalRControl || reqPortal_D_OUT_addr != 5'd4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
-       : ((portalRControl || reqPortal_D_OUT_addr != 5'd0 || RDY_indication) && reqrs_EMPTY_N));
+        (((portalRControl || reqPortal_D_OUT_addr != 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
+       : ((portalRControl || reqPortal_D_OUT_addr != 0 || RDY_indication) && reqrs_EMPTY_N));
 
   always@(reqPortal_D_OUT_addr or indicationData or indicationNotEmpty or requestNotFull)
   begin
     if (selectRIndReq)
-      requestValue = { 31'd0, (reqPortal_D_OUT_addr == 5'd4 && requestNotFull) };
+      requestValue = { 31'd0, (reqPortal_D_OUT_addr == 4 && requestNotFull) };
     else
     case (reqPortal_D_OUT_addr)
-      5'd0: requestValue = indicationData;
-      5'd4: requestValue = { 31'd0, indicationNotEmpty };
+      0: requestValue = indicationData;
+      4: requestValue = { 31'd0, indicationNotEmpty };
       default: requestValue = 32'd0;
     endcase
   end
@@ -233,9 +233,9 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
   begin
     if (selectRIndReq)
     case (reqPortal_D_OUT_addr)
-      5'd0: reqInfo = {31'd0,  reqIntrChannel != 0};
-      5'd4: reqInfo = {31'd0, ctrlPort_1_interruptEnableReg};
-      5'd8: reqInfo = 32'd1;
+      0: reqInfo = {31'd0,  reqIntrChannel != 0};
+      4: reqInfo = {31'd0, ctrlPort_1_interruptEnableReg};
+      8: reqInfo = 32'd1;
       5'h0C: reqInfo = reqIntrChannel;
       5'h10: reqInfo = 32'd6;
       5'h14: reqInfo = 32'd2;
@@ -245,9 +245,9 @@ module mkZynqTop( input  zzCLK, input  zzRST_N,
     endcase
     else
     case (reqPortal_D_OUT_addr)
-      5'd0: reqInfo = {31'd0,  indIntrChannel != 0};
-      5'd4: reqInfo = {31'd0, ctrlPort_0_interruptEnableReg};
-      5'd8: reqInfo = 32'd1;
+      0: reqInfo = {31'd0,  indIntrChannel != 0};
+      4: reqInfo = {31'd0, ctrlPort_0_interruptEnableReg};
+      8: reqInfo = 32'd1;
       5'h0C: reqInfo = indIntrChannel;
       5'h10: reqInfo = 32'd5;
       5'h14: reqInfo = 32'd2;
@@ -317,7 +317,7 @@ wire [5 : 0] ts_0_ReadData_id;
   assign maxigp0AWREADY = reqws_FULL_N && write_reqFifo_FULL_N;
   assign maxigp0WREADY = !CMRlastWriteDataSeen && reqwriteDataFifo_FULL_N ;
   assign reqdoneFifo_ENQ = RULEwrite && writeFifo_D_OUT_last;
-  assign writeFirstNext = writeFirst ?  write_reqFifo_D_OUT_base == 10'd4 : writeLast ;
+  assign writeFirstNext = writeFirst ?  write_reqFifo_D_OUT_base == 4 : writeLast ;
   FIFO1 #(.width(21), .guarded(1)) write_reqFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
         .D_IN({maxigp0AWADDR[4:0], { 4'd0, maxigp0AWLEN + 4'd1, 2'd0 }, maxigp0AWID[5:0] }), .ENQ(EN_WriteReq),
         .D_OUT({write_reqFifo_D_OUT_addr, write_reqFifo_D_OUT_base, write_reqFifo_D_OUT_id}), .DEQ(writeAddr_EN && writeFirstNext), .FULL_N(write_reqFifo_FULL_N), .EMPTY_N(write_reqFifo_EMPTY_N));
@@ -350,18 +350,18 @@ wire [5 : 0] ts_0_ReadData_id;
         ctrlPort_0_interruptEnableReg <=  1'd0;
         ctrlPort_1_interruptEnableReg <=  1'd0;
         CMRlastWriteDataSeen <=  1'd0;
-        readAddr <= 5'd0;
-        readCount <= 10'd0;
+        readAddr <= 0;
+        readCount <= 0;
         readFirst <= 1'd1;
         readLast <= 1'd0;
-        writeAddr <= 5'd0;
-        writeCount <= 10'd0;
+        writeAddr <= 0;
+        writeCount <= 0;
         writeFirst <= 1'd1;
         writeLast <= 1'd0;
       end
     else
       begin
-        if (RULEwrite && portalWControl && writeFifo_D_OUT_addr == 5'd4) begin
+        if (RULEwrite && portalWControl && writeFifo_D_OUT_addr == 4) begin
           if (selectWIndReq)
             ctrlPort_1_interruptEnableReg <= requestData[0];
           else
@@ -370,24 +370,24 @@ wire [5 : 0] ts_0_ReadData_id;
         if (EN_WriteData && maxigp0WLAST || EN_WriteReq)
           CMRlastWriteDataSeen <= !EN_WriteReq;
         if (readAddr_EN) begin
-          readAddr <= readAddrupdate + 5'd4 ;
-          readCount <= readburstCount - 10'd1 ;
+          readAddr <= readAddrupdate + 4 ;
+          readCount <= readburstCount - 1 ;
           readFirst <= readFirstNext;
-          readLast <= readburstCount == 10'd2 ;
+          readLast <= readburstCount == 2 ;
         end
 
         if (writeAddr_EN) begin
-          writeAddr <= writeAddrupdate + 5'd4 ;
-          writeCount <= writeburstCount - 10'd1 ;
+          writeAddr <= writeAddrupdate + 4 ;
+          writeCount <= writeburstCount - 1 ;
           writeFirst <= writeFirstNext ;
-          writeLast <= writeburstCount == 10'd2 ;
+          writeLast <= writeburstCount == 2 ;
         end
       end
   end
 mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .selectIndication(selectIndication), .selectRequest(selectRequest),
     .requestEnqV(requestData),
-    .EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 5'd0),
+    .EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
     .EN_request(RULEwrite && !portalWControl && selectWIndReq),
     .reqIntrChannel(reqIntrChannel), .indIntrChannel(indIntrChannel),
     .requestNotFull(requestNotFull),
