@@ -181,7 +181,7 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
         .PSPORB(FIXED_IO_ps_porb), .PSSRSTB(FIXED_IO_ps_srstb), .MIO(MIO));
 /* verilator lint_on PINMISSING */
 
-  reg ctrlPort_0_interruptEnableReg, ctrlPort_1_interruptEnableReg;
+  reg ctrlPort_0_interruptEnableReg;
   reg readFirst, readLast, selectRIndReq, portalRControl, selectWIndReq, portalWControl;
   reg [31 : 0] requestValue, reqInfo;
   reg [9 : 0] readCount;
@@ -199,7 +199,7 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
   wire [1 : 0] selectIndication, selectRequest;
   assign zzIntrChannel = selectRIndReq ? reqIntrChannel : indIntrChannel;
 
-  assign interrupt_0__read = (indIntrChannel != 0 && ctrlPort_0_interruptEnableReg) || (reqIntrChannel != 0 && ctrlPort_1_interruptEnableReg );
+  assign interrupt_0__read = (indIntrChannel != 0 || reqIntrChannel != 0) && ctrlPort_0_interruptEnableReg;
   assign readFirstNext = readFirst ? read_reqFifo_D_OUT_count == 4  : readLast ;
   assign RULEread = reqPortal_EMPTY_N && ReadDataFifo_FULL_N && (selectRIndReq ?
         (((portalRControl || reqPortal_D_OUT_addr != 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
@@ -216,11 +216,11 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
       default: requestValue = 32'd0;
     endcase
   end
-  always@(reqPortal_D_OUT_addr or ctrlPort_0_interruptEnableReg or ctrlPort_1_interruptEnableReg or zzIntrChannel or selectRIndReq)
+  always@(reqPortal_D_OUT_addr or ctrlPort_0_interruptEnableReg or zzIntrChannel or selectRIndReq)
   begin
     case (reqPortal_D_OUT_addr)
       0: reqInfo = {31'd0,  zzIntrChannel != 0};
-      4: reqInfo = {31'd0, selectRIndReq ? ctrlPort_1_interruptEnableReg : ctrlPort_0_interruptEnableReg};
+      4: reqInfo = 0;//{31'd0, ctrlPort_0_interruptEnableReg;
       8: reqInfo = 1;
       5'h0C: reqInfo = zzIntrChannel;
       5'h10: reqInfo = selectRIndReq ? 6 : 5;
@@ -316,7 +316,6 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
     if (RST_N == 0)
       begin
         ctrlPort_0_interruptEnableReg <=  1'd0;
-        ctrlPort_1_interruptEnableReg <=  1'd0;
         CMRlastWriteDataSeen <=  1'd0;
         readAddr <= 0;
         readCount <= 0;
@@ -329,12 +328,8 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
       end
     else
       begin
-        if (RULEwrite && portalWControl && writeFifo_D_OUT_addr == 4) begin
-          if (selectWIndReq)
-            ctrlPort_1_interruptEnableReg <= requestData[0];
-          else
-            ctrlPort_0_interruptEnableReg <= requestData[0];
-        end
+        if (RULEwrite && portalWControl && writeFifo_D_OUT_addr == 4)
+          ctrlPort_0_interruptEnableReg <= requestData[0];
         if (EN_WriteData && maxigp0WLAST || EN_WriteReq)
           CMRlastWriteDataSeen <= !EN_WriteReq;
         if (readAddr_EN) begin
