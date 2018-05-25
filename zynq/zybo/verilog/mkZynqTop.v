@@ -228,6 +228,14 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
       5'h18: reqInfo = 0;
       5'h1C: reqInfo = 0;
       default: reqInfo = 32'h005A05A0;
+// PORTAL_CTRL_INTERRUPT_STATUS 0
+// PORTAL_CTRL_INTERRUPT_ENABLE 1
+// PORTAL_CTRL_NUM_TILES        2
+// PORTAL_CTRL_IND_QUEUE_STATUS 3
+// PORTAL_CTRL_PORTAL_ID        4
+// PORTAL_CTRL_NUM_PORTALS      5
+// PORTAL_CTRL_COUNTER_MSB      6
+// PORTAL_CTRL_COUNTER_LSB      7
     endcase
   end
 
