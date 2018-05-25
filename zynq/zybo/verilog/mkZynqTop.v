@@ -47,12 +47,16 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
   wire [31 : 0] maxigp0ARADDR, maxigp0AWADDR, maxigp0WDATA;
   wire [11 : 0] maxigp0ARID, maxigp0AWID, maxigp0WID;
   wire maxigp0ARVALID, maxigp0AWVALID, maxigp0RREADY, maxigp0BREADY, maxigp0WLAST, maxigp0WVALID;
-  wire maxigp0AWREADY, maxigp0WREADY, maxigp0ARREADY, maxigp0RVALID;
+  wire maxigp0AWREADY, maxigp0WREADY, read_reqFifo_EMPTY_N, maxigp0RVALID;
   wire RDY_WriteDone;
   wire [31 : 0] maxigp0RDATA;
   wire [13 : 0] maxigp0BRESP;
   wire interrupt_0__read;
   wire [5 : 0] maxigp0RID;
+  wire reqwriteDataFifo_FULL_N, write_reqFifo_FULL_N, reqws_FULL_N;
+  reg CMRlastWriteDataSeen;
+  assign maxigp0AWREADY = reqws_FULL_N && write_reqFifo_FULL_N;
+  assign maxigp0WREADY = !CMRlastWriteDataSeen && reqwriteDataFifo_FULL_N ;
 /* verilator lint_off PINMISSING */
   PS7 ps7_ps7_foo(.MAXIGP0ACLK(CLK),
         .MAXIGP1ACLK(CLK), .SAXIACPACLK(CLK), .SAXIGP0ACLK(CLK),
@@ -63,7 +67,7 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
         .IRQF2P({ 19'b0, interrupt_0__read}),
 
         .MAXIGP0ARADDR(maxigp0ARADDR), .MAXIGP0ARID(maxigp0ARID), .MAXIGP0ARLEN(maxigp0ARLEN),
-        .MAXIGP0ARVALID(maxigp0ARVALID), .MAXIGP0ARREADY(maxigp0ARREADY),
+        .MAXIGP0ARVALID(maxigp0ARVALID), .MAXIGP0ARREADY(!read_reqFifo_EMPTY_N),
 
         .MAXIGP0RDATA(maxigp0RDATA), .MAXIGP0RRESP(0), .MAXIGP0RLAST(1),
         .MAXIGP0RID({6'b0, maxigp0RID}), .MAXIGP0RREADY(maxigp0RREADY), .MAXIGP0RVALID(maxigp0RVALID),
@@ -177,7 +181,7 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
         .PSPORB(FIXED_IO_ps_porb), .PSSRSTB(FIXED_IO_ps_srstb), .MIO(MIO));
 /* verilator lint_on PINMISSING */
 
-  reg ctrlPort_0_interruptEnableReg, ctrlPort_1_interruptEnableReg, CMRlastWriteDataSeen;
+  reg ctrlPort_0_interruptEnableReg, ctrlPort_1_interruptEnableReg;
   reg readFirst, readLast, selectRIndReq, portalRControl, selectWIndReq, portalWControl;
   reg [31 : 0] requestValue, reqInfo;
   reg [9 : 0] readCount;
@@ -185,9 +189,9 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
 
   wire indicationNotEmpty, requestNotFull;
   wire RDY_indication, RDY_requestEnq, ReadDataFifo_FULL_N;
-  wire reqPortal_EMPTY_N, reqPortal_FULL_N, read_reqFifo_EMPTY_N, read_reqFifo_FULL_N;
+  wire reqPortal_EMPTY_N, reqPortal_FULL_N, read_reqFifo_FULL_N;
   wire reqrs_EMPTY_N, reqrs_FULL_N;
-  wire reqwriteDataFifo_EMPTY_N, reqwriteDataFifo_FULL_N, reqws_EMPTY_N;
+  wire reqwriteDataFifo_EMPTY_N, reqws_EMPTY_N;
   wire readFirstNext, readAddr_EN, RULEread;
   wire [38 : 0] reqRead_D_OUT;
   wire [31 : 0]indIntrChannel, reqIntrChannel, indicationData, requestData;
@@ -223,7 +227,6 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
   end
   always@(reqPortal_D_OUT_addr or ctrlPort_0_interruptEnableReg or ctrlPort_1_interruptEnableReg or zzIntrChannel or selectRIndReq)
   begin
-    //if (selectRIndReq)
     case (reqPortal_D_OUT_addr)
       0: reqInfo = {31'd0,  zzIntrChannel != 0};
       4: reqInfo = {31'd0, selectRIndReq ? ctrlPort_1_interruptEnableReg : ctrlPort_0_interruptEnableReg};
@@ -235,21 +238,8 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
       5'h1C: reqInfo = 0;
       default: reqInfo = 32'h005A05A0;
     endcase
-    //else
-    //case (reqPortal_D_OUT_addr)
-      //0: reqInfo = {31'd0,  zzIntrChannel != 0};
-      //4: reqInfo = {31'd0, ctrlPort_0_interruptEnableReg};
-      //8: reqInfo = 1;
-      //5'h0C: reqInfo = zzIntrChannel;
-      //5'h10: reqInfo = 5;
-      //5'h14: reqInfo = 2;
-      //5'h18: reqInfo = 0;
-      //5'h1C: reqInfo = 0;
-      //default: reqInfo = 32'h005A05A0;
-    //endcase
   end
 
-  assign maxigp0ARREADY = !read_reqFifo_EMPTY_N;
   assign readAddr_EN = read_reqFifo_EMPTY_N && reqPortal_FULL_N;
 
   FIFO1 #(.width(2), .guarded(1)) reqrs(.RST(RST_N), .CLK(CLK), .CLR(0),
@@ -283,8 +273,8 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
   reg [9 : 0] writeCount;
   reg [4 : 0] writeAddr;
 
-  wire writeAddr_EN, reqws_FULL_N, writeFirstNext, WriteDone_FULL_N, RULEwrite;
-  wire writeFifo_EMPTY_N, writeFifo_FULL_N, write_reqFifo_EMPTY_N, write_reqFifo_FULL_N, reqdoneFifo_ENQ;
+  wire writeAddr_EN, writeFirstNext, WriteDone_FULL_N, RULEwrite;
+  wire writeFifo_EMPTY_N, writeFifo_FULL_N, write_reqFifo_EMPTY_N, reqdoneFifo_ENQ;
   wire [27 : 0] ctrlAws_D_OUT;
   wire [4 : 0] writeFifo_D_OUT_addr;
   wire [9 : 0] writeFifo_D_OUT_count;
@@ -302,8 +292,6 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
             && (!selectWIndReq || portalWControl || (reqws_EMPTY_N && RDY_requestEnq));
   assign writeAddr_EN = write_reqFifo_EMPTY_N && writeFifo_FULL_N ;
 
-  assign maxigp0AWREADY = reqws_FULL_N && write_reqFifo_FULL_N;
-  assign maxigp0WREADY = !CMRlastWriteDataSeen && reqwriteDataFifo_FULL_N ;
   assign reqdoneFifo_ENQ = RULEwrite && writeFifo_D_OUT_last;
   assign writeFirstNext = writeFirst ?  write_reqFifo_D_OUT_base == 4 : writeLast ;
   FIFO1 #(.width(21), .guarded(1)) write_reqFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
