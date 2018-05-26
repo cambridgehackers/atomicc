@@ -192,14 +192,14 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
   wire reqPortal_EMPTY_N, reqPortal_FULL_N, read_reqFifo_FULL_N;
   wire reqrs_EMPTY_N, reqrs_FULL_N, reqwriteDataFifo_EMPTY_N, reqws_EMPTY_N;
   wire readFirstNext, readAddr_EN, RULEread, reqPortal_D_OUT_last;
-  wire [31 : 0]indIntrChannel, reqIntrChannel, indicationData, requestData, zzIntrChannel;
+  wire [31 : 0]indIntrChannel, indicationData, requestData, zzIntrChannel;
   wire [9 : 0] reqPortal_D_OUT_base, read_reqFifo_D_OUT_count, readburstCount;
   wire [5 : 0] reqPortal_D_OUT_id, read_reqFifo_D_OUT_id;
   wire [4 : 0] reqPortal_D_OUT_addr, read_reqFifo_D_OUT_addr, readAddrupdate;
   wire [1 : 0] selectIndication, selectRequest;
-  assign zzIntrChannel = selectRIndReq ? reqIntrChannel : indIntrChannel;
+  assign zzIntrChannel = selectRIndReq ? 32'd0 : indIntrChannel;
 
-  assign interrupt_0__read = (indIntrChannel != 0 || reqIntrChannel != 0) && ctrlPort_0_interruptEnableReg;
+  assign interrupt_0__read = indIntrChannel != 0 && ctrlPort_0_interruptEnableReg;
   assign readFirstNext = readFirst ? read_reqFifo_D_OUT_count == 4  : readLast ;
   assign RULEread = reqPortal_EMPTY_N && ReadDataFifo_FULL_N && (selectRIndReq ?
         (((portalRControl || reqPortal_D_OUT_addr != 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
@@ -358,5 +358,5 @@ mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .RDY_indication(RDY_indication),
     .selectIndication(selectIndication), .indicationNotEmpty(indicationNotEmpty),
 
-    .reqIntrChannel(reqIntrChannel), .indIntrChannel(indIntrChannel));
+    .indIntrChannel(indIntrChannel));
 endmodule  // mkZynqTop

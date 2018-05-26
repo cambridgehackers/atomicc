@@ -1,23 +1,24 @@
 
 module mkConnectalTop(input CLK, input  RST_N,
-    input [1:0]selectIndication, input [1:0]selectRequest,
     input [31 : 0] requestEnqV,
-    input EN_indication, input EN_request,
-    output [31 : 0]reqIntrChannel, output [31 : 0]indIntrChannel,
-    output requestNotFull,
-    output indicationNotEmpty,
+    input EN_request,
+    output RDY_requestEnq,
+    input [1:0]selectRequest, output requestNotFull,
+
     output [31 : 0] indicationData,
+    input EN_indication,
     output RDY_indication,
-    output RDY_requestEnq);
+    input [1:0]selectIndication, output indicationNotEmpty,
+    output [31 : 0]indIntrChannel);
 
   reg RDY_requestEnq, requestNotFull;
   wire RDY_indicationDeq, RDY_indicationData, indicationNotEmpty;
   wire [31 : 0] indicationData;
 
   wire RDY_req0_enq, RDY_req1_enq, RDY_req2_enq, ind0_notEmpty, ind1_notEmpty;
-  wire reqIntrStatus, indIntrStatus;
+  wire indIntrStatus;
   wire [31 : 0]ind0_first, ind1_first;
-  wire [31 : 0]dutreqIntrChannel, dutindIntrChannel;
+  wire [31 : 0]dutindIntrChannel;
 
   always@(selectRequest or RDY_req0_enq or RDY_req1_enq or RDY_req2_enq)
   begin
@@ -44,7 +45,6 @@ module mkConnectalTop(input CLK, input  RST_N,
   assign RDY_indicationData = selectIndication[0] ? RDY_ind1_first : RDY_ind0_first;
   assign RDY_indicationDeq = selectIndication[0] ? RDY_ind1_deq : RDY_ind0_deq;
   assign RDY_indication = RDY_indicationDeq && RDY_indicationData;
-  assign reqIntrChannel = reqIntrStatus ? (dutreqIntrChannel + 32'd1) : 32'd0;
   assign indIntrChannel = indIntrStatus ? (dutindIntrChannel + 32'd1) : 32'd0;
 ////////////////////////////////////////////////////////////////////////////
   wire [31 : 0] lEchoIndicationOutput_ifc_heard_v;
@@ -154,9 +154,9 @@ module mkConnectalTop(input CLK, input  RST_N,
         .RDY_portalIfc_requests_2_enq(RDY_req2_enq),
         .portalIfc_requests_2_notFull(req2_notFull),
         .RDY_portalIfc_requests_2_notFull(),
-        .portalIfc_intr_status(reqIntrStatus),
+        .portalIfc_intr_status(),
         .RDY_portalIfc_intr_status(),
-        .portalIfc_intr_channel(dutreqIntrChannel),
+        .portalIfc_intr_channel(),
         .RDY_portalIfc_intr_channel(),
         .pipes_say_PipeOut_first(lEchoRequestInput_pipes_say_PipeOut_first),
         .RDY_pipes_say_PipeOut_first(RDY_lEchoRequestInput_pipes_say_PipeOut_first),
