@@ -1,0 +1,6 @@
+
+GENERATED_CPP=GeneratedCppCallbacks.cpp \
+    XsimMsgRequest.c \
+    XsimMsgIndication.c \
+    EchoRequest.c \
+    EchoIndication.c
