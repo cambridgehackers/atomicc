@@ -1,11 +1,12 @@
-module mkCnocTop( input  CLK, input  RST_N,
+
+module mkCnocTop(input  CLK, input  RST_N,
   output [31 : 0] requests_0_id, output RDY_requests_0_id,
   input  [31 : 0] requests_0_message_enq_v, input  EN_requests_0_message_enq, output RDY_requests_0_message_enq,
   output requests_0_message_notFull, output RDY_requests_0_message_notFull,
   output [31 : 0] indications_0_id, output RDY_indications_0_id,
   output [31 : 0] indications_0_message_first, output RDY_indications_0_message_first,
   input  EN_indications_0_message_deq, output RDY_indications_0_message_deq,
-  output indications_0_message_notEmpty, output RDY_indications_0_message_notEmpty,
+  output indications_0_message_notEmpty, output RDY_indications_0_message_notEmpty);
 
   reg lEIONoc_bpState;
   wire lEIONoc_bpState_D_IN,
@@ -222,17 +223,14 @@ module mkCnocTop( input  CLK, input  RST_N,
         .D_OUT(lEcho_delay2_D_OUT),
         .FULL_N(lEcho_delay2_FULL_N),
         .EMPTY_N(lEcho_delay2_EMPTY_N));
-  assign WILL_FIRE_RL_lEIONoc_sendHeader = lEIONoc_fifoMsgSource_FULL_N &&
-             !lEIONoc_bpState &&
+  assign WILL_FIRE_RL_lEIONoc_sendHeader = lEIONoc_fifoMsgSource_FULL_N && !lEIONoc_bpState &&
              (lEIO_portalIfc_indications_0_notEmpty || lEIO_portalIfc_indications_1_notEmpty) ;
   assign WILL_FIRE_RL_lEIONoc_sendMessage = lEIONoc_fifoMsgSource_FULL_N &&
              CASE_lEIONoc_methodIdReg_4_0__ETC___d51 && lEIONoc_bpState ;
   assign WILL_FIRE_RL_lERINoc_receiveMessageHeader = lERINoc_fifoMsgSink_EMPTY_N && !lERINoc_bpState ;
   assign WILL_FIRE_RL_lERINoc_receiveMessage = lERINoc_fifoMsgSink_i_notEmpty__3_ETC___d80 && lERINoc_bpState ;
-  assign MUX_lEIONoc_bpState_write_1__SEL_1 = WILL_FIRE_RL_lEIONoc_sendMessage &&
-             lEIONoc_messageWordsReg == 16'd1 ;
-  assign MUX_lERINoc_bpState_write_1__SEL_1 = WILL_FIRE_RL_lERINoc_receiveMessageHeader &&
-             _theResult____h1942 != 8'd0 ;
+  assign MUX_lEIONoc_bpState_write_1__SEL_1 = WILL_FIRE_RL_lEIONoc_sendMessage && lEIONoc_messageWordsReg == 16'd1 ;
+  assign MUX_lERINoc_bpState_write_1__SEL_1 = WILL_FIRE_RL_lERINoc_receiveMessageHeader && _theResult____h1942 != 8'd0 ;
   assign MUX_lEIONoc_fifoMsgSource_enq_1__VAL_1 = { methodNumber__h1378, x__h1485 } ;
   always@(lEIONoc_methodIdReg or lEIO_portalIfc_indications_0_first or lEIO_portalIfc_indications_1_first)
   begin
@@ -245,8 +243,7 @@ module mkCnocTop( input  CLK, input  RST_N,
   assign MUX_lEIONoc_messageWordsReg_write_1__VAL_2 = lEIONoc_messageWordsReg - 16'd1 ;
   assign MUX_lERINoc_messageWordsReg_write_1__VAL_2 = lERINoc_messageWordsReg - 8'd1 ;
   assign lEIONoc_bpState_D_IN = !MUX_lEIONoc_bpState_write_1__SEL_1 ;
-  assign lEIONoc_bpState_EN = WILL_FIRE_RL_lEIONoc_sendMessage &&
-             lEIONoc_messageWordsReg == 16'd1 ||
+  assign lEIONoc_bpState_EN = WILL_FIRE_RL_lEIONoc_sendMessage && lEIONoc_messageWordsReg == 16'd1 ||
              WILL_FIRE_RL_lEIONoc_sendHeader ;
   assign lEIONoc_messageWordsReg_D_IN = WILL_FIRE_RL_lEIONoc_sendHeader ?
                numWords__h1336 : MUX_lEIONoc_messageWordsReg_write_1__VAL_2 ;
@@ -255,14 +252,11 @@ module mkCnocTop( input  CLK, input  RST_N,
   assign lEIONoc_methodIdReg_D_IN = readyChannel__h1054 ;
   assign lEIONoc_methodIdReg_EN = WILL_FIRE_RL_lEIONoc_sendHeader ;
   assign lERINoc_bpState_D_IN = MUX_lERINoc_bpState_write_1__SEL_1 ;
-  assign lERINoc_bpState_EN = WILL_FIRE_RL_lERINoc_receiveMessageHeader &&
-             _theResult____h1942 != 8'd0 ||
-             WILL_FIRE_RL_lERINoc_receiveMessage &&
-             lERINoc_messageWordsReg == 8'd1 ;
+  assign lERINoc_bpState_EN = WILL_FIRE_RL_lERINoc_receiveMessageHeader && _theResult____h1942 != 8'd0 ||
+             WILL_FIRE_RL_lERINoc_receiveMessage && lERINoc_messageWordsReg == 8'd1 ;
   assign lERINoc_messageWordsReg_D_IN = WILL_FIRE_RL_lERINoc_receiveMessageHeader ?
                _theResult____h1942 : MUX_lERINoc_messageWordsReg_write_1__VAL_2 ;
-  assign lERINoc_messageWordsReg_EN = WILL_FIRE_RL_lERINoc_receiveMessageHeader ||
-             WILL_FIRE_RL_lERINoc_receiveMessage ;
+  assign lERINoc_messageWordsReg_EN = WILL_FIRE_RL_lERINoc_receiveMessageHeader || WILL_FIRE_RL_lERINoc_receiveMessage ;
   assign lERINoc_methodIdReg_D_IN = lERINoc_fifoMsgSink_D_OUT[23:16] ;
   assign lERINoc_methodIdReg_EN = WILL_FIRE_RL_lERINoc_receiveMessageHeader ;
   assign lEIO_ifc_heard2_a = lEcho_delay2_D_OUT[15:0] ;

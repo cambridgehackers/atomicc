@@ -32,7 +32,7 @@ hw/mkTop.bit: prepare_bin_target  fpgamake.mk
 	$(Q)$(MAKE) -f fpgamake.mk
 
 unneeded:
-	rm -rf Cache/ Impl/ Synth/ bin/ obj libs hw vivado* .Xil syntax.timestamp
+	rm -rf Cache/ Impl/ Synth/ bin/ obj libs hw vivado* .Xil syntax.timestamp obj_dir/
 
 new: unneeded
 	make all

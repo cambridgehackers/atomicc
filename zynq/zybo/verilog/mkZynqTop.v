@@ -205,6 +205,13 @@ module mkZynqTop(
         (((portalRControl || reqPortal_D_OUT_addr != 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
        : ((portalRControl || reqPortal_D_OUT_addr != 0 || RDY_indication) && reqrs_EMPTY_N));
 
+  wire RDY_requests_0_id, EN_requests_0_message_enq, RDY_requests_0_message_enq;
+  wire requests_0_message_notFull, RDY_requests_0_message_notFull;
+  wire RDY_indications_0_id, RDY_indications_0_message_first;
+  wire EN_indications_0_message_deq, RDY_indications_0_message_deq;
+  wire indications_0_message_notEmpty, RDY_indications_0_message_notEmpty;
+  wire [31 : 0] requests_0_id, requests_0_message_enq_v;
+  wire [31 : 0] indications_0_id, indications_0_message_first;
   always@(reqPortal_D_OUT_addr or indicationData or requestNotFull)
   begin
     if (selectRIndReq)
@@ -212,9 +219,20 @@ module mkZynqTop(
     else
     case (reqPortal_D_OUT_addr)
       0: requestValue = indicationData;
+      5'h0C: requestValue = requests_0_id;
+      5'h10: requestValue = indications_0_id;
+      5'h14: requestValue = indications_0_message_first;
+      5'h1C: requestValue =
+         {28'd0, RDY_requests_0_message_enq,
+                 requests_0_message_notFull && RDY_requests_0_message_notFull,
+                 RDY_indications_0_message_deq && RDY_indications_0_message_first,
+                 indications_0_message_notEmpty && RDY_indications_0_message_notEmpty};
       default: requestValue = 32'd0;
     endcase
   end
+  assign requests_0_message_enq_v = requestData;
+  assign EN_requests_0_message_enq = RULEwrite && !portalWControl && writeFifo_D_OUT_addr == 5'h10 && RDY_requests_0_message_enq;
+  assign EN_indications_0_message_deq = RULEwrite && !portalWControl && writeFifo_D_OUT_addr == 5'h14 && RDY_indications_0_message_deq;
   always@(reqPortal_D_OUT_addr or ctrlPort_0_interruptEnableReg or zzIntrChannel or selectRIndReq)
   begin
     case (reqPortal_D_OUT_addr)
@@ -358,4 +376,12 @@ mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .RDY_indication(RDY_indication),
 
     .indIntrChannel(indIntrChannel));
+mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
+    .requests_0_id (requests_0_id ), .RDY_requests_0_id(RDY_requests_0_id),
+    .requests_0_message_enq_v (requests_0_message_enq_v ), .EN_requests_0_message_enq (EN_requests_0_message_enq ), .RDY_requests_0_message_enq(RDY_requests_0_message_enq),
+    .requests_0_message_notFull (requests_0_message_notFull ), .RDY_requests_0_message_notFull(RDY_requests_0_message_notFull),
+    .indications_0_id (indications_0_id ), .RDY_indications_0_id(RDY_indications_0_id),
+    .indications_0_message_first (indications_0_message_first ), .RDY_indications_0_message_first(RDY_indications_0_message_first),
+    .EN_indications_0_message_deq (EN_indications_0_message_deq ), .RDY_indications_0_message_deq(RDY_indications_0_message_deq),
+    .indications_0_message_notEmpty (indications_0_message_notEmpty ), .RDY_indications_0_message_notEmpty(RDY_indications_0_message_notEmpty));
 endmodule  // mkZynqTop
