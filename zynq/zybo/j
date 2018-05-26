@@ -1,7 +1,9 @@
 #
 set -x
 set -e
-verilator --lint-only \
+export STYLE=--lint-only
+#export STYLE=--xml-only
+verilator $STYLE \
         -Iextrav \
         -Iverilog \
         -I../connectal/verilog/xilinx \
