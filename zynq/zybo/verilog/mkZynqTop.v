@@ -1,4 +1,4 @@
-module mkZynqTop(// input  zzCLK, input  zzRST_N,
+module mkZynqTop(
   inout  [14 : 0] DDR_Addr, inout  [2 : 0] DDR_BankAddr,
   inout  DDR_CAS_n, inout  DDR_CKE, inout  DDR_CS_n, inout  DDR_Clk_n, inout  DDR_Clk_p,
   inout  [3 : 0] DDR_DM, inout  [31 : 0] DDR_DQ,
@@ -183,7 +183,7 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
 
   reg ctrlPort_0_interruptEnableReg;
   reg readFirst, readLast, selectRIndReq, portalRControl, selectWIndReq, portalWControl;
-  reg [31 : 0] requestValue, reqInfo;
+  reg [31 : 0] requestValue, portalCtrlInfo;
   reg [9 : 0] readCount;
   reg [4 : 0] readAddr;
 
@@ -218,15 +218,15 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
   always@(reqPortal_D_OUT_addr or ctrlPort_0_interruptEnableReg or zzIntrChannel or selectRIndReq)
   begin
     case (reqPortal_D_OUT_addr)
-      0: reqInfo = {31'd0,  zzIntrChannel != 0};
-      //4: reqInfo = 0;//{31'd0, ctrlPort_0_interruptEnableReg;
-      8: reqInfo = 1;
-      5'h0C: reqInfo = zzIntrChannel;
-      5'h10: reqInfo = selectRIndReq ? 6 : 5;
-      5'h14: reqInfo = 2;
-      //5'h18: reqInfo = 0;
-      //5'h1C: reqInfo = 0;
-      default: reqInfo = 32'h005A05A0;
+      0: portalCtrlInfo = {31'd0,  zzIntrChannel != 0};
+      //4: portalCtrlInfo = 0;//{31'd0, ctrlPort_0_interruptEnableReg;
+      8: portalCtrlInfo = 1;
+      5'h0C: portalCtrlInfo = zzIntrChannel;
+      5'h10: portalCtrlInfo = selectRIndReq ? 6 : 5;
+      5'h14: portalCtrlInfo = 2;
+      //5'h18: portalCtrlInfo = 0;
+      //5'h1C: portalCtrlInfo = 0;
+      default: portalCtrlInfo = 32'h005A05A0;
 // PORTAL_CTRL_INTERRUPT_STATUS 0
 // PORTAL_CTRL_INTERRUPT_ENABLE 1
 // PORTAL_CTRL_NUM_TILES        2
@@ -261,7 +261,7 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
         .D_OUT({reqPortal_D_OUT_addr, reqPortal_D_OUT_base, reqPortal_D_OUT_id, reqPortal_D_OUT_last}),
         .DEQ(RULEread), .FULL_N(reqPortal_FULL_N), .EMPTY_N(reqPortal_EMPTY_N));
   FIFO2 #(.width(38), .guarded(1)) ReadDataFifo(.RST(RST_N), .CLK(CLK), .CLR(0),
-        .D_IN({portalRControl ? reqInfo : requestValue, reqPortal_D_OUT_id}), .ENQ(RULEread),
+        .D_IN({portalRControl ? portalCtrlInfo : requestValue, reqPortal_D_OUT_id}), .ENQ(RULEread),
         .D_OUT({maxigp0RDATA, maxigp0RID}), .DEQ(maxigp0RREADY && maxigp0RVALID),
         .FULL_N(ReadDataFifo_FULL_N), .EMPTY_N(maxigp0RVALID));
 
