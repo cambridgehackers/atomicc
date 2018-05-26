@@ -2,7 +2,7 @@
 set -x
 set -e
 export STYLE=--lint-only
-#export STYLE=--xml-only
+export STYLE=--xml-only
 verilator $STYLE \
         -Iextrav \
         -Iverilog \
