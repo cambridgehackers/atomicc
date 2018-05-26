@@ -187,7 +187,7 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
   reg [9 : 0] readCount;
   reg [4 : 0] readAddr;
 
-  wire indicationNotEmpty, requestNotFull;
+  wire requestNotFull;
   wire RDY_indication, RDY_requestEnq, ReadDataFifo_FULL_N;
   wire reqPortal_EMPTY_N, reqPortal_FULL_N, read_reqFifo_FULL_N;
   wire reqrs_EMPTY_N, reqrs_FULL_N, reqwriteDataFifo_EMPTY_N, reqws_EMPTY_N;
@@ -205,14 +205,13 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
         (((portalRControl || reqPortal_D_OUT_addr != 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
        : ((portalRControl || reqPortal_D_OUT_addr != 0 || RDY_indication) && reqrs_EMPTY_N));
 
-  always@(reqPortal_D_OUT_addr or indicationData or indicationNotEmpty or requestNotFull)
+  always@(reqPortal_D_OUT_addr or indicationData or requestNotFull)
   begin
     if (selectRIndReq)
       requestValue = { 31'd0, (reqPortal_D_OUT_addr == 4 && requestNotFull) };
     else
     case (reqPortal_D_OUT_addr)
       0: requestValue = indicationData;
-      4: requestValue = { 31'd0, indicationNotEmpty };
       default: requestValue = 32'd0;
     endcase
   end
@@ -220,13 +219,13 @@ module mkZynqTop(// input  zzCLK, input  zzRST_N,
   begin
     case (reqPortal_D_OUT_addr)
       0: reqInfo = {31'd0,  zzIntrChannel != 0};
-      4: reqInfo = 0;//{31'd0, ctrlPort_0_interruptEnableReg;
+      //4: reqInfo = 0;//{31'd0, ctrlPort_0_interruptEnableReg;
       8: reqInfo = 1;
       5'h0C: reqInfo = zzIntrChannel;
       5'h10: reqInfo = selectRIndReq ? 6 : 5;
       5'h14: reqInfo = 2;
-      5'h18: reqInfo = 0;
-      5'h1C: reqInfo = 0;
+      //5'h18: reqInfo = 0;
+      //5'h1C: reqInfo = 0;
       default: reqInfo = 32'h005A05A0;
 // PORTAL_CTRL_INTERRUPT_STATUS 0
 // PORTAL_CTRL_INTERRUPT_ENABLE 1
@@ -354,9 +353,9 @@ mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .selectRequest(selectRequest), .requestNotFull(requestNotFull),
 
     .EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
+    .selectIndication(selectIndication),
     .indicationData(indicationData),
     .RDY_indication(RDY_indication),
-    .selectIndication(selectIndication), .indicationNotEmpty(indicationNotEmpty),
 
     .indIntrChannel(indIntrChannel));
 endmodule  // mkZynqTop

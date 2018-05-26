@@ -5,14 +5,13 @@ module mkConnectalTop(input CLK, input  RST_N,
     output RDY_requestEnq,
     input [1:0]selectRequest, output requestNotFull,
 
-    output [31 : 0] indicationData,
     input EN_indication,
+    input [1:0]selectIndication,
+    output [31 : 0] indicationData,
     output RDY_indication,
-    input [1:0]selectIndication, output indicationNotEmpty,
     output [31 : 0]indIntrChannel);
 
   reg RDY_requestEnq, requestNotFull;
-  wire RDY_indicationDeq, RDY_indicationData, indicationNotEmpty;
   wire [31 : 0] indicationData;
 
   wire RDY_req0_enq, RDY_req1_enq, RDY_req2_enq, ind0_notEmpty, ind1_notEmpty;
@@ -40,11 +39,9 @@ module mkConnectalTop(input CLK, input  RST_N,
       2'd3: requestNotFull = 1'b0 /* unspecified value */ ;
     endcase
   end
-  assign indicationNotEmpty = selectIndication[0] ? ind1_notEmpty : ind0_notEmpty;
   assign indicationData = selectIndication[0] ? ind1_first : ind0_first;
-  assign RDY_indicationData = selectIndication[0] ? RDY_ind1_first : RDY_ind0_first;
-  assign RDY_indicationDeq = selectIndication[0] ? RDY_ind1_deq : RDY_ind0_deq;
-  assign RDY_indication = RDY_indicationDeq && RDY_indicationData;
+  assign RDY_indication =
+      (selectIndication[0] ? RDY_ind1_first : RDY_ind0_first) && (selectIndication[0] ? RDY_ind1_deq : RDY_ind0_deq);
   assign indIntrChannel = indIntrStatus ? (dutindIntrChannel + 32'd1) : 32'd0;
 ////////////////////////////////////////////////////////////////////////////
   wire [31 : 0] lEchoIndicationOutput_ifc_heard_v;
