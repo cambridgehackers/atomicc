@@ -39,54 +39,13 @@ public:
         sem_post(&sem_heard2);
         printf("heard an echo2: %d %d\n", a, b);
     }
-    EchoIndication(unsigned int id) : EchoIndicationWrapper(id) {}
+    virtual void heard3 ( const uint16_t a, const uint32_t b, const uint32_t c, const uint16_t d ) {
+printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+exit(-1);
+    }
+    EchoIndication(unsigned int id, PortalTransportFunctions *item, void *param) : EchoIndicationWrapper(id, item, param) {}
 };
 EchoIndication *echoIndication;
-volatile unsigned int *getPtr(void)
-{
-int channel = 0;
-    PortalInternal *p = &echoIndication->pint;
-    return p->transport->mapchannelInd(p, channel);
-}
-unsigned int readReg(void)
-{
-    volatile unsigned int* temp_working_addr = getPtr();
-    unsigned int rc = temp_working_addr[5];
-    temp_working_addr[5] = 0;
-    return rc;
-}
-void writeReg(int ind, unsigned int val)
-{
-    //printf("[%s:%d] [%x] = %x\n", __FUNCTION__, __LINE__, ind, val);
-    getPtr()[ind] = val;
-}
-void readRegisters(const char *tag)
-{
-    volatile unsigned int* temp_working_addr = getPtr();
-    printf("[%s:%d]   %s:", __FUNCTION__, __LINE__, tag);
-    //printf("0x%x,   ", temp_working_addr[5]);
-    printf("0x%x,   ", temp_working_addr[7]);
-    printf("\n");
-    //RDY_requests_0_message_enq              8
-    //requests_0_message_notFull              4
-    //RDY_indications_0_message_first/deq     2
-    //indications_0_message_notEmpty          1
-}
-void writeReq(int ind, unsigned int val)
-{
-printf("[%s:%d] val %x\n", __FUNCTION__, __LINE__, val);
-readRegisters("REQ        val");
-     writeReg(4, ind);
-///readRegisters("REQchannel/len");
-     writeReg(4, val);
-}
-void getInd()
-{
-readRegisters("IND        val");
-     unsigned int len = readReg();
-     unsigned int val = readReg();
-printf("getInd: len %x val %x\n", len, val);
-}
 
 static void call_say(int v)
 {
@@ -107,8 +66,16 @@ int main(int argc, const char **argv)
     long actualFrequency = 0;
     long requestedFrequency = 1e9 / MainClockPeriod;
 
+#if 0
     echoIndication = new EchoIndication(IfcNames_EchoIndicationH2S);
     echoRequestProxy = new EchoRequestProxy(IfcNames_EchoRequestS2H);
+#else
+    Portal *mcommon = new Portal(5, 0, sizeof(uint32_t), portal_mux_handler, NULL, &transportPortal, NULL, 0);
+    PortalMuxParam param = {};
+    param.pint = &mcommon->pint;
+    echoIndication = new EchoIndication(IfcNames_EchoIndicationH2S, &transportMux, &param);
+    echoRequestProxy = new EchoRequestProxy(IfcNames_EchoRequestS2H, &transportMux, &param);
+#endif
 
     int status = setClockFrequency(0, requestedFrequency, &actualFrequency);
     fprintf(stderr, "Requested main clock frequency %5.2f, actual clock frequency %5.2f MHz status=%d errno=%d\n",
@@ -121,10 +88,6 @@ int main(int argc, const char **argv)
     call_say(v);
     call_say(v*5);
     call_say(v*17);
-for (int i = 0; i < 14; i++)
-writeReq(0x00002, 0x33000+i); // req
-for (int i = 0; i < 14; i++)
-getInd();
     call_say(v*93);
     call_say2(v, v*3);
     printf("TEST TYPE: SEM\n");
