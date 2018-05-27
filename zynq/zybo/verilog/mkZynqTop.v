@@ -364,24 +364,31 @@ module mkZynqTop(
         end
       end
   end
-mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
-    .EN_request(RULEwrite && !portalWControl && selectWIndReq),
-    .requestEnqV(requestData),
-    .RDY_requestEnq(RDY_requestEnq),
-    .selectRequest(selectRequest), .requestNotFull(requestNotFull),
+//mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
+    //.EN_request(RULEwrite && !portalWControl && selectWIndReq),
+    //.requestEnqV(requestData),
+    //.RDY_requestEnq(RDY_requestEnq),
+    //.selectRequest(selectRequest), .requestNotFull(requestNotFull),
 
-    .EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
-    .selectIndication(selectIndication),
-    .indicationData(indicationData),
-    .RDY_indication(RDY_indication),
+    //.EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
+    //.selectIndication(selectIndication),
+    //.indicationData(indicationData),
+    //.RDY_indication(RDY_indication),
 
-    .indIntrChannel(indIntrChannel));
+    //.indIntrChannel(indIntrChannel));
 mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
     .requests_0_id (requests_0_id ), .RDY_requests_0_id(RDY_requests_0_id),
-    .requests_0_message_enq_v (requests_0_message_enq_v ), .EN_requests_0_message_enq (EN_requests_0_message_enq ), .RDY_requests_0_message_enq(RDY_requests_0_message_enq),
-    .requests_0_message_notFull (requests_0_message_notFull ), .RDY_requests_0_message_notFull(RDY_requests_0_message_notFull),
+    .requests_0_message_enq_v (requests_0_message_enq_v ),
+    .EN_requests_0_message_enq (EN_requests_0_message_enq ),
+    .RDY_requests_0_message_enq(RDY_requests_0_message_enq),
+    .requests_0_message_notFull (requests_0_message_notFull ),
+    .RDY_requests_0_message_notFull(RDY_requests_0_message_notFull),
+
     .indications_0_id (indications_0_id ), .RDY_indications_0_id(RDY_indications_0_id),
-    .indications_0_message_first (indications_0_message_first ), .RDY_indications_0_message_first(RDY_indications_0_message_first),
-    .EN_indications_0_message_deq (EN_indications_0_message_deq ), .RDY_indications_0_message_deq(RDY_indications_0_message_deq),
-    .indications_0_message_notEmpty (indications_0_message_notEmpty ), .RDY_indications_0_message_notEmpty(RDY_indications_0_message_notEmpty));
+    .indications_0_message_first (indications_0_message_first ),
+    .RDY_indications_0_message_first(RDY_indications_0_message_first),
+    .EN_indications_0_message_deq (EN_indications_0_message_deq ),
+    .RDY_indications_0_message_deq(RDY_indications_0_message_deq),
+    .indications_0_message_notEmpty (indications_0_message_notEmpty ),
+    .RDY_indications_0_message_notEmpty(RDY_indications_0_message_notEmpty));
 endmodule  // mkZynqTop
