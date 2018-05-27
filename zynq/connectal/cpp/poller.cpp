@@ -48,7 +48,7 @@ PortalPoller::PortalPoller(int autostart)
     addFd(pipefd[0]);
 
     timeout = -1; // wait for interrupt
-#if 1//defined(SIMULATION)
+#if defined(SIMULATION)
     timeout = 100;
 #endif
 }
@@ -117,7 +117,7 @@ int PortalPoller::registerInstance(Portal *portal)
         addFd(portal->pint.fpga_fd);
     for (int i = 0; i < portal->pint.client_fd_number; i++)
         addFd(portal->pint.client_fd[i]);
-    //portal->pint.transport->enableint(&portal->pint, 1);
+    portal->pint.transport->enableint(&portal->pint, 1);
     pthread_mutex_unlock(&mutex);
     start();
     return 0;
@@ -193,7 +193,7 @@ void* PortalPoller::event(void)
         instance->pint.transport->event(&instance->pint);
         if (instance->pint.handler) {
             // re-enable interrupt which was disabled by portal_isr
-            //instance->pint.transport->enableint(&instance->pint, 1);
+            instance->pint.transport->enableint(&instance->pint, 1);
         }
     }
     pthread_mutex_unlock(&mutex);

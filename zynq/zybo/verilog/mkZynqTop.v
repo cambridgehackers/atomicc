@@ -205,13 +205,6 @@ module mkZynqTop(
         (((portalRControl || reqPortal_D_OUT_addr != 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
        : ((portalRControl || reqPortal_D_OUT_addr != 0 || RDY_indication) && reqrs_EMPTY_N));
 
-  wire RDY_requests_0_id, EN_requests_0_message_enq, RDY_requests_0_message_enq;
-  wire requests_0_message_notFull, RDY_requests_0_message_notFull;
-  wire RDY_indications_0_id, RDY_indications_0_message_first;
-  wire EN_indications_0_message_deq, RDY_indications_0_message_deq;
-  wire indications_0_message_notEmpty, RDY_indications_0_message_notEmpty;
-  wire [31 : 0] requests_0_id, requests_0_message_enq_v;
-  wire [31 : 0] indications_0_id, indications_0_message_first;
   always@(reqPortal_D_OUT_addr or indicationData or requestNotFull)
   begin
     if (selectRIndReq)
@@ -219,38 +212,23 @@ module mkZynqTop(
     else
     case (reqPortal_D_OUT_addr)
       0: requestValue = indicationData;
-      5'h0C: requestValue = requests_0_id;
-      5'h10: requestValue = indications_0_id;
-      5'h14: requestValue = indications_0_message_first;
-      5'h1C: requestValue =
-         {28'd0, RDY_requests_0_message_enq,
-                 requests_0_message_notFull && RDY_requests_0_message_notFull,
-                 RDY_indications_0_message_deq && RDY_indications_0_message_first,
-                 indications_0_message_notEmpty && RDY_indications_0_message_notEmpty};
+      4: requestValue = { 31'd0, requestNotFull};
       default: requestValue = 32'd0;
     endcase
   end
-  assign requests_0_message_enq_v = requestData;
-  assign EN_requests_0_message_enq = RULEwrite && !portalWControl && writeFifo_D_OUT_addr == 5'h10 && RDY_requests_0_message_enq;
-  assign EN_indications_0_message_deq = RULEwrite && !portalWControl && writeFifo_D_OUT_addr == 5'h14 && RDY_indications_0_message_deq;
   always@(reqPortal_D_OUT_addr or ctrlPort_0_interruptEnableReg or zzIntrChannel or selectRIndReq)
   begin
     case (reqPortal_D_OUT_addr)
-      0: portalCtrlInfo = {31'd0,  zzIntrChannel != 0};
+      0: portalCtrlInfo = {31'd0,  zzIntrChannel != 0}; // PORTAL_CTRL_INTERRUPT_STATUS 0
       //4: portalCtrlInfo = 0;//{31'd0, ctrlPort_0_interruptEnableReg;
-      8: portalCtrlInfo = 1;
-      5'h0C: portalCtrlInfo = zzIntrChannel;
-      5'h10: portalCtrlInfo = selectRIndReq ? 6 : 5;
-      5'h14: portalCtrlInfo = 2;
+      8: portalCtrlInfo = 1;                         // PORTAL_CTRL_NUM_TILES        2
+      5'h0C: portalCtrlInfo = zzIntrChannel;         // PORTAL_CTRL_IND_QUEUE_STATUS 3
+      5'h10: portalCtrlInfo = selectRIndReq ? 6 : 5; // PORTAL_CTRL_PORTAL_ID        4
+      5'h14: portalCtrlInfo = 2;                     // PORTAL_CTRL_NUM_PORTALS      5
       //5'h18: portalCtrlInfo = 0;
       //5'h1C: portalCtrlInfo = 0;
       default: portalCtrlInfo = 32'h005A05A0;
-// PORTAL_CTRL_INTERRUPT_STATUS 0
 // PORTAL_CTRL_INTERRUPT_ENABLE 1
-// PORTAL_CTRL_NUM_TILES        2
-// PORTAL_CTRL_IND_QUEUE_STATUS 3
-// PORTAL_CTRL_PORTAL_ID        4
-// PORTAL_CTRL_NUM_PORTALS      5
 // PORTAL_CTRL_COUNTER_MSB      6
 // PORTAL_CTRL_COUNTER_LSB      7
     endcase
@@ -364,28 +342,36 @@ module mkZynqTop(
         end
       end
   end
+  wire RDY_requests_0_id, RDY_requests_0_message_enq;
+  wire requests_0_message_notFull, RDY_requests_0_message_notFull;
+  wire RDY_indications_0_id, RDY_indications_0_message_first;
+  wire EN_indications_0_message_deq, RDY_indications_0_message_deq;
+  wire indications_0_message_notEmpty, RDY_indications_0_message_notEmpty;
+  wire [31 : 0] requests_0_id, indications_0_id;
 //mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     //.EN_request(RULEwrite && !portalWControl && selectWIndReq),
     //.requestEnqV(requestData),
     //.RDY_requestEnq(RDY_requestEnq),
     //.selectRequest(selectRequest), .requestNotFull(requestNotFull),
-
     //.EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
     //.selectIndication(selectIndication),
     //.indicationData(indicationData),
     //.RDY_indication(RDY_indication),
-
     //.indIntrChannel(indIntrChannel));
-mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
+ 
+  assign indIntrChannel = RDY_indications_0_message_notEmpty && indications_0_message_notEmpty;
+  assign RDY_indication = RDY_indications_0_message_deq && RDY_indications_0_message_first;
+  assign EN_indications_0_message_deq = RULEread && !portalRControl && reqPortal_D_OUT_addr == 0;
+  assign requestNotFull = RDY_requests_0_message_notFull && requests_0_message_notFull;
+  mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
     .requests_0_id (requests_0_id ), .RDY_requests_0_id(RDY_requests_0_id),
-    .requests_0_message_enq_v (requests_0_message_enq_v ),
-    .EN_requests_0_message_enq (EN_requests_0_message_enq ),
+    .requests_0_message_enq_v (requestData),
+    .EN_requests_0_message_enq (RULEwrite && !portalWControl),
     .RDY_requests_0_message_enq(RDY_requests_0_message_enq),
     .requests_0_message_notFull (requests_0_message_notFull ),
     .RDY_requests_0_message_notFull(RDY_requests_0_message_notFull),
-
     .indications_0_id (indications_0_id ), .RDY_indications_0_id(RDY_indications_0_id),
-    .indications_0_message_first (indications_0_message_first ),
+    .indications_0_message_first (indicationData),
     .RDY_indications_0_message_first(RDY_indications_0_message_first),
     .EN_indications_0_message_deq (EN_indications_0_message_deq ),
     .RDY_indications_0_message_deq(RDY_indications_0_message_deq),
