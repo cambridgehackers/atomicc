@@ -1,4 +1,4 @@
-module mkZynqTop(
+module mkZynqTop #(parameter width = 64) (
   inout  [14 : 0] DDR_Addr, inout  [2 : 0] DDR_BankAddr,
   inout  DDR_CAS_n, inout  DDR_CKE, inout  DDR_CS_n, inout  DDR_Clk_n, inout  DDR_Clk_p,
   inout  [3 : 0] DDR_DM, inout  [31 : 0] DDR_DQ,
@@ -398,8 +398,55 @@ module mkZynqTop(
 
   assign EN_outgoing = (EN_echo_out_enq && RDY_echo_out_enq); // 'or' together all EN signals
   // use priority encoder to mux outgoing signals when multiple portals
-  assign outgoingData = {echoData[`MAX_OUT_WIDTH-1:16], `IfcNames_EchoIndicationH2S};
+  assign outgoingData = echoData; //{echoData[`MAX_OUT_WIDTH-1:16], `IfcNames_EchoIndicationH2S};
   assign outgoingLength = echoData[15:0];
   assign RDY_echo_out_enq = RDY_outgoing;
+
+  wire    inrequestLast;
+  reg EN_inrequestData;
+  reg [width-1 : 0] inrequestData;
+  reg [width-1 : 0] outindicationData;
+  reg RDY_outindication;
+  reg haveRequestCount;
+  reg [15 : 0] requestCount, indicationCount;
+  assign incomingData = inrequestData;
+  assign RDY_echo_in_enq = EN_inrequestData;
+  assign indicationData = outindicationData[31:0];
+  always @(posedge CLK) begin
+    if (RST_N == 0) begin
+      inrequestData <= 32'haaaaaaaa;
+      EN_inrequestData <= 0;
+      haveRequestCount <= 0;
+      RDY_outindication <= 1;
+      indicationCount <= 0;
+    end
+    else begin
+      if (EN_inrequestData)
+        EN_inrequestData <= 0;
+      else if (RULEwrite && !portalWControl) begin
+        if (!haveRequestCount && requestData[15:0] != 1) begin
+          requestCount <= requestData[15:0];
+          haveRequestCount <= 1;
+        end
+        else if (!haveRequestCount || requestCount == 1) begin
+          haveRequestCount <= 0;
+          EN_inrequestData <= 1;
+        end
+        inrequestData <= {inrequestData[width-1-32:0], requestData};
+      end
+      if (EN_outindication) begin
+        RDY_outindication <= 0;
+        outindicationData <= outgoingData;
+        indicationCount <= outindicationLength;// + 1;
+        //$display("VSOURCE: start data %x", data);
+      end
+      if (!RDY_outindication && RDY_indications_0_message_deq) begin
+        outindicationData <= {32'b0, outindicationData[width-1:32]};
+        if (indicationCount == 1)
+          RDY_outindication <= 1;
+        indicationCount <= indicationCount - 1;
+      end
+    end
+  end
 `endif
 endmodule  // mkZynqTop
