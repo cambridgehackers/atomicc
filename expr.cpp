@@ -202,7 +202,8 @@ static bool checkOperator(std::string s)
 {
     return s == "==" || s == "&" || s == "+" || s == "-" || s == "*" || s == "%" || s == "!="
       || s == "?" || s == ":" || s == "^" || s == ","
-      || s == "|" || s == "||" || s == "<" || s == ">";
+      || s == "|" || s == "||" || s == "<" || s == ">"
+      || s == "<<" || s == ">>";
 }
 
 static ACCExpr *getRHS(ACCExpr *expr)

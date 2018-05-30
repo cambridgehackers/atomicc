@@ -21,6 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+static int trace_iter;//=1;
 std::string getRdyName(std::string basename)
 {
     std::string rdyName = basename;
@@ -88,7 +89,8 @@ ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
             std::string fldName = item.fldName;
             if (vecCount != -1)
                 fldName += autostr(dimIndex++);
-printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+            if (trace_iter)
+                printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
             if (auto ret = (cbWorker)(item, fldName))
                 return ret;
         } while(--vecCount > 0);

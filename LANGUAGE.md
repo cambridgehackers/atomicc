@@ -108,6 +108,12 @@ CWrapper just forwards the interface 'request' down into the instance 'consumer'
 
 ### integer bit width: __int(A)
 
+### __bitsize
+New builtin function to return size in bits of a type or variable.
+
+### reinterpret_cast
+This can now be used to cast any datatype to/from __int(A), allowing operations to be performed on a bit level.
+
 ## Execution Semantics
 
 ### Execution control
