@@ -22,6 +22,7 @@
 #include "common.h"
 #define MAX_EXPR_DEPTH 20
 
+static int trace_expr;//=1;
 static std::string lexString;
 static unsigned lexIndex;
 static char lexChar;
@@ -75,7 +76,7 @@ std::string tree2str(const ACCExpr *arg)
         ret += op + " ";
         op = ",";
     }
-    else if (!arg->operands.size())
+    else if (!arg->operands.size() || (op == "-" /*unary*/ && arg->operands.size() == 1))
         ret += op;
     for (auto item: arg->operands) {
         ret += sep;
@@ -256,6 +257,8 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
         expr = expr->operands.front();
     if (expr->value == "{" && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
+    if (trace_expr)
+        dumpExpr("cleanupExpr", expr);
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
     if (v == "^" && getRHS(expr)->value == "1")
@@ -263,6 +266,8 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
          ACCExpr *titem = cleanupExpr(item);
+         if (trace_expr)
+             printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, item, titem, ret);
          if (titem->value != ret->value || ret->value == "?" || isParenChar(ret->value[0]))
              ret->operands.push_back(titem);
          else
@@ -340,13 +345,23 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
     TOP = nullptr;
     if (head) {
         while ((tok = get1Token()) && tok->value != terminator) {
+            if (trace_expr)
+                printf("[%s:%d] parseState %d tok->value %s repeat %d\n", __FUNCTION__, __LINE__, parseState, tok->value.c_str(), repeatCurrentToken);
             if ((parseState = !parseState)) {    /* Operand */
+                ACCExpr *unary = nullptr;
                 ACCExpr *tnext = tok;
                 if (repeatCurrentToken)
                     tok = head;
                 else
                     tnext = get1Token();
                 repeatCurrentToken = false;
+                if (tok->value == "-" && !tok->operands.size()) { // unary '-'
+                    unary = tok;
+                    tok = tnext;
+                    tnext = get1Token();
+                    if (trace_expr)
+                        printf("[%s:%d] unary '-' unary %p tok %p tnext %p\n", __FUNCTION__, __LINE__, unary, tok, tnext);
+                }
                 if (!checkOperand(tok->value) && !checkOperator(tok->value)) {
                     printf("[%s:%d] OPERAND CHECKFAILLLLLLLLLLLLLLL %s from %s\n", __FUNCTION__, __LINE__, tree2str(tok).c_str(), lexString.c_str());
                     exit(-1);
@@ -370,6 +385,10 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                     }
                 }
                 repeatGet1Token = tnext;
+                if (unary) {
+                    unary->operands.push_back(tok);
+                    tok = unary;
+                }
                 currentOperand = tok;
             }
             else {                        /* Operator */
