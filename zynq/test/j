@@ -3,10 +3,10 @@
 set -x
 set -e
 scp $COMPILE_HOST:git/atomicc/zynq/zybo/bin/android.exe .
-adb connect 192.168.2.90
+adb connect 192.168.2.91
 adb root
 sleep 3
-adb connect 192.168.2.90
+adb connect 192.168.2.91
 adb push android.exe /mnt/sdcard/tmp
 adb shell insmod /mnt/sdcard/zynqportal.ko 
 adb shell insmod /mnt/sdcard/portalmem.ko 
