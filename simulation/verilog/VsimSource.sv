@@ -20,38 +20,17 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-module VsimSource #(parameter width = 64) (input CLK, input RST_N,
-   input EN_data, input [width-1:0] data_v, input [15:0] data_length, output RDY_data);
-
-   wire sourceLast;
-   reg [width-1 : 0] outgoingData;
-   reg indicationState;
-   reg [15 : 0] indicationWords;
-
-   assign sourceLast = indicationWords == 16'd1;
-   assign RDY_data = !indicationState;
+module VsimSource #(parameter width = 32) (input CLK, input RST_N,
+   output EN_beat, input RDY_beat, input [width-1:0] beat, input last);
 
    import "DPI-C" function void dpi_msgSource_beat(input int beat, input int last);
 
+   assign EN_beat = 1;
    always @(posedge CLK) begin
-    if (RST_N == `BSV_RESET_VALUE) begin
-      indicationState <= 0;
-      indicationWords <= 16'd0;
-    end
-    else begin
-      if (EN_data) begin
-          indicationState <= 1;
-          outgoingData <= data_v;
-          indicationWords <= data_length + 1;
-          //$display("VSOURCE: start data %x", data);
-      end
-      if (indicationState) begin
-          //$display("VSOURCE: outgoing data %x last %x", outgoingData, sourceLast);
-          dpi_msgSource_beat(outgoingData[31:0], {31'b0, sourceLast});
-          outgoingData <= {32'b0, outgoingData[width-1:32]};
-          if (sourceLast)
-              indicationState <= 0;
-          indicationWords <= indicationWords - 16'd1;
+    if (RST_N != `BSV_RESET_VALUE) begin
+      if (EN_beat && RDY_beat) begin
+          //$display("VSOURCE: outgoing data %x last %x", beat, last);
+          dpi_msgSource_beat(beat, {31'b0, last});
       end
     end
   end

@@ -20,38 +20,27 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-module VsimSink #(parameter width = 64) (input CLK, input RST_N,
-   output RDY_data, input EN_data, output [width-1:0] data);
-
-   wire    last, valid;
-   wire    [31:0] beat;
-   reg     last_reg;
-   reg [width-1 : 0] incomingData;
-   
+module VsimSink #(parameter width = 32) (input CLK, input RST_N,
+   output EN_beat, input RDY_beat, output [width-1:0] beat, output last);
    import "DPI-C" function longint dpi_msgSink_beat();
 
-   assign RDY_data = last_reg;
-   assign data = incomingData;
-   
    always @(posedge CLK) begin
       if (RST_N == `BSV_RESET_VALUE) begin
-	 last_reg <= 0;
-	 incomingData <= 32'haaaaaaaa;
       end
-      else if (EN_data == 1 || last_reg == 0) begin
+      else if (RDY_beat) begin
 `ifndef BOARD_cvc
 	 automatic longint v = dpi_msgSink_beat();
 	 last = v[33];
-	 valid = v[32];
+	 EN_beat = v[32];
 	 beat = v[31:0];
 `else
-	 { last, valid, beat } = dpi_msgSink_beat();
+	 { last, EN_beat, beat } = dpi_msgSink_beat();
 `endif
-         last_reg <= last;
-         if (valid) begin
-             //$display("VSIMSINK: incomingData %x beat %x", incomingData, v);
-             incomingData <= {incomingData[width-1-32:0], beat};
-         end
+      end
+      else begin
+	 last = 0;
+	 EN_beat = 0;
+	 beat = 0;
       end
    end
 endmodule
