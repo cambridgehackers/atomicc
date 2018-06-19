@@ -163,7 +163,7 @@ printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2s
             ret += op + " ";
             op = ",";
         }
-        else if (!expr->operands.size() || (op == "-" /*unary*/ && expr->operands.size() == 1))
+        else if (!expr->operands.size() || ((op == "-" || op == "!")/*unary*/ && expr->operands.size() == 1))
             ret += op;
         for (auto item: expr->operands) {
             bool operand = checkOperand(item->value) || item->value == "," || item->value == "?" || expr->operands.size() == 1;

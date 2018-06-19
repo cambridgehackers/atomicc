@@ -76,7 +76,7 @@ std::string tree2str(const ACCExpr *arg)
         ret += op + " ";
         op = ",";
     }
-    else if (!arg->operands.size() || (op == "-" /*unary*/ && arg->operands.size() == 1))
+    else if (!arg->operands.size() || ((op == "-" || op == "!")/*unary*/ && arg->operands.size() == 1))
         ret += op;
     for (auto item: arg->operands) {
         ret += sep;
@@ -202,7 +202,7 @@ static ACCExpr *get1Token(void)
 static bool checkOperator(std::string s)
 {
     return s == "==" || s == "&" || s == "+" || s == "-" || s == "*" || s == "%" || s == "!="
-      || s == "?" || s == ":" || s == "^" || s == ","
+      || s == "?" || s == ":" || s == "^" || s == "," || s == "!"
       || s == "|" || s == "||" || s == "<" || s == ">"
       || s == "<<" || s == ">>";
 }
@@ -308,7 +308,46 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
     }
     if (ret->operands.size() == 1 && (ret->value == "&" || ret->value == "|"))
         ret = ret->operands.front();
+    if (ret->value == "!=") {
+        if (isdigit(ret->operands.front()->value[0])) { // move constants to RHS
+            ACCExpr *lhs = ret->operands.front();
+            ret->operands.pop_front();
+            ret->operands.push_back(lhs);
+        }
+        ACCExpr *rhs = getRHS(ret), *lhs = ret->operands.front();
+        if (rhs->value == "0" && lhs->value == "^" && getRHS(lhs)->value == "1") {
+            ret->value = "==";
+            ret->operands.clear();
+            ret->operands.push_back(lhs->operands.front());
+            ret->operands.push_back(rhs);
+        }
+    }
     if (ret->value == "==") {
+        int leftLen = -1;
+        if (isdigit(ret->operands.front()->value[0])) { // move constants to RHS
+            ACCExpr *lhs = ret->operands.front();
+            ret->operands.pop_front();
+            ret->operands.push_back(lhs);
+        }
+        for (auto item: ret->operands) {
+            if (isIdChar(item->value[0])) {
+                if(!refList[item->value].pin) {
+printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str());
+//exit(-1);
+                }
+                else
+                    leftLen = convertType(refList[item->value].type);
+            }
+            else if (isdigit(item->value[0])) {
+                if (item->value == "0" && leftLen == 1) {
+                    ret = allocExpr("!", ret->operands.front());
+                    break;
+                }
+                updateWidth(item, leftLen);
+            }
+        }
+    }
+    if (ret->value == "!=") {
         int leftLen = -1;
         for (auto item: ret->operands) {
             if (isIdChar(item->value[0])) {
@@ -319,16 +358,13 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
                 else
                     leftLen = convertType(refList[item->value].type);
             }
-            else if (isdigit(item->value[0]))
+            else if (isdigit(item->value[0])) {
+                if (item->value == "0" && leftLen == 1) {
+                    ret = ret->operands.front();
+                    break;
+                }
                 updateWidth(item, leftLen);
-        }
-    }
-    if (ret->value == "!=") {
-        ACCExpr *rhs = getRHS(ret);
-        if (ret->operands.front()->value == "0" && rhs->value == "^" && getRHS(rhs)->value == "1") {
-            ret->value = "==";
-            ret->operands.pop_back();
-            ret->operands.push_back(rhs->operands.front());
+            }
         }
     }
     return ret;
@@ -355,7 +391,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                 else
                     tnext = get1Token();
                 repeatCurrentToken = false;
-                if (tok->value == "-" && !tok->operands.size()) { // unary '-'
+                if ((tok->value == "-" || tok->value == "!") && !tok->operands.size()) { // unary '-'
                     unary = tok;
                     tok = tnext;
                     tnext = get1Token();
