@@ -21,26 +21,26 @@
 // SOFTWARE.
 
 module VsimReceive #(parameter width = 32) (input CLK, input nRST,
-   output EN_beat, input RDY_beat, output [width-1:0] beat, output last);
-   import "DPI-C" function longint dpi_msgReceive_beat();
+    output EN_beat, input RDY_beat, output [width-1:0] beat, output last);
 
-   always @(posedge CLK) begin
-      if (nRST == `BSV_RESET_VALUE) begin
-      end
-      else if (RDY_beat) begin
+    import "DPI-C" function longint dpi_msgReceive_beat();
+    always @(posedge CLK) begin
+        if (nRST != `BSV_RESET_VALUE) begin
+            if (RDY_beat) begin
 `ifndef BOARD_cvc
-	 automatic longint v = dpi_msgReceive_beat();
-	 last = v[33];
-	 EN_beat = v[32];
-	 beat = v[31:0];
+	        automatic longint v = dpi_msgReceive_beat();
+	        last = v[33];
+	        EN_beat = v[32];
+	        beat = v[31:0];
 `else
-	 { last, EN_beat, beat } = dpi_msgReceive_beat();
+	        { last, EN_beat, beat } = dpi_msgReceive_beat();
 `endif
-      end
-      else begin
-	 last = 0;
-	 EN_beat = 0;
-	 beat = 0;
-      end
-   end
+            end
+            else begin
+	        last = 0;
+	        EN_beat = 0;
+	        beat = 0;
+            end
+        end
+    end
 endmodule
