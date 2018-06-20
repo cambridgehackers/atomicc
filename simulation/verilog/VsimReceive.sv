@@ -20,21 +20,21 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-module VsimSink #(parameter width = 32) (input CLK, input RST_N,
+module VsimReceive #(parameter width = 32) (input CLK, input nRST,
    output EN_beat, input RDY_beat, output [width-1:0] beat, output last);
-   import "DPI-C" function longint dpi_msgSink_beat();
+   import "DPI-C" function longint dpi_msgReceive_beat();
 
    always @(posedge CLK) begin
-      if (RST_N == `BSV_RESET_VALUE) begin
+      if (nRST == `BSV_RESET_VALUE) begin
       end
       else if (RDY_beat) begin
 `ifndef BOARD_cvc
-	 automatic longint v = dpi_msgSink_beat();
+	 automatic longint v = dpi_msgReceive_beat();
 	 last = v[33];
 	 EN_beat = v[32];
 	 beat = v[31:0];
 `else
-	 { last, EN_beat, beat } = dpi_msgSink_beat();
+	 { last, EN_beat, beat } = dpi_msgReceive_beat();
 `endif
       end
       else begin

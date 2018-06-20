@@ -93,7 +93,7 @@ extern "C" void dpi_init()
 
 #define VALID_FLAG (1ll << 32)
 #define END_FLAG   (2ll << 32)
-extern "C" long long dpi_msgSink_beat(void)
+extern "C" long long dpi_msgReceive_beat(void)
 {
 top:
     if (rxLength > 1) {
@@ -139,10 +139,10 @@ top:
   return 0xbadad7a;
 }
 
-extern "C" void dpi_msgSource_beat(int beat, int last)
+extern "C" void dpi_msgSend_beat(int beat, int last)
 {
     //if (trace_xsimtop)
-        //fprintf(stdout, "dpi_msgSource_beat: beat=%08x\n", beat);
+        //fprintf(stdout, "dpi_msgSend_beat: beat=%08x\n", beat);
 //printf("[%s:%d] index %x txBuffer[0] %x beat %x last %x\n", __FUNCTION__, __LINE__, txIndex, txBuffer[0], beat, last);
     txBuffer[txIndex++] = beat;
     if (last) {
