@@ -1,12 +1,10 @@
 
 module mkCnocTop(input  CLK, input  RST_N,
-  output [31 : 0] requests_0_id, output RDY_requests_0_id,
-  input  [31 : 0] requests_0_message_enq_v, input  EN_requests_0_message_enq, output RDY_requests_0_message_enq,
-  output requests_0_message_notFull, output RDY_requests_0_message_notFull,
-  output [31 : 0] indications_0_id, output RDY_indications_0_id,
-  output [31 : 0] indications_0_message_first, output RDY_indications_0_message_first,
-  input  EN_indications_0_message_deq, output RDY_indications_0_message_deq,
-  output indications_0_message_notEmpty, output RDY_indications_0_message_notEmpty);
+  input  [31 : 0] requests_0_message_enq_v, input  EN_requests_0_message_enq,
+  output RDY_requests_0_message_enq,
+  output [31 : 0] indications_0_message_first,
+  input  EN_indications_0_message_deq, output RDY_indication,
+  output indIntrChannel);
 
   reg lEIONoc_bpState;
   wire lEIONoc_bpState_D_IN,
@@ -110,18 +108,10 @@ module mkCnocTop(input  CLK, input  RST_N,
   wire [7 : 0] _theResult____h1942, messageWords__h1941, readyChannel__h1054;
   wire CASE_lEIONoc_methodIdReg_4_0__ETC___d51,
        lERINoc_fifoMsgSink_i_notEmpty__3_ETC___d80;
-  assign requests_0_id = 32'd6 ;
-  assign RDY_requests_0_id = 1'd1 ;
   assign RDY_requests_0_message_enq = lERINoc_fifoMsgSink_FULL_N ;
-  assign requests_0_message_notFull = lERINoc_fifoMsgSink_FULL_N ;
-  assign RDY_requests_0_message_notFull = 1'd1 ;
-  assign indications_0_id = 32'd5 ;
-  assign RDY_indications_0_id = 1'd1 ;
   assign indications_0_message_first = lEIONoc_fifoMsgSource_D_OUT ;
-  assign RDY_indications_0_message_first = lEIONoc_fifoMsgSource_EMPTY_N ;
-  assign RDY_indications_0_message_deq = lEIONoc_fifoMsgSource_EMPTY_N ;
-  assign indications_0_message_notEmpty = lEIONoc_fifoMsgSource_EMPTY_N ;
-  assign RDY_indications_0_message_notEmpty = 1'd1 ;
+  assign RDY_indication = lEIONoc_fifoMsgSource_EMPTY_N ;
+  assign indIntrChannel = lEIONoc_fifoMsgSource_EMPTY_N ;
   mkEchoIndicationOutput lEIO(.CLK(CLK), .RST_N(RST_N),
         .ifc_heard2_a(lEIO_ifc_heard2_a),
         .ifc_heard2_b(lEIO_ifc_heard2_b),

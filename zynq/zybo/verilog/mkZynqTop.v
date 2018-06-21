@@ -358,29 +358,13 @@ mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .indIntrChannel(indIntrChannel));
 bozomod bo(.CLK(CLK));
 `else 
-  wire RDY_requests_0_id, RDY_requests_0_message_enq;
-  wire requests_0_message_notFull, RDY_requests_0_message_notFull;
-  wire RDY_indications_0_id, RDY_indications_0_message_first;
-  wire EN_indications_0_message_deq, RDY_indications_0_message_deq;
-  wire indications_0_message_notEmpty, RDY_indications_0_message_notEmpty;
-  wire [31 : 0] requests_0_id, indications_0_id;
-  assign indIntrChannel = RDY_indications_0_message_notEmpty && indications_0_message_notEmpty;
-  assign RDY_indication = RDY_indications_0_message_deq && RDY_indications_0_message_first;
-  assign EN_indications_0_message_deq = RULEread && !portalRControl && reqPortal_D_OUT_addr == 0;
-  assign requestNotFull = RDY_requests_0_message_notFull && requests_0_message_notFull;
   mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
-    .requests_0_id (requests_0_id ), .RDY_requests_0_id(RDY_requests_0_id),
     .requests_0_message_enq_v (requestData),
     .EN_requests_0_message_enq (RULEwrite && !portalWControl),
-    .RDY_requests_0_message_enq(RDY_requests_0_message_enq),
-    .requests_0_message_notFull (requests_0_message_notFull ),
-    .RDY_requests_0_message_notFull(RDY_requests_0_message_notFull),
-    .indications_0_id (indications_0_id ), .RDY_indications_0_id(RDY_indications_0_id),
+    .RDY_requests_0_message_enq(requestNotFull),
     .indications_0_message_first (indicationData),
-    .RDY_indications_0_message_first(RDY_indications_0_message_first),
-    .EN_indications_0_message_deq (EN_indications_0_message_deq ),
-    .RDY_indications_0_message_deq(RDY_indications_0_message_deq),
-    .indications_0_message_notEmpty (indications_0_message_notEmpty ),
-    .RDY_indications_0_message_notEmpty(RDY_indications_0_message_notEmpty));
+    .EN_indications_0_message_deq (RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
+    .RDY_indication(RDY_indication),
+    .indIntrChannel (indIntrChannel ));
 `endif
 endmodule  // mkZynqTop
