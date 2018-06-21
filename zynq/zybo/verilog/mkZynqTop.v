@@ -342,7 +342,7 @@ module mkZynqTop #(parameter width = 64) (
         end
       end
   end
-`define CONNTOP
+//`define CONNTOP
 `ifdef CONNTOP
 mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .EN_request(RULEwrite && !portalWControl && selectWIndReq),
@@ -356,6 +356,7 @@ mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .RDY_indication(RDY_indication),
 
     .indIntrChannel(indIntrChannel));
+bozomod bo(.CLK(CLK));
 `else 
   wire RDY_requests_0_id, RDY_requests_0_message_enq;
   wire requests_0_message_notFull, RDY_requests_0_message_notFull;
@@ -381,6 +382,5 @@ mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .RDY_indications_0_message_deq(RDY_indications_0_message_deq),
     .indications_0_message_notEmpty (indications_0_message_notEmpty ),
     .RDY_indications_0_message_notEmpty(RDY_indications_0_message_notEmpty));
-bozomod bo(.CLK(CLK));
 `endif
 endmodule  // mkZynqTop

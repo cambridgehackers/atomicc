@@ -1,12 +1,14 @@
 #
 set -x
 set -e
-export STYLE=--lint-only
-#export STYLE=--xml-only
-verilator $STYLE \
-        -Iextrav \
-        -Iverilog \
-        -I../connectal/verilog/xilinx \
-        -I../connectal/verilog \
-        -I/scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog \
-    verilog/mkZynqTop.v
+#export STYLE=--lint-only
+##export STYLE=--xml-only
+#verilator $STYLE \
+#        -Iextrav \
+#        -Iverilog \
+#        -I../connectal/verilog/xilinx \
+#        -I../connectal/verilog \
+#        -I/scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog \
+#    verilog/mkZynqTop.v
+rm -rf Cache Impl Synth bin hw
+make
