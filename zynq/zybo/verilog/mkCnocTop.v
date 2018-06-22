@@ -77,9 +77,6 @@ module mkCnocTop(input  CLK, input  RST_N,
        RULE_lEIONoc_sendMessage,
        RULE_lERINoc_receiveMessage,
        RULE_lERINoc_receiveMessageHeader;
-  reg [31 : 0] MUX_lEIONoc_fifoMsgSource_enq_1__VAL_2;
-  wire [31 : 0] MUX_lEIONoc_fifoMsgSource_enq_1__VAL_1;
-  wire [15 : 0] MUX_lEIONoc_messageWordsReg_write_1__VAL_2;
   wire MUX_lEIONoc_bpState_write_1__SEL_1;
   wire [15 : 0] methodNumber__h1378,
                 numWords__h1336,
@@ -191,15 +188,7 @@ module mkCnocTop(input  CLK, input  RST_N,
   assign RDY_requests_0_message_enq = lERI_RDY_portalIfc_requests_0_enq && lERI_RDY_portalIfc_requests_1_enq && lERI_RDY_portalIfc_requests_2_enq;
   
   assign MUX_lEIONoc_bpState_write_1__SEL_1 = RULE_lEIONoc_sendMessage && lEIONoc_messageWordsReg == 16'd1 ;
-  assign MUX_lEIONoc_fifoMsgSource_enq_1__VAL_1 = { methodNumber__h1378, x__h1485 } ;
-  always@(lEIONoc_methodIdReg or lEIO_portalIfc_indications_0_first or lEIO_portalIfc_indications_1_first)
-  begin
-    case (lEIONoc_methodIdReg)
-      8'd0: MUX_lEIONoc_fifoMsgSource_enq_1__VAL_2 = lEIO_portalIfc_indications_0_first;
-      8'd1: MUX_lEIONoc_fifoMsgSource_enq_1__VAL_2 = lEIO_portalIfc_indications_1_first;
-      default: MUX_lEIONoc_fifoMsgSource_enq_1__VAL_2 = 32'hAAAAAAAA /* unspecified value */ ;
-    endcase
-  end
+  wire [15 : 0] MUX_lEIONoc_messageWordsReg_write_1__VAL_2;
   assign MUX_lEIONoc_messageWordsReg_write_1__VAL_2 = lEIONoc_messageWordsReg - 16'd1 ;
   assign lEIONoc_bpState_D_IN = !MUX_lEIONoc_bpState_write_1__SEL_1 ;
   assign lEIONoc_bpState_EN = RULE_lEIONoc_sendMessage && lEIONoc_messageWordsReg == 16'd1 || RULE_lEIONoc_sendHeader ;
@@ -216,10 +205,9 @@ module mkCnocTop(input  CLK, input  RST_N,
   assign lEIO_EN_portalIfc_indications_1_deq = RULE_lEIONoc_sendMessage && lEIONoc_methodIdReg == 8'd1 ;
   assign lEIO_EN_ifc_heard = lEIO_RDY_ifc_heard && lEcho_delay_EMPTY_N ;
   assign lEIO_EN_ifc_heard2 = lEIO_RDY_ifc_heard2 && lEcho_delay2_EMPTY_N ;
-  assign lEIONoc_fifoMsgSource_D_IN = RULE_lEIONoc_sendHeader ?
-               MUX_lEIONoc_fifoMsgSource_enq_1__VAL_1 : MUX_lEIONoc_fifoMsgSource_enq_1__VAL_2 ;
-  assign lEIONoc_fifoMsgSource_ENQ = RULE_lEIONoc_sendHeader ||
-             RULE_lEIONoc_sendMessage ;
+  assign lEIONoc_fifoMsgSource_D_IN = RULE_lEIONoc_sendHeader ?  { methodNumber__h1378, x__h1485 } :
+    (lEIONoc_methodIdReg == 0 ?  lEIO_portalIfc_indications_0_first: lEIO_portalIfc_indications_1_first);
+  assign lEIONoc_fifoMsgSource_ENQ = RULE_lEIONoc_sendHeader || RULE_lEIONoc_sendMessage ;
   assign lEIONoc_fifoMsgSource_DEQ = EN_indications_0_message_deq ;
   assign lERI_portalIfc_messageSize_size_methodNumber = 16'h0 ;
   assign lERI_portalIfc_requests_0_enq_v = requests_0_message_enq_v[63:32] ;
