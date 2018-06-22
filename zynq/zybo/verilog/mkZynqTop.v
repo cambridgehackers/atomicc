@@ -192,14 +192,14 @@ module mkZynqTop #(parameter width = 64) (
   wire reqPortal_EMPTY_N, reqPortal_FULL_N, read_reqFifo_FULL_N;
   wire reqrs_EMPTY_N, reqrs_FULL_N, reqwriteDataFifo_EMPTY_N, reqws_EMPTY_N;
   wire readFirstNext, readAddr_EN, RULEread, reqPortal_D_OUT_last;
-  wire [31 : 0]indIntrChannel, indicationData, requestData, zzIntrChannel;
+  wire [31 : 0]indicationData, requestData, zzIntrChannel;
   wire [9 : 0] reqPortal_D_OUT_base, read_reqFifo_D_OUT_count, readburstCount;
   wire [5 : 0] reqPortal_D_OUT_id, read_reqFifo_D_OUT_id;
   wire [4 : 0] reqPortal_D_OUT_addr, read_reqFifo_D_OUT_addr, readAddrupdate;
   wire [1 : 0] selectIndication, selectRequest;
-  assign zzIntrChannel = selectRIndReq ? 32'd0 : indIntrChannel;
+  assign zzIntrChannel = selectRIndReq ? 32'd0 : RDY_indication;
 
-  assign interrupt_0__read = indIntrChannel != 0 && ctrlPort_0_interruptEnableReg;
+  assign interrupt_0__read = RDY_indication && ctrlPort_0_interruptEnableReg;
   assign readFirstNext = readFirst ? read_reqFifo_D_OUT_count == 4  : readLast ;
   assign RULEread = reqPortal_EMPTY_N && ReadDataFifo_FULL_N && (selectRIndReq ?
         ((!(!portalRControl && reqPortal_D_OUT_addr == 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
@@ -342,38 +342,47 @@ module mkZynqTop #(parameter width = 64) (
         end
       end
   end
-//`define CONNTOP
-`ifdef CONNTOP
-mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
-    .EN_request(RULEwrite && !portalWControl && selectWIndReq),
-    .requestEnqV(requestData),
-    .RDY_requestEnq(RDY_requestEnq),
-    .selectRequest(selectRequest), .requestNotFull(requestNotFull),
-
-    .EN_indication(RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
-    .selectIndication(selectIndication),
-    .indicationData(indicationData),
-    .RDY_indication(RDY_indication),
-
-    .indIntrChannel(indIntrChannel));
-bozomod bo(.CLK(CLK));
-`else 
-reg [63:0] requestBuffer;
+reg [127:0] requestBuffer, indicationBuffer;
+wire [127:0] indicationMessage;
+reg [15: 0] indicationRemain;
+wire indicationFromDUT;
+wire transferBuffer;
+assign indicationData = indicationBuffer[31 : 0];
+assign RDY_indication = (indicationRemain != 0);
+assign transferBuffer = indicationRemain == 0 && indicationFromDUT;
   always@(posedge CLK)
   begin
     if (RST_N == 0)
       begin
+      indicationRemain <= 0;
       end
     else begin
       if (RULEwrite && !portalWControl)
           requestBuffer <= requestBuffer << 32 | requestData;
+      if (indicationRemain != 0 && RULEread && !portalRControl) begin
+          indicationRemain <= indicationRemain - 1;
+          indicationBuffer <= indicationBuffer >> 32;
+      end
+      if (transferBuffer) begin
+          indicationBuffer <= indicationMessage;
+          indicationRemain <= indicationMessage[15:0];
+      end
     end
   end
+`define OLDSTYLE
+`ifdef OLDSTYLE
   mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
     .requests_0_message_enq_v (requestBuffer << 32 | requestData),
     .EN_requests_0_message_enq (RULEwrite && !portalWControl && writeFifo_D_OUT_addr != 0), .RDY_requests_0_message_enq(requestNotFull),
-    .indications_0_message_first (indicationData),
-    .EN_indications_0_message_deq (RULEread && !portalRControl), .RDY_indication(RDY_indication),
-    .indIntrChannel (indIntrChannel ));
+    .indications_0_message_first (indicationMessage),
+    .EN_indications_0_message_deq (transferBuffer), .RDY_indication(indicationFromDUT));
+`else
+module l_top (input CLK, input nRST,
+    output indication$enq__ENA,
+    output [127:0]indication$enq$v,
+    input indication$enq__RDY,
+    input request$enq__ENA,
+    input [127:0]request$enq$v,
+    output request$enq__RDY);
 `endif
 endmodule  // mkZynqTop

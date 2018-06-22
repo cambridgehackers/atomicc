@@ -37,9 +37,8 @@ static int event_portal(struct PortalInternal *pint)
     // handle all messasges from this portal instance
     volatile unsigned int *map_base = pint->map_base;
     while (map_base[PORTAL_CTRL_IND_QUEUE_STATUS]) {
-        if(trace_portal) {
+        if(trace_portal)
             PORTAL_PRINTF( "%s: (fpga%d) about to receive messages int=%08x en=%08x qs=%08x handler %p parent %p\n", __FUNCTION__, pint->fpga_number, 0, 0, 0, pint->handler, pint->parent);
-        }
         if (pint->handler)
             pint->handler(pint, 5/*portal number */, 0);
         else {
@@ -93,28 +92,20 @@ static void send_portal(struct PortalInternal *pint, volatile unsigned int *data
         return;
     }
     int i = (hdr & 0xffff) - 2;
-#if 1
-    for (; i > 0; i--)
-{
-printf("[%s:%d] data[%d] = %x\n", __FUNCTION__, __LINE__, i, data[i]);
+    for (; i > 0; i--) {
+printf("[SEND] data[%d] = %x\n", i, data[i]);
         portalPtr[0] = data[i];
-}
-printf("[%s:%d] Ldata[%d] = %x\n", __FUNCTION__, __LINE__, 0, data[0]);
+    }
+printf("[SEND] Ldata[%d] = %x\n", 0, data[0]);
     portalPtr[1] = data[0];
-#else
-    for (i = 0; i < (hdr & 0xffff) - 2; i++)
-{
-printf("[%s:%d] data[%d] = %x\n", __FUNCTION__, __LINE__, i, data[i]);
-        portalPtr[0] = data[i];
-}
-        portalPtr[1] = data[i];
-#endif
 }
 static int recv_portal(struct PortalInternal *pint, volatile unsigned int *buffer, int len, int *recvfd)
 {
     int i;
-    for (i = 0; i < len; i++)
+    for (i = 0; i < len; i++) {
         buffer[i] = portalPtr[0];
+printf("[RECV] data[%d] = %x\n", i, buffer[i]);
+    }
 }
 
 PortalTransportFunctions transportPortal = {

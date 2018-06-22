@@ -12,21 +12,18 @@ int EchoIndication_handleMessage(struct PortalInternal *p, unsigned int channel,
     int tmpfd __attribute__ ((unused));
     EchoIndicationData tempdata __attribute__ ((unused));
     memset(&tempdata, 0, sizeof(tempdata));
-    unsigned int temp_working_addr[REQINFO_SIZE(EchoIndication_reqinfo)];
+    volatile unsigned int *temp_working_addr = &p->map_base[1];
     switch (channel) {
     case CHAN_NUM_EchoIndication_heard: {
-        p->transport->recv(p, temp_working_addr, 1, &tmpfd);
         tempdata.heard.v = (uint32_t)(((temp_working_addr[0])&0xfffffffful));
         ((EchoIndicationCb *)p->cb)->heard(p, tempdata.heard.v);
       } break;
     case CHAN_NUM_EchoIndication_heard2: {
-        p->transport->recv(p, temp_working_addr, 1, &tmpfd);
         tempdata.heard2.b = (uint16_t)(((temp_working_addr[0])&0xfffful));
         tempdata.heard2.a = (uint16_t)(((temp_working_addr[0]>>16)&0xfffful));
         ((EchoIndicationCb *)p->cb)->heard2(p, tempdata.heard2.a, tempdata.heard2.b);
       } break;
     case CHAN_NUM_EchoIndication_heard3: {
-        p->transport->recv(p, temp_working_addr, 3, &tmpfd);
         tempdata.heard3.b = (uint32_t)(((uint32_t)(((temp_working_addr[0])&0xfffful))<<16));
         tempdata.heard3.a = (uint16_t)(((temp_working_addr[0]>>16)&0xfffful));
         tempdata.heard3.c = (uint32_t)(((uint32_t)(((temp_working_addr[1])&0xfffful))<<16));

@@ -215,6 +215,8 @@ int portal_mux_handler(struct PortalInternal *pint, unsigned int channel, int me
         PortalInternal *p = pint->mux_ports[i].pint;
         if (channel == p->fpga_number && p->handler) {
             p->transport->recv(p, p->map_base, 1, &dummy);
+            int len = (p->map_base[0] & 0xffff) - 1;
+            p->transport->recv(p, &p->map_base[1], len, &dummy);
             if (connectalPrintfHandler && (*p->map_base >> 16) == CONNECTAL_PRINTF_PORT)
                 connectalPrintfHandler(p, *p->map_base);
             else
