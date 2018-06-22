@@ -3,4 +3,5 @@ set -x
 set -e
 ~/git/connectal/scripts/power.py 192.168.2.80 pset 1 0
 sleep 2
+adb disconnect
 ~/git/connectal/scripts/power.py 192.168.2.80 pset 1 1

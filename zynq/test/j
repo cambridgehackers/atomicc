@@ -1,5 +1,6 @@
 #
 . ~/.bashrc
+set | grep ANDROID
 set -x
 set -e
 scp $COMPILE_HOST:git/atomicc/zynq/zybo/bin/android.exe .
