@@ -85,16 +85,30 @@ static int init_portal(struct PortalInternal *pint, void *param)
 static void send_portal(struct PortalInternal *pint, volatile unsigned int *data, unsigned int hdr, int sendFd)
 {
     volatile unsigned int *buffer = data-1;
-    if(trace_portal)
+    //if(trace_portal)
         fprintf(stderr, "[%s:%d] hdr %x fpga %x num %d\n", __FUNCTION__, __LINE__, hdr, pint->fpga_number, pint->client_fd_number);
     buffer[0] = hdr;
     if (!portalPtr[1]) {
         printf("[%s:%d] ERROR: queue full\n", __FUNCTION__, __LINE__);
         return;
     }
-    int i;
-    for (i = 0; i < (hdr & 0xffff) - 1; i++)
+    int i = (hdr & 0xffff) - 2;
+#if 1
+    for (; i > 0; i--)
+{
+printf("[%s:%d] data[%d] = %x\n", __FUNCTION__, __LINE__, i, data[i]);
         portalPtr[0] = data[i];
+}
+printf("[%s:%d] Ldata[%d] = %x\n", __FUNCTION__, __LINE__, 0, data[0]);
+    portalPtr[1] = data[0];
+#else
+    for (i = 0; i < (hdr & 0xffff) - 2; i++)
+{
+printf("[%s:%d] data[%d] = %x\n", __FUNCTION__, __LINE__, i, data[i]);
+        portalPtr[0] = data[i];
+}
+        portalPtr[1] = data[i];
+#endif
 }
 static int recv_portal(struct PortalInternal *pint, volatile unsigned int *buffer, int len, int *recvfd)
 {

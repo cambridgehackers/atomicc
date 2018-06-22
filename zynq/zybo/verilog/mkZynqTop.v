@@ -202,8 +202,8 @@ module mkZynqTop #(parameter width = 64) (
   assign interrupt_0__read = indIntrChannel != 0 && ctrlPort_0_interruptEnableReg;
   assign readFirstNext = readFirst ? read_reqFifo_D_OUT_count == 4  : readLast ;
   assign RULEread = reqPortal_EMPTY_N && ReadDataFifo_FULL_N && (selectRIndReq ?
-        (((portalRControl || reqPortal_D_OUT_addr != 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
-       : ((portalRControl || reqPortal_D_OUT_addr != 0 || RDY_indication) && reqrs_EMPTY_N));
+        ((!(!portalRControl && reqPortal_D_OUT_addr == 4) && !reqPortal_D_OUT_last) || reqrs_EMPTY_N)
+       : ((!(!portalRControl && reqPortal_D_OUT_addr == 0) || RDY_indication) && reqrs_EMPTY_N));
 
   always@(reqPortal_D_OUT_addr or indicationData or requestNotFull)
   begin
@@ -358,13 +358,22 @@ mkConnectalTop top(.CLK(CLK), .RST_N(RST_N),
     .indIntrChannel(indIntrChannel));
 bozomod bo(.CLK(CLK));
 `else 
+reg [63:0] requestBuffer;
+  always@(posedge CLK)
+  begin
+    if (RST_N == 0)
+      begin
+      end
+    else begin
+      if (RULEwrite && !portalWControl)
+          requestBuffer <= requestBuffer << 32 | requestData;
+    end
+  end
   mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
-    .requests_0_message_enq_v (requestData),
-    .EN_requests_0_message_enq (RULEwrite && !portalWControl),
-    .RDY_requests_0_message_enq(requestNotFull),
+    .requests_0_message_enq_v (requestBuffer << 32 | requestData),
+    .EN_requests_0_message_enq (RULEwrite && !portalWControl && writeFifo_D_OUT_addr != 0), .RDY_requests_0_message_enq(requestNotFull),
     .indications_0_message_first (indicationData),
-    .EN_indications_0_message_deq (RULEread && !portalRControl && reqPortal_D_OUT_addr == 0),
-    .RDY_indication(RDY_indication),
+    .EN_indications_0_message_deq (RULEread && !portalRControl), .RDY_indication(RDY_indication),
     .indIntrChannel (indIntrChannel ));
 `endif
 endmodule  // mkZynqTop
