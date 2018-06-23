@@ -368,20 +368,9 @@ assign RDY_indication = (indicationRemain != 0);
       end
     end
   end
-//`define OLDSTYLE
-`ifdef OLDSTYLE
-assign transferBuffer = indicationRemain == 0 && indicationFromDUT;
-  mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
-    .requests_0_message_enq_v (requestBuffer << 32 | requestData),
-    .EN_requests_0_message_enq (RULEwrite && !portalWControl && writeFifo_D_OUT_addr != 0), .RDY_requests_0_message_enq(requestNotFull),
-    .indications_0_message_first (indicationMessage),
-    .EN_indications_0_message_deq (transferBuffer), .RDY_indication(indicationFromDUT));
-`else
   l_top ctop( .CLK (CLK ), .nRST(RST_N),
     .request$enq$v (requestBuffer << 32 | requestData),
     .request$enq__ENA (RULEwrite && !portalWControl && writeFifo_D_OUT_addr != 0), .request$enq__RDY(requestNotFull),
     .indication$enq$v (indicationMessage),
     .indication$enq__ENA(transferBuffer), .indication$enq__RDY(!RDY_indication));
-    //.EN_indications_0_message_deq (transferBuffer), .RDY_indication(indicationFromDUT));
-`endif
 endmodule  // mkZynqTop
