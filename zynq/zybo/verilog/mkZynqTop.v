@@ -349,7 +349,6 @@ wire indicationFromDUT;
 wire transferBuffer;
 assign indicationData = indicationBuffer[31 : 0];
 assign RDY_indication = (indicationRemain != 0);
-assign transferBuffer = indicationRemain == 0 && indicationFromDUT;
   always@(posedge CLK)
   begin
     if (RST_N == 0)
@@ -369,20 +368,20 @@ assign transferBuffer = indicationRemain == 0 && indicationFromDUT;
       end
     end
   end
-`define OLDSTYLE
+//`define OLDSTYLE
 `ifdef OLDSTYLE
+assign transferBuffer = indicationRemain == 0 && indicationFromDUT;
   mkCnocTop ctop( .CLK (CLK ), .RST_N(RST_N),
     .requests_0_message_enq_v (requestBuffer << 32 | requestData),
     .EN_requests_0_message_enq (RULEwrite && !portalWControl && writeFifo_D_OUT_addr != 0), .RDY_requests_0_message_enq(requestNotFull),
     .indications_0_message_first (indicationMessage),
     .EN_indications_0_message_deq (transferBuffer), .RDY_indication(indicationFromDUT));
 `else
-module l_top (input CLK, input nRST,
-    output indication$enq__ENA,
-    output [127:0]indication$enq$v,
-    input indication$enq__RDY,
-    input request$enq__ENA,
-    input [127:0]request$enq$v,
-    output request$enq__RDY);
+  l_top ctop( .CLK (CLK ), .nRST(RST_N),
+    .request$enq$v (requestBuffer << 32 | requestData),
+    .request$enq__ENA (RULEwrite && !portalWControl && writeFifo_D_OUT_addr != 0), .request$enq__RDY(requestNotFull),
+    .indication$enq$v (indicationMessage),
+    .indication$enq__ENA(transferBuffer), .indication$enq__RDY(!RDY_indication));
+    //.EN_indications_0_message_deq (transferBuffer), .RDY_indication(indicationFromDUT));
 `endif
 endmodule  // mkZynqTop

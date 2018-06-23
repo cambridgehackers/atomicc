@@ -14,7 +14,7 @@ REPORT_NWORST_TIMING_PATHS?=
 include $(TCLDIR)/Makefile.fpgamake.common
 
 mkZynqTop_HEADERFILES = 
-mkZynqTop_VFILES = verilog/mkZynqTop.v verilog/mkZynqTop.v /home/jca/git/atomicc/zynq/connectal/verilog/CONNECTNET2.v /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog/ResetInverter.v verilog/mkEchoIndicationOutputPipes.v verilog/mkEchoRequestInput.v /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog.Vivado/SizedFIFO.v /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog/FIFO2.v /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog/FIFO1.v verilog/mkConnectalTop.v verilog/mkEchoIndicationOutput.v verilog/mkCnocTop.v
+mkZynqTop_VFILES = verilog/mkZynqTop.v verilog/mkZynqTop.v /home/jca/git/atomicc/zynq/connectal/verilog/CONNECTNET2.v /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog/ResetInverter.v verilog/mkEchoIndicationOutputPipes.v verilog/mkEchoRequestInput.v /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog.Vivado/SizedFIFO.v /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog/FIFO2.v /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog/FIFO1.v verilog/mkConnectalTop.v verilog/mkEchoIndicationOutput.v verilog/l_top.v
 mkZynqTop_VHDFILES = 
 mkZynqTop_VHDL_LIBRARIES = 
 mkZynqTop_STUBS = 
