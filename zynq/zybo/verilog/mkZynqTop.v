@@ -355,38 +355,12 @@ module mkUser (input CLK, input nRST,
   input Userwrite, input [`MAX_BUS_WIDTH-1:0] writeBeatData, input requestLast, output RDY_writeBeat,
   input Userread, output [`MAX_BUS_WIDTH-1:0] readBeatData, output RDY_readBeat);
 
-  wire RDY_incoming, EN_incoming, EN_indication, RDY_echo_in_enq, EN_echo_out_enq, RDY_echo_out_enq;
+  wire EN_outgoing, RDY_incoming, EN_incoming, RDY_echo_in_enq, EN_echo_out_enq, RDY_echo_out_enq;
   wire [`MAX_OUT_WIDTH-1 : 0] echoData, incomingData;
-`define OLDD
-`ifdef OLDD
-  reg [15: 0] in$enq$length;
-reg [`MAX_OUT_WIDTH-1 :0] indicationBuffer;
-assign readBeatData = indicationBuffer[31 : 0];
-assign RDY_readBeat = (in$enq$length != 0);
-assign RDY_echo_out_enq = !RDY_readBeat;
-  always@(posedge CLK)
-  begin
-    if (nRST == 0)
-      begin
-      in$enq$length <= 0;
-      end
-    else begin
-      if (in$enq$length != 0 && Userread) begin
-          in$enq$length <= in$enq$length - 1;
-          indicationBuffer <= indicationBuffer >> 32;
-      end
-      if (EN_echo_out_enq) begin
-          indicationBuffer <= echoData;
-          in$enq$length <= echoData[15:0];
-      end
-    end
-  end
-`else
+  assign RDY_readBeat = !RDY_echo_out_enq;
   l_module_OC_AdapterToBus radapter_0(.CLK(CLK), .nRST(nRST),
-   .in$enq__ENA(EN_indication), .in$enq__RDY(RDY_echo_out_enq), .in$enq$v(echoData), .in$enq$length(echoData[15:0]),
-   .out$enq__ENA(Userread), .out$enq__RDY(RDY_readBeat), .out$enq$v(readBeatData), .out$enq$last());
-  assign EN_indication = RDY_readBeat && (EN_echo_out_enq && RDY_echo_out_enq); // 'or' together all EN signals
-`endif
+   .in$enq__ENA(EN_echo_out_enq), .in$enq__RDY(RDY_echo_out_enq), .in$enq$v(echoData), .in$enq$length(echoData[15:0]-1),
+   .out$enq__ENA(EN_outgoing), .out$enq__RDY(Userread && RDY_readBeat), .out$enq$v(readBeatData), .out$enq$last());
   l_module_OC_AdapterFromBus wadapter_0(.CLK(CLK), .nRST(nRST),
     .in$enq__ENA(Userwrite), .in$enq$v(writeBeatData), .in$enq$last(requestLast), .in$enq__RDY(RDY_writeBeat),
     .out$enq__ENA(EN_incoming), .out$enq$v(incomingData), .out$enq$length(), .out$enq__RDY(RDY_incoming));
