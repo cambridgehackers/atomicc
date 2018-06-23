@@ -344,27 +344,34 @@ module mkZynqTop #(parameter width = 64) (
         end
       end
   end
-  wire EN_incoming, EN_indication, in$enq$last, EN_in$enq, EN_readBeat, readLast;
-  wire RDY_echo_in_enq, EN_echo_out_enq, RDY_echo_out_enq, incomingEnable;
-  wire [`MAX_OUT_WIDTH-1 : 0] in$enqData, echoData, incomingData;
-  wire [`MAX_BUS_WIDTH-1:0] in$enq$v, readData;
-  wire RDY_incoming, RDY_indication;
+
+mkUser user(.CLK(CLK), .nRST(RST_N),
+  .Userwrite(RULEwrite && !portalWControl), .writeBeatData(requestData), .requestLast(writeFifo_D_OUT_addr != 0),
+  .RDY_writeBeat(requestNotFull),
+  .Userread(RULEread && !portalRControl), .readBeatData(indicationData), .RDY_readBeat(RDY_indication));
+endmodule  // mkZynqTop
+
+module mkUser (input CLK, input nRST,
+  input Userwrite, input [`MAX_BUS_WIDTH-1:0] writeBeatData, input requestLast, output RDY_writeBeat,
+  input Userread, output [`MAX_BUS_WIDTH-1:0] readBeatData, output RDY_readBeat);
+
+  wire RDY_incoming, EN_incoming, EN_indication, RDY_echo_in_enq, EN_echo_out_enq, RDY_echo_out_enq;
+  wire [`MAX_OUT_WIDTH-1 : 0] echoData, incomingData;
 `define OLDD
 `ifdef OLDD
   reg [15: 0] in$enq$length;
 reg [`MAX_OUT_WIDTH-1 :0] indicationBuffer;
-wire indicationFromDUT;
-assign indicationData = indicationBuffer[31 : 0];
-assign RDY_indication = (in$enq$length != 0);
-assign RDY_echo_out_enq = !RDY_indication;
+assign readBeatData = indicationBuffer[31 : 0];
+assign RDY_readBeat = (in$enq$length != 0);
+assign RDY_echo_out_enq = !RDY_readBeat;
   always@(posedge CLK)
   begin
-    if (RST_N == 0)
+    if (nRST == 0)
       begin
       in$enq$length <= 0;
       end
     else begin
-      if (in$enq$length != 0 && RULEread && !portalRControl) begin
+      if (in$enq$length != 0 && Userread) begin
           in$enq$length <= in$enq$length - 1;
           indicationBuffer <= indicationBuffer >> 32;
       end
@@ -375,20 +382,15 @@ assign RDY_echo_out_enq = !RDY_indication;
     end
   end
 `else
-  wire [15: 0] in$enq$length;
-  l_module_OC_AdapterToBus radapter_0(.CLK(CLK), .nRST(RST_N),
-   .in$enq__ENA(EN_indication), .in$enq__RDY(RDY_indication), .in$enq$v(in$enqData), .in$enq$length(in$enq$length),
-   .out$enq__ENA(RULEread && !portalRControl), .out$enq__RDY(RDY_indication), .out$enq$v(readData), .readLast(readLast));
-  assign EN_indication = RDY_indication && (EN_echo_out_enq && RDY_echo_out_enq); // 'or' together all EN signals
-  assign in$enqData = {echoData};//[`MAX_OUT_WIDTH-1:16], `IfcNames_EchoIndicationH2S};
-  assign in$enq$length = echoData[15:0];
+  l_module_OC_AdapterToBus radapter_0(.CLK(CLK), .nRST(nRST),
+   .in$enq__ENA(EN_indication), .in$enq__RDY(RDY_echo_out_enq), .in$enq$v(echoData), .in$enq$length(echoData[15:0]),
+   .out$enq__ENA(Userread), .out$enq__RDY(RDY_readBeat), .out$enq$v(readBeatData), .out$enq$last());
+  assign EN_indication = RDY_readBeat && (EN_echo_out_enq && RDY_echo_out_enq); // 'or' together all EN signals
 `endif
-  l_module_OC_AdapterFromBus wadapter_0(.CLK(CLK), .nRST(RST_N),
-    .in$enq__ENA(RULEwrite && !portalWControl), .in$enq$v(requestData), .in$enq$last(writeFifo_D_OUT_addr != 0), .in$enq__RDY(requestNotFull),
+  l_module_OC_AdapterFromBus wadapter_0(.CLK(CLK), .nRST(nRST),
+    .in$enq__ENA(Userwrite), .in$enq$v(writeBeatData), .in$enq$last(requestLast), .in$enq__RDY(RDY_writeBeat),
     .out$enq__ENA(EN_incoming), .out$enq$v(incomingData), .out$enq$length(), .out$enq__RDY(RDY_incoming));
-  l_top ctop( .CLK (CLK ), .nRST(RST_N),
-    .request$enq$v (incomingData),
-    .request$enq__ENA (EN_incoming), .request$enq__RDY(RDY_incoming),
-    .indication$enq$v (echoData),
-    .indication$enq__ENA(EN_echo_out_enq), .indication$enq__RDY(RDY_echo_out_enq));
-endmodule  // mkZynqTop
+  l_top ctop( .CLK (CLK ), .nRST(nRST),
+    .request$enq$v (incomingData), .request$enq__ENA (EN_incoming), .request$enq__RDY(RDY_incoming),
+    .indication$enq$v (echoData), .indication$enq__ENA(EN_echo_out_enq), .indication$enq__RDY(RDY_echo_out_enq));
+endmodule  // mkUser
