@@ -28,7 +28,6 @@ import copy, json, optparse, os, sys, re, tokenize
 masterlist = []
 parammap = {}
 paramnames = []
-ifdefmap = {}
 conditionalcf = {}
 clock_names = []
 deleted_interface = []
@@ -134,10 +133,6 @@ def parse_item():
                     for k, v in sorted(pinlist.items()):
                         if v[1] == '':
                             ptemp = '1'
-                            if options.clock and k in options.clock:
-                                ptemp = 'Clock'
-                            if options.reset and k in options.reset:
-                                ptemp = 'Reset'
                         else:
                             ptemp = str(int(v[1])+1)
                         ttemp = PinType(v[0], ptemp, k, k)
@@ -215,7 +210,7 @@ def generate_interface(interfacename, paramlist, paramval, ilist, cname):
     if not methodfound:
         deleted_interface.append(interfacename)
         return
-    print('__verilog ' + interfacename + paramlist + ' {', file=options.outfile)
+    print(interfacename + paramlist + ' {', file=options.outfile)
     for item in ilist:
         if item.mode != 'input' and item.mode != 'output' and item.mode != 'inout' and item.mode != 'interface':
             continue
@@ -230,26 +225,6 @@ def generate_interface(interfacename, paramlist, paramval, ilist, cname):
         print('    ' + typ.ljust(16) + outp + item.name + ';', file=options.outfile)
     print('};', file=options.outfile)
 
-def fixname(arg):
-    titem = arg.replace('ZZ', 'ZZA')
-    titem = titem.replace('I2C', 'ZZB')
-    titem = titem.replace('P2F', 'ZZC')
-    titem = titem.replace('F2P', 'ZZD')
-    titem = titem.replace('ev128', 'ZZE')
-    titem = titem.replace('ev1', 'ZZF')
-    titem = titem.replace('l2', 'ZZG')
-    return titem
-
-def goback(arg):
-    titem = arg.replace('ZZB', 'I2C')
-    titem = titem.replace('ZZC', 'P2F')
-    titem = titem.replace('ZZD', 'F2P')
-    titem = titem.replace('ZZA', 'ZZ')
-    titem = titem.replace('ZZE', 'ev128')
-    titem = titem.replace('ZZF', 'ev1')
-    titem = titem.replace('ZZG', 'l2')
-    return titem
-
 def regroup_items(masterlist):
     global paramnames, commoninterfaces
     paramnames.sort()
@@ -263,9 +238,7 @@ def regroup_items(masterlist):
             #print("DD", item.name)
         else:
             litem = item.origname
-            titem = fixname(litem)
-            #m = re.search('(.+?)(\d+)_(.+)', litem)
-            m = re.search('(.+?)(\d+)(_?)(.+)', titem)
+            titem = litem
             #print('OA', titem)
             separator = '_'
             indexname = ''
@@ -276,31 +249,15 @@ def regroup_items(masterlist):
                 for tstring in options.factor:
                     if len(litem) > len(tstring) and litem.startswith(tstring):
                         groupname = tstring
-                        fieldname = litem[len(tstring):]
-                        if fieldname[0] == '_':
-                            fieldname = fieldname[1:]
-                            separator = '_'
-                        else:
-                            separator = ''
+                        m = re.search('(\d*)(_?)(.+)', litem[len(tstring):])
+                        indexname = m.group(1)
+                        separator = m.group(2)
+                        fieldname = m.group(3)
                         m = None
                         skipParse = True
                         #print('OM', titem, groupname, fieldname, separator)
                         break
-            if m:
-                skipcheck = False
-                for checkitem in options.notfactor:
-                    if litem.startswith(checkitem):
-                        skipcheck = True
-                if skipcheck:
-                    newlist.append(item)
-                    #print('OB', item.name)
-                    continue
-                groupname = goback(m.group(1))
-                indexname = goback(m.group(2))
-                separator = goback(m.group(3))
-                fieldname = goback(m.group(4))
-                #print('OO', item.name, [groupname, indexname, fieldname], file=sys.stderr)
-            elif separator != '' and skipParse != True:
+            if separator != '' and skipParse != True:
                 m = re.search('(.+?)_(.+)', litem)
                 if not m:
                     newlist.append(item)
@@ -308,10 +265,9 @@ def regroup_items(masterlist):
                     continue
                 if len(m.group(1)) == 1: # if only 1 character prefix, get more greedy
                     m = re.search('(.+)_(.+)', litem)
-                #print('OJ', item.name, m.groups(), file=sys.stderr)
+                print('OJ', item.name, m.groups(), file=sys.stderr)
                 fieldname = m.group(2)
                 groupname = m.group(1)
-
             skipcheck = False
             for checkitem in options.notfactor:
                 if litem.startswith(checkitem):
@@ -321,8 +277,6 @@ def regroup_items(masterlist):
                 #print('OI', item.name, file=sys.stderr)
                 continue
             itemname = (groupname + indexname)
-            if itemname in ['event']:
-                itemname = itemname + '_'
             interfacename = options.ifprefix + groupname.lower()
             if not commoninterfaces.get(interfacename):
                 commoninterfaces[interfacename] = {}
@@ -336,44 +290,14 @@ def regroup_items(masterlist):
             foo = copy.copy(item)
             foo.origname = fieldname
             lfield = fieldname
-            if lfield in ['assert', 'do']:
-                lfield = 'zz' + lfield      # prefix prohibited names with 'zz'
             foo.name = lfield
             commoninterfaces[interfacename][indexname].append(foo)
     return newlist
 
-def generate_inter_declarations(paramlist, paramval):
-    global commoninterfaces
-    for k, v in sorted(commoninterfaces.items()):
-        #print('interface', k, file=sys.stderr)
-        for kuse, vuse in sorted(v.items()):
-            if kuse == '' or kuse == '0':
-                generate_interface(k, paramlist, paramval, vuse, [])
-            #else:
-                #print('     ', kuse, json.dumps(vuse), file=sys.stderr)
-
-def locate_clocks(item, prefix):
-    global clock_params, reset_params
-    pname = prefix + item.name
-    if item.mode == 'input':
-        if item.type == 'Clock':
-            clock_params.append(pname)
-            reset_params.append(pname + '_reset')
-        if item.type == 'Reset':
-            reset_params.append(pname)
-    elif item.mode == 'interface':
-        temp = commoninterfaces[item.type].get('0')
-        if not temp:
-            temp = commoninterfaces[item.type].get('')
-        if not temp:
-            print('Missing interface definition', item.type, commoninterfaces[item.type])
-            return
-        for titem in temp:
-            locate_clocks(titem, item.origname)
-
 def generate_cpp():
     global paramnames, modulename, clock_names
     global clock_params, reset_params, options
+    global commoninterfaces
     # generate output file
     paramlist = ''
     for item in paramnames:
@@ -381,21 +305,22 @@ def generate_cpp():
     if paramlist != '':
         paramlist = '#(' + paramlist[2:] + ')'
     paramval = paramlist.replace('numeric type ', '')
-    generate_inter_declarations(paramlist, paramval)
-    generate_interface(options.ifname, paramlist, paramval, masterlist, clock_names)
-    print('__module '+modulename + ' {\n    ' + options.ifname + ' none;\n};', file=options.outfile)
+    for k, v in sorted(commoninterfaces.items()):
+        #print('interface', k, file=sys.stderr)
+        for kuse, vuse in sorted(v.items()):
+            if kuse == '' or kuse == '0':
+                generate_interface('__verilog ' + k, paramlist, paramval, vuse, [])
+            #else:
+                #print('     ', kuse, json.dumps(vuse), file=sys.stderr)
+    generate_interface('__emodule ' + modulename, paramlist, paramval, masterlist, clock_names)
 
 if __name__=='__main__':
     parser = optparse.OptionParser("usage: %prog [options] arg")
     parser.add_option("-o", "--output", dest="filename", help="write data to FILENAME")
     parser.add_option("-p", "--param", action="append", dest="param")
     parser.add_option("-f", "--factor", action="append", dest="factor")
-    parser.add_option("-c", "--clock", action="append", dest="clock")
-    parser.add_option("-r", "--reset", action="append", dest="reset")
-    parser.add_option("-d", "--delete", action="append", dest="delete")
     parser.add_option("-e", "--export", action="append", dest="export")
     parser.add_option("--notdef", action="append", dest="notdef")
-    parser.add_option("-i", "--ifdef", action="append", dest="ifdef")
     parser.add_option("-n", "--notfactor", action="append", dest="notfactor")
     parser.add_option("-C", "--cell", dest="cell")
     parser.add_option("-P", "--ifprefix", dest="ifprefix")
@@ -420,11 +345,6 @@ if __name__=='__main__':
                 parammap[item2[0]] = item2[1]
                 if item2[1] not in paramnames:
                     paramnames.append(item2[1])
-    if options.ifdef:
-        for item in options.ifdef:
-            item2 = item.split(':')
-            ifdefmap[item2[0]] = item2[1:]
-            print('III', ifdefmap, file=sys.stderr)
     if len(args) != 1:
         print("incorrect number of arguments", file=sys.stderr)
     else:

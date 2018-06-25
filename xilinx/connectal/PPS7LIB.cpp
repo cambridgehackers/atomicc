@@ -109,6 +109,9 @@ __verilog Pps7emiospi {
     __int(3)        *SSON;
     __int(1)        *STN;
 };
+__verilog Pps7emiosramint {
+    __int(1)         IN;
+};
 __verilog Pps7emiotrace {
     __int(1)         CLK;
     __int(1)        *CTL;
@@ -143,6 +146,14 @@ __verilog Pps7event {
     __int(2)        *STANDBYWFE;
     __int(2)        *STANDBYWFI;
 };
+__verilog Pps7fclk {
+    __int(4)        *CLK;
+    __int(4)         CLKTRIGN;
+    __int(4)        *RESETN;
+};
+__verilog Pps7fpgaid {
+    __int(1)         LEN;
+};
 __verilog Pps7ftmd {
     __int(4)         TRACEINATID;
     __int(1)         TRACEINCLOCK;
@@ -161,8 +172,11 @@ __verilog Pps7irq {
     __int(20)        F2P;
     __int(29)       *P2F;
 };
+__verilog Pps7m {
+    __INOUT(__int(54)) IO;
+};
 __verilog Pps7maxigp {
-    Clock            ACLK;
+    __int(1)         ACLK;
     __int(32)       *ARADDR;
     __int(2)        *ARBURST;
     __int(4)        *ARCACHE;
@@ -209,7 +223,7 @@ __verilog Pps7ps {
     __INOUT(__int(1)) SRSTB;
 };
 __verilog Pps7saxiacp {
-    Clock            ACLK;
+    __int(1)         ACLK;
     __int(32)        ARADDR;
     __int(2)         ARBURST;
     __int(4)         ARCACHE;
@@ -253,7 +267,7 @@ __verilog Pps7saxiacp {
     __int(1)         WVALID;
 };
 __verilog Pps7saxigp {
-    Clock            ACLK;
+    __int(1)         ACLK;
     __int(32)        ARADDR;
     __int(2)         ARBURST;
     __int(4)         ARCACHE;
@@ -295,7 +309,7 @@ __verilog Pps7saxigp {
     __int(1)         WVALID;
 };
 __verilog Pps7saxihp {
-    Clock            ACLK;
+    __int(1)         ACLK;
     __int(32)        ARADDR;
     __int(2)         ARBURST;
     __int(4)         ARCACHE;
@@ -342,7 +356,7 @@ __verilog Pps7saxihp {
     __int(8)         WSTRB;
     __int(1)         WVALID;
 };
-__verilog PPS7LIB {
+__emodule PS7 {
     Pps7ddr          DDR;
     Pps7dma          DMA0;
     Pps7dma          DMA1;
@@ -360,7 +374,7 @@ __verilog PPS7LIB {
     Pps7emiosdio     EMIOSDIO1;
     Pps7emiospi      EMIOSPI0;
     Pps7emiospi      EMIOSPI1;
-    __int(1)         EMIOSRAMINTIN;
+    Pps7emiosramint  EMIOSRAMINT;
     Pps7emiotrace    EMIOTRACE;
     Pps7emiottc      EMIOTTC0;
     Pps7emiottc      EMIOTTC1;
@@ -370,16 +384,14 @@ __verilog PPS7LIB {
     Pps7emiousb      EMIOUSB1;
     Pps7emiowdt      EMIOWDT;
     Pps7event        EVENT;
-    __int(4)        *FCLKCLK;
-    __int(4)         FCLKCLKTRIGN;
-    __int(4)        *FCLKRESETN;
-    __int(1)         FPGAIDLEN;
+    Pps7fclk         FCLK;
+    Pps7fpgaid       FPGAID;
     Pps7ftmd         FTMD;
     Pps7ftmt         FTMT;
     Pps7irq          IRQ;
     Pps7maxigp       MAXIGP0;
     Pps7maxigp       MAXIGP1;
-    __INOUT(__int(54)) MIO;
+    Pps7m            M;
     Pps7ps           PS;
     Pps7saxiacp      SAXIACP;
     Pps7saxigp       SAXIGP0;
@@ -388,7 +400,4 @@ __verilog PPS7LIB {
     Pps7saxihp       SAXIHP1;
     Pps7saxihp       SAXIHP2;
     Pps7saxihp       SAXIHP3;
-};
-__module PS7 {
-    PPS7LIB none;
 };
