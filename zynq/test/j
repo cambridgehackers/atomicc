@@ -3,7 +3,8 @@
 set | grep ANDROID
 set -x
 set -e
-scp $COMPILE_HOST:git/atomicc/zynq/zybo/bin/android.exe .
+#scp $COMPILE_HOST:git/atomicc/zynq/zybo/bin/android.exe .
+scp $COMPILE_HOST:git/atomicc-examples/examples/rulec/zybo/bin/android.exe .
 adb connect 192.168.2.91
 adb root
 sleep 3
