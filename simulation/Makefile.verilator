@@ -7,7 +7,7 @@ VERILATOR_ARGS= -O3 -CFLAGS "-I$(CONNECTALDIR)/cpp -I$(DTOP)/jni -O " -LDFLAGS "
 SIM_CXX_COMMON = $(addprefix $(CONNECTALDIR)/cpp/, sock_utils.c portalPrintf.c)
 SIM_OBJECTS = $(addprefix lib/, $(addsuffix .o, $(basename $(notdir $(SIM_CXX_COMMON)))))
 
-build: prepare_dir bin/ubuntu.exe bin/libconnectal-sim.so vlsim
+verilator: prepare_dir bin/ubuntu.exe bin/libconnectal-sim.so vlsim
 
 define SIM_CXX_RULE
 $1/$(notdir $(basename $3)).o: $3
