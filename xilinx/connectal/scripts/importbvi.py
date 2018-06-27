@@ -210,19 +210,19 @@ def generate_interface(interfacename, paramlist, paramval, ilist, cname):
     if not methodfound:
         deleted_interface.append(interfacename)
         return
-    print(interfacename + paramlist + ' {', file=options.outfile)
+    print('__interface ' + interfacename + paramlist + ' {', file=options.outfile)
     for item in ilist:
         if item.mode != 'input' and item.mode != 'output' and item.mode != 'inout' and item.mode != 'interface':
             continue
         typ = item.type
-        outp = ' '
         if typ[0] >= '0' and typ[0] <= '9':
             typ = '__int(' + typ + ')'
+        outp = '__input'
         if item.mode == 'inout':
-            typ = '__INOUT(' + typ + ')'
+            outp = '__inout'
         if item.mode == 'output':
-            outp = '*'
-        print('    ' + typ.ljust(16) + outp + item.name + ';', file=options.outfile)
+            outp = '__output'
+        print('    ' + outp.ljust(8) + ' ' + typ.ljust(16) + item.name + ';', file=options.outfile)
     print('};', file=options.outfile)
 
 def regroup_items(masterlist):
@@ -309,10 +309,10 @@ def generate_cpp():
         #print('interface', k, file=sys.stderr)
         for kuse, vuse in sorted(v.items()):
             if kuse == '' or kuse == '0':
-                generate_interface('__verilog ' + k, paramlist, paramval, vuse, [])
+                generate_interface(k, paramlist, paramval, vuse, [])
             #else:
                 #print('     ', kuse, json.dumps(vuse), file=sys.stderr)
-    generate_interface('__emodule ' + modulename, paramlist, paramval, masterlist, clock_names)
+    generate_interface(modulename, paramlist, paramval, masterlist, clock_names)
 
 if __name__=='__main__':
     parser = optparse.OptionParser("usage: %prog [options] arg")
