@@ -28,10 +28,10 @@ static void processSerialize(ModuleIR *IR)
 printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     ModuleIR *IIR = lookupIR(inter.type);
     IR->fields.clear();
-    IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", false});
-    IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_16", false});
+    IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", false, false, false, false});
+    IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_16", false, false, false, false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
-    IR->fields.push_back(FieldElement{"data", -1, unionIR->name, false});
+    IR->fields.push_back(FieldElement{"data", -1, unionIR->name, false, false, false, false});
     int counter = 0;  // start method number at 0
     uint64_t maxDataLength = 0;
     for (auto FI: IIR->method) {
@@ -49,14 +49,14 @@ exit(-1);
         unionIR->unionList.push_back(UnionItem{methodName, variant->name});
         uint64_t dataLength = 0;
         for (auto param: MI->params) {
-            variant->fields.push_back(FieldElement{param.name, -1, param.type, false});
+            variant->fields.push_back(FieldElement{param.name, -1, param.type, false, false, false, false});
             dataLength += convertType(param.type);
         }
         if (dataLength > maxDataLength)
             maxDataLength = dataLength;
         counter++;
     }
-    unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), false});
+    unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), false, false, false, false});
 }
 
 static void processM2P(ModuleIR *IR)
@@ -79,7 +79,7 @@ dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
             ModuleIR *II = lookupIR(type);
             if (!II) {
                 II = allocIR(type);
-                II->interfaces.push_back(FieldElement{"ifc", -1, inter.type, false});
+                II->interfaces.push_back(FieldElement{"ifc", -1, inter.type, false, false, false, false});
             }
 printf("[%s:%d] IIIIIIIIIII iname %s IRNAME %s type %s\n", __FUNCTION__, __LINE__, iname.c_str(), IR->name.c_str(), type.c_str());
             processSerialize(II);

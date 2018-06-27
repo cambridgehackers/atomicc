@@ -194,7 +194,7 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     modParam.push_back(ModData{"", IR->name + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, 0});
-    for (auto item : IR->interfaces)
+    for (auto item : IR->interfaces) {
         for (auto FI: lookupIR(item.type)->method) {
             MethodInfo *MI = FI.second;
             std::string name = item.fldName + MODULE_SEPARATOR + MI->name;
@@ -203,6 +203,18 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
             for (auto pitem: MI->params)
                 checkWire(name.substr(0, name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, out);
         }
+        for (auto fld: lookupIR(item.type)->fields) {
+            bool out = (instance != "");
+            std::string name = item.fldName + fld.fldName;
+            if (fld.isInput)
+                checkWire(name, fld.type, out);
+            if (fld.isOutput)
+                checkWire(name, fld.type, !out);
+            if (fld.isInout) {
+printf("[%s:%d] INOUT NOT HANDLED %s\n", __FUNCTION__, __LINE__, name.c_str());
+            }
+        }
+    }
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
