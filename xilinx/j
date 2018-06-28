@@ -1,6 +1,6 @@
 #
 set -x
-VERILATOR="../../verilator/verilator_bin --xml-only --top-module -Wno-lint -Wno-style -Wno-fatal -Wno-STMTDLY -Wno-WIDTH -Wno-REALCVT -Wno-LITENDIAN -Wno-IMPLICIT"
+VERILATOR="../../verilator/verilator_bin --atomicc --top-module -Wno-lint -Wno-style -Wno-fatal -Wno-STMTDLY -Wno-WIDTH -Wno-REALCVT -Wno-LITENDIAN -Wno-IMPLICIT"
 #$VERILATOR --top-module PS7 PS7.v
 #$VERILATOR --top-module IDDRE1 Vivado//2015.2/data/verilog/src/xeclib/IDDRE1.v
 $VERILATOR --top-module BUFCE_LEAF          Vivado//2015.2/data/verilog/src/xeclib/BUFCE_LEAF.v
