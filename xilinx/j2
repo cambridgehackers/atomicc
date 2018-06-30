@@ -1,11 +1,14 @@
 #
 set -x
 set -e
-./atomiccImport -o PPS7.h -C PS7 -I PPS7LIB -P Pps7 \
+OPTIONS="-C PS7 -I PPS7LIB -P Pps7 \
     -f DDR -f FTMT -f FTMD -f IRQ \
     -f EMIOGPIO -f EMIOPJTAG -f EMIOTRACE -f EMIOWDT -f EVENT -f PS -f SAXIACP \
     -f SAXIHP -f SAXIGP -f MAXIHP -f MAXIGP \
     -f DMA -f EMIOENET -f EMIOI2C -f EMIOSDIO -f EMIOTTC -f EMIOUSB -f EMIOSDIO \
     -f EMIOCAN -f EMIOSPI -f EMIOUART \
-    -f FPGAID -f EMIOSRAMINT -f FCLK -f M \
-    Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
+    -f FPGAID -f EMIOSRAMINT -f FCLK -f M"
+
+./atomiccImport -o PPS7.h $OPTIONS Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
+./atomiccImport -o VPPS7.h $OPTIONS PS7.v
+cmp VPPS7.h PPS7.h

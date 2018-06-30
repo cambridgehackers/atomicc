@@ -69,6 +69,12 @@ std::map<std::string, std::map<std::string, PinList>> interfaceList;
 PinList masterList;
 std::map<std::string, int> masterSeen;
 
+typedef struct {
+    std::string dir;
+    std::string type;
+} VPInfo;
+std::map<std::string, VPInfo> vinfo;
+
 static inline std::string autostr(uint64_t X, bool isNeg = false) {
   char Buffer[21];
   char *BufPtr = std::end(Buffer);
@@ -286,6 +292,53 @@ void parse_lib(std::string filename)
     parse_item(false, nullptr);
 }
 
+void getVline()
+{
+    while (*p && *p == ' ')
+        p++;
+    if (*p == '\n')
+        p++;
+}
+
+std::string getVtoken()
+{
+    while (*p && *p == ' ')
+        p++;
+    char *start = p;
+    while (*p && *p != ' ' && *p != '\n')
+        p++;
+    std::string ret = std::string(start, p);
+//printf("[%s:%d] %s\n", __FUNCTION__, __LINE__, ret.c_str());
+    return ret;
+}
+
+void parse_verilator(std::string filename)
+{
+    std::string commandLine = "verilator --atomicc --top-module " + options.cell + " " + filename;
+    int rc = system(commandLine.c_str());
+printf("[%s:%d] calling '%s' returned %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), rc);
+
+    std::string tempFile = "obj_dir/V" + options.cell + ".atomicc";
+    int inpfile = open(tempFile.c_str(), O_RDONLY);
+    if (inpfile == -1) {
+        printf("[%s:%d] unable to open '%s'\n", __FUNCTION__, __LINE__, tempFile.c_str());
+        exit(-1);
+    }
+    int len = read(inpfile, buffer, sizeof(buffer));
+    if (len >= sizeof(buffer) - 1) {
+        printf("[%s:%d] incomplete read of '%s'\n", __FUNCTION__, __LINE__, tempFile.c_str());
+        exit(-1);
+    }
+    while (*p) {
+        std::string dir = getVtoken();
+        std::string type = getVtoken();
+        std::string name = getVtoken();
+        vinfo[name] = VPInfo{dir, type};
+        getVline();
+    }
+    for (auto item: vinfo)
+        pinList.push_back(PinInfo{item.second.dir, item.second.type, item.first, ""});
+}
 void generate_interface(std::string interfacename, std::string indexname, std::string paramlist, PinList &ilist)
 {
     fprintf(outfile, "__interface %s {\n", (options.ifprefix + interfacename + paramlist).c_str());
@@ -404,7 +457,10 @@ int main(int argc, char **argv)
         exit(-1);
     }
     outfile = fopen(options.filename.c_str(), "w");
-    parse_lib(argv[optind]);
+    if (endswith(argv[optind], ".lib"))
+        parse_lib(argv[optind]);
+    else
+        parse_verilator(argv[optind]);
     regroup_items();
     generate_cpp();
     return 0;
