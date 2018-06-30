@@ -19,13 +19,14 @@
 // ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/uio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
 #include <map>
 #include <list>
 #include <string>
@@ -42,6 +43,8 @@ class OptItem {
 public:
     std::string cell, filename, ifname, ifprefix;
     std::string notfactor;
+    std::list<std::string> factor;
+    std::list<std::string> notFactor;
 };
 OptItem options;
 static char buffer[BUFFER_LEN];
@@ -55,6 +58,31 @@ typedef struct {
 } PinInfo;
 typedef std::map<std::string, PinInfo> PinMap;
 PinMap capturePins;
+
+static inline std::string autostr(uint64_t X, bool isNeg = false) {
+  char Buffer[21];
+  char *BufPtr = std::end(Buffer);
+
+  if (X == 0) *--BufPtr = '0';  // Handle special case...
+
+  while (X) {
+    *--BufPtr = '0' + char(X % 10);
+    X /= 10;
+  }
+
+  if (isNeg) *--BufPtr = '-';   // Add negative sign...
+  return std::string(BufPtr, std::end(Buffer));
+}
+
+static bool inline endswith(std::string str, std::string suffix)
+{
+    int skipl = str.length() - suffix.length();
+    return skipl >= 0 && str.substr(skipl) == suffix;
+}
+static bool inline startswith(std::string str, std::string suffix)
+{
+    return str.substr(0, suffix.length()) == suffix;
+}
 
 bool isId(char c)
 {
@@ -191,11 +219,11 @@ void parse_item(bool capture, AttributeList *attr)
                 }
                 else
                     parse_item(capture || cell, attr);
-//if (paramname == "cell")
-//printf("[%s:%d] paramname %s paramstr %s \n", __FUNCTION__, __LINE__, paramname.c_str(), paramstr.c_str());
+if (paramname == "cell")
+printf("[%s:%d] paramname %s paramstr %s \n", __FUNCTION__, __LINE__, paramname.c_str(), paramstr.c_str());
                 if (cell) {
                     processCell();
-                    return;
+                    //return;
                 }
                 paramname = tokval;
                 if (!isId(tokval[0]))
@@ -414,41 +442,41 @@ void generate_cpp()
 int main(int argc, char **argv)
 {
 printf("[%s:%d]argc %d\n", __FUNCTION__, __LINE__, argc);
-    //parser = optparse.OptionParser("usage: %prog [options] arg");
-    //parser.add_option("-o", "--output", dest="filename", help="write data to FILENAME");
-    //parser.add_option("-f", "--factor", action="append", dest="factor");
-    //parser.add_option("-n", "--notfactor", action="append", dest="notfactor");
-    //parser.add_option("-C", "--cell", dest="cell");
-    //parser.add_option("-P", "--ifprefix", dest="ifprefix");
-    //parser.add_option("-I", "--ifname", dest="ifname");
-    //(options, args) = parser.parse_args();
-    //printf("KK", options, args);
-options.cell = "PS7";
-options.ifname = "PPS7LIB";
-options.ifprefix = "Pps7";
-options.filename = "fooout";
-//scripts/importbvi.py -o PPS7LIB.cpp -C PS7 -I PPS7LIB -P Pps7 \
-    //-f DDR -f FTMT -f FTMD -f IRQ \
-    //-f EMIOGPIO -f EMIOPJTAG -f EMIOTRACE -f EMIOWDT -f EVENT -f PS -f SAXIACP \
-    //-f SAXIHP -f SAXIGP -f MAXIHP -f MAXIGP \
-    //-f DMA -f EMIOENET -f EMIOI2C -f EMIOSDIO -f EMIOTTC -f EMIOUSB -f EMIOSDIO \
-    //-f EMIOCAN -f EMIOSPI -f EMIOUART \
-    //-f FPGAID -f EMIOSRAMINT -f FCLK -f M \
-    //..//Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
-    if (options.filename == "" || argc == 0 || options.ifname == "" || options.ifprefix == "") {;
+    opterr = 0;
+    int c;
+    while ((c = getopt (argc, argv, "o:f:n:C:P:I:")) != -1)
+        switch (c) {
+        case 'o':
+            options.filename = optarg;
+            break;
+        case 'f':
+            options.factor.push_back(optarg);
+            break;
+        case 'n':
+            options.notFactor.push_back(optarg);
+            break;
+        case 'C':
+            options.cell = optarg;
+            break;
+        case 'P':
+            options.ifprefix = optarg;
+            break;
+        case 'I':
+            options.ifname = optarg;
+            break;
+        default:
+            abort();
+        }
+    //for (int index = optind; index < argc; index++)
+        //printf ("Non-option argument %s\n", argv[index]);
+//printf("[%s:%d] filename %s cell %s ifname %s ifpre %s\n", __FUNCTION__, __LINE__, options.filename.c_str(), options.cell.c_str(), options.ifname.c_str(), options.ifprefix.c_str());
+    if (optind != argc-1 || options.filename == "" || argc == 0 || options.ifname == "" || options.ifprefix == "") {;
         printf("Missing \"--o\" option, missing input filenames, missing ifname or missing ifprefix.  Run \" importbvi.py -h \" to see available options\n");
         exit(-1);
     }
     outfile = fopen(options.filename.c_str(), "w");
-    //if (options.notfactor == None)
-        //options.notfactor = [];
-    if (argc != 1)
-        printf("incorrect number of arguments");
-    else {
-std::string intest = "Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib";
-        parse_lib(intest);
-        //masterlist = regroup_items(masterlist);
-        generate_cpp();
-    }
+    parse_lib(argv[optind]);
+    //masterlist = regroup_items(masterlist);
+    generate_cpp();
     return 0;
 }
