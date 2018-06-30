@@ -1,10 +1,9 @@
 #
 set -x
 VERILATOR="../../verilator/verilator_bin --atomicc"
-# --top-module -Wno-lint -Wno-style -Wno-fatal -Wno-STMTDLY -Wno-WIDTH -Wno-REALCVT -Wno-LITENDIAN -Wno-IMPLICIT"
 $VERILATOR --top-module BITSLICE_CONTROL          Vivado//2015.2/data/verilog/src/xeclib/BITSLICE_CONTROL.v
-$VERILATOR --top-module DSP48          Vivado//2015.2/data/verilog/src/retarget/DSP48.v
-#$VERILATOR --top-module PS7 PS7.v
+#$VERILATOR --top-module DSP48          Vivado//2015.2/data/verilog/src/retarget/DSP48.v
+$VERILATOR --top-module PS7 PS7.v
 #$VERILATOR --top-module IDDRE1 Vivado//2015.2/data/verilog/src/xeclib/IDDRE1.v
 #$VERILATOR --top-module BUFCE_LEAF          Vivado//2015.2/data/verilog/src/xeclib/BUFCE_LEAF.v
 #$VERILATOR --top-module IDDRE1 IDDRE1.v
