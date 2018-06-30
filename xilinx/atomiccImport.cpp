@@ -54,7 +54,7 @@ typedef struct {
     std::map<int, int> pins;
 } PinInfo;
 typedef std::map<std::string, PinInfo> PinMap;
-PinMap modulePins;
+PinMap capturePins;
 
 bool isId(char c)
 {
@@ -119,7 +119,7 @@ std::string parseparam()
 }
 void processCell()
 {
-    for (auto item : modulePins) {
+    for (auto item : capturePins) {
         int next = 0;
         bool nextok = false;
         for (auto pin: item.second.pins)
@@ -147,6 +147,8 @@ void processCell()
 
 void addAttr(AttributeList *attr, std::string name, std::string value)
 {
+    if (!attr)
+        return;
     if (attr->find(name) != attr->end()) {
         if ((*attr)[name] != value) {
 printf("[%s:%d] attr replace [%s] was %s new %s\n", __FUNCTION__, __LINE__, name.c_str(), (*attr)[name].c_str(), value.c_str());
@@ -158,7 +160,6 @@ printf("[%s:%d] attr replace [%s] was %s new %s\n", __FUNCTION__, __LINE__, name
 
 void parse_item(bool capture, AttributeList *attr)
 {
-    int paramlist = 0;//{};
     while (tokval != "}" && !eof) {
         std::string paramname = tokval;
         validate_token(isId(tokval[0]), "name");
@@ -167,16 +168,14 @@ void parse_item(bool capture, AttributeList *attr)
             if (capture)
                 addAttr(attr, paramname, tokval);
             validate_token(isdigit(tokval[0]), "number");
-            continue;
         }
-        if (paramname == "bus_type") {
+        else if (paramname == "bus_type") {
             validate_token(tokval == ":", ":(bus_type)");
             if (capture)
                 addAttr(attr, paramname, tokval);
             validate_token(isId(tokval[0]), "name");
-            continue;
         }
-        if (tokval == "(") {
+        else if (tokval == "(") {
             while (tokval == "(") {
                 std::string paramstr = parseparam();
                 bool cell = paramname == "cell" && paramstr == options.cell;
@@ -186,15 +185,15 @@ void parse_item(bool capture, AttributeList *attr)
                         std::string sub = paramstr.substr(ind+1);
                         sub = sub.substr(0, sub.length()-1);
                         paramstr = paramstr.substr(0, ind);
-                        modulePins[paramstr].pins[atol(sub.c_str())] = 1;
+                        capturePins[paramstr].pins[atol(sub.c_str())] = 1;
                     }
-                    parse_item(capture || cell, &modulePins[paramstr].attr);
+                    parse_item(true, &capturePins[paramstr].attr);
                 }
                 else
                     parse_item(capture || cell, attr);
 //if (paramname == "cell")
 //printf("[%s:%d] paramname %s paramstr %s \n", __FUNCTION__, __LINE__, paramname.c_str(), paramstr.c_str());
-                if (paramname == "cell" && paramstr == options.cell) {
+                if (cell) {
                     processCell();
                     return;
                 }
@@ -205,7 +204,7 @@ void parse_item(bool capture, AttributeList *attr)
             }
         }
         else {
-            validate_token(tokval == ":", ":(arc)");
+            validate_token(tokval == ":", ":(other)");
             if (capture && paramname != "timing_type")
                 addAttr(attr, paramname, tokval);
             if (isdigit(tokval[0]) || isId(tokval[0]) || tokval[0] == '"')
@@ -238,8 +237,7 @@ void parse_lib(std::string filename)
     }
     validate_token(isId(tokval[0]), "name");
     parseparam();
-    AttributeList attr;
-    parse_item(false, &attr);
+    parse_item(false, nullptr);
 #if 0
     searchlist = [];
     for (auto item : masterlist) {
@@ -396,8 +394,8 @@ int regroup_items(int masterlist)
 void generate_cpp()
 {
     // generate output file
-    std::string paramlist = "";
 #if 0
+    std::string paramlist = "";
     for (auto item : paramnames);
         paramlist = paramlist + ", numeric type " + item;
     if (paramlist != "");
