@@ -42,7 +42,7 @@ FILE *outfile;
 class OptItem {
 public:
     std::string cell, filename, ifname, ifprefix;
-    std::string notfactor;
+    std::list<std::string> notfactor;
     std::list<std::string> factor;
     std::list<std::string> notFactor;
 };
@@ -55,9 +55,19 @@ typedef std::map<std::string, std::string> AttributeList;
 typedef struct {
     AttributeList attr;
     std::map<int, int> pins;
+} LibInfo;
+std::map<std::string, LibInfo> capturePins;
+typedef struct {
+    std::string dir;
+    std::string type;
+    std::string name;
+    std::string comment;
 } PinInfo;
-typedef std::map<std::string, PinInfo> PinMap;
-PinMap capturePins;
+typedef std::list<PinInfo> PinList;
+PinList pinList;
+std::map<std::string, std::map<std::string, PinList>> interfaceList;
+PinList masterList;
+std::map<std::string, int> masterSeen;
 
 static inline std::string autostr(uint64_t X, bool isNeg = false) {
   char Buffer[21];
@@ -82,6 +92,13 @@ static bool inline endswith(std::string str, std::string suffix)
 static bool inline startswith(std::string str, std::string suffix)
 {
     return str.substr(0, suffix.length()) == suffix;
+}
+static std::string ljust(std::string str, int len)
+{
+    int size = len - str.length();
+    if (size > 0)
+        str += std::string(size, ' ');
+    return str;
 }
 
 bool isId(char c)
@@ -157,19 +174,20 @@ void processCell()
                 nextok = false;
                 break;
             }
-        printf("%s %d %s related %s;", item.second.attr["direction"].c_str(),
-            nextok ? next : 1, item.first.c_str(),
-            item.second.attr["related_pin"].c_str());
+        std::string dir = item.second.attr["direction"];
+        std::string type = autostr(nextok ? next : 1);
+        std::string name = item.first;
+        std::string comment = item.second.attr["related_pin"];
         item.second.attr["direction"] = "";
         item.second.attr["related_pin"] = "";
-        if (!nextok)
-            for (auto pin: item.second.pins)
-                if (pin.second)
-                    printf("P%d, ", pin.first);
+        if (!nextok && item.second.pins.size()) {
+            printf("[%s:%d] pins not consecutive\n", __FUNCTION__, __LINE__);
+            exit(-1);
+        }
         for (auto attr: item.second.attr)
             if (attr.second != "")
-                printf("%s = %s, ", attr.first.c_str(), attr.second.c_str());
-        printf("\n");
+                comment += ", " + attr.first + "=" + attr.second;
+        pinList.push_back(PinInfo{dir, type, name, comment});
     }
 }
 
@@ -219,11 +237,11 @@ void parse_item(bool capture, AttributeList *attr)
                 }
                 else
                     parse_item(capture || cell, attr);
-if (paramname == "cell")
-printf("[%s:%d] paramname %s paramstr %s \n", __FUNCTION__, __LINE__, paramname.c_str(), paramstr.c_str());
+//if (paramname == "cell")
+//printf("[%s:%d] paramname %s paramstr %s \n", __FUNCTION__, __LINE__, paramname.c_str(), paramstr.c_str());
                 if (cell) {
                     processCell();
-                    //return;
+                    return;
                 }
                 paramname = tokval;
                 if (!isId(tokval[0]))
@@ -266,182 +284,96 @@ void parse_lib(std::string filename)
     validate_token(isId(tokval[0]), "name");
     parseparam();
     parse_item(false, nullptr);
-#if 0
-    searchlist = [];
-    for (auto item : masterlist) {
-        int ind = item.name.find("1");
-        if (ind > 0) {
-            searchstr = item.name[:ind];
-            //printf("II", item.name, searchstr);
-            if (searchstr not in searchlist)
-                for (auto iitem : masterlist) {
-                    //printf("VV", iitem.name, searchstr + "0");
-                    if (iitem.name.startswith(searchstr + "0")) {
-                        searchlist.push_back(searchstr);
-                        break;
-                    }
-                }
-        }
+}
+
+void generate_interface(std::string interfacename, std::string indexname, std::string paramlist, PinList &ilist)
+{
+    fprintf(outfile, "__interface %s {\n", (options.ifprefix + interfacename + paramlist).c_str());
+    for (auto item : ilist) {
+        if (item.dir != "input" && item.dir != "output" && item.dir != "inout" && item.dir != "interface")
+            continue;
+        std::string typ = item.type;
+        if (isdigit(typ[0]))
+            typ = "__int(" + typ + ")";
+        std::string outp;
+        if (item.dir == "input")
+            outp = "__input  ";
+        if (item.dir == "inout")
+            outp = "__inout  ";
+        if (item.dir == "output")
+            outp = "__output ";
+        fprintf(outfile, "    %s%s %s;\n", outp.c_str(), ljust(typ,16).c_str(), item.name.c_str());
     }
-    for (auto item : masterlist)
-        for (auto sitem : searchlist) {
-            tname = item.name;
-            if (tname.startswith(sitem)) {
-                tname = tname[len(sitem):];
-                ind = 0;
-                while (tname[ind] >= "0" && tname[ind] <= "9" && ind < len(tname) - 1)
-                    ind = ind + 1;
-                item.name = sitem + tname[:ind] + item.separator + tname[ind:];
+    fprintf(outfile, "};\n");
+}
+
+void regroup_items()
+{
+    std::string currentgroup = "";
+    for (auto item: pinList) {
+        std::string litem = item.name, titem = litem, groupname, fieldname;
+        std::string indexname;
+        bool skipcheck = false;
+//printf("[%s:%d] dir %s type %s name %s comment %s\n", __FUNCTION__, __LINE__, item.dir.c_str(), item.type.c_str(), item.name.c_str(), item.comment.c_str());
+        if (item.dir != "input" && item.dir != "output" && item.dir != "inout") {
+            //newlist.push_back(item);
+            printf("DD %s\n", item.name.c_str());
+            continue;
+        }
+        for (auto tstring : options.factor)
+            if (startswith(litem, tstring)) {
+                groupname = tstring;
+                litem = litem.substr(groupname.length());
+                int ind = 0;
+                while (isdigit(litem[ind]))
+                    ind++;
+                indexname = litem.substr(0,ind);
+                litem = litem.substr(ind);
+                fieldname = litem;
+//printf("[%s:%d] group %s litem %s index %s\n", __FUNCTION__, __LINE__, groupname.c_str(), litem.c_str(), indexname.c_str());
                 break;
             }
+        for (auto checkitem : options.notfactor) {
+            if (startswith(litem, checkitem)) {
+printf("[%s:%d]notfactor\n", __FUNCTION__, __LINE__);
+                skipcheck = 1;
+            }
         }
-#endif
-}
-
-void generate_interface(std::string interfacename, std::string paramlist, int paramval, int ilist, std::string cname)
-{
-    bool methodfound = 0;
-#if 0
-    for (auto item : ilist) {
-        //printf("GG", item.name, item.type, item.mode);
-        if (item.mode == "input" && (item.type != "Clock" && item.type != "Reset"))
-            methodfound = 1;
-        else if (item.mode == "output")
-            methodfound = 1;
-        else if (item.mode == "inout")
-            methodfound = 1;
-        else if (item.mode == "interface")
-            methodfound = 1;
-    }
-    if (! methodfound) {
-        //deleted_interface.push_back(interfacename);
-        return;
-    }
-    fprintf(outfile, "__interface %s {", (interfacename + paramlist).c_str());
-    for (auto item : ilist) {
-        if (item.mode != "input" && item.mode != "output" && item.mode != "inout" && item.mode != "interface")
+        if (skipcheck) {
+            //newlist.push_back(item);
+            masterList.push_back(PinInfo{item.dir, item.type, item.name, item.comment});
             continue;
-        typ = item.type;
-        if (typ[0] >= "0" && typ[0] <= "9")
-            typ = "__int(" + typ + ")";
-        outp = "__input";
-        if (item.mode == "inout");
-            outp = "__inout";
-        if (item.mode == "output");
-            outp = "__output";
-        fprintf(outfile, "    " + outp.ljust(8) + " " + typ.ljust(16) + item.name + ";");
-    }
-#endif
-    fprintf(outfile, "};");
-}
-
-int regroup_items(int masterlist)
-{
-    //paramnames.sort();
-    //masterlist = sorted(masterlist, key=lambda item: item.type if (item.mode == "parameter" else item.name);;
-    //newlist = [];
-    std::string currentgroup = "";
-#if 0
-    prevlist = [];
-    for (auto item : masterlist) {
-        if (item.mode != "input" && item.mode != "output" && item.mode != "inout") {
-            newlist.push_back(item);
-            //printf("DD", item.name);
         }
-        else {
-            litem = item.origname;
-            titem = litem;
-            //printf("OA", titem);
-            separator = "_";
-            indexname = "";
-            skipParse = 0;
-            if (prevlist != [] && ! litem.startswith(currentgroup));
-                printf("UU", currentgroup, litem, prevlist);
-            if (options.factor) {
-                for (auto tstring : options.factor) {
-                    if (len(litem) > len(tstring) && litem.startswith(tstring)) {
-                        groupname = tstring;
-                        m = re.search("(\d*)(_?)(.+)", litem[len(tstring):]);
-                        indexname = m.group(1);
-                        separator = m.group(2);
-                        fieldname = m.group(3);
-                        m = None;
-                        skipParse = 1;
-                        //printf("OM", titem, groupname, fieldname, separator);
-                        break;
-                    }
-                }
-            }
-            if (separator != "" && skipParse != 1) {;
-                m = re.search("(.+?)_(.+)", litem);
-                if (! m) {
-                    newlist.push_back(item);
-                    //printf("OD", item.name);
-                    continue;
-                }
-                if (len(m.group(1)) == 1) // if only 1 character prefix, get more greedy
-                    m = re.search("(.+)_(.+)", litem);
-                printf("OJ", item.name, m.groups());
-                fieldname = m.group(2);
-                groupname = m.group(1);
-            }
-            skipcheck = 0;
-            for (auto checkitem : options.notfactor) {
-                if (litem.startswith(checkitem))
-                    skipcheck = 1;
-            }
-            if (skipcheck) {
-                newlist.push_back(item);
-                //printf("OI", item.name);
-                continue
-            }
-            itemname = (groupname + indexname);
-            interfacename = options.ifprefix + groupname.lower();
-            if (! commoninterfaces.get(interfacename))
-                commoninterfaces[interfacename] = {};
-            if (! commoninterfaces[interfacename].get(indexname)) {
-                commoninterfaces[interfacename][indexname] = [];
-                t = PinType("interface", interfacename, itemname, groupname+indexname+separator);
-                //printf("OZ", interfacename, itemname, groupname+indexname+separator);
-                t.separator = separator;
-                newlist.push_back(t);
-            }
-            //printf("OH", itemname, separator);
-            foo = copy.copy(item);
-            foo.origname = fieldname;
-            lfield = fieldname;
-            foo.name = lfield;
-            commoninterfaces[interfacename][indexname].push_back(foo);
+        std::string itemname = groupname + indexname;
+        std::transform(groupname.begin(), groupname.end(), groupname.begin(), ::tolower);
+        if (!masterSeen[itemname]) {
+            masterSeen[itemname] = 1;
+            masterList.push_back(PinInfo{"interface", options.ifprefix + groupname, itemname, ""});
         }
+        interfaceList[groupname][indexname].push_back(PinInfo{item.dir, item.type, fieldname, item.comment});
     }
-    return newlist;
-#endif
-    return 0;
 }
 
 void generate_cpp()
 {
     // generate output file
-#if 0
-    std::string paramlist = "";
-    for (auto item : paramnames);
-        paramlist = paramlist + ", numeric type " + item;
-    if (paramlist != "");
-        paramlist = "//(" + paramlist[2:] + ")";;
-    paramval = paramlist.replace("numeric type ", "");
-    for (auto k, v : sorted(commoninterfaces.items())) {
-        //printf("interface", k);
-        for (auto kuse, vuse : sorted(v.items()));
-            if (kuse == "" || kuse == "0");
-                generate_interface(k, paramlist, paramval, vuse, []);
-    }
-    generate_interface(options.cell, paramlist, paramval, masterlist, clock_names);
-#endif
+    //std::string paramlist = "";
+    //for (auto item : paramnames);
+        //paramlist = paramlist + ", numeric type " + item;
+    //if (paramlist != "");
+        //paramlist = "//(" + paramlist[2:] + ")";;
+    //paramval = paramlist.replace("numeric type ", "");
+    for (auto item: interfaceList)
+        for (auto iitem: item.second)
+            generate_interface(item.first, iitem.first, "", iitem.second);
+    generate_interface(options.cell, "", "", masterList);
+    fprintf(outfile, "__emodule %s {\n", options.cell.c_str());
+    fprintf(outfile, "    %s _;\n", (options.ifprefix + options.cell).c_str());
+    fprintf(outfile, "};\n");
 }
 
 int main(int argc, char **argv)
 {
-printf("[%s:%d]argc %d\n", __FUNCTION__, __LINE__, argc);
     opterr = 0;
     int c;
     while ((c = getopt (argc, argv, "o:f:n:C:P:I:")) != -1)
@@ -467,16 +399,13 @@ printf("[%s:%d]argc %d\n", __FUNCTION__, __LINE__, argc);
         default:
             abort();
         }
-    //for (int index = optind; index < argc; index++)
-        //printf ("Non-option argument %s\n", argv[index]);
-//printf("[%s:%d] filename %s cell %s ifname %s ifpre %s\n", __FUNCTION__, __LINE__, options.filename.c_str(), options.cell.c_str(), options.ifname.c_str(), options.ifprefix.c_str());
     if (optind != argc-1 || options.filename == "" || argc == 0 || options.ifname == "" || options.ifprefix == "") {;
         printf("Missing \"--o\" option, missing input filenames, missing ifname or missing ifprefix.  Run \" importbvi.py -h \" to see available options\n");
         exit(-1);
     }
     outfile = fopen(options.filename.c_str(), "w");
     parse_lib(argv[optind]);
-    //masterlist = regroup_items(masterlist);
+    regroup_items();
     generate_cpp();
     return 0;
 }
