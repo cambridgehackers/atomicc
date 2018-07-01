@@ -1,7 +1,7 @@
 #
 set -x
 set -e
-OPTIONS="-C PS7 -I PPS7LIB -P Pps7 \
+OPTIONS="-C PS7 -P Pps7 \
     -f DDR -f FTMT -f FTMD -f IRQ \
     -f EMIOGPIO -f EMIOPJTAG -f EMIOTRACE -f EMIOWDT -f EVENT -f PS -f SAXIACP \
     -f SAXIHP -f SAXIGP -f MAXIHP -f MAXIGP \

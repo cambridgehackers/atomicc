@@ -41,7 +41,7 @@ FILE *outfile;
 
 class OptItem {
 public:
-    std::string cell, filename, ifname, ifprefix;
+    std::string cell, filename, ifprefix;
     std::list<std::string> notfactor;
     std::list<std::string> factor;
     std::list<std::string> notFactor;
@@ -364,8 +364,7 @@ void regroup_items()
 {
     std::string currentgroup = "";
     for (auto item: pinList) {
-        std::string litem = item.name, titem = litem, groupname, fieldname;
-        std::string indexname;
+        std::string litem = item.name, groupname, fieldname, indexname;
         bool skipcheck = false;
 //printf("[%s:%d] dir %s type %s name %s comment %s\n", __FUNCTION__, __LINE__, item.dir.c_str(), item.type.c_str(), item.name.c_str(), item.comment.c_str());
         if (item.dir != "input" && item.dir != "output" && item.dir != "inout") {
@@ -392,7 +391,7 @@ printf("[%s:%d]notfactor\n", __FUNCTION__, __LINE__);
                 skipcheck = 1;
             }
         }
-        if (skipcheck) {
+        if (skipcheck || fieldname == "") {
             //newlist.push_back(item);
             masterList.push_back(PinInfo{item.dir, item.type, item.name, item.comment});
             continue;
@@ -446,13 +445,10 @@ int main(int argc, char **argv)
         case 'P':
             options.ifprefix = optarg;
             break;
-        case 'I':
-            options.ifname = optarg;
-            break;
         default:
             abort();
         }
-    if (optind != argc-1 || options.filename == "" || argc == 0 || options.ifname == "" || options.ifprefix == "") {;
+    if (optind != argc-1 || options.filename == "" || argc == 0 || options.ifprefix == "") {;
         printf("Missing \"--o\" option, missing input filenames, missing ifname or missing ifprefix.  Run \" importbvi.py -h \" to see available options\n");
         exit(-1);
     }
