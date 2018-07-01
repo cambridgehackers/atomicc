@@ -16,32 +16,25 @@
 #
 
 SOURCES = main.cpp verilog.cpp util.cpp interfaces.cpp \
-    expr.cpp readIR.cpp \
-    software.cpp metaGen.cpp preprocessIR.cpp
+    expr.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp
+LLVMDIR = ../llvm/lib/Target/Atomicc
 
-all:
-	@clang++  \
-    -g \
-    -fblocks \
-    -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
-    -fPIC \
-    -fvisibility-inlines-hidden \
-    -Werror=date-time \
-    -std=c++11 \
-    -Wall \
-    -W \
-    -Wno-unused-parameter \
-    -Wwrite-strings \
-    -Wcast-qual \
-    -Wmissing-field-initializers \
-    -pedantic \
-    -Wno-long-long \
-    -Wcovered-switch-default \
-    -Wnon-virtual-dtor \
-    -Wdelete-non-virtual-dtor \
-    -Wstring-conversion    \
-    -fno-exceptions \
-    -fno-rtti \
-    -I. -I../llvm/lib/Target/Atomicc \
-    -lBlocksRuntime \
-    -o veriloggen $(SOURCES)
+all: veriloggen atomiccImport
+
+veriloggen: $(SOURCES) $(LLVMDIR)/*.h
+	@clang++ -o veriloggen -g -std=c++11 \
+            -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
+            -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
+            -pedantic \
+            -Wall -W \
+            -Werror=date-time -Wno-long-long -Wno-unused-parameter \
+            -Wwrite-strings -Wcovered-switch-default -Wcast-qual \
+            -Wmissing-field-initializers -Wstring-conversion    \
+            -Wnon-virtual-dtor -Wdelete-non-virtual-dtor \
+            -I. -I$(LLVMDIR) $(SOURCES) -lBlocksRuntime
+
+atomiccImport: atomiccImport.cpp
+	clang++ -g -std=c++11 -o atomiccImport atomiccImport.cpp
+
+clean:
+	rm -f veriloggen atomiccImport

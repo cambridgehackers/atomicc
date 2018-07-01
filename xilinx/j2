@@ -9,6 +9,6 @@ OPTIONS="-C PS7 -P Pps7 \
     -f EMIOCAN -f EMIOSPI -f EMIOUART \
     -f FPGAID -f EMIOSRAMINT -f FCLK -f M"
 
-./atomiccImport -o PPS7.h $OPTIONS Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
-./atomiccImport -o VPPS7.h $OPTIONS PS7.v
+../atomiccImport -o PPS7.h $OPTIONS Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
+../atomiccImport -o VPPS7.h $OPTIONS PS7.v
 cmp VPPS7.h PPS7.h
