@@ -205,7 +205,9 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
         }
         for (auto fld: lookupIR(item.type)->fields) {
             bool out = (instance != "");
-            std::string name = item.fldName + fld.fldName;
+            std::string name = fld.fldName;
+            if (item.fldName != "_")
+                name = item.fldName + name;
             if (fld.isInput)
                 checkWire(name, fld.type, out);
             if (fld.isOutput)
