@@ -321,7 +321,7 @@ static void optimizeAssign(void)
 
 static void generateAssign(FILE *OStr)
 {
-    bool hasAlways = false;
+    bool hasAlways = alwaysLines.size() > 0;
     // generate local state element declarations and wires
     for (auto item: refList) {
         if (item.second.pin == PIN_REG) {
