@@ -39,7 +39,7 @@ obj_dir/vlsim: obj_dir/vlsim.mk
 
 vlsim: obj_dir/vlsim
 
-clean:
+cleansim:
 	rm -rf obj_dir/ bin/ lib/ SWSOCK[0-9] verilator/
 
 CC=$(TOOLCHAIN)gcc
@@ -51,7 +51,7 @@ CFLAGS = $(CFLAGS_COMMON)
 PORTAL_INFRA := portal.c transportHardware.c transportSocket.c portalPrintf.c poller.cpp sock_utils.c timer.c
 SOURCES := $(addprefix $(CONNECTALDIR)/cpp/, $(PORTAL_INFRA)) \
       $(SIMDIR)/cpp/printfHandler.cpp \
-      $(addprefix $(DTOP)/, $(GENERATED_CPP) $(PROJECT_CPP))
+      $(addprefix $(DTOP)/, $(PROJECT_CPP)) $(DTOP)/jni/*.c $(DTOP)/jni/*.cpp
 
 LDLIBS := -lpthread
 

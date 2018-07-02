@@ -97,7 +97,6 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
     if (softwareNameList.size() > 0) {
         int counter = 5;
         std::string enumList, sep;
-        std::string flist = "GENERATED_CPP = jni/GeneratedCppCallbacks.cpp \\\n   ";
         ModuleIR *IR = allocIR("l_top");
         irSeq.push_back(IR);
         std::string dutType;
@@ -110,12 +109,9 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
             std::string name = "IfcNames_" + item.first + (item.second.field.isPtr ? "H2S" : "S2H");
             enumList += sep + "[ \"" + name + "\", \"" + autostr(counter++) + "\" ]";
             sep = ", ";
-            flist += " jni/" + item.first + ".c";
         }
         OStrJ = fopen((outName + ".json").c_str(), "w");
         fprintf(OStrJ, jsonPrefix, enumList.c_str());
-        FILE *OStrFL = fopen((outName + ".filelist").c_str(), "w");
-        fprintf(OStrFL, "%s\n", flist.c_str());
         std::string localName = "DUT__" + dutType;
         std::string muxName = "mux";
         std::string muxTypeName = "l_module_OC_MuxPipe";
@@ -185,7 +181,6 @@ dumpModule("MUX", muxDef);
         }
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
-        fclose(OStrFL);
 dumpModule("TOP", IR);
         std::string commandLine(exename);
         int ind = commandLine.rfind("/");
