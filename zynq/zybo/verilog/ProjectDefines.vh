@@ -1,1 +1,0 @@
-../../../../atomicc-examples/examples/rulec/verilog/ProjectDefines.vh

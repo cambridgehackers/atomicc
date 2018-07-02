@@ -1,5 +1,0 @@
-#
-set -x
-set -e
-../../../atomiccImport -o cnet2.h -C CONNECTNET2 -P CN CONNECTNET2.v
-cat cnet2.h
