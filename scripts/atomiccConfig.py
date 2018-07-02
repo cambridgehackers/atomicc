@@ -21,10 +21,8 @@
 ## CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ## SOFTWARE.
 import os, sys, json
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/../../connectal/scripts')
-import cppgen
 
-connectalProjectString = '''
+verilatorProjectString = '''
 #ifndef _ConnectalProjectConfig_h
 #define _ConnectalProjectConfig_h
 
@@ -35,15 +33,31 @@ connectalProjectString = '''
 #endif // _ConnectalProjectConfig_h
 '''
 
+zyboProjectString = '''
+#ifndef _ConnectalProjectConfig_h
+#define _ConnectalProjectConfig_h
+
+#define TRACE_PORTAL ""
+#define MainClockPeriod 10
+#define XILINX 1
+#define ZYNQ ""
+#define BOARD_zybo ""
+
+#endif // _ConnectalProjectConfig_h
+'''
+
 if __name__=='__main__':
     print 'new', sys.argv
-    filename = "generatedDesignInterfaceFile.json"
-    if (len(sys.argv) > 1):
-        filename = sys.argv[1];
-    jsondata = json.loads(open(filename).read())
-    cppgen.generateJson = False
-    cppgen.generatePacketOnly = True
-    cppgen.suppressGeneratedMakefile = True
-    cppgen.generate_cpp(".", False, jsondata)
-    #open('jni/ConnectalProjectConfig.h', 'w').write(connectalProjectString)
-    open('jni/driver_signature_file.h', 'w')
+    if len(sys.argv) != 2 or (sys.argv[1] != 'verilator' and sys.argv[1] != 'zybo'):
+        print 'atomiccConfig.py <targetDirectoryName>'
+        sys.exit(-1)
+    #filename = 'generatedDesignInterfaceFile.json'
+    #if (len(sys.argv) > 1):
+    #    filename = sys.argv[1];
+    #jsondata = json.loads(open(filename).read())
+    fd = open(sys.argv[1] + '/ConnectalProjectConfig.h', 'w')
+    if sys.argv[1] == 'zybo':
+        fd.write(zyboProjectString)
+    else:
+        fd.write(verilatorProjectString)
+
