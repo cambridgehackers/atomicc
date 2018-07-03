@@ -9,6 +9,8 @@ OPTIONS="-C PS7 -P Pps7 \
     -f EMIOCAN -f EMIOSPI -f EMIOUART \
     -f FPGAID -f EMIOSRAMINT -f FCLK -f M"
 
-../atomiccImport -o PPS7.h $OPTIONS Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
-../atomiccImport -o VPPS7.h $OPTIONS PS7.v
-cmp VPPS7.h PPS7.h
+#../atomiccImport -o PPS7.h $OPTIONS Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
+#../atomiccImport -o VPPS7.h $OPTIONS PS7.v
+#cmp VPPS7.h PPS7.h
+../atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
+../atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 Vivado/2015.2/data/verilog/src/xeclib/MMCME2_ADV.v

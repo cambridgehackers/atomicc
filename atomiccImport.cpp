@@ -58,6 +58,7 @@ typedef struct {
     std::map<int, int> pins;
 } LibInfo;
 std::map<std::string, LibInfo> capturePins;
+std::map<std::string, LibInfo> busInfo;
 typedef struct {
     std::string dir;
     std::string type;
@@ -183,6 +184,9 @@ void processCell()
             }
         std::string dir = item.second.attr["direction"];
         std::string type = autostr(nextok ? next : 1);
+        std::string bus = item.second.attr["bus_type"];
+        if (bus != "")
+             type = busInfo[bus].attr["bit_width"];
         std::string name = item.first;
         std::string comment = item.second.attr["related_pin"];
         item.second.attr["direction"] = "";
@@ -198,20 +202,22 @@ void processCell()
     }
 }
 
-void addAttr(AttributeList *attr, std::string name, std::string value)
+void addAttr(AttributeList *attr, std::string pinName, std::string name, std::string value)
 {
     if (!attr)
         return;
     if (attr->find(name) != attr->end()) {
-        if ((*attr)[name] != value) {
-printf("[%s:%d] attr replace [%s] was %s new %s\n", __FUNCTION__, __LINE__, name.c_str(), (*attr)[name].c_str(), value.c_str());
+        if (name != "fpga_arc_condition" && (*attr)[name] != value) {
+        if (!(value[0] == '"' && value[value.length()-1] == '"' && value.substr(1, value.length()-2) == pinName)) {
+            printf("%s: pin %s attr replace [%s] was %s new %s\n", __FUNCTION__, pinName.c_str(), name.c_str(), (*attr)[name].c_str(), value.c_str());
             exit(-1);
+        }
         }
     }
     (*attr)[name] = value;
 }
 
-void parse_item(bool capture, AttributeList *attr)
+void parse_item(bool capture, std::string pinName, AttributeList *attr)
 {
     while (tokval != "}" && !eof) {
         std::string paramname = tokval;
@@ -219,13 +225,13 @@ void parse_item(bool capture, AttributeList *attr)
         if (paramname == "default_intrinsic_fall" || paramname == "default_intrinsic_rise") {
             validate_token(tokval == ":", ":(paramname)");
             if (capture)
-                addAttr(attr, paramname, tokval);
+                addAttr(attr, pinName, paramname, tokval);
             validate_token(isdigit(tokval[0]), "number");
         }
         else if (paramname == "bus_type") {
             validate_token(tokval == ":", ":(bus_type)");
             if (capture)
-                addAttr(attr, paramname, tokval);
+                addAttr(attr, pinName, paramname, tokval);
             validate_token(isId(tokval[0]), "name");
         }
         else if (tokval == "(") {
@@ -233,17 +239,20 @@ void parse_item(bool capture, AttributeList *attr)
                 std::string paramstr = parseparam();
                 bool cell = paramname == "cell" && paramstr == options.cell;
                 int ind = paramstr.find("[");
-                if (capture && paramname == "pin") {
+                if (capture && (paramname == "pin" || paramname == "bus")) {
                     if (ind > 0 && paramstr[paramstr.length()-1] == ']') {
                         std::string sub = paramstr.substr(ind+1);
                         sub = sub.substr(0, sub.length()-1);
                         paramstr = paramstr.substr(0, ind);
                         capturePins[paramstr].pins[atol(sub.c_str())] = 1;
                     }
-                    parse_item(true, &capturePins[paramstr].attr);
+                    parse_item(true, paramstr, &capturePins[paramstr].attr);
+                }
+                else if (paramname == "type") {
+                    parse_item(true, "", &busInfo[paramstr].attr);
                 }
                 else
-                    parse_item(capture || cell, attr);
+                    parse_item(capture || cell, pinName, attr);
 //if (paramname == "cell")
 //printf("[%s:%d] paramname %s paramstr %s \n", __FUNCTION__, __LINE__, paramname.c_str(), paramstr.c_str());
                 if (cell) {
@@ -259,7 +268,7 @@ void parse_item(bool capture, AttributeList *attr)
         else {
             validate_token(tokval == ":", ":(other)");
             if (capture && paramname != "timing_type")
-                addAttr(attr, paramname, tokval);
+                addAttr(attr, pinName, paramname, tokval);
             if (isdigit(tokval[0]) || isId(tokval[0]) || tokval[0] == '"')
                 parsenext();
             else
@@ -290,7 +299,7 @@ void parse_lib(std::string filename)
     }
     validate_token(isId(tokval[0]), "name");
     parseparam();
-    parse_item(false, nullptr);
+    parse_item(false, "", nullptr);
 }
 
 void getVline()
@@ -344,11 +353,17 @@ void generate_interface(std::string interfacename, std::string indexname, std::s
 {
     fprintf(outfile, "__interface %s {\n", (options.ifprefix + interfacename + paramlist).c_str());
     for (auto item : ilist) {
-        if (item.dir != "input" && item.dir != "output" && item.dir != "inout" && item.dir != "interface")
+        if (item.dir != "input" && item.dir != "output" && item.dir != "inout" && item.dir != "parameter" && item.dir != "interface")
             continue;
         std::string typ = item.type;
         if (isdigit(typ[0]))
             typ = "__int(" + typ + ")";
+        else if (typ == "integer")
+            typ = "int";
+        else if (typ == "real" || typ == "DOUBLE")
+            typ = "float";
+        else if (typ == "GENERIC")
+            typ = "const char *";
         std::string outp;
         if (item.dir == "input")
             outp = "__input  ";
@@ -356,6 +371,8 @@ void generate_interface(std::string interfacename, std::string indexname, std::s
             outp = "__inout  ";
         if (item.dir == "output")
             outp = "__output ";
+        if (item.dir == "parameter")
+            outp = "__parameter ";
         fprintf(outfile, "    %s%s %s;\n", outp.c_str(), ljust(typ,16).c_str(), item.name.c_str());
     }
     fprintf(outfile, "};\n");
@@ -368,7 +385,7 @@ void regroup_items()
         std::string litem = item.name, groupname, fieldname, indexname;
         bool skipcheck = false;
 //printf("[%s:%d] dir %s type %s name %s comment %s\n", __FUNCTION__, __LINE__, item.dir.c_str(), item.type.c_str(), item.name.c_str(), item.comment.c_str());
-        if (item.dir != "input" && item.dir != "output" && item.dir != "inout") {
+        if (item.dir != "input" && item.dir != "output" && item.dir != "inout" && item.dir != "parameter") {
             //newlist.push_back(item);
             printf("DD %s\n", item.name.c_str());
             continue;
