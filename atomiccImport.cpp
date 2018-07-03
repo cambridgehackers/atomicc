@@ -357,8 +357,8 @@ void generate_interface(std::string interfacename, std::string indexname, std::s
             continue;
         std::string typ = item.type;
         if (isdigit(typ[0]))
-            typ = "__int(" + typ + ")";
-        else if (typ == "integer")
+            typ = "__uint(" + typ + ")";
+        else if (typ == "integer" || typ == "logic")
             typ = "int";
         else if (typ == "real" || typ == "DOUBLE")
             typ = "float";
