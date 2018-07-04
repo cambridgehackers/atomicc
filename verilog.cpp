@@ -193,7 +193,21 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
         expandStruct(IR, instance + name, type, dir, false, PIN_WIRE);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
-    modParam.push_back(ModData{"", IR->name + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, 0});
+    std::string moduleInstantiation = IR->name;
+    if (instance != "") {
+        std::string params, sep;
+        for (auto item : IR->interfaces) {
+            for (auto fld: lookupIR(item.type)->fields) {
+                if (fld.isParameter) {
+                    params += sep + "." + fld.fldName + "(" + "FOO" + ")";
+                    sep = ", ";
+                }
+            }
+        }
+        if (params != "")
+            moduleInstantiation += "#(" + params + ")";
+    }
+    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, 0});
     for (auto item : IR->interfaces) {
         for (auto FI: lookupIR(item.type)->method) {
             MethodInfo *MI = FI.second;

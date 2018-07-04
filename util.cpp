@@ -153,8 +153,10 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
             getFieldList(fieldList, sname + item.name, tname, item.type, out, true, toff, true, false);
         }
         iterField(IR, CBAct {
+          if (!item.isParameter) {
           getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
           offset += convertType(item.type);
+          }
           return nullptr;
           });
     }
