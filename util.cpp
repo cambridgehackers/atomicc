@@ -52,6 +52,8 @@ uint64_t convertType(std::string arg)
     };
     if (checkT("INTEGER_"))
         return atoi(bp);
+    if (arg == "FLOAT")
+        return 1;                 // should never occur in declarations
     if (checkT("ARRAY_")) {
         uint64_t arr = atoi(bp);
         while (isdigit(*bp) || *bp == '_')
