@@ -151,6 +151,8 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                     vecCount = atoi(getToken().c_str());
                 std::string type = getToken();
                 std::string fldName = getToken();
+                if (fldName == "_")
+                    fldName = "";
                 IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, false});
             }
             else if (checkItem("METHOD")) {

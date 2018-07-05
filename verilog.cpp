@@ -182,31 +182,30 @@ printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2s
     return ret;
 }
 typedef struct {
-    std::string type;
-    std::string name;
-    bool        isInput, isOutput, isInout;
+    std::string type, name;
+    bool        isOutput, isInout;
     MethodInfo *MI;
 } PinInfo;
 std::list<PinInfo> pinPorts, pinMethods;
-static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string portPrefix)
+static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix)
 {
     for (auto item : IR->interfaces) {
         ModuleIR *IIR = lookupIR(item.type);
         for (auto FI: IIR->method) {
             MethodInfo *MI = FI.second;
-            std::string name = item.fldName + MODULE_SEPARATOR + MI->name;
+            std::string name = methodPrefix + item.fldName + MODULE_SEPARATOR + MI->name;
             bool out = instance ^ item.isPtr;
-            pinMethods.push_back(PinInfo{MI->type, name, !out, out, false, MI});
+            pinMethods.push_back(PinInfo{MI->type, name, out, false, MI});
         }
         for (auto fld: IIR->fields) {
-            std::string name = fld.fldName;
-            if (item.fldName != "_")
-                name = item.fldName + name;
-            pinPorts.push_back(PinInfo{fld.type, name, fld.isInput, fld.isOutput, fld.isInout, nullptr});
+            std::string name = pinPrefix + item.fldName + fld.fldName;
+            bool out = instance ^ fld.isOutput;
+            if (!fld.isParameter)
+                pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, nullptr});
         }
-        for (auto ifc: IIR->interfaces) {
-            collectInterfacePins(lookupIR(ifc.type), instance, pinPrefix, portPrefix);
-        }
+        for (auto ifc: IIR->interfaces)
+            collectInterfacePins(lookupIR(ifc.type), instance, pinPrefix + item.fldName + ifc.fldName,
+                methodPrefix + item.fldName + MODULE_SEPARATOR + ifc.fldName + MODULE_SEPARATOR);
     }
 }
 
@@ -253,14 +252,11 @@ printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.subst
                 checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput);
         }
         for (auto item: pinPorts) {
-            bool out = instance != "";
-            if (item.isInput)
-                checkWire(item.name, item.type, out);
-            if (item.isOutput)
-                checkWire(item.name, item.type, !out);
             if (item.isInout) {
 printf("[%s:%d] INOUT NOT HANDLED %s\n", __FUNCTION__, __LINE__, item.name.c_str());
             }
+            else
+                checkWire(item.name, item.type, item.isOutput);
         }
 }
 
