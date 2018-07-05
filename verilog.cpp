@@ -181,18 +181,33 @@ printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2s
     ret += treePost(expr);
     return ret;
 }
-
-static bool hasPinInterfaces(ModuleIR *IR)
+typedef struct {
+    std::string type;
+    std::string name;
+    bool        isInput, isOutput, isInout;
+    MethodInfo *MI;
+} PinInfo;
+std::list<PinInfo> pinPorts, pinMethods;
+static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string portPrefix)
 {
     for (auto item : IR->interfaces) {
         ModuleIR *IIR = lookupIR(item.type);
-        if (IIR->fields.size() > 0)   // if we have bare verilog pins
-            return true;
-        for (auto ifc: IIR->interfaces)
-            if (hasPinInterfaces(lookupIR(ifc.type))) // or recursively have bare pins
-                return true;           // then don't generate CLK and nRST by default
+        for (auto FI: IIR->method) {
+            MethodInfo *MI = FI.second;
+            std::string name = item.fldName + MODULE_SEPARATOR + MI->name;
+            bool out = instance ^ item.isPtr;
+            pinMethods.push_back(PinInfo{MI->type, name, !out, out, false, MI});
+        }
+        for (auto fld: IIR->fields) {
+            std::string name = fld.fldName;
+            if (item.fldName != "_")
+                name = item.fldName + name;
+            pinPorts.push_back(PinInfo{fld.type, name, fld.isInput, fld.isOutput, fld.isInout, nullptr});
+        }
+        for (auto ifc: IIR->interfaces) {
+            collectInterfacePins(lookupIR(ifc.type), instance, pinPrefix, portPrefix);
+        }
     }
-    return false;
 }
 
 /*
@@ -228,31 +243,25 @@ printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.subst
             moduleInstantiation += "#(" + actual + ")";
         }
     }
-printf("[%s:%d] RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR %s %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), hasPinInterfaces(IR));
-    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, hasPinInterfaces(IR), 0});
-    for (auto item : IR->interfaces) {
-        for (auto FI: lookupIR(item.type)->method) {
-            MethodInfo *MI = FI.second;
-            std::string name = item.fldName + MODULE_SEPARATOR + MI->name;
-            bool out = (instance != "") ^ item.isPtr;
-            checkWire(name, MI->type, out ^ (MI->type != ""));
-            for (auto pitem: MI->params)
-                checkWire(name.substr(0, name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, out);
+    pinPorts.clear();
+    pinMethods.clear();
+    collectInterfacePins(IR, instance != "", "", "");
+    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, pinPorts.size() > 0, 0});
+        for (auto item: pinMethods) {
+            checkWire(item.name, item.type, item.isOutput ^ (item.type != ""));
+            for (auto pitem: item.MI->params)
+                checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput);
         }
-        for (auto fld: lookupIR(item.type)->fields) {
-            bool out = (instance != "");
-            std::string name = fld.fldName;
-            if (item.fldName != "_")
-                name = item.fldName + name;
-            if (fld.isInput)
-                checkWire(name, fld.type, out);
-            if (fld.isOutput)
-                checkWire(name, fld.type, !out);
-            if (fld.isInout) {
-printf("[%s:%d] INOUT NOT HANDLED %s\n", __FUNCTION__, __LINE__, name.c_str());
+        for (auto item: pinPorts) {
+            bool out = instance != "";
+            if (item.isInput)
+                checkWire(item.name, item.type, out);
+            if (item.isOutput)
+                checkWire(item.name, item.type, !out);
+            if (item.isInout) {
+printf("[%s:%d] INOUT NOT HANDLED %s\n", __FUNCTION__, __LINE__, item.name.c_str());
             }
         }
-    }
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
