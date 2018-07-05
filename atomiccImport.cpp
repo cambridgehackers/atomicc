@@ -349,7 +349,7 @@ printf("[%s:%d] calling '%s' returned %d\n", __FUNCTION__, __LINE__, commandLine
     for (auto item: vinfo)
         pinList.push_back(PinInfo{item.second.dir, item.second.type, item.first, ""});
 }
-void generate_interface(std::string interfacename, std::string indexname, std::string paramlist, PinList &ilist)
+void generate_interface(std::string interfacename, std::string paramlist, PinList &ilist)
 {
     fprintf(outfile, "__interface %s {\n", (options.ifprefix + interfacename + paramlist).c_str());
     for (auto item : ilist) {
@@ -426,6 +426,7 @@ printf("[%s:%d]notfactor\n", __FUNCTION__, __LINE__);
 
 void generate_cpp()
 {
+    std::map<std::string, bool> alreadyGenerated;
     // generate output file
     //std::string paramlist = "";
     //for (auto item : paramnames);
@@ -434,9 +435,13 @@ void generate_cpp()
         //paramlist = "//(" + paramlist[2:] + ")";;
     //paramval = paramlist.replace("numeric type ", "");
     for (auto item: interfaceList)
-        for (auto iitem: item.second)
-            generate_interface(item.first, iitem.first, "", iitem.second);
-    generate_interface(options.cell, "", "", masterList);
+        for (auto iitem: item.second) {
+            if (alreadyGenerated[item.first])
+                continue;
+            alreadyGenerated[item.first] = true;
+            generate_interface(item.first, "", iitem.second);
+        }
+    generate_interface(options.cell, "", masterList);
     fprintf(outfile, "__emodule %s {\n", options.cell.c_str());
     fprintf(outfile, "    %s _;\n", (options.ifprefix + options.cell).c_str());
     fprintf(outfile, "};\n");
