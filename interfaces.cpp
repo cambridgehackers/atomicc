@@ -136,7 +136,7 @@ dumpModule("P2M/IIR :" + target, IIR);
         }
         else {
             HIR = lookupIR(inter.type);
-printf("[%s:%d] HIR type %s IR %p\n", __FUNCTION__, __LINE__, inter.type.c_str(), HIR);
+printf("[%s:%d] HIR type %s IR %p\n", __FUNCTION__, __LINE__, inter.type.c_str(), (void *)HIR);
             host = inter.fldName;
 dumpModule("P2M/HIR :" + host, HIR);
         }
@@ -155,7 +155,7 @@ printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
         MInew->guard = MI->guard;
     }
     MethodInfo *MInew = lookupMethod(IR, host + MODULE_SEPARATOR + "enq");
-printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEPARATOR + "enq__ENA").c_str(), MInew);
+printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEPARATOR + "enq__ENA").c_str(), (void *)MInew);
 assert(MInew);
     int counter = 0;  // start method number at 0
     for (auto FI: IIR->method) {

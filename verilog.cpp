@@ -141,7 +141,7 @@ static std::string walkTree (ACCExpr *expr, bool *changed)
     std::string ret = expr->value;
     if (isIdChar(ret[0])) {
 if (trace_assign)
-printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, ret.c_str(), assignList[ret].value);
+printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, ret.c_str(), (void *)assignList[ret].value);
         ACCExpr *temp = assignList[ret].value;
         if (temp && !assignList[ret].noReplace) {
             refList[ret].count = 0;
@@ -182,6 +182,19 @@ printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2s
     return ret;
 }
 
+static bool hasPinInterfaces(ModuleIR *IR)
+{
+    for (auto item : IR->interfaces) {
+        ModuleIR *IIR = lookupIR(item.type);
+        if (IIR->fields.size() > 0)   // if we have bare verilog pins
+            return true;
+        for (auto ifc: IIR->interfaces)
+            if (hasPinInterfaces(lookupIR(ifc.type))) // or recursively have bare pins
+                return true;           // then don't generate CLK and nRST by default
+    }
+    return false;
+}
+
 /*
  * Generate verilog module header for class definition or reference
  */
@@ -189,7 +202,7 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
 {
     auto checkWire = [&](std::string name, std::string type, int dir) -> void {
         refList[instance + name] = RefItem{dir != 0 && instance == "", type, dir != 0, instance == "" ? PIN_MODULE : PIN_OBJECT};
-        modParam.push_back(ModData{name, instance + name, type, false, dir});
+        modParam.push_back(ModData{name, instance + name, type, false, false, dir});
         expandStruct(IR, instance + name, type, dir, false, PIN_WIRE);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
@@ -215,7 +228,8 @@ printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.subst
             moduleInstantiation += "#(" + actual + ")";
         }
     }
-    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, 0});
+printf("[%s:%d] RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR %s %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), hasPinInterfaces(IR));
+    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, hasPinInterfaces(IR), 0});
     for (auto item : IR->interfaces) {
         for (auto FI: lookupIR(item.type)->method) {
             MethodInfo *MI = FI.second;
@@ -373,7 +387,8 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
     std::string endStr, sep;
     for (auto item: modNew) {
         if (item.moduleStart) {
-            fprintf(OStr, "%s (.CLK(CLK), .nRST(nRST),", (endStr + "    " + item.value).c_str());
+            fprintf(OStr, "%s (%s", (endStr + "    " + item.value).c_str(),
+                item.noDefaultClock ? "" : ".CLK(CLK), .nRST(nRST),");
             sep = "";
         }
         else {
@@ -580,10 +595,11 @@ static std::list<ModData> modLine;
         static const char *dirStr[] = {"input", "output"};
         fprintf(OStr, "%s", sep.c_str());
         if (mitem.moduleStart)
-            fprintf(OStr, "%s (input CLK, input nRST", mitem.value.c_str());
+            fprintf(OStr, "%s (%s", mitem.value.c_str(),
+                mitem.noDefaultClock ? "" :"input CLK, input nRST");
         else
             fprintf(OStr, "%s %s%s", dirStr[mitem.out], sizeProcess(mitem.type).c_str(), mitem.value.c_str());
-        sep = ",\n    ";
+        sep = (mitem.moduleStart && mitem.noDefaultClock) ? "\n    " : ",\n    ";
     }
     fprintf(OStr, ");\n");
     modLine.clear();
@@ -777,7 +793,7 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
                 val = temp;
             }
         }
-        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.out});
+        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out});
     }
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;

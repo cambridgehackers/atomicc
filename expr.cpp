@@ -57,7 +57,7 @@ bool checkOperand(std::string s)
 
 void dumpExpr(std::string tag, ACCExpr *next)
 {
-    printf("DE: %s %p %s\n", tag.c_str(), next, next ? next->value.c_str() : "");
+    printf("DE: %s %p %s\n", tag.c_str(), (void *)next, next ? next->value.c_str() : "");
     int i = 0;
     if (next)
     for (auto item: next->operands) {
@@ -267,7 +267,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
     for (auto item: expr->operands) {
          ACCExpr *titem = cleanupExpr(item);
          if (trace_expr)
-             printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, item, titem, ret);
+             printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
          if (titem->value != ret->value || ret->value == "?" || isParenChar(ret->value[0]))
              ret->operands.push_back(titem);
          else
@@ -396,7 +396,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                     tok = tnext;
                     tnext = get1Token();
                     if (trace_expr)
-                        printf("[%s:%d] unary '-' unary %p tok %p tnext %p\n", __FUNCTION__, __LINE__, unary, tok, tnext);
+                        printf("[%s:%d] unary '-' unary %p tok %p tnext %p\n", __FUNCTION__, __LINE__, (void *)unary, (void *)tok, (void *)tnext);
                 }
                 if (!checkOperand(tok->value) && !checkOperator(tok->value)) {
                     printf("[%s:%d] OPERAND CHECKFAILLLLLLLLLLLLLLL %s from %s\n", __FUNCTION__, __LINE__, tree2str(tok).c_str(), lexString.c_str());

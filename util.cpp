@@ -181,7 +181,10 @@ ModuleIR *allocIR(std::string name)
 
 MethodInfo *allocMethod(std::string name)
 {
-    MethodInfo *MI = new MethodInfo{nullptr};
+    MethodInfo *MI = new MethodInfo{nullptr/*guard*/,
+        ""/*name*/, false/*rule*/,
+        {}/*storeList*/, {}/*letList*/, {}/*callList*/, {}/*printfList*/,
+        ""/*type*/, {}/*params*/, {}/*alloca*/, {{}}/*meta*/};
     MI->name = name;
     return MI;
 }

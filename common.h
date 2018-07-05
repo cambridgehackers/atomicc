@@ -25,6 +25,7 @@ typedef struct {
     std::string value;
     std::string type;
     bool        moduleStart;
+    bool        noDefaultClock;
     int         out;
 } ModData;
 typedef struct {
