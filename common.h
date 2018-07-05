@@ -27,6 +27,7 @@ typedef struct {
     bool        moduleStart;
     bool        noDefaultClock;
     int         out;
+    bool        inout;
 } ModData;
 typedef struct {
     ACCExpr    *cond;
@@ -49,6 +50,7 @@ typedef struct {
     int         count;
     std::string type;
     bool        out;
+    bool        inout;
     int         pin;
 } RefItem;
 typedef struct {

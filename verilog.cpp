@@ -66,7 +66,7 @@ if (trace_assign) {
     }
 }
 
-static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool force, int pin)
+static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin)
 {
     ACCExpr *itemList = allocExpr("{");
     std::list<FieldItem> fieldList;
@@ -81,8 +81,8 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
 if (trace_expand)
 printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, (int)upper, fnew.c_str());
         assert (!refList[fitem.name].pin);
-        refList[fitem.name] = RefItem{0, fitem.type, out != 0, fitem.alias ? PIN_WIRE : pin};
-        refList[fnew] = RefItem{0, fitem.type, out != 0, PIN_ALIAS};
+        refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin};
+        refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS};
         if (!fitem.alias && out)
             itemList->operands.push_front(allocExpr(fitem.name));
         else if (out)
@@ -203,9 +203,8 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
             if (!fld.isParameter)
                 pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, nullptr});
         }
-        for (auto ifc: IIR->interfaces)
-            collectInterfacePins(lookupIR(ifc.type), instance, pinPrefix + item.fldName + ifc.fldName,
-                methodPrefix + item.fldName + MODULE_SEPARATOR + ifc.fldName + MODULE_SEPARATOR);
+        collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
+            methodPrefix + item.fldName + MODULE_SEPARATOR);
     }
 }
 
@@ -214,10 +213,10 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
  */
 static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params)
 {
-    auto checkWire = [&](std::string name, std::string type, int dir) -> void {
-        refList[instance + name] = RefItem{dir != 0 && instance == "", type, dir != 0, instance == "" ? PIN_MODULE : PIN_OBJECT};
-        modParam.push_back(ModData{name, instance + name, type, false, false, dir});
-        expandStruct(IR, instance + name, type, dir, false, PIN_WIRE);
+    auto checkWire = [&](std::string name, std::string type, int dir, bool inout) -> void {
+        refList[instance + name] = RefItem{dir != 0 && instance == "", type, dir != 0, inout, instance == "" ? PIN_MODULE : PIN_OBJECT};
+        modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout});
+        expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     std::string moduleInstantiation = IR->name;
@@ -245,19 +244,14 @@ printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.subst
     pinPorts.clear();
     pinMethods.clear();
     collectInterfacePins(IR, instance != "", "", "");
-    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, pinPorts.size() > 0, 0});
+    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, pinPorts.size() > 0, 0, false});
         for (auto item: pinMethods) {
-            checkWire(item.name, item.type, item.isOutput ^ (item.type != ""));
+            checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false);
             for (auto pitem: item.MI->params)
-                checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput);
+                checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false);
         }
-        for (auto item: pinPorts) {
-            if (item.isInout) {
-printf("[%s:%d] INOUT NOT HANDLED %s\n", __FUNCTION__, __LINE__, item.name.c_str());
-            }
-            else
-                checkWire(item.name, item.type, item.isOutput);
-        }
+        for (auto item: pinPorts)
+            checkWire(item.name, item.type, item.isOutput, item.isInout);
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -411,7 +405,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             temp = temp.substr(0,ind);
         if (item.second.out && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT)) {
             if (!assignList[item.first].value)
-                fprintf(OStr, "    // assign %s = MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE;\n", item.first.c_str());
+                fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
             else if (refList[temp].count) // must have value != ""
                 fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
             refList[item.first].count = 0;
@@ -616,21 +610,21 @@ static std::list<ModData> modLine;
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
             if (startswith(itemIR->name, "l_struct_OC_")) {
-                refList[fldName] = RefItem{0, item.type, 1, PIN_WIRE};
-                expandStruct(IR, fldName, item.type, 1, true, PIN_REG);
+                refList[fldName] = RefItem{0, item.type, 1, false, PIN_WIRE};
+                expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
             }
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName]);
             }
             else if (convertType(item.type) != 0)
-                refList[fldName] = RefItem{0, item.type, false, PIN_REG};
+                refList[fldName] = RefItem{0, item.type, false, false, PIN_REG};
           return nullptr;
           });
     for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be generated for rules
-            refList[methodName] = RefItem{1, MI->type, true, PIN_WIRE};
+            refList[methodName] = RefItem{1, MI->type, true, false, PIN_WIRE};
         if (hasPrintf)
             for (auto info: MI->printfList) // must be before callList processing
                 MI->callList.push_back(new CallListElement{printfArgs(info->value), info->cond, true});
@@ -658,8 +652,8 @@ static std::list<ModData> modLine;
         }
         setAssign(methodName, MI->guard, MI->type, MI->rule);  // collect the text of the return value into a single 'assign'
         for (auto item: MI->alloca) {
-            refList[item.first] = RefItem{0, item.second, true, PIN_WIRE};
-            expandStruct(IR, item.first, item.second, 1, true, PIN_WIRE);
+            refList[item.first] = RefItem{0, item.second, true, false, PIN_WIRE};
+            expandStruct(IR, item.first, item.second, 1, false, true, PIN_WIRE);
         }
         for (auto info: MI->letList) {
             ACCExpr *cond = cleanupExpr(info->cond);
@@ -798,7 +792,7 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
                 val = temp;
             }
         }
-        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out});
+        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout});
     }
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
