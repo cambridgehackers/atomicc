@@ -8,9 +8,11 @@ during build.
 
 To build
 
-0) get sources
+0) prepare machine
     sudo apt-get install libffi-dev libblocksruntime-dev clang
     sudo apt-get install gcc-multilib g++-multilib
+
+1) get sources
     git clone git://github.com/cambridgehackers/atomicc
     git clone git://github.com/cambridgehackers/atomicc-examples
     git clone git://github.com/cambridgehackers/llvm
@@ -20,7 +22,7 @@ To build
     cd ../llvm; git checkout remotes/origin/release_50atomicc1 -b release_50atomicc1
     cd ../verilator; git checkout remotes/origin/atomicc1 -b atomicc1
 
-1) build source
+2) build source
     cd llvm 
     mkdir build
     cd build
@@ -29,13 +31,19 @@ To build
     cd ../../atomicc
     make
 
-2) cd atomicc-examples/examples/rulec
+3) cd atomicc-examples/examples/rulec
 
-    make 
-    make build
-    make run
+    To run on verilator:
+        make 
+        make verilator
+        make run
+    To build for zybo:
+        make
+        make zybo
+    To clean up afterward:
+        make clean
 
-3) examine output in:
+4) examine output in:
 
     ls *.generated.*
 
