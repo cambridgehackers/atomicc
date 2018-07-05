@@ -1,0 +1,38 @@
+__interface Mmcme2MMCME2_ADV {
+    __input  __uint(1)        CLKFBIN;
+    __output __uint(1)        CLKFBOUT;
+    __output __uint(1)        CLKFBOUTB;
+    __output __uint(1)        CLKFBSTOPPED;
+    __input  __uint(1)        CLKIN1;
+    __input  __uint(1)        CLKIN2;
+    __input  __uint(1)        CLKINSEL;
+    __output __uint(1)        CLKINSTOPPED;
+    __output __uint(1)        CLKOUT0;
+    __output __uint(1)        CLKOUT0B;
+    __output __uint(1)        CLKOUT1;
+    __output __uint(1)        CLKOUT1B;
+    __output __uint(1)        CLKOUT2;
+    __output __uint(1)        CLKOUT2B;
+    __output __uint(1)        CLKOUT3;
+    __output __uint(1)        CLKOUT3B;
+    __output __uint(1)        CLKOUT4;
+    __output __uint(1)        CLKOUT5;
+    __output __uint(1)        CLKOUT6;
+    __input  __uint(7)        DADDR;
+    __input  __uint(1)        DCLK;
+    __input  __uint(1)        DEN;
+    __input  __uint(16)       DI;
+    __output __uint(16)       DO;
+    __output __uint(1)        DRDY;
+    __input  __uint(1)        DWE;
+    __output __uint(1)        LOCKED;
+    __input  __uint(1)        PSCLK;
+    __output __uint(1)        PSDONE;
+    __input  __uint(1)        PSEN;
+    __input  __uint(1)        PSINCDEC;
+    __input  __uint(1)        PWRDWN;
+    __input  __uint(1)        RST;
+};
+__emodule MMCME2_ADV {
+    Mmcme2MMCME2_ADV _;
+};
