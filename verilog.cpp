@@ -185,7 +185,7 @@ printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2s
 /*
  * Generate verilog module header for class definition or reference
  */
-static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam)
+static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params)
 {
     auto checkWire = [&](std::string name, std::string type, int dir) -> void {
         refList[instance + name] = RefItem{dir != 0 && instance == "", type, dir != 0, instance == "" ? PIN_MODULE : PIN_OBJECT};
@@ -195,17 +195,25 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
-        std::string params, sep;
-        for (auto item : IR->interfaces) {
-            for (auto fld: lookupIR(item.type)->fields) {
-                if (fld.isParameter) {
-                    params += sep + "." + fld.fldName + "(" + "FOO" + ")";
-                    sep = ", ";
-                }
+printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.substr(0,instance.length()-1).c_str(), params.c_str());
+        if (params != "") {
+            std::string actual, sep;
+            const char *p = params.c_str();
+            p++;
+            char ch = ';';
+            while (ch == ';') {
+                const char *start = p;
+                while (*p++ != ':')
+                    ;
+                std::string name(start, p-1);
+                start = p;
+                while ((ch = *p++) && ch != ';' && ch != '>')
+                    ;
+                actual += sep + "." + name + "(" + std::string(start, p-1) + ")";
+                sep = ",";
             }
+            moduleInstantiation += "#(" + actual + ")";
         }
-        if (params != "")
-            moduleInstantiation += "#(" + params + ")";
     }
     modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, 0});
     for (auto item : IR->interfaces) {
@@ -566,7 +574,7 @@ static std::list<ModData> modLine;
     alwaysLines.clear();
 
     // Generate module header
-    generateModuleSignature(IR, "", modLine);
+    generateModuleSignature(IR, "", modLine, "");
     std::string sep = "module ";
     for (auto mitem: modLine) {
         static const char *dirStr[] = {"input", "output"};
@@ -591,7 +599,7 @@ static std::list<ModData> modLine;
                 expandStruct(IR, fldName, item.type, 1, true, PIN_REG);
             }
             else
-                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine);
+                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName]);
             }
             else if (convertType(item.type) != 0)
                 refList[fldName] = RefItem{0, item.type, false, PIN_REG};

@@ -140,6 +140,10 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 std::string fldName = getToken();
                 IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter});
             }
+            else if (checkItem("PARAMS")) {
+                std::string fldName = getToken();
+                IR->params[fldName] = bufp;
+            }
             else if (checkItem("INTERFACE")) {
                 int64_t     vecCount = -1;
                 bool        isPtr = checkItem("/Ptr");
