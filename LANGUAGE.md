@@ -226,15 +226,15 @@ To use the NOC printf:
 To reference a module in verilog, fields can be declared in __interface items.
 For example:
 
->    __interface CNCONNECTNET2 {
->        __input  __int(1)         IN1;
->        __input  __int(1)         IN2;
->        __output __int(1)         OUT1;
->        __output __int(1)         OUT2;
->    };
->    __emodule CONNECTNET2 {
->        CNCONNECTNET2 _;
->    };
+>        __interface CNCONNECTNET2 {
+>            __input  __int(1)         IN1;
+>            __input  __int(1)         IN2;
+>            __output __int(1)         OUT1;
+>            __output __int(1)         OUT2;
+>        };
+>        __emodule CONNECTNET2 {
+>            CNCONNECTNET2 _;
+>        };
 
 This will allow references/instantiation of an externally defined verilog module CONNECTNET2
 that has 2 'input' ports, IN1 and IN2, as well as 2 'output' ports, OUT1 and OUT2.
@@ -244,36 +244,36 @@ that has 2 'input' ports, IN1 and IN2, as well as 2 'output' ports, OUT1 and OUT
 Verilog modules that have module instantiation parameters can also be declared/referenced.
 For example:
 
->    __interface Mmcme2MMCME2_ADV {
->        __parameter const char *  BANDWIDTH;
->        __parameter float         CLKFBOUT_MULT_F;
->        __input  __uint(1)        CLKFBIN;
->        __output __uint(1)        CLKFBOUT;
->        __output __uint(1)        CLKFBOUTB;
->    };
->    __emodule MMCME2_ADV {
->        Mmcme2MMCME2_ADV _;
->    };
+>        __interface Mmcme2MMCME2_ADV {
+>            __parameter const char *  BANDWIDTH;
+>            __parameter float         CLKFBOUT_MULT_F;
+>            __input  __uint(1)        CLKFBIN;
+>            __output __uint(1)        CLKFBOUT;
+>            __output __uint(1)        CLKFBOUTB;
+>        };
+>        __emodule MMCME2_ADV {
+>            Mmcme2MMCME2_ADV _;
+>        };
 
 This example can be instantiated as:
 
->    __module Test {
->        ...
->        MMCME2_ADV#(BANDWIDTH="WIDE",CLKFBOUT_MULT_F=1.0) mmcm;
->        ...
->        Test() {
->           __rule initRule {
->               mmcm._.CLKFBIN = mmcm._.CLKFBOUT;
->           }
+>        __module Test {
+>            ...
+>            MMCME2_ADV#(BANDWIDTH="WIDE",CLKFBOUT_MULT_F=1.0) mmcm;
+>            ...
+>            Test() {
+>               __rule initRule {
+>                   mmcm._.CLKFBIN = mmcm._.CLKFBOUT;
+>               }
+>            }
 >        }
->    }
 
 ### Reference syntax
 
 For declaring ports in an interface:
->    __interface <interfaceName> {
->         __input/__output/__inout/__parameter <elementType> <elementName>;
->    }
+>        __interface <interfaceName> {
+>             __input/__output/__inout/__parameter <elementType> <elementName>;
+>        }
 For '__parameter' items, supported datatypes include: "const char *", "float", "int".
 
 ### Factoring of interfaces into sub interfaces is also supported.
@@ -287,8 +287,8 @@ flexibility to not require them when interfacing with legacy code).
 
 There is a tool to automate the creation of AtomicC header files from verilog source files.
 For example:
->    atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 zynq.lib
->    atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
+>        atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 zynq.lib
+>        atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
 
 Command line switches...
 
