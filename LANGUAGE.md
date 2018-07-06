@@ -2,6 +2,35 @@
 #AtomicC Language Reference
 
 ## Introduction
+
+AtomicC is a structural hardware description language that extends C++
+with Bluespec-style modules, rules, interfaces, and methods.
+
+AtomicC is structural in that all state elements in the hardware
+netlist are explicit in the source code of the design. AtomicC is a
+timed HDL, using SystemC terminology. Atomic actions (rules and method
+invocations) execute in a single clock cycle.
+
+Like Connectal, AtomicC designs may include both hardware and
+software, using interfaces to specify hardware/software communication
+in a type safe way. The AtomicC compiler generates the code to pass
+arguments between hardware and software.
+
+AtomicC execution consists of 3 phases: netlist generation, netlist
+compilation or implementation, and runtime.  During netlist
+generation, modules are instantiated by executing their
+constructors. During this phase, any C++ constructs may be used, but
+the resulting netlist may only contain synthesizeable components.
+
+During netlist compilation, the netlist is analyzed and translated to
+an intermediate representation and then to Verilog for simulation or
+synthesis. Alternate translations are possible: to native code via
+LLVM, to System C, to Gallina for formal verification with the Coq
+Proof Assistant, etc.
+
+
+## Notes on compilation
+
 The design is separated into modules that can export and import interfaces to other modules.
 Each source language module compiles into a single verilog module.  Modules are independantly
 compiled, depending only on the interface definitions for referenced modules.
