@@ -18,6 +18,7 @@ To build
     git clone git://github.com/cambridgehackers/llvm
     git clone git://github.com/cambridgehackers/clang
     git clone git://github.com/cambridgehackers/verilator
+    git clone git://github.com/cambridgehackers/connectal
     cd clang; git checkout remotes/origin/release_50atomicc1 -b release_50atomicc1
     cd ../llvm; git checkout remotes/origin/release_50atomicc1 -b release_50atomicc1
     cd ../verilator; git checkout remotes/origin/atomicc1 -b atomicc1
