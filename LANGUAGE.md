@@ -45,6 +45,29 @@ within a cycle.
 
 ## Additions to C++ syntax
 
+AtomicC incorporates several concepts from BSV: interfaces, modules, guards on methods, and rules.
+
+### __interface
+
+An AtomicC interface is essentially an abstract class similar to a
+Java interface. All the methods are virtual and no default
+implementations are provided. AtomicC style uses composition of
+interfaces rather than inheritance.
+
+The __interface keyword defines a list of methods that are exposed from an object.
+Instead of using object inheritance to define reusable interfaces,
+they are defined/exported explicitly by objects, allowing fine-grained
+specification of interface method visibility.
+
+References to an object can only be done through interface methods.  State element
+declarations inside an object (member variables) are private.
+
+Example:
+>        __interface EchoRequest {
+>            void say(__int(32) v);
+>            void say2(__int(16) a, __int(16) b);
+>        };
+
 ### __module, __emodule
 A module is defined using the keyword "__module", resulting in generation of verilog.
 It includes local state elements, interfaces exported, interfaces imported
@@ -57,6 +80,7 @@ Example:
 >            bool busy;
 >            __int(32) itemSay;
 >            ...
+>            // implementation of method request.say(). Note the guard "if (!busy)".
 >            void request.say(__int(32) v) if(!busy) {
 >                itemSay = v;
 >                ...
@@ -74,21 +98,15 @@ Example:
 >            EchoIndication   indication;           // exported interface
 >        };
 
-### __interface
-This defines a list of methods that are exposed from an object.  Instead of using object
-inheritance to define reusable interfaces, they are defined/exported explicitly by
-objects, allowing fine-grained specification of interface method visibility.
-
-References to an object can only be done through interface methods.  State element
-declarations inside an object (member variables) are private.
-
-Example:
->        __interface EchoRequest {
->            void say(__int(32) v);
->            void say2(__int(16) a, __int(16) b);
->        };
-
 ### guard clauses on methods
+
+Rules are only ready to fire if the rule's guard is true and all the
+guards on methods invoked within the rule are also true.
+
+>            void request.say(__int(32) v) if(!busy) {
+>                itemSay = v;
+>                ...
+>            }
 
 ### __connect
 The __connect statement allows exported interface declarations to be connected
