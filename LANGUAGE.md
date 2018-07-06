@@ -59,6 +59,10 @@ Instead of using object inheritance to define reusable interfaces,
 they are defined/exported explicitly by objects, allowing fine-grained
 specification of interface method visibility.
 
+Methods of a module are translated to value ports for passing the
+method arguments and a pair of handshaking ports used for scheduling
+method invocations.
+
 References to an object can only be done through interface methods.  State element
 declarations inside an object (member variables) are private.
 
@@ -152,6 +156,18 @@ Example:
 CWrapper just forwards the interface 'request' down into the instance 'consumer'.
 
 ### __rule
+
+Rules specify the behavior with a design. A rule operates
+transactionally: when a rule's guard and the guards of all of its
+method invocations are satisfied, then it is ready to fire. It will be
+fire on a clock cycle when it does not conflict with any higher
+priority rule. A rule executes atomically.
+
+>        // default guard is true
+>        __rule respond_rule {
+>            fifo->out.deq();
+>            ind->heard(fifo->out.first());
+>        }
 
 ### integer bit width: __int(A)
 
