@@ -97,7 +97,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
     if (softwareNameList.size() > 0) {
         int counter = 5;
         std::string enumList, sep;
-        ModuleIR *IR = allocIR("l_top");
+        ModuleIR *IR = allocIR("l_module_OC_l_top");
         irSeq.push_back(IR);
         std::string dutType;
         bool hasPrintf = false;

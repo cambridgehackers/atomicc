@@ -666,8 +666,10 @@ static std::list<ModData> modLine;
             getFieldList(fieldList, "", "", info->type, false, true);
             for (auto fitem : fieldList) {
                 std::string dest = info->dest->value + fitem.name;
-                std::string src = value->value + fitem.name;
-                muxValueList[dest].push_back(MuxValueEntry{cond, allocExpr(src)});
+                ACCExpr *newExpr = value;
+                if (isIdChar(value->value[0]))
+                    newExpr = allocExpr(value->value + fitem.name);
+                muxValueList[dest].push_back(MuxValueEntry{cond, newExpr});
             }
         }
         for (auto info: MI->callList) {
@@ -750,8 +752,12 @@ dumpExpr("READCALL", value);
             head = prevValue;
         setAssign(item.first, head, refList[item.first].type);
     }
-    for (auto IC : IR->interfaceConnect)
-        for (auto FI : lookupIR(IC.type)->method) {
+    for (auto IC : IR->interfaceConnect) {
+        ModuleIR *IIR = lookupIR(IC.type);
+        if (!IIR)
+            dumpModule("CONNECT", IR);
+        assert(IIR && "interfaceConnect interface type");
+        for (auto FI : IIR->method) {
             MethodInfo *MI = FI.second;
             std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
                         sstr = IC.source + MODULE_SEPARATOR + MI->name;
@@ -764,12 +770,14 @@ dumpExpr("READCALL", value);
             sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
             for (auto info: MI->params) {
                 std::string sparm = sstr + info.name, tparm = tstr + info.name;
+//printf("[%s:%d] IFCCC %s/%d %s/%d\n", __FUNCTION__, __LINE__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
                 if (refList[sparm].out)
                     setAssign(sparm, allocExpr(tparm), info.type);
                 else
                     setAssign(tparm, allocExpr(sparm), info.type);
             }
         }
+    }
     optimizeBitAssigns();
 
     // last chance to optimize out single assigns to output ports
