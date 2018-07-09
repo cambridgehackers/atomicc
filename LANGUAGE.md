@@ -283,6 +283,10 @@ Note that if interface port pins are declared in a module interface declaration,
 CLK and nRST are _not_ automatically declared/instantiated.  (Since the user needs the
 flexibility to not require them when interfacing with legacy code).
 
+Note that this also allows arbitrary signals (like the output of clock generators) to be
+passed to modules as CLK/nRST signals.  (For Atomicc generated modules, please note that the
+default clock/reset signals for a module will always have these names)
+
 ### Import tooling
 
 There is a tool to automate the creation of AtomicC header files from verilog source files.
