@@ -814,15 +814,20 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
 
 void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
 {
-    FILE *OStrV = fopen((OutputDir + ".v").c_str(), "w");
-    if (!OStrV) {
-        printf("veriloggen: unable to open '%s'\n", (OutputDir + ".v").c_str());
-        exit(-1);
-    }
-    fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
-    for (auto IR : irSeq)
+    std::string baseDir = OutputDir;
+    int ind = baseDir.rfind('/');
+    if (ind > 0)
+        baseDir = baseDir.substr(0, ind+1);
+    for (auto IR : irSeq) {
+        FILE *OStrV = fopen((baseDir + IR->name + ".v").c_str(), "w");
+        if (!OStrV) {
+            printf("veriloggen: unable to open '%s'\n", (baseDir + IR->name + ".v").c_str());
+            exit(-1);
+        }
+        fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
         generateModuleDef(IR, OStrV); // Generate verilog
-    fclose(OStrV);
+        fclose(OStrV);
+    }
     if (printfFormat.size()) {
     FILE *OStrP = fopen((OutputDir + ".printf").c_str(), "w");
     for (auto item: printfFormat) {
