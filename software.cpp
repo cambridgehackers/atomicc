@@ -97,7 +97,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
     if (softwareNameList.size() > 0) {
         int counter = 5;
         std::string enumList, sep;
-        ModuleIR *IR = allocIR("l_module_OC_l_top");
+        ModuleIR *IR = allocIR("l_top");
         irSeq.push_back(IR);
         std::string dutType;
         bool hasPrintf = false;
@@ -114,7 +114,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         fprintf(OStrJ, jsonPrefix, enumList.c_str());
         std::string localName = "DUT__" + dutType;
         std::string muxName = "mux";
-        std::string muxTypeName = "l_module_OC_MuxPipe";
+        std::string muxTypeName = "MuxPipe";
         std::string pipeName = "l_ainterface_OC_PipeIn";
         IR->fields.push_back(FieldElement{localName, -1, dutType, false, false, false, false, false});
         if (hasPrintf) {
@@ -159,7 +159,7 @@ dumpModule("MUX", muxDef);
             std::string userTypeName = item.second.inter->name;
             std::string userInterface = item.second.field.fldName;
             std::string fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
-            ModuleIR *ifcIR = allocIR("l_module_OC_" + fieldName);
+            ModuleIR *ifcIR = allocIR(fieldName);
             ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall, false, false, false, false});
             ifcIR->interfaces.push_back(FieldElement{"pipe", -1, pipeName, outcall, false, false, false, false});
             IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false, false, false, false, false});

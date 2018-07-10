@@ -74,7 +74,7 @@ dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
             HIR = lookupIR(inter.type);
             host = inter.fldName;
             std::string iname = inter.type.substr(16);
-            IR->name = "l_module_OC_" + iname + "___M2P";
+            IR->name = iname + "___M2P";
             std::string type = "l_serialize_OC_" + iname + "__Data";
             ModuleIR *II = lookupIR(type);
             if (!II) {
@@ -130,7 +130,7 @@ static void processP2M(ModuleIR *IR)
             IIR = lookupIR(inter.type);
             target = inter.fldName;
             std::string iname = inter.type.substr(16);
-            IR->name = "l_module_OC_" + iname + "___P2M";
+            IR->name = iname + "___P2M";
             std::string type = "l_serialize_OC_P2M_MD_" + iname + "_OD__KD__KD_Data";
 dumpModule("P2M/IIR :" + target, IIR);
         }
@@ -190,12 +190,12 @@ void processInterfaces(std::list<ModuleIR *> &irSeq)
         ModuleIR *IR = mapp.second;
         if (startswith(IR->name, "l_serialize_"))
             processSerialize(IR);
-        if (startswith(IR->name, "l_module_OC_P2M")) {
+        if (startswith(IR->name, "P2M")) {
 dumpModule("P2M", IR);
             irSeq.push_back(IR);
             processP2M(IR);
         }
-        if (startswith(IR->name, "l_module_OC_M2P")) {
+        if (startswith(IR->name, "M2P")) {
             irSeq.push_back(IR);
             std::list<FieldElement> temp;
 dumpModule("M2Porig", IR);
