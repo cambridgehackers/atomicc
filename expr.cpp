@@ -163,6 +163,10 @@ static ACCExpr *get1Token(void)
             } while (lexChar != ']');
             getNext();
         }
+        if (lexToken == "__defaultClock")
+            lexToken = "CLK";
+        else if (lexToken == "__defaultnReset")
+            lexToken = "nRST";
     }
     else if (isdigit(lexChar))
         do {

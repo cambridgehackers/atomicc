@@ -600,7 +600,9 @@ static std::list<ModData> modLine;
             fprintf(OStr, "%s %s%s", dirStr[mitem.out], sizeProcess(mitem.type).c_str(), mitem.value.c_str());
         sep = (mitem.moduleStart && mitem.noDefaultClock) ? "\n    " : ",\n    ";
     }
-    fprintf(OStr, ");\n");
+    fprintf(OStr, ");\n    wire CLK, nRST;\n");
+    refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
+    refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
     modLine.clear();
     for (auto item: IR->interfaces)
         if (item.fldName == "printfp")
