@@ -138,6 +138,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                     vecCount = atoi(getToken().c_str());
                 std::string type = getToken();
                 std::string fldName = getToken();
+                if (fldName != "__defaultClock" && fldName != "__defaultnReset")
                 IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter});
             }
             else if (checkItem("PARAMS")) {
