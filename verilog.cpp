@@ -23,6 +23,7 @@
 
 int trace_assign;//= 1;
 int trace_expand;//= 1;
+int trace_skipped;//= 1;
 
 std::map<std::string, RefItem> refList;
 std::map<std::string, ModuleIR *> mapIndex;
@@ -143,7 +144,7 @@ static std::string walkTree (ACCExpr *expr, bool *changed)
 if (trace_assign)
 printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, ret.c_str(), (void *)assignList[ret].value);
         ACCExpr *temp = assignList[ret].value;
-        if (temp && !assignList[ret].noReplace) {
+        if (temp && !assignList[ret].noReplace && (refList[ret].pin != PIN_MODULE || !refList[ret].out)) {
             refList[ret].count = 0;
 if (trace_assign)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2str(temp).c_str());
@@ -214,7 +215,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
 static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params)
 {
     auto checkWire = [&](std::string name, std::string type, int dir, bool inout) -> void {
-        refList[instance + name] = RefItem{dir != 0 && instance == "", type, dir != 0, inout, instance == "" ? PIN_MODULE : PIN_OBJECT};
+        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0, inout, instance == "" ? PIN_MODULE : PIN_OBJECT};
         modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout});
         expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
     };
@@ -285,9 +286,8 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName)
         if (item == guardName) {
 if (trace_assign)
 printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
-            return nullptr;
+            return allocExpr("1");
         }
-        //assert(refList[item].pin);
     }
     for (auto item: expr->operands) {
         ACCExpr *operand = walkRemoveCalledGuard(item, guardName);
@@ -433,6 +433,8 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                 fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
             else if (refList[temp].count) // must have value != ""
                 fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
+            else if (trace_skipped)
+                fprintf(OStr, "    skippedassign %s = %s; //temp = '%s', count = %d, pin = %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin);
             refList[item.first].count = 0;
         }
     }
@@ -572,8 +574,10 @@ printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
             condStr = "    if (" + walkTree(cond, nullptr) + ")";
         condLines[condStr].push_back("    $display" + walkTree(value, nullptr) + ";");
     }
-    if (condLines.size())
-        alwaysLines.push_back("if (" + MI->name + ") begin");
+    if (condLines.size()) {
+        ACCExpr *tempCond = allocExpr("&", allocExpr(MI->name), allocExpr(getRdyName(MI->name)));
+        alwaysLines.push_back("if (" + walkTree(tempCond, nullptr) + ") begin");
+    }
     for (auto item: condLines) {
         std::string endStr;
         std::string temp = item.first;
@@ -713,7 +717,7 @@ dumpExpr("READCALL", value);
             walkRead(MI, value, cond);
             if (!info->isAction)
                 continue;
-            ACCExpr *tempCond = allocExpr(methodName);
+            ACCExpr *tempCond = allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)));
             if (cond) {
                 ACCExpr *temp = cond;
                 if (temp->value != "&")
@@ -728,11 +732,11 @@ dumpExpr("READCALL", value);
                 exit(-1);
             }
             // 'Or' together ENA lines from all invocations of a method from this class
-            if (info->isAction) {
+            //if (info->isAction) {
                 if (!enableList[calledName])
                     enableList[calledName] = allocExpr("||");
                 enableList[calledName]->operands.push_back(tempCond);
-            }
+            //}
             MethodInfo *CI = lookupQualName(IR, calledName);
             if (!CI) {
                 printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());

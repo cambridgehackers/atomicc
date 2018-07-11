@@ -253,6 +253,13 @@ void updateWidth(ACCExpr *item, int len)
         item->value = autostr(len) + "'d" + item->value;
 }
 
+bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
+{
+    if (isIdChar(lhs->value[0]) && lhs->value == rhs->value && !lhs->operands.size() && !rhs->operands.size())
+        return true;
+    return false;
+}
+
 ACCExpr *cleanupExpr(ACCExpr *expr)
 {
     if (!expr)
@@ -292,7 +299,11 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
                  continue;
              else if (item->value == "1" && ret->operands.size() > 1)
                  continue;
+             else for (auto pitem: nret->operands)
+                 if (matchExpr(pitem, item))  // see if we already have this operand
+                     goto nexta;
              nret->operands.push_back(item);
+nexta:;
         }
         ret = nret;
     }
@@ -306,7 +317,11 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
              }
              else if (item->value == "0" && ret->operands.size() > 1)
                  continue;
+             else for (auto pitem: nret->operands)
+                 if (matchExpr(pitem, item))  // see if we already have this operand
+                     goto nexto;
              nret->operands.push_back(item);
+nexto:;
         }
         ret = nret;
     }
