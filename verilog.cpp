@@ -625,7 +625,7 @@ static std::list<ModData> modLine;
     for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
-        if (MI->rule)    // both RDY and ENA must be generated for rules
+        if (MI->rule)    // both RDY and ENA must be allocated for rules
             refList[methodName] = RefItem{1, MI->type, true, false, PIN_WIRE};
         if (hasPrintf)
             for (auto info: MI->printfList) // must be before callList processing
@@ -652,7 +652,7 @@ static std::list<ModData> modLine;
             if (MI->rule)
                 setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1", true);
         }
-        setAssign(methodName, MI->guard, MI->type, MI->rule);  // collect the text of the return value into a single 'assign'
+        setAssign(methodName, MI->guard, MI->type, MI->rule && !endswith(methodName, "__RDY"));  // collect the text of the return value into a single 'assign'
         for (auto item: MI->alloca) {
             refList[item.first] = RefItem{0, item.second, true, false, PIN_WIRE};
             expandStruct(IR, item.first, item.second, 1, false, true, PIN_WIRE);
