@@ -275,6 +275,45 @@ printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, i
     return newExpr;
 }
 
+static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName)
+{
+    ACCExpr *newExpr = allocExpr(expr->value);
+    std::string item = expr->value;
+    if (isIdChar(item[0])) {
+        if (ACCExpr *assignValue = assignList[item].value)
+            return walkRemoveCalledGuard(assignValue, guardName);
+        if (item == guardName) {
+if (trace_assign)
+printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
+            return nullptr;
+        }
+        //assert(refList[item].pin);
+    }
+    for (auto item: expr->operands) {
+        ACCExpr *operand = walkRemoveCalledGuard(item, guardName);
+        if (operand)
+            newExpr->operands.push_back(operand);
+    }
+    return newExpr;
+}
+
+static void processRecursiveAssign(void)
+{
+    // recursively process all replacements internal to the list of 'setAssign' items
+    for (auto item: assignList)
+        if (item.second.value) {
+if (trace_assign)
+printf("[%s:%d] checking [%s] = '%s'\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str());
+            bool treeChanged = false;
+            std::string newItem = walkTree(item.second.value, &treeChanged);
+            if (treeChanged) {
+if (trace_assign)
+printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str(), newItem.c_str());
+                assignList[item.first].value = str2tree(newItem, true);
+            }
+        }
+}
+
 static void optimizeBitAssigns(void)
 {
     // gather bitfield assigns together
@@ -312,20 +351,6 @@ printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bi
             newVal->operands.push_back(allocExpr(autostr(size) + "'d0"));
         setAssign(item.first, newVal, type);
     }
-
-    // recursively process all replacements internal to the list of 'setAssign' items
-    for (auto item: assignList)
-        if (item.second.value) {
-if (trace_assign)
-printf("[%s:%d] checking [%s] = '%s'\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str());
-            bool treeChanged = false;
-            std::string newItem = walkTree(item.second.value, &treeChanged);
-            if (treeChanged) {
-if (trace_assign)
-printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str(), newItem.c_str());
-                assignList[item.first].value = str2tree(newItem, true);
-            }
-        }
 }
 
 static void optimizeAssign(void)
@@ -729,8 +754,6 @@ dumpExpr("READCALL", value);
             }
         }
     }
-    for (auto item: enableList)
-        setAssign(item.first, item.second, "INTEGER_1");
     // combine mux'ed assignments into a single 'assign' statement
     // Context: before local state declarations, to allow inlining
     for (auto item: muxValueList) {
@@ -780,7 +803,13 @@ dumpExpr("READCALL", value);
             }
         }
     }
+    for (auto item: enableList) {
+        // remove dependancy of the calling __ENA line on the calling __RDY
+        ACCExpr *tempCond = cleanupExpr(walkRemoveCalledGuard(item.second, getRdyName(item.first)));
+        setAssign(item.first, tempCond, "INTEGER_1");
+    }
     optimizeBitAssigns();
+    processRecursiveAssign();
 
     // last chance to optimize out single assigns to output ports
     std::map<std::string, std::string> mapPort;
