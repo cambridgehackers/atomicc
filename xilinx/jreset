@@ -1,0 +1,1 @@
+../atomiccImport -o VResetInverter.h -C ResetInverter -P MResetInverter /scratch/bluespec/Bluespec-2015.09.beta2/lib/Verilog/ResetInverter.v
