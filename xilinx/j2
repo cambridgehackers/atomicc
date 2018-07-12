@@ -14,5 +14,6 @@ OPTIONS="-C PS7 -P Pps7 \
 cmp VPPS7.h PPS7.h
 ../atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 Vivado/2015.2/data/parts/xilinx/zynq/zynq.lib
 ../atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 Vivado/2015.2/data/verilog/src/xeclib/MMCME2_ADV.v
+../atomiccImport -o VBUFG.h -C BUFG -P Mbufg BUFG.v
 # interface generated from verilog has parameters
 #diff MMCME2_ADV.h VMMCME2_ADV.h
