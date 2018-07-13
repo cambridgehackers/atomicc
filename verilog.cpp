@@ -141,10 +141,10 @@ static std::string walkTree (ACCExpr *expr, bool *changed)
 {
     std::string ret = expr->value;
     if (isIdChar(ret[0])) {
-if (trace_assign)
-printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, ret.c_str(), (void *)assignList[ret].value);
         ACCExpr *temp = assignList[ret].value;
-        if (temp && !assignList[ret].noReplace && (refList[ret].pin != PIN_MODULE || !refList[ret].out)) {
+if (trace_assign)
+printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, ret.c_str(), (void *)temp);
+        if (temp && !assignList[ret].noReplace && refList[ret].pin != PIN_MODULE) {
             refList[ret].count = 0;
 if (trace_assign)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2str(temp).c_str());
@@ -187,7 +187,7 @@ typedef struct {
     bool        isOutput, isInout;
     MethodInfo *MI;
 } PinInfo;
-std::list<PinInfo> pinPorts, pinMethods;
+std::list<PinInfo> pinPorts, pinMethods, paramPorts;
 static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix)
 {
     for (auto item : IR->interfaces) {
@@ -201,7 +201,9 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         for (auto fld: IIR->fields) {
             std::string name = pinPrefix + item.fldName + fld.fldName;
             bool out = instance ^ fld.isOutput;
-            if (!fld.isParameter)
+            if (fld.isParameter)
+                paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : fld.type, name, out, fld.isInout, nullptr});
+            else
                 pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, nullptr});
         }
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
@@ -214,9 +216,10 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
  */
 static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params)
 {
-    auto checkWire = [&](std::string name, std::string type, int dir, bool inout) -> void {
+    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam) -> void {
         refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0, inout, instance == "" ? PIN_MODULE : PIN_OBJECT};
-        modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout});
+        modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam});
+        if (!isparam)
         expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
@@ -244,15 +247,19 @@ printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.subst
     }
     pinPorts.clear();
     pinMethods.clear();
+    paramPorts.clear();
     collectInterfacePins(IR, instance != "", "", "");
-    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, pinPorts.size() > 0, 0, false});
-        for (auto item: pinMethods) {
-            checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false);
-            for (auto pitem: item.MI->params)
-                checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false);
-        }
-        for (auto item: pinPorts)
-            checkWire(item.name, item.type, item.isOutput, item.isInout);
+    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, pinPorts.size() > 0, 0, false, false});
+    if (instance == "")
+        for (auto item: paramPorts)
+            checkWire(item.name, item.type, item.isOutput, item.isInout, true);
+    for (auto item: pinMethods) {
+        checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, false);
+        for (auto pitem: item.MI->params)
+            checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, false);
+    }
+    for (auto item: pinPorts)
+        checkWire(item.name, item.type, item.isOutput, item.isInout, false);
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -428,7 +435,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         int ind = temp.find('[');
         if (ind != -1)
             temp = temp.substr(0,ind);
-        if (item.second.out && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT)) {
+        if ((item.second.out || item.second.inout) && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT)) {
             if (!assignList[item.first].value)
                 fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
             else if (refList[temp].count) // must have value != ""
@@ -618,18 +625,79 @@ static std::list<ModData> modLine;
 
     // Generate module header
     generateModuleSignature(IR, "", modLine, "");
-    std::string sep = "module ";
+    std::string sep;
+    bool hasCLK = false, hasnRST = false;
+    bool handleCLK = false;
+    bool paramSeen = false;
     for (auto mitem: modLine) {
         static const char *dirStr[] = {"input", "output"};
-        fprintf(OStr, "%s", sep.c_str());
-        if (mitem.moduleStart)
-            fprintf(OStr, "%s (%s", mitem.value.c_str(),
-                mitem.noDefaultClock ? "" :"input CLK, input nRST");
-        else
-            fprintf(OStr, "%s %s%s", dirStr[mitem.out], sizeProcess(mitem.type).c_str(), mitem.value.c_str());
-        sep = (mitem.moduleStart && mitem.noDefaultClock) ? "\n    " : ",\n    ";
+        if (mitem.moduleStart) {
+            fprintf(OStr, "module %s ", mitem.value.c_str());
+            handleCLK = !mitem.noDefaultClock;
+            if (handleCLK)
+                sep = "(";
+            else
+                sep = "(\n    ";
+        }
+        else if (mitem.isparam) {
+            if (!paramSeen) {
+                fprintf(OStr, "#(\n    ");
+                sep = "";
+                paramSeen = true;
+            }
+            std::string typ = "UNKNOWN_PARAM_TYPE[" + mitem.type + "] ";
+            std::string init = "\"FALSE\"";
+            if (mitem.type == "FLOAT") {
+                typ = "real ";
+                init = "0.0";
+            }
+            else if (mitem.type == "POINTER")
+                typ = "";
+            else if (startswith(mitem.type, "INTEGER_")) {
+                typ = "integer ";
+                init = "0";
+            }
+            fprintf(OStr, "%sparameter %s%s = %s", sep.c_str(), typ.c_str(), mitem.value.c_str(), init.c_str());
+            sep = ",\n    ";
+        }
+        else {
+            if (paramSeen) {
+                fprintf(OStr, ")(\n    ");
+                sep = "";
+                paramSeen = false;
+            }
+            fprintf(OStr, "%s", sep.c_str());
+            sep = ",\n    ";
+            if (handleCLK) {
+                fprintf(OStr, "input CLK, input nRST,\n    ");
+                hasCLK = true;
+                hasnRST = true;
+                handleCLK = false;
+            }
+            std::string dirs = dirStr[mitem.out];
+            std::string psize;
+            if (mitem.inout)
+                dirs = "inout";
+            else
+                psize = sizeProcess(mitem.type);
+            fprintf(OStr, "%s %s%s", dirs.c_str(), psize.c_str(), mitem.value.c_str());
+            if (mitem.value == "CLK")
+                hasCLK = true;
+            if (mitem.value == "nRST")
+                hasnRST = true;
+        }
     }
-    fprintf(OStr, ");\n    wire CLK, nRST;\n");
+    if (handleCLK) {
+        fprintf(OStr, "%sinput CLK, input nRST", sep.c_str());
+        hasCLK = true;
+        hasnRST = true;
+        handleCLK = false;
+    }
+    fprintf(OStr, ");\n");
+    if (!hasCLK)
+        fprintf(OStr, "    wire CLK;\n");
+    if (!hasnRST)
+        fprintf(OStr, "    wire nRST;\n");
     refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
     refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
     modLine.clear();
@@ -819,7 +887,8 @@ dumpExpr("READCALL", value);
     std::map<std::string, std::string> mapPort;
     for (auto item: assignList)
         if (refList[item.first].out && refList[item.first].pin == PIN_MODULE
-          && item.second.value && isIdChar(item.second.value->value[0])) {
+          && item.second.value && isIdChar(item.second.value->value[0])
+          && refList[item.second.value->value].pin != PIN_MODULE) {
             mapPort[item.second.value->value] = item.first;
         }
     // process assignList replacements, mark referenced items
@@ -835,7 +904,7 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
                 val = temp;
             }
         }
-        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout});
+        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, false});
     }
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;

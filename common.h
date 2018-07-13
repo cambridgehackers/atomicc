@@ -28,6 +28,7 @@ typedef struct {
     bool        noDefaultClock;
     int         out;
     bool        inout;
+    bool        isparam;
 } ModData;
 typedef struct {
     ACCExpr    *cond;
