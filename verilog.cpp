@@ -700,12 +700,14 @@ static std::list<ModData> modLine;
         handleCLK = false;
     }
     fprintf(OStr, ");\n");
-    if (!hasCLK)
+    if (!hasCLK) {
         fprintf(OStr, "    wire CLK;\n");
-    if (!hasnRST)
+        refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
+    }
+    if (!hasnRST) {
         fprintf(OStr, "    wire nRST;\n");
-    refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
-    refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
+        refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
+    }
     modLine.clear();
     for (auto item: IR->interfaces)
         if (item.fldName == "printfp")
