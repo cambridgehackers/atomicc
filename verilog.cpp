@@ -225,7 +225,7 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
-printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.substr(0,instance.length()-1).c_str(), params.c_str());
+//printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.substr(0,instance.length()-1).c_str(), params.c_str());
         if (params != "") {
             std::string actual, sep;
             const char *p = params.c_str();
@@ -914,7 +914,7 @@ dumpExpr("READCALL", value);
             val = walkTree(allocExpr(mitem.value), nullptr);
             std::string temp = mapPort[val];
             if (temp != "") {
-printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
+//printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
                 refList[val].count = 0;
                 refList[temp].count = 0;
                 val = temp;
