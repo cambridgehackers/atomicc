@@ -436,12 +436,18 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         if (ind != -1)
             temp = temp.substr(0,ind);
         if ((item.second.out || item.second.inout) && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT)) {
+            if (item.second.inout && !assignList[item.first].value)
+                for (auto alitem: assignList)
+                    if (ACCExpr *val = alitem.second.value)
+                    if (isIdChar(val->value[0]) && val->value == item.first)
+                        goto next;
             if (!assignList[item.first].value)
                 fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
             else if (refList[temp].count) // must have value != ""
                 fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
             else if (trace_skipped)
                 fprintf(OStr, "    skippedassign %s = %s; //temp = '%s', count = %d, pin = %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin);
+next:;
             refList[item.first].count = 0;
         }
     }
@@ -854,6 +860,16 @@ dumpExpr("READCALL", value);
         if (!IIR)
             dumpModule("CONNECT", IR);
         assert(IIR && "interfaceConnect interface type");
+//printf("[%s:%d] CONNECT target %s source %s\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.source.c_str());
+        for (auto fld : IIR->fields) {
+            std::string tstr = IC.target + fld.fldName,
+                        sstr = IC.source + fld.fldName;
+//printf("[%s:%d] IFCCC %s/%d %s/%d\n", __FUNCTION__, __LINE__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+            if (refList[sstr].out)
+                setAssign(sstr, allocExpr(tstr), fld.type);
+            else
+                setAssign(tstr, allocExpr(sstr), fld.type);
+        }
         for (auto FI : IIR->method) {
             MethodInfo *MI = FI.second;
             std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
