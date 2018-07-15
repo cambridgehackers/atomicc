@@ -636,7 +636,7 @@ static std::list<ModData> modLine;
     bool handleCLK = false;
     bool paramSeen = false;
     for (auto mitem: modLine) {
-        static const char *dirStr[] = {"input", "output"};
+        static const char *dirStr[] = {"input wire", "output wire"};
         if (mitem.moduleStart) {
             fprintf(OStr, "module %s ", mitem.value.c_str());
             handleCLK = !mitem.noDefaultClock;
@@ -675,18 +675,15 @@ static std::list<ModData> modLine;
             fprintf(OStr, "%s", sep.c_str());
             sep = ",\n    ";
             if (handleCLK) {
-                fprintf(OStr, "input CLK, input nRST,\n    ");
+                fprintf(OStr, "input wire CLK, input wire nRST,\n    ");
                 hasCLK = true;
                 hasnRST = true;
                 handleCLK = false;
             }
             std::string dirs = dirStr[mitem.out];
-            std::string psize;
             if (mitem.inout)
-                dirs = "inout";
-            else
-                psize = sizeProcess(mitem.type);
-            fprintf(OStr, "%s %s%s", dirs.c_str(), psize.c_str(), mitem.value.c_str());
+                dirs = "inout wire";
+            fprintf(OStr, "%s %s%s", dirs.c_str(), sizeProcess(mitem.type).c_str(), mitem.value.c_str());
             if (mitem.value == "CLK")
                 hasCLK = true;
             if (mitem.value == "nRST")
@@ -945,7 +942,9 @@ void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::stri
             exit(-1);
         }
         fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
+        fprintf(OStrV, "`default_nettype none\n");
         generateModuleDef(IR, OStrV); // Generate verilog
+        fprintf(OStrV, "`default_nettype wire    // set back to default value\n");
         fclose(OStrV);
     }
     if (printfFormat.size()) {
