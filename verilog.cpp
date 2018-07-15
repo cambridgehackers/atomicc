@@ -283,13 +283,16 @@ printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, i
     return newExpr;
 }
 
-static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName)
+static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName, bool useAssign)
 {
+    if (!expr)
+        return expr;
     ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
     if (isIdChar(item[0])) {
+        if (useAssign)
         if (ACCExpr *assignValue = assignList[item].value)
-            return walkRemoveCalledGuard(assignValue, guardName);
+            return walkRemoveCalledGuard(assignValue, guardName, useAssign);
         if (item == guardName) {
 if (trace_assign)
 printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
@@ -297,7 +300,7 @@ printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION
         }
     }
     for (auto item: expr->operands) {
-        ACCExpr *operand = walkRemoveCalledGuard(item, guardName);
+        ACCExpr *operand = walkRemoveCalledGuard(item, guardName, useAssign);
         if (operand)
             newExpr->operands.push_back(operand);
     }
@@ -852,11 +855,8 @@ dumpExpr("READCALL", value);
             prevCond = element.cond;
             prevValue = element.value;
         }
-        if (type == "INTEGER_1") {
-printf("[%s:%d]MMMMMMMMMMMMMMMMMMMMMMMM %s type %s temp %p prevcon %s prevval %s\n", __FUNCTION__, __LINE__, item.first.c_str(), type.c_str(), temp, tree2str(prevCond).c_str(), tree2str(prevValue).c_str());
-            if (prevCond)
-                prevValue = allocExpr("?", prevCond, prevValue, allocExpr("0"));
-        }
+        if (type == "INTEGER_1" && prevCond) // since bools are also used for rdy/ena, be pedantic in calculating conditionalized value
+            prevValue = allocExpr("?", prevCond, prevValue, allocExpr("0"));
         if (temp)
             temp->operands.push_back(prevValue);
         else
@@ -901,11 +901,14 @@ printf("[%s:%d]MMMMMMMMMMMMMMMMMMMMMMMM %s type %s temp %p prevcon %s prevval %s
     }
     for (auto item: enableList) {
         // remove dependancy of the calling __ENA line on the calling __RDY
-        ACCExpr *tempCond = cleanupExpr(walkRemoveCalledGuard(item.second, getRdyName(item.first)));
+        ACCExpr *tempCond = cleanupExpr(walkRemoveCalledGuard(item.second, getRdyName(item.first), true));
         setAssign(item.first, tempCond, "INTEGER_1");
     }
     optimizeBitAssigns();
     processRecursiveAssign();
+    for (auto item: assignList)
+        if (item.second.value && IR->method.find(item.first) != IR->method.end())
+            assignList[item.first].value = cleanupExpr(walkRemoveCalledGuard(item.second.value, getRdyName(item.first), false));
 
     // last chance to optimize out single assigns to output ports
     std::map<std::string, std::string> mapPort;

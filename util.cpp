@@ -27,8 +27,7 @@ std::string getRdyName(std::string basename)
     std::string rdyName = basename;
     if (endswith(rdyName, "__ENA"))
         rdyName = rdyName.substr(0, rdyName.length()-5);
-    rdyName += "__RDY";
-    return rdyName;
+    return rdyName + "__RDY";
 }
 
 ModuleIR *lookupIR(std::string ind)

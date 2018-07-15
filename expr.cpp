@@ -301,6 +301,11 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
              }
              if (item->value == "==")
                  checkName = item->operands.front()->value;
+             else if (item->value == "&") {
+                 for (auto pitem: item->operands)
+                     nret->operands.push_back(pitem);
+                 continue;
+             }
              else if (item->value == "!=" && checkName == item->operands.front()->value)
                  continue;
              else if (item->value == "1" && ret->operands.size() > 1)
