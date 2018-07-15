@@ -73,7 +73,9 @@ std::string tree2str(const ACCExpr *arg)
         return "";
     std::string sep, op = arg->value;
     if (isParenChar(op[0]) || isIdChar(op[0])) {
-        ret += op + " ";
+        ret += op;
+        if (arg->operands.size())
+            ret += " ";
         op = ",";
     }
     else if (!arg->operands.size() || ((op == "-" || op == "!")/*unary*/ && arg->operands.size() == 1))
@@ -222,13 +224,24 @@ static ACCExpr *getRHS(ACCExpr *expr, int match = 1)
      return nullptr;
 }
 
+static bool checkInteger(ACCExpr *expr, std::string pattern)
+{
+    std::string val = expr->value;
+    if (!isdigit(val[0]))
+        return false;
+    int ind = val.find("'");
+    if (ind > 0)    // strip off radix
+        val = val.substr(ind+2);
+    return val == pattern;
+}
+
 ACCExpr *invertExpr(ACCExpr *expr)
 {
     if (!expr)
         return allocExpr("1");
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
-    if (v == "^" && getRHS(expr)->value == "1")
+    if (v == "^" && checkInteger(getRHS(expr), "1"))
         return lhs;
     if (v == "==") {
         if (expr->operands.size() == 1)
@@ -274,7 +287,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
         dumpExpr("cleanupExpr", expr);
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
-    if (v == "^" && getRHS(expr)->value == "1")
+    if (v == "^" && checkInteger(getRHS(expr), "1"))
         return invertExpr(cleanupExpr(lhs));
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
@@ -287,11 +300,14 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
              for (auto oitem: titem->operands)
                  ret->operands.push_back(oitem);
     }
-    if (ret->value == "?" && ret->operands.front()->value == "1")
+    if (ret->value == "?" && checkInteger(ret->operands.front(), "1"))
         ret = getRHS(ret);
-    if (ret->value == "?" && getRHS(ret, 2)->value == "0")
+    if (ret->value == "?" && checkInteger(getRHS(ret, 2), "0"))
         ret = allocExpr("&", ret->operands.front(), getRHS(ret));
     if (ret->value == "&") {
+        bool restartFlag = false;
+        do {
+        restartFlag = false;
         ACCExpr *nret = allocExpr(ret->value);
         std::string checkName;
         for (auto item: ret->operands) {
@@ -304,11 +320,12 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
              else if (item->value == "&") {
                  for (auto pitem: item->operands)
                      nret->operands.push_back(pitem);
+                 restartFlag = true;
                  continue;
              }
              else if (item->value == "!=" && checkName == item->operands.front()->value)
                  continue;
-             else if (item->value == "1" && ret->operands.size() > 1)
+             else if (checkInteger(item, "1") && ret->operands.size() > 1)
                  continue;
              else for (auto pitem: nret->operands)
                  if (matchExpr(pitem, item))  // see if we already have this operand
@@ -317,12 +334,13 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
 nexta:;
         }
         ret = nret;
+        } while (restartFlag);
     }
     if (ret->value == "|") {
         ACCExpr *nret = allocExpr(ret->value);
         std::string checkName;
         for (auto item: ret->operands) {
-             if (item->value == "1") {
+             if (checkInteger(item, "1")) {
                  nret = item;
                  break;
              }
@@ -345,7 +363,7 @@ nexto:;
             ret->operands.push_back(lhs);
         }
         ACCExpr *rhs = getRHS(ret), *lhs = ret->operands.front();
-        if (rhs->value == "0" && lhs->value == "^" && getRHS(lhs)->value == "1") {
+        if (rhs->value == "0" && lhs->value == "^" && checkInteger(getRHS(lhs), "1")) {
             ret->value = "==";
             ret->operands.clear();
             ret->operands.push_back(lhs->operands.front());

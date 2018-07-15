@@ -319,7 +319,7 @@ printf("[%s:%d] checking [%s] = '%s'\n", __FUNCTION__, __LINE__, item.first.c_st
             if (treeChanged) {
 if (trace_assign)
 printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str(), newItem.c_str());
-                assignList[item.first].value = str2tree(newItem, true);
+                assignList[item.first].value = cleanupExpr(str2tree(newItem, true));
             }
         }
 }
@@ -426,7 +426,8 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             sep = "";
         }
         else {
-            fprintf(OStr, "%s", (sep + "\n        ." + item.argName + "(" + item.value + ")").c_str());
+            std::string val = tree2str(cleanupExpr(str2tree(item.value)));
+            fprintf(OStr, "%s", (sep + "\n        ." + item.argName + "(" + val + ")").c_str());
             sep = ",";
         }
         endStr = ");\n";
