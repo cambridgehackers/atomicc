@@ -760,7 +760,10 @@ static std::list<ModData> modLine;
             expandStruct(IR, item.first, item.second, 1, false, true, PIN_WIRE);
         }
         for (auto info: MI->letList) {
-            ACCExpr *cond = cleanupExpr(info->cond);
+            ACCExpr *cond = allocExpr("&", allocExpr(getRdyName(methodName)));
+            if (info->cond)
+                cond->operands.push_back(info->cond);
+            cond = cleanupExpr(cond);
             ACCExpr *value = cleanupExpr(info->value);
             if (isdigit(value->value[0]))
                 updateWidth(value, convertType(info->type));
@@ -836,6 +839,7 @@ dumpExpr("READCALL", value);
     for (auto item: muxValueList) {
         ACCExpr *prevCond = nullptr, *prevValue = nullptr;
         ACCExpr *temp = nullptr, *head = nullptr;
+        std::string type = refList[item.first].type;
         for (auto element: item.second) {
             if (prevCond) {
                 ACCExpr *newExpr = allocExpr("?", prevCond, prevValue);
@@ -848,11 +852,16 @@ dumpExpr("READCALL", value);
             prevCond = element.cond;
             prevValue = element.value;
         }
+        if (type == "INTEGER_1") {
+printf("[%s:%d]MMMMMMMMMMMMMMMMMMMMMMMM %s type %s temp %p prevcon %s prevval %s\n", __FUNCTION__, __LINE__, item.first.c_str(), type.c_str(), temp, tree2str(prevCond).c_str(), tree2str(prevValue).c_str());
+            if (prevCond)
+                prevValue = allocExpr("?", prevCond, prevValue, allocExpr("0"));
+        }
         if (temp)
             temp->operands.push_back(prevValue);
         else
             head = prevValue;
-        setAssign(item.first, head, refList[item.first].type);
+        setAssign(item.first, head, type);
     }
     for (auto IC : IR->interfaceConnect) {
         ModuleIR *IIR = lookupIR(IC.type);

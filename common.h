@@ -81,7 +81,7 @@ std::string findType(std::string name);
 
 // AtomiccExpr.cpp
 std::string tree2str(const ACCExpr *arg);
-ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr);
+ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
 void dumpExpr(std::string tag, ACCExpr *next);
 ACCExpr *cleanupExpr(ACCExpr *expr);

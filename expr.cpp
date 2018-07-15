@@ -94,7 +94,7 @@ std::string tree2str(const ACCExpr *arg)
     return ret;
 }
 
-ACCExpr *allocExpr(std::string value, ACCExpr *argl, ACCExpr *argr)
+ACCExpr *allocExpr(std::string value, ACCExpr *argl, ACCExpr *argr, ACCExpr *argt)
 {
     ACCExpr *ret = new ACCExpr;
     ret->value = value;
@@ -103,6 +103,8 @@ ACCExpr *allocExpr(std::string value, ACCExpr *argl, ACCExpr *argr)
         ret->operands.push_back(argl);
     if (argr)
         ret->operands.push_back(argr);
+    if (argt)
+        ret->operands.push_back(argt);
     return ret;
 }
 
@@ -211,11 +213,11 @@ static bool checkOperator(std::string s)
       || s == "<<" || s == ">>";
 }
 
-static ACCExpr *getRHS(ACCExpr *expr)
+static ACCExpr *getRHS(ACCExpr *expr, int match = 1)
 {
      int i = 0;
      for (auto item: expr->operands)
-         if (i++ == 1)
+         if (i++ == match)
              return item;
      return nullptr;
 }
@@ -285,6 +287,10 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
              for (auto oitem: titem->operands)
                  ret->operands.push_back(oitem);
     }
+    if (ret->value == "?" && ret->operands.front()->value == "1")
+        ret = getRHS(ret);
+    if (ret->value == "?" && getRHS(ret, 2)->value == "0")
+        ret = allocExpr("&", ret->operands.front(), getRHS(ret));
     if (ret->value == "&") {
         ACCExpr *nret = allocExpr(ret->value);
         std::string checkName;
