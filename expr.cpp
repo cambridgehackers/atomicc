@@ -196,10 +196,6 @@ static ACCExpr *get1Token(void)
             getNext();
         } while (lexChar != '"');
         getNext();
-        if (startswith(lexToken, "\"__valid:"))
-            lexToken = lexToken.substr(9, lexToken.length()-10) + "__ENA";
-        if (startswith(lexToken, "\"__ready:"))
-            lexToken = lexToken.substr(9, lexToken.length()-10) + "__RDY";
     }
     else {
         printf("[%s:%d] lexString '%s' unknown lexChar %c %x\n", __FUNCTION__, __LINE__, lexString.c_str(), lexChar, lexChar);
@@ -419,6 +415,10 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
             }
         }
     }
+    if (ret->value == "&" && !ret->operands.size())
+        ret->value = "1";
+    if (ret->value == "|" && !ret->operands.size())
+        ret->value = "0";
     return ret;
 }
 
