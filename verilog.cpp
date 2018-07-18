@@ -558,11 +558,8 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
     for (auto info: MI->storeList) {
         ACCExpr *cond = cleanupExpr(info->cond);
         ACCExpr *value = (info->value);
-printf("[%s:%d]STORRRROROROROROR\n", __FUNCTION__, __LINE__);
-dumpExpr("STORERR", value);
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
-printf("[%s:%d]WALALAL %s\n", __FUNCTION__, __LINE__, walkTree(value, nullptr).c_str());
         ACCExpr *destt = info->dest;
         destt = str2tree(walkTree(destt, nullptr), true);
         walkRef(destt);
