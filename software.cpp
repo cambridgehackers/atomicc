@@ -181,7 +181,7 @@ dumpModule("MUX", muxDef);
         }
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
-dumpModule("TOP", IR);
+        //dumpModule("TOP", IR);
         std::string commandLine(exename);
         int ind = commandLine.rfind("/");
         if (ind == -1)

@@ -128,7 +128,7 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
     for (auto item: IR->interfaceConnect) {
         std::string tname = item.target;
         std::string sname = item.source;
-printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
+//printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
         for (auto FI: lookupIR(item.type)->method) {
             MethodInfo *MI = FI.second;
             std::string methodName = MI->name;

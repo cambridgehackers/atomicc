@@ -21,10 +21,12 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+int trace_software;//= 1;
 static void processSerialize(ModuleIR *IR)
 {
     std::string prefix = "__" + IR->name + "_";
     auto inter = IR->interfaces.front();
+    if (trace_software)
 printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     ModuleIR *IIR = lookupIR(inter.type);
     IR->fields.clear();
@@ -68,6 +70,7 @@ static void processM2P(ModuleIR *IR)
         if (inter.isPtr)
 {
             target = inter.fldName;
+    if (trace_software)
 dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
 }
         else {
@@ -81,9 +84,11 @@ dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
                 II = allocIR(type);
                 II->interfaces.push_back(FieldElement{"ifc", -1, inter.type, false, false, false, false, false});
             }
+    if (trace_software)
 printf("[%s:%d] IIIIIIIIIII iname %s IRNAME %s type %s\n", __FUNCTION__, __LINE__, iname.c_str(), IR->name.c_str(), type.c_str());
             processSerialize(II);
             pipeArgSize = convertType(type);
+    if (trace_software)
 dumpModule("M2P/HIR :" + host, HIR);
         }
     }
@@ -118,6 +123,7 @@ exit(-1);
                  + "16'd" + autostr(counter) + ", 16'd" + autostr(dataLength/32) + "}"))), nullptr, true});
         counter++;
     }
+    if (trace_software)
     dumpModule("M2P", IR);
 }
 
@@ -132,12 +138,15 @@ static void processP2M(ModuleIR *IR)
             std::string iname = inter.type.substr(16);
             IR->name = iname + "___P2M";
             std::string type = "l_serialize_OC_P2M_MD_" + iname + "_OD__KD__KD_Data";
+    if (trace_software)
 dumpModule("P2M/IIR :" + target, IIR);
         }
         else {
             HIR = lookupIR(inter.type);
+    if (trace_software)
 printf("[%s:%d] HIR type %s IR %p\n", __FUNCTION__, __LINE__, inter.type.c_str(), (void *)HIR);
             host = inter.fldName;
+    if (trace_software)
 dumpModule("P2M/HIR :" + host, HIR);
         }
     }
@@ -145,9 +154,11 @@ assert(HIR);
     for (auto FI: HIR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
+    if (trace_software)
 printf("[%s:%d] P2Mhifmethod %s\n", __FUNCTION__, __LINE__, methodName.c_str());
         MethodInfo *MInew = allocMethod(host + MODULE_SEPARATOR + methodName);
         addMethod(IR, MInew);
+    if (trace_software)
 printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
         for (auto param: MI->params)
             MInew->params.push_back(param);
@@ -155,6 +166,7 @@ printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
         MInew->guard = MI->guard;
     }
     MethodInfo *MInew = lookupMethod(IR, host + MODULE_SEPARATOR + "enq");
+    if (trace_software)
 printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEPARATOR + "enq__ENA").c_str(), (void *)MInew);
 assert(MInew);
     int counter = 0;  // start method number at 0
@@ -181,6 +193,7 @@ exit(-1);
                  allocExpr("16'd" + autostr(counter))), true});
         counter++;
     }
+    if (trace_software)
     dumpModule("P2M", IR);
 }
 
@@ -191,6 +204,7 @@ void processInterfaces(std::list<ModuleIR *> &irSeq)
         if (startswith(IR->name, "l_serialize_"))
             processSerialize(IR);
         if (startswith(IR->name, "P2M")) {
+    if (trace_software)
 dumpModule("P2M", IR);
             irSeq.push_back(IR);
             processP2M(IR);
@@ -198,12 +212,14 @@ dumpModule("P2M", IR);
         if (startswith(IR->name, "M2P")) {
             irSeq.push_back(IR);
             std::list<FieldElement> temp;
+    if (trace_software)
 dumpModule("M2Porig", IR);
             for (auto inter: IR->interfaces) {
                 if (inter.fldName != "unused")
                     temp.push_back(inter);
             }
             IR->interfaces = temp;
+    if (trace_software)
 dumpModule("M2P", IR);
             processM2P(IR);
         }

@@ -66,12 +66,30 @@ void dumpExpr(std::string tag, ACCExpr *next)
     }
 }
 
-std::string tree2str(const ACCExpr *arg)
+ACCExpr *getRHS(ACCExpr *expr, int match)
+{
+     int i = 0;
+     for (auto item: expr->operands)
+         if (i++ == match)
+             return item;
+     return nullptr;
+}
+
+std::string tree2str(ACCExpr *arg)
 {
     std::string ret;
     if (!arg)
         return "";
     std::string sep, op = arg->value;
+    if (op == "__bitconcat")
+        return tree2str(arg->operands.front());
+    if (op == "__bitsubstr") {
+        std::string extra;
+        ACCExpr *list = arg->operands.front();
+        if (arg->operands.size() == 3)
+            extra = ":" + tree2str(getRHS(list, 2));
+        return tree2str(list->operands.front()) + "[" + tree2str(getRHS(list)) + extra + "]";
+    }
     if (isParenChar(op[0]) || isIdChar(op[0])) {
         ret += op;
         if (arg->operands.size())
@@ -213,15 +231,6 @@ static bool checkOperator(std::string s)
       || s == "?" || s == ":" || s == "^" || s == "," || s == "!"
       || s == "|" || s == "||" || s == "<" || s == ">"
       || s == "<<" || s == ">>";
-}
-
-static ACCExpr *getRHS(ACCExpr *expr, int match = 1)
-{
-     int i = 0;
-     for (auto item: expr->operands)
-         if (i++ == match)
-             return item;
-     return nullptr;
 }
 
 static bool checkInteger(ACCExpr *expr, std::string pattern)

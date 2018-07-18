@@ -140,6 +140,15 @@ item = base;
 static std::string walkTree (ACCExpr *expr, bool *changed)
 {
     std::string ret = expr->value;
+    if (ret == "__bitconcat")
+        return walkTree(expr->operands.front(), changed);
+    if (ret == "__bitsubstr") {
+        std::string extra;
+        ACCExpr *list = expr->operands.front();
+        if (list->operands.size() == 3)
+            extra = ":" + walkTree(getRHS(list, 2), changed);
+        return walkTree(list->operands.front(), changed) + "[" + walkTree(getRHS(list), changed) + extra + "]";
+    }
     if (isIdChar(ret[0])) {
         ACCExpr *temp = assignList[ret].value;
 if (trace_assign)
@@ -542,15 +551,18 @@ dumpExpr("PRINTFLL", value);
     return value;
 }
 
-static void processMethod(MethodInfo *MI, bool hasPrintf)
+static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
 {
     std::string methodName = MI->name;
     std::map<std::string, std::list<std::string>> condLines;
     for (auto info: MI->storeList) {
         ACCExpr *cond = cleanupExpr(info->cond);
         ACCExpr *value = (info->value);
+printf("[%s:%d]STORRRROROROROROR\n", __FUNCTION__, __LINE__);
+dumpExpr("STORERR", value);
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
+printf("[%s:%d]WALALAL %s\n", __FUNCTION__, __LINE__, walkTree(value, nullptr).c_str());
         ACCExpr *destt = info->dest;
         destt = str2tree(walkTree(destt, nullptr), true);
         walkRef(destt);
@@ -867,7 +879,7 @@ dumpExpr("READCALL", value);
     for (auto IC : IR->interfaceConnect) {
         ModuleIR *IIR = lookupIR(IC.type);
         if (!IIR)
-            dumpModule("CONNECT", IR);
+            dumpModule("MISSINGCONNECT", IR);
         assert(IIR && "interfaceConnect interface type");
 //printf("[%s:%d] CONNECT target %s source %s\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.source.c_str());
         for (auto fld : IIR->fields) {
@@ -936,7 +948,7 @@ dumpExpr("READCALL", value);
     }
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
-        processMethod(MI, hasPrintf);
+        generateAlwaysLines(MI, hasPrintf);
     }
     optimizeAssign();
     generateAssign(OStr);

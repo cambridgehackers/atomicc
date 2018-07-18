@@ -79,8 +79,8 @@ void addMethod(ModuleIR *IR, MethodInfo *MI);
 void dumpModule(std::string name, ModuleIR *IR);
 std::string findType(std::string name);
 
-// AtomiccExpr.cpp
-std::string tree2str(const ACCExpr *arg);
+// expr.cpp
+std::string tree2str(ACCExpr *arg);
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
 void dumpExpr(std::string tag, ACCExpr *next);
@@ -91,8 +91,9 @@ std::string treePost(const ACCExpr *arg);
 bool checkOperand(std::string s);
 ACCExpr *invertExpr(ACCExpr *expr);
 void updateWidth(ACCExpr *item, int len);
+ACCExpr *getRHS(ACCExpr *expr, int match = 1);
 
-// AtomiccReadIR.cpp
+// readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);
 
 // processInterfaces
@@ -107,7 +108,7 @@ void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string 
 // preprocessIR.cpp
 void preprocessIR(std::list<ModuleIR *> &irSeq);
 
-// verilogGen
+// verilog.cpp
 void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir);
 
 extern int trace_assign;
