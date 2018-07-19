@@ -98,6 +98,15 @@ static std::string getToken()
     return ret;
 }
 
+static std::string cleanInterface(std::string name)
+{
+    if (name == "_")
+        name = "";
+    else if (endswith(name, "$_"))
+        name = name.substr(0, name.length()-1);
+    return name;
+}
+
 static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
@@ -118,8 +127,8 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 IR->priority[rule] = getToken();
             }
             else if (checkItem("INTERFACECONNECT")) {
-                std::string target = getToken();
-                std::string source = getToken();
+                std::string target = cleanInterface(getToken());
+                std::string source = cleanInterface(getToken());
                 std::string type = getToken();
                 IR->interfaceConnect.push_back(InterfaceConnectType{target, source, type});
             }
