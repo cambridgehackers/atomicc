@@ -75,43 +75,86 @@ ACCExpr *getRHS(ACCExpr *expr, int match)
      return nullptr;
 }
 
-std::string tree2str(ACCExpr *arg)
+std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
 {
-    std::string ret;
-    if (!arg)
+    if (!expr)
         return "";
-    std::string sep, op = arg->value;
+    std::string ret, sep, op = expr->value;
     if (op == "__bitconcat")
-        return tree2str(arg->operands.front());
+        return tree2str(expr->operands.front(), changed, assignReplace);
     if (op == "__bitsubstr") {
         std::string extra;
-        ACCExpr *list = arg->operands.front();
-        if (arg->operands.size() == 3)
-            extra = ":" + tree2str(getRHS(list, 2));
-        return tree2str(list->operands.front()) + "[" + tree2str(getRHS(list)) + extra + "]";
+        ACCExpr *list = expr->operands.front();
+        if (list->operands.size() == 3)
+            extra = ":" + tree2str(getRHS(list, 2), changed, assignReplace);
+        return tree2str(list->operands.front(), changed, assignReplace) + "[" + tree2str(getRHS(list), changed, assignReplace) + extra + "]";
     }
-    if (isParenChar(op[0]) || isIdChar(op[0])) {
+    if (isParenChar(op[0])) {
         ret += op;
-        if (arg->operands.size())
+        if (expr->operands.size())
             ret += " ";
         op = ",";
     }
-    else if (!arg->operands.size() || ((op == "-" || op == "!")/*unary*/ && arg->operands.size() == 1))
+    else if (isIdChar(op[0])) {
         ret += op;
-    for (auto item: arg->operands) {
+        if (assignReplace) {
+        ACCExpr *temp = assignList[op].value;
+if (trace_assign)
+printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)temp);
+        if (temp && !assignList[op].noReplace && refList[op].pin != PIN_MODULE) {
+            refList[op].count = 0;
+if (trace_assign)
+printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(temp).c_str());
+            ret = tree2str(temp, changed, assignReplace);
+            if (changed)
+                *changed = true;
+            else
+                walkRef(temp);
+        }
+        else if (!changed)
+            refList[op].count++;
+        }
+    }
+    else if (!expr->operands.size() || ((op == "-" || op == "!")/*unary*/ && expr->operands.size() == 1))
+        ret += op;
+    for (auto item: expr->operands) {
         ret += sep;
-        bool operand = checkOperand(item->value) || item->value == "," || item->value == "?" || arg->operands.size() == 1;
+        bool operand = checkOperand(item->value) || item->value == "," || item->value == "?" || expr->operands.size() == 1;
         if (!operand)
             ret += "( ";
-        ret += tree2str(item);
+        ret += tree2str(item, changed, assignReplace);
         if (!operand)
             ret += " )";
         sep = " " + op + " ";
         if (op == "?")
             op = ":";
     }
-    ret += treePost(arg);
+    ret += treePost(expr);
     return ret;
+}
+
+void walkRef (ACCExpr *expr)
+{
+    std::string item = expr->value;
+    if (isIdChar(item[0])) {
+        std::string base = item;
+        int ind = base.find("[");
+        if (ind > 0)
+            base = base.substr(0, ind);
+        if (!refList[item].pin)
+            printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
+        if (base != item)
+{
+if (trace_assign)
+printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
+            //refList[item.substr(0,ind)].count++;
+item = base;
+}
+        assert(refList[item].pin);
+        refList[item].count++;
+    }
+    for (auto item: expr->operands)
+        walkRef(item);
 }
 
 ACCExpr *allocExpr(std::string value, ACCExpr *argl, ACCExpr *argr, ACCExpr *argt)
@@ -143,6 +186,8 @@ static struct {
     {"^", 18},
 
     {"==", 20}, {"!=" , 20}, {"<", 20}, {">", 20}, {"<=", 20}, {">=", 20},
+
+    {">>", 25}, {"<<", 25},
 
     {"+", 30}, {"-", 30},
     {"*", 40}, {"%", 40},
@@ -235,6 +280,8 @@ static bool checkOperator(std::string s)
 
 static bool checkInteger(ACCExpr *expr, std::string pattern)
 {
+    if (!expr)
+        return false;
     std::string val = expr->value;
     if (!isdigit(val[0]))
         return false;
@@ -429,6 +476,17 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
     if (ret->value == "|" && !ret->operands.size())
         ret->value = "0";
     return ret;
+}
+ACCExpr *cleanupExprBit(ACCExpr *expr)
+{
+    if (!expr)
+        return expr;
+    ACCExpr *temp = cleanupExpr(expr);
+    return temp;
+    std::string bitTemp = tree2str(temp);  //HACK HACK HACK HACK to trigger __bitsubstr processing
+printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, bitTemp.c_str());
+dumpExpr("EXPR", expr);
+    return str2tree(bitTemp);              //HACK HACK HACK HACK to trigger __bitsubstr processing
 }
 
 static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCurrentToken)

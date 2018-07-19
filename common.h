@@ -80,11 +80,12 @@ void dumpModule(std::string name, ModuleIR *IR);
 std::string findType(std::string name);
 
 // expr.cpp
-std::string tree2str(ACCExpr *arg);
+std::string tree2str(ACCExpr *expr, bool *changed = nullptr, bool assignReplace = false);
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
 void dumpExpr(std::string tag, ACCExpr *next);
 ACCExpr *cleanupExpr(ACCExpr *expr);
+ACCExpr *cleanupExprBit(ACCExpr *expr);
 ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
 bool isParenChar(char ch);
 std::string treePost(const ACCExpr *arg);
@@ -92,6 +93,7 @@ bool checkOperand(std::string s);
 ACCExpr *invertExpr(ACCExpr *expr);
 void updateWidth(ACCExpr *item, int len);
 ACCExpr *getRHS(ACCExpr *expr, int match = 1);
+void walkRef (ACCExpr *expr);
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);
@@ -114,4 +116,5 @@ void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::stri
 extern int trace_assign;
 extern int trace_expand;
 extern std::map<std::string, RefItem> refList;
+extern std::map<std::string, AssignItem> assignList;
 extern std::map<std::string, ModuleIR *> mapIndex;

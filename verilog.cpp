@@ -28,7 +28,7 @@ int trace_skipped;//= 1;
 std::map<std::string, RefItem> refList;
 std::map<std::string, ModuleIR *> mapIndex;
 
-static std::map<std::string, AssignItem> assignList;
+std::map<std::string, AssignItem> assignList;
 static std::map<std::string, std::string> replaceTarget;
 static std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
 static std::list<ModData> modNew;
@@ -114,83 +114,6 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
         addRead(MI->meta[MetaRead][fieldName], cond);
 }
 
-static void walkRef (ACCExpr *expr)
-{
-    std::string item = expr->value;
-    if (isIdChar(item[0])) {
-        std::string base = item;
-        int ind = base.find("[");
-        if (ind > 0)
-            base = base.substr(0, ind);
-        if (!refList[item].pin)
-            printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
-        if (base != item)
-{
-if (trace_assign)
-printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
-            //refList[item.substr(0,ind)].count++;
-item = base;
-}
-        assert(refList[item].pin);
-        refList[item].count++;
-    }
-    for (auto item: expr->operands)
-        walkRef(item);
-}
-static std::string walkTree (ACCExpr *expr, bool *changed)
-{
-    std::string ret = expr->value;
-    if (ret == "__bitconcat")
-        return walkTree(expr->operands.front(), changed);
-    if (ret == "__bitsubstr") {
-        std::string extra;
-        ACCExpr *list = expr->operands.front();
-        if (list->operands.size() == 3)
-            extra = ":" + walkTree(getRHS(list, 2), changed);
-        return walkTree(list->operands.front(), changed) + "[" + walkTree(getRHS(list), changed) + extra + "]";
-    }
-    if (isIdChar(ret[0])) {
-        ACCExpr *temp = assignList[ret].value;
-if (trace_assign)
-printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, ret.c_str(), (void *)temp);
-        if (temp && !assignList[ret].noReplace && refList[ret].pin != PIN_MODULE) {
-            refList[ret].count = 0;
-if (trace_assign)
-printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, ret.c_str(), tree2str(temp).c_str());
-            ret = walkTree(temp, changed);
-            if (changed)
-                *changed = true;
-            else
-                walkRef(temp);
-        }
-        else if (!changed)
-            refList[ret].count++;
-    }
-    else {
-        ret = "";
-        std::string sep, op = expr->value;
-        if (isParenChar(op[0])) {
-            ret += op + " ";
-            op = ",";
-        }
-        else if (!expr->operands.size() || ((op == "-" || op == "!")/*unary*/ && expr->operands.size() == 1))
-            ret += op;
-        for (auto item: expr->operands) {
-            bool operand = checkOperand(item->value) || item->value == "," || item->value == "?" || expr->operands.size() == 1;
-            ret += sep;
-            if (!operand)
-                ret += "( ";
-            ret += walkTree(item, changed);
-            if (!operand)
-                ret += " )";
-            sep = " " + op + " ";
-            if (op == "?")
-                op = ":";
-        }
-    }
-    ret += treePost(expr);
-    return ret;
-}
 typedef struct {
     std::string type, name;
     bool        isOutput, isInout;
@@ -324,7 +247,7 @@ static void processRecursiveAssign(void)
 if (trace_assign)
 printf("[%s:%d] checking [%s] = '%s'\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str());
             bool treeChanged = false;
-            std::string newItem = walkTree(item.second.value, &treeChanged);
+            std::string newItem = tree2str(item.second.value, &treeChanged, true);
             if (treeChanged) {
 if (trace_assign)
 printf("[%s:%d] change [%s] = %s -> %s\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str(), newItem.c_str());
@@ -556,12 +479,12 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
     std::string methodName = MI->name;
     std::map<std::string, std::list<std::string>> condLines;
     for (auto info: MI->storeList) {
-        ACCExpr *cond = cleanupExpr(info->cond);
-        ACCExpr *value = (info->value);
+        ACCExpr *cond = cleanupExprBit(info->cond);
+        ACCExpr *value = cleanupExprBit(info->value);
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         ACCExpr *destt = info->dest;
-        destt = str2tree(walkTree(destt, nullptr), true);
+        destt = str2tree(tree2str(destt, nullptr, true));
         walkRef(destt);
         ACCExpr *expr = destt;
         if (expr->value == "?") {
@@ -581,14 +504,14 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
         }
         std::string condStr;
         if (cond)
-            condStr = "    if (" + walkTree(cond, nullptr) + ")";
-        condLines[condStr].push_back("    " + tree2str(destt) + " <= " + walkTree(value, nullptr) + ";");
+            condStr = "    if (" + tree2str(cond, nullptr, true) + ")";
+        condLines[condStr].push_back("    " + tree2str(destt) + " <= " + tree2str(value, nullptr, true) + ";");
     }
     if (!hasPrintf)
     for (auto info: MI->printfList) {
 printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
-        ACCExpr *cond = cleanupExpr(info->cond);
-        ACCExpr *value = cleanupExpr(info->value)->operands.front();
+        ACCExpr *cond = cleanupExprBit(info->cond);
+        ACCExpr *value = cleanupExprBit(info->value)->operands.front();
         value->value = "(";   // change from '{'
         ACCExpr *listp = value->operands.front();
         if (endswith(listp->value, "\\n\""))
@@ -597,12 +520,12 @@ printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
 //dumpExpr("PRINTF", value);
         std::string condStr;
         if (cond)
-            condStr = "    if (" + walkTree(cond, nullptr) + ")";
-        condLines[condStr].push_back("    $display" + walkTree(value, nullptr) + ";");
+            condStr = "    if (" + tree2str(cond, nullptr, true) + ")";
+        condLines[condStr].push_back("    $display" + tree2str(value, nullptr, true) + ";");
     }
     if (condLines.size()) {
         ACCExpr *tempCond = allocExpr("&", allocExpr(MI->name), allocExpr(getRdyName(MI->name)));
-        alwaysLines.push_back("if (" + walkTree(tempCond, nullptr) + ") begin");
+        alwaysLines.push_back("if (" + tree2str(tempCond, nullptr, true) + ") begin");
     }
     for (auto item: condLines) {
         std::string endStr;
@@ -776,8 +699,8 @@ static std::list<ModData> modLine;
             ACCExpr *cond = allocExpr("&", allocExpr(getRdyName(methodName)));
             if (info->cond)
                 cond->operands.push_back(info->cond);
-            cond = cleanupExpr(cond);
-            ACCExpr *value = cleanupExpr(info->value);
+            cond = cleanupExprBit(cond);
+            ACCExpr *value = cleanupExprBit(info->value);
             if (isdigit(value->value[0]))
                 updateWidth(value, convertType(info->type));
             walkRead(MI, cond, nullptr);
@@ -793,8 +716,8 @@ static std::list<ModData> modLine;
             }
         }
         for (auto info: MI->callList) {
-            ACCExpr *cond = cleanupExpr(info->cond);
-            ACCExpr *value = cleanupExpr(info->value);
+            ACCExpr *cond = cleanupExprBit(info->cond);
+            ACCExpr *value = cleanupExprBit(info->value);
             if (isIdChar(value->value[0]) && value->operands.size() && value->operands.front()->value == "{")
                 MI->meta[MetaInvoke][value->value].insert(tree2str(cond));
             else {
@@ -932,7 +855,7 @@ dumpExpr("READCALL", value);
     for (auto mitem: modLine) {
         std::string val = mitem.value;
         if (!mitem.moduleStart) {
-            val = walkTree(allocExpr(mitem.value), nullptr);
+            val = tree2str(allocExpr(mitem.value), nullptr, true);
             std::string temp = mapPort[val];
             if (temp != "") {
 //printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
