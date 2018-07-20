@@ -102,8 +102,14 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
         ACCExpr *list = expr->operands.front();
         if (list->operands.size() == 3)
             extra = ":" + tree2str(getRHS(list, 2), changed, assignReplace);
+        ACCExpr *bitem = list->operands.front();
+        if (!isIdChar(bitem->value[0])) {
+            printf("[%s:%d] can only do __bitsubstr on elementary items\n", __FUNCTION__, __LINE__);
+            dumpExpr("BITSUB", expr);
+            exit(-1);
+        }
         std::string base = tree2str(list->operands.front(), changed, assignReplace);
-        return "(" + base + ")[" + tree2str(getRHS(list), changed, assignReplace) + extra + "]";
+        return base + "[" + tree2str(getRHS(list), changed, assignReplace) + extra + "]";
     }
     if (isParen(op)) {
         ret += op;
