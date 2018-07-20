@@ -103,6 +103,15 @@ static ACCExpr *cloneReplaceTree (ACCExpr *expr, ACCExpr *target)
 void preprocessIR(std::list<ModuleIR *> &irSeq)
 {
     for (auto IR : irSeq) {
+        std::map<std::string, int> localConnect;
+        for (auto IC : IR->interfaceConnect)
+            if (!IC.isForward) {
+                localConnect[IC.target] = 1;
+                localConnect[IC.source] = 1;
+            }
+        for (auto item = IR->interfaces.begin(); item != IR->interfaces.end(); item++)
+            if (localConnect[item->fldName])
+                item->isLocalInterface = 1; // interface declaration that is used to connect to local objects (does not appear in module signature)
         // expand all subscript calculations before processing the module
         for (auto item: IR->method) {
             MethodInfo *MI = item.second;

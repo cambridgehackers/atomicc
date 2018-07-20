@@ -215,6 +215,8 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, n
         std::string ret = "    INTERFACE";
         if (item.isPtr)
             ret += "/Ptr";
+        if (item.isLocalInterface) // interface declaration that is used to connect to local objects (does not appear in module signature)
+            ret += "/Local";
         ret += " ";
         if (item.vecCount != -1)
             ret += "/Count " + autostr(item.vecCount);

@@ -166,10 +166,11 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 IR->priority[rule] = getToken();
             }
             else if (checkItem("INTERFACECONNECT")) {
+                bool        isForward = checkItem("/Forward");
                 std::string target = cleanInterface(getToken());
                 std::string source = cleanInterface(getToken());
                 std::string type = getToken();
-                IR->interfaceConnect.push_back(InterfaceConnectType{target, source, type});
+                IR->interfaceConnect.push_back(InterfaceConnectType{target, source, type, isForward});
             }
             else if (checkItem("UNION")) {
                 std::string type = getToken();
@@ -186,7 +187,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                     vecCount = atoi(getToken().c_str());
                 std::string type = getToken();
                 std::string fldName = getToken();
-                IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter});
+                IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter, false});
             }
             else if (checkItem("PARAMS")) {
                 std::string fldName = getToken();
@@ -201,7 +202,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 std::string fldName = getToken();
                 if (fldName == "_")
                     fldName = "";
-                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, false});
+                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, false, false});
             }
             else if (checkItem("METHOD")) {
                 bool rule = false;

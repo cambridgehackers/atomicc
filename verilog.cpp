@@ -116,11 +116,11 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
 
 typedef struct {
     std::string type, name;
-    bool        isOutput, isInout;
+    bool        isOutput, isInout, isLocal;
     MethodInfo *MI;
 } PinInfo;
 std::list<PinInfo> pinPorts, pinMethods, paramPorts;
-static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix)
+static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal)
 {
     for (auto item : IR->interfaces) {
         ModuleIR *IIR = lookupIR(item.type);
@@ -128,18 +128,18 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
             MethodInfo *MI = FI.second;
             std::string name = methodPrefix + item.fldName + MODULE_SEPARATOR + MI->name;
             bool out = instance ^ item.isPtr;
-            pinMethods.push_back(PinInfo{MI->type, name, out, false, MI});
+            pinMethods.push_back(PinInfo{MI->type, name, out, false, isLocal || item.isLocalInterface, MI});
         }
         for (auto fld: IIR->fields) {
             std::string name = pinPrefix + item.fldName + fld.fldName;
             bool out = instance ^ fld.isOutput;
             if (fld.isParameter)
-                paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : fld.type, name, out, fld.isInout, nullptr});
+                paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr});
             else
-                pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, nullptr});
+                pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr});
         }
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
-            methodPrefix + item.fldName + MODULE_SEPARATOR);
+            methodPrefix + item.fldName + MODULE_SEPARATOR, isLocal || item.isLocalInterface);
     }
 }
 
@@ -148,8 +148,13 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
  */
 static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params)
 {
-    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam) -> void {
-        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0, inout, instance == "" ? PIN_MODULE : PIN_OBJECT};
+    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam, bool islocal) -> void {
+        int refPin = instance == "" ? PIN_MODULE : PIN_OBJECT;
+        if (islocal && instance == "")
+            refPin = PIN_WIRE;
+        if (!islocal || instance == "")
+        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin};
+        if (!islocal)
         modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam});
         if (!isparam)
         expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
@@ -180,18 +185,18 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
     pinPorts.clear();
     pinMethods.clear();
     paramPorts.clear();
-    collectInterfacePins(IR, instance != "", "", "");
+    collectInterfacePins(IR, instance != "", "", "", false);
     modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, pinPorts.size() > 0, 0, false, false});
     if (instance == "")
         for (auto item: paramPorts)
-            checkWire(item.name, item.type, item.isOutput, item.isInout, true);
+            checkWire(item.name, item.type, item.isOutput, item.isInout, true, item.isLocal);
     for (auto item: pinMethods) {
-        checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, false);
+        checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, false, item.isLocal);
         for (auto pitem: item.MI->params)
-            checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, false);
+            checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, false, item.isLocal);
     }
     for (auto item: pinPorts)
-        checkWire(item.name, item.type, item.isOutput, item.isInout, false);
+        checkWire(item.name, item.type, item.isOutput, item.isInout, false, item.isLocal);
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
