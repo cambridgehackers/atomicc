@@ -20,6 +20,11 @@
 #include <assert.h>
 #include "AtomiccIR.h"
 
+#define SUBSCRIPT_MARKER "@["
+#define PARAMETER_MARKER "@{"
+#define SUBSCRIPT_CLOSE "@]"
+#define PARAMETER_CLOSE "@}"
+
 typedef struct {
     std::string argName;
     std::string value;
@@ -87,7 +92,6 @@ void dumpExpr(std::string tag, ACCExpr *next);
 ACCExpr *cleanupExpr(ACCExpr *expr);
 ACCExpr *cleanupExprBit(ACCExpr *expr);
 ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
-bool isParenChar(char ch);
 std::string treePost(const ACCExpr *arg);
 bool checkOperand(std::string s);
 ACCExpr *invertExpr(ACCExpr *expr);

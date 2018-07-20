@@ -135,7 +135,7 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
                     MI->params.push_back(ParamElement{"v", "l_struct_OC_NOCData"});
                     std::string call;
                     MI->callList.push_back(new CallListElement{
-                        allocExpr("out$enq__ENA", allocExpr("{", allocExpr(
+                        allocExpr("out$enq__ENA", allocExpr(PARAMETER_MARKER, allocExpr(
                             methodName.substr(0, methodName.length()-5)
                                + MODULE_SEPARATOR + "v"))),
                         nullptr, true});

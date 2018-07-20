@@ -28,7 +28,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
     for (auto item: expr->operands)
         walkSubscript(IR, item);
     std::string fieldName = expr->value;
-    if (!isIdChar(fieldName[0]) || !expr->operands.size() || expr->operands.front()->value != "[")
+    if (!isIdChar(fieldName[0]) || !expr->operands.size() || expr->operands.front()->value != SUBSCRIPT_MARKER)
         return;
     ACCExpr *subscript = expr->operands.front()->operands.front();
     expr->operands.pop_front();
@@ -43,7 +43,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
             size = item.vecCount;
             break;
         }
-printf("[%s:%d] ARRAAA size %d '%s' post '%s'\n", __FUNCTION__, __LINE__, size, fieldName.c_str(), post.c_str());
+printf("[%s:%d] ARRAAA size %d '%s' post '%s' subscriptval %s\n", __FUNCTION__, __LINE__, size, fieldName.c_str(), post.c_str(), subscript->value.c_str());
     assert (!isdigit(subscript->value[0]));
     std::string lastElement = fieldName + autostr(size - 1) + post;
     expr->value = lastElement; // if only 1 element
@@ -63,7 +63,7 @@ printf("[%s:%d] ARRAAA size %d '%s' post '%s'\n", __FUNCTION__, __LINE__, size, 
 }
 static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
 {
-    if (isIdChar(expr->value[0]) && expr->operands.size() && expr->operands.front()->value == "[") {
+    if (isIdChar(expr->value[0]) && expr->operands.size() && expr->operands.front()->value == SUBSCRIPT_MARKER) {
         fieldName = expr->value;
         *subscript = expr->operands.front()->operands.front();
         expr->operands.pop_front();

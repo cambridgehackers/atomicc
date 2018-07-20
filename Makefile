@@ -21,7 +21,7 @@ LLVMDIR = ../llvm/lib/Target/Atomicc
 
 all: veriloggen atomiccImport
 
-veriloggen: $(SOURCES) $(LLVMDIR)/*.h
+veriloggen: $(SOURCES) $(LLVMDIR)/*.h *.h
 	@clang++ -o veriloggen -g -std=c++11 \
             -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
             -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \

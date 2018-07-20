@@ -119,7 +119,7 @@ exit(-1);
         if (pipeArgSize > dataLength)
             call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
         MInew->callList.push_back(new CallListElement{
-             allocExpr(target + "$enq__ENA", allocExpr("{", allocExpr("{ " + call
+             allocExpr(target + "$enq__ENA", allocExpr(PARAMETER_MARKER, allocExpr("{ " + call
                  + "16'd" + autostr(counter) + ", 16'd" + autostr(dataLength/32) + "}"))), nullptr, true});
         counter++;
     }
@@ -178,7 +178,7 @@ assert(MInew);
         if (endswith(methodName, "__RDY"))
             continue;
         ACCExpr *paramList = allocExpr(",");
-        ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr("{", paramList));
+        ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr(PARAMETER_MARKER, paramList));
         for (auto param: MI->params) {
             uint64_t upper = offset + convertType(param.type);
             paramList->operands.push_back(allocExpr(host + "$enq$v[" + autostr(upper-1) + ":" + autostr(offset) + "]"));

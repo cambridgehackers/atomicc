@@ -34,19 +34,30 @@ bool isIdChar(char ch)
     return isalpha(ch) || ch == '_' || ch == '$';
 }
 
-bool isParenChar(char ch)
+static bool isParen(std::string ch)
 {
-    return ch == '[' || ch == '(' || ch == '{';
+    return ch == "[" || ch == "(" || ch == "{" || ch == SUBSCRIPT_MARKER || ch == PARAMETER_MARKER;
+}
+static bool isParen(char ch)
+{
+    static char item[2];
+    item[0] = ch;
+    return isParen(item);
 }
 
 std::string treePost(const ACCExpr *arg)
 {
+    std::string space = " ";
     if (arg->value == "[")
         return " ]";
     else if (arg->value == "(")
         return " )";
     else if (arg->value == "{")
         return " }";
+    else if (arg->value == SUBSCRIPT_MARKER)
+        return space + SUBSCRIPT_CLOSE;
+    else if (arg->value == PARAMETER_MARKER)
+        return space + PARAMETER_CLOSE;
     return "";
 }
 
@@ -80,16 +91,21 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
     if (!expr)
         return "";
     std::string ret, sep, op = expr->value;
-    if (op == "__bitconcat")
-        return tree2str(expr->operands.front(), changed, assignReplace);
+    if (op == "__bitconcat") {
+        ACCExpr *list = expr->operands.front();
+        if (list->value == PARAMETER_MARKER)
+            list->value = "{";
+        return tree2str(list, changed, assignReplace);
+    }
     if (op == "__bitsubstr") {
         std::string extra;
         ACCExpr *list = expr->operands.front();
         if (list->operands.size() == 3)
             extra = ":" + tree2str(getRHS(list, 2), changed, assignReplace);
-        return tree2str(list->operands.front(), changed, assignReplace) + "[" + tree2str(getRHS(list), changed, assignReplace) + extra + "]";
+        std::string base = tree2str(list->operands.front(), changed, assignReplace);
+        return "(" + base + ")[" + tree2str(getRHS(list), changed, assignReplace) + extra + "]";
     }
-    if (isParenChar(op[0])) {
+    if (isParen(op)) {
         ret += op;
         if (expr->operands.size())
             ret += " ";
@@ -248,10 +264,14 @@ static ACCExpr *get1Token(void)
         do {
             getNext();
         } while (lexChar == '=' || lexChar == '<' || lexChar == '>');
-    else if (isParenChar(lexChar) || lexChar == '/' || lexChar == '%'
+    else if (isParen(lexChar) || lexChar == '/' || lexChar == '%'
         || lexChar == ']' || lexChar == '}' || lexChar == ')' || lexChar == '^'
         || lexChar == ',' || lexChar == '?' || lexChar == ':' || lexChar == ';')
         getNext();
+    else if (lexChar == '@') { // special 'escape' character for internal SUBSCRIPT_MARKER/PARAMETER_MARKER sequences
+        getNext();
+        getNext();
+    }
     else if (lexChar == '"') {
         do {
             if (lexChar == '\\')
@@ -265,7 +285,7 @@ static ACCExpr *get1Token(void)
         exit(-1);
     }
     ret = allocExpr(lexToken);
-    if (isParenChar(ret->value[0]))
+    if (isParen(ret->value))
         return getExprList(ret, treePost(ret).substr(1), false);
     return ret;
 }
@@ -339,6 +359,8 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
         expr = expr->operands.front();
     if (expr->value == "{" && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
+    if (expr->value == PARAMETER_MARKER && expr->operands.size() == 1 && expr->operands.front()->value == ",")
+        expr->operands = expr->operands.front()->operands;
     if (trace_expr)
         dumpExpr("cleanupExpr", expr);
     ACCExpr *lhs = expr->operands.front();
@@ -350,7 +372,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
          ACCExpr *titem = cleanupExpr(item);
          if (trace_expr)
              printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
-         if (titem->value != ret->value || ret->value == "?" || isParenChar(ret->value[0]))
+         if (titem->value != ret->value || ret->value == "?" || isParen(ret->value))
              ret->operands.push_back(titem);
          else
              for (auto oitem: titem->operands)
@@ -521,13 +543,14 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                     printf("[%s:%d] OPERAND CHECKFAILLLLLLLLLLLLLLL %s from %s\n", __FUNCTION__, __LINE__, tree2str(tok).c_str(), lexString.c_str());
                     exit(-1);
                 }
-                while (tnext && (tnext->value == "{" || tnext->value == "[" || isIdChar(tnext->value[0]))) {
+                while (tnext && (isParen(tnext->value) || isIdChar(tnext->value[0]))) {
                     assert(isIdChar(tok->value[0]));
                     tok->operands.push_back(tnext);
                     tnext = get1Token();
                 }
                 if (isIdChar(tok->value[0]) && tok->operands.size()
-                  && tok->operands.front()->value == "["
+// HACK HACK HACK HACK HACK HACK HACK this processing is in incorrect location!!
+                  && (tok->operands.front()->value == SUBSCRIPT_MARKER || tok->operands.front()->value == "[")
                   && tok->operands.front()->operands.size()) {
                     std::string sub = tok->operands.front()->operands.front()->value;
                     if (isdigit(sub[0])) {

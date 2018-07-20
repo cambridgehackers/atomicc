@@ -107,6 +107,45 @@ static std::string cleanInterface(std::string name)
     return name;
 }
 
+/*
+ * rewrite method call parameter and subscript markers, since '[' and '{'
+ * are needed in verilog output
+ */
+static void rewriteExpr(ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    if (expr->value == "[")
+        expr->value = SUBSCRIPT_MARKER;
+    else if (expr->value == "{")
+        expr->value = PARAMETER_MARKER;
+    for (auto item: expr->operands)
+        rewriteExpr(item);
+}
+
+static void postParseCleanup(MethodInfo *MI)
+{
+    rewriteExpr(MI->guard);
+    for (auto item: MI->storeList) {
+        rewriteExpr(item->dest);
+        rewriteExpr(item->value);
+        rewriteExpr(item->cond);
+    }
+    for (auto item: MI->letList) {
+        rewriteExpr(item->dest);
+        rewriteExpr(item->value);
+        rewriteExpr(item->cond);
+    }
+    for (auto item: MI->callList) {
+        rewriteExpr(item->value);
+        rewriteExpr(item->cond);
+    }
+    for (auto item: MI->printfList) {
+        rewriteExpr(item->value);
+        rewriteExpr(item->cond);
+    }
+}
+
 static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
@@ -245,6 +284,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                             ParseCheck(false, "unknown method item");
                     }
                 }
+                postParseCleanup(MI);
             }
             else
                 ParseCheck(false, "unknown module item");

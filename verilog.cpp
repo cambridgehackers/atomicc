@@ -110,7 +110,7 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
     for (auto item: expr->operands)
         walkRead(MI, item, cond);
     std::string fieldName = expr->value;
-    if (isIdChar(fieldName[0]) && cond && (!expr->operands.size() || expr->operands.front()->value != "{"))
+    if (isIdChar(fieldName[0]) && cond && (!expr->operands.size() || expr->operands.front()->value != PARAMETER_MARKER))
         addRead(MI->meta[MetaRead][fieldName], cond);
 }
 
@@ -433,7 +433,7 @@ static int printfNumber = 1;
 #define PRINTF_PORT 0x7fff
 static ACCExpr *printfArgs(ACCExpr *value)
 {
-    ACCExpr *listp = value->operands.front(); // get '{' node
+    ACCExpr *listp = value->operands.front(); // get PARAMETER_MARKER node
     ACCExpr *fitem = listp->operands.front();
     listp->operands.pop_front();
     std::string format = fitem->value;
@@ -468,7 +468,7 @@ static ACCExpr *printfArgs(ACCExpr *value)
     next->operands.push_back(allocExpr("16'd" + autostr((total_length + sizeof(int) * 8 - 1)/(sizeof(int) * 8) + 2)));
     listp->operands.clear();
     listp->operands = next->operands;
-    value = allocExpr("printfp$enq__ENA", allocExpr("{", next));
+    value = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next));
     printfFormat.push_back(PrintfInfo{format, width});
 dumpExpr("PRINTFLL", value);
     return value;
@@ -512,7 +512,7 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
 printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
         ACCExpr *cond = cleanupExprBit(info->cond);
         ACCExpr *value = cleanupExprBit(info->value)->operands.front();
-        value->value = "(";   // change from '{'
+        value->value = "(";   // change from PARAMETER_MARKER
         ACCExpr *listp = value->operands.front();
         if (endswith(listp->value, "\\n\""))
             listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
@@ -718,7 +718,7 @@ static std::list<ModData> modLine;
         for (auto info: MI->callList) {
             ACCExpr *cond = cleanupExprBit(info->cond);
             ACCExpr *value = cleanupExprBit(info->value);
-            if (isIdChar(value->value[0]) && value->operands.size() && value->operands.front()->value == "{")
+            if (isIdChar(value->value[0]) && value->operands.size() && value->operands.front()->value == PARAMETER_MARKER)
                 MI->meta[MetaInvoke][value->value].insert(tree2str(cond));
             else {
                 printf("[%s:%d] called method name not found %s\n", __FUNCTION__, __LINE__, tree2str(value).c_str());
@@ -739,7 +739,7 @@ dumpExpr("READCALL", value);
             }
             std::string calledName = value->value;
 //printf("[%s:%d] CALLLLLL '%s'\n", __FUNCTION__, __LINE__, calledName.c_str());
-            if (!value->operands.size() || value->operands.front()->value != "{") {
+            if (!value->operands.size() || value->operands.front()->value != PARAMETER_MARKER) {
                 printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
                 exit(-1);
             }
