@@ -37,6 +37,10 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
         post = expr->operands.front()->value;
         expr->operands.pop_front();
     }
+    if (isdigit(subscript->value[0])) {
+        expr->value += subscript->value + post;
+        return;
+    }
     int size = -1;
     for (auto item: IR->fields)
         if (item.fldName == fieldName) {
@@ -65,12 +69,17 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::stri
 {
     if (isIdChar(expr->value[0]) && expr->operands.size() && expr->operands.front()->value == SUBSCRIPT_MARKER) {
         fieldName = expr->value;
-        *subscript = expr->operands.front()->operands.front();
+        ACCExpr *sub = expr->operands.front()->operands.front();
         expr->operands.pop_front();
         if (expr->operands.size() && isIdChar(expr->operands.front()->value[0])) {
             post = expr->operands.front()->value;
             expr->operands.pop_front();
         }
+        if (isdigit(sub->value[0])) {
+            expr->value += sub->value + post;
+            return nullptr;
+        }
+        *subscript = sub;
         for (auto item: IR->fields)
             if (item.fldName == expr->value) {
                 size = item.vecCount;
