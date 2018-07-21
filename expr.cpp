@@ -108,7 +108,8 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
             dumpExpr("BITSUB", expr);
             exit(-1);
         }
-        std::string base = tree2str(list->operands.front(), changed, assignReplace);
+        std::string base = tree2str(list->operands.front(), changed, false);  // can only do bit select on net or reg (not expressions)
+        refList[base].count++;
         return base + "[" + tree2str(getRHS(list), changed, assignReplace) + extra + "]";
     }
     if (isParen(op)) {
@@ -123,7 +124,7 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
         ACCExpr *temp = assignList[op].value;
 if (trace_assign)
 printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)temp);
-        if (temp && !assignList[op].noReplace && refList[op].pin != PIN_MODULE) {
+        if (temp && !expr->operands.size() && !assignList[op].noReplace && refList[op].pin != PIN_MODULE) {
             refList[op].count = 0;
 if (trace_assign)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(temp).c_str());
@@ -510,10 +511,10 @@ ACCExpr *cleanupExprBit(ACCExpr *expr)
     if (!expr)
         return expr;
     ACCExpr *temp = cleanupExpr(expr);
-    return temp;
+    //return temp;
     std::string bitTemp = tree2str(temp);  //HACK HACK HACK HACK to trigger __bitsubstr processing
-printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, bitTemp.c_str());
-dumpExpr("EXPR", expr);
+//printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, bitTemp.c_str());
+//dumpExpr("EXPR", expr);
     return str2tree(bitTemp);              //HACK HACK HACK HACK to trigger __bitsubstr processing
 }
 
