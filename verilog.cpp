@@ -808,12 +808,16 @@ dumpExpr("READCALL", value);
             dumpModule("MISSINGCONNECT", IR);
         assert(IIR && "interfaceConnect interface type");
         if (trace_connect)
-printf("[%s:%d] CONNECT target %s source %s forward %d\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.source.c_str(), IC.isForward);
+            printf("%s: CONNECT target %s source %s forward %d\n", __FUNCTION__, IC.target.c_str(), IC.source.c_str(), IC.isForward);
         for (auto fld : IIR->fields) {
             std::string tstr = IC.target + fld.fldName,
                         sstr = IC.source + fld.fldName;
-        if (trace_connect)
-printf("[%s:%d] IFCCC %s/%d %s/%d\n", __FUNCTION__, __LINE__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+            if (!IC.isForward) {
+                refList[tstr].out = 0;   // for local connections, don't bias for 'output'
+                refList[sstr].out = 0;
+            }
+            if (trace_connect)
+                printf("%s: IFCCCfield %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (refList[sstr].out)
                 setAssign(sstr, allocExpr(tstr), fld.type);
             else
@@ -823,8 +827,12 @@ printf("[%s:%d] IFCCC %s/%d %s/%d\n", __FUNCTION__, __LINE__, tstr.c_str(), refL
             MethodInfo *MI = FI.second;
             std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
                         sstr = IC.source + MODULE_SEPARATOR + MI->name;
-        if (trace_connect)
-printf("[%s:%d] IFCCC %s/%d %s/%d\n", __FUNCTION__, __LINE__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+            if (!IC.isForward) {
+                refList[tstr].out = 0;   // for local connections, don't bias for 'output'
+                refList[sstr].out = 0;
+            }
+            if (trace_connect)
+                printf("%s: IFCCCmeth %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (refList[sstr].out)
                 setAssign(sstr, allocExpr(tstr), MI->type);
             else
@@ -833,8 +841,8 @@ printf("[%s:%d] IFCCC %s/%d %s/%d\n", __FUNCTION__, __LINE__, tstr.c_str(), refL
             sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
             for (auto info: MI->params) {
                 std::string sparm = sstr + info.name, tparm = tstr + info.name;
-        if (trace_connect)
-printf("[%s:%d] IFCCC %s/%d %s/%d\n", __FUNCTION__, __LINE__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
+                if (trace_connect)
+                    printf("%s: IFCCCparam %s/%d %s/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
                 if (refList[sparm].out)
                     setAssign(sparm, allocExpr(tparm), info.type);
                 else
