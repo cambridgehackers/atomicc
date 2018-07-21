@@ -396,7 +396,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
         ACCExpr *nret = allocExpr(ret->value);
         std::string checkName;
         for (auto item: ret->operands) {
-             if (item->value == "0") {
+             if (checkInteger(item, "0")) {
                  nret = item;
                  break;
              }
@@ -429,7 +429,7 @@ nexta:;
                  nret = item;
                  break;
              }
-             else if (item->value == "0" && ret->operands.size() > 1)
+             else if (checkInteger(item, "0") && ret->operands.size() > 1)
                  continue;
              else for (auto pitem: nret->operands)
                  if (matchExpr(pitem, item))  // see if we already have this operand
@@ -448,7 +448,7 @@ nexto:;
             ret->operands.push_back(lhs);
         }
         ACCExpr *rhs = getRHS(ret), *lhs = ret->operands.front();
-        if (rhs->value == "0" && lhs->value == "^" && checkInteger(getRHS(lhs), "1")) {
+        if (checkInteger(rhs, "0") && lhs->value == "^" && checkInteger(getRHS(lhs), "1")) {
             ret->value = "==";
             ret->operands.clear();
             ret->operands.push_back(lhs->operands.front());
@@ -472,7 +472,7 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
                     leftLen = convertType(refList[item->value].type);
             }
             else if (isdigit(item->value[0])) {
-                if (item->value == "0" && leftLen == 1) {
+                if (checkInteger(item, "0") && leftLen == 1) {
                     ret = allocExpr("!", ret->operands.front());
                     break;
                 }
@@ -492,7 +492,7 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
                     leftLen = convertType(refList[item->value].type);
             }
             else if (isdigit(item->value[0])) {
-                if (item->value == "0" && leftLen == 1) {
+                if (checkInteger(item, "0") && leftLen == 1) {
                     ret = ret->operands.front();
                     break;
                 }
