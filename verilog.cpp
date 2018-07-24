@@ -887,6 +887,8 @@ dumpExpr("READCALL", value);
                 setAssign(sstr, allocExpr(tstr), fld.type);
             else
                 setAssign(tstr, allocExpr(sstr), fld.type);
+refList[sstr].count++;
+refList[tstr].count++;
         }
         for (auto FI : IIR->method) {
             MethodInfo *MI = FI.second;
@@ -902,6 +904,8 @@ dumpExpr("READCALL", value);
                 setAssign(sstr, allocExpr(tstr), MI->type);
             else
                 setAssign(tstr, allocExpr(sstr), MI->type);
+refList[sstr].count++;
+refList[tstr].count++;
             tstr = tstr.substr(0, tstr.length()-5) + MODULE_SEPARATOR;
             sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
             for (auto info: MI->params) {
@@ -912,16 +916,19 @@ dumpExpr("READCALL", value);
                     setAssign(sparm, allocExpr(tparm), info.type);
                 else
                     setAssign(tparm, allocExpr(sparm), info.type);
+refList[sparm].count++;
+refList[tparm].count++;
             }
         }
     }
     for (auto item: enableList) {
         setAssign(item.first, item.second, "INTEGER_1");
-        refList[item.first].count++;
+        //refList[item.first].count++;
     }
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
+        refList[methodName].count++;
         for (auto info: MI->storeList) {
             info->dest = cleanupExprBit(info->dest);
             info->cond = cleanupExprBit(info->cond);
