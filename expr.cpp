@@ -141,8 +141,6 @@ if (replaceBlock[op] > 7)
 exit(-1);
         }
         }
-        //else if (!changed)
-            //refList[op].count++;
         }
     }
     else if (!expr->operands.size() || ((op == "-" || op == "!")/*unary*/ && expr->operands.size() == 1))

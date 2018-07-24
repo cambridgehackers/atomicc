@@ -150,15 +150,13 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
 static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params)
 {
     auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam, bool islocal) -> void {
-        int refPin = instance == "" ? PIN_MODULE : PIN_OBJECT;
-        if (islocal && instance == "")
-            refPin = PIN_WIRE;
+        int refPin = instance != "" ? PIN_OBJECT: (islocal ? PIN_LOCAL: PIN_MODULE);
         if (!islocal || instance == "")
-        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin};
+        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0 || refPin == PIN_LOCAL, inout, refPin};
         if (!islocal)
         modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam});
         if (!isparam)
-        expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
+        expandStruct(IR, instance + name, type, dir || refPin == PIN_LOCAL, inout, false, PIN_WIRE);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     std::string moduleInstantiation = IR->name;
@@ -337,7 +335,7 @@ static void optimizeAssign(ModuleIR *IR)
 
     for (auto item: assignList)
         if (item.second.value && (refList[item.first].out || refList[item.first].inout) &&
-            (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_MODULE))
+            (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_LOCAL || refList[item.first].pin == PIN_MODULE))
             refList[item.first].count++;
     // Now extend 'was referenced' from assignList items actually referenced
 #if 1
@@ -377,7 +375,7 @@ static void generateAssign(FILE *OStr)
     }
     for (auto item: refList) {
         std::string temp = item.first;
-        if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT) {
+        if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL) {
         if (refList[temp].count) {
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
 if (trace_assign && item.second.out) {
@@ -415,7 +413,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         int ind = temp.find('[');
         if (ind != -1)
             temp = temp.substr(0,ind);
-        if ((item.second.out || item.second.inout) && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT)) {
+        if ((item.second.out || item.second.inout) && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL)) {
             if (item.second.inout && !assignList[item.first].value)
                 for (auto alitem: assignList)
                     if (ACCExpr *val = alitem.second.value)
@@ -728,11 +726,11 @@ static std::list<ModData> modLine;
     fprintf(OStr, ");\n");
     if (!hasCLK) {
         fprintf(OStr, "    wire CLK;\n");
-        refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
+        refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL};
     }
     if (!hasnRST) {
         fprintf(OStr, "    wire nRST;\n");
-        refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
+        refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL};
     }
     modLine.clear();
     for (auto item: IR->interfaces)
@@ -900,9 +898,8 @@ dumpExpr("READCALL", value);
         for (auto fld : IIR->fields) {
             std::string tstr = IC.target + fld.fldName,
                         sstr = IC.source + fld.fldName;
-            if (!IC.isForward// && !refList[tstr].out && !refList[sstr].out
-) {
-                refList[tstr].out = 0;   // for local connections, don't bias for 'output'
+            if (!IC.isForward) {
+                refList[tstr].out = 1;   // for local connections, don't bias for 'output'
                 refList[sstr].out = 0;
             }
             if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
@@ -911,16 +908,13 @@ dumpExpr("READCALL", value);
                 setAssign(sstr, allocExpr(tstr), fld.type);
             else
                 setAssign(tstr, allocExpr(sstr), fld.type);
-refList[sstr].count++;
-refList[tstr].count++;
         }
         for (auto FI : IIR->method) {
             MethodInfo *MI = FI.second;
             std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
                         sstr = IC.source + MODULE_SEPARATOR + MI->name;
-            if (!IC.isForward// && !refList[tstr].out && !refList[sstr].out
-) {
-                refList[tstr].out = 0;   // for local connections, don't bias for 'output'
+            if (!IC.isForward) {
+                refList[tstr].out = 1;   // for local connections, don't bias for 'output'
                 refList[sstr].out = 0;
             }
             if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
@@ -929,29 +923,21 @@ refList[tstr].count++;
                 setAssign(sstr, allocExpr(tstr), MI->type);
             else
                 setAssign(tstr, allocExpr(sstr), MI->type);
-refList[sstr].count++;
-refList[tstr].count++;
             tstr = tstr.substr(0, tstr.length()-5) + MODULE_SEPARATOR;
             sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
             for (auto info: MI->params) {
                 std::string sparm = sstr + info.name, tparm = tstr + info.name;
-                //if (!refList[tparm].out && !refList[sparm].out)
-                    //refList[tparm].out = 1;   // for local connections, don't bias for 'output'
                 if (trace_connect)
                     printf("%s: IFCCCparam %s/%d %s/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
                 if (refList[sparm].out)
                     setAssign(sparm, allocExpr(tparm), info.type);
                 else
                     setAssign(tparm, allocExpr(sparm), info.type);
-refList[sparm].count++;
-refList[tparm].count++;
             }
         }
     }
-    for (auto item: enableList) {
+    for (auto item: enableList)
         setAssign(item.first, item.second, "INTEGER_1");
-        //refList[item.first].count++;
-    }
     for (auto item: assignList)
         assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
 
