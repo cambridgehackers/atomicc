@@ -935,8 +935,8 @@ dumpExpr("READCALL", value);
             }
 printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LINE__, name.c_str());
             assignList[name].noRecursion = true;
-            if (i++ > 0) {
-printf("[%s:%d]SETNO\n", __FUNCTION__, __LINE__);
+            if (i++ > 1000) {
+printf("[%s:%d]SETNO error; exit\n", __FUNCTION__, __LINE__);
 exit(-1);
             }
         }

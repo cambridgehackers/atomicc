@@ -399,11 +399,17 @@ ACCExpr *cleanupExpr(ACCExpr *expr)
          ACCExpr *titem = cleanupExpr(item);
          if (trace_expr)
              printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
-         if (titem->value != ret->value || ret->value == "?" || isParen(ret->value))
+         if (titem->value != ret->value || ret->value == "?" || isParen(ret->value)
+            || (  titem->value != "&" && titem->value != "|"
+               && titem->value != "&&" && titem->value != "||"
+               && titem->value != "+" && titem->value != "*"))
              ret->operands.push_back(titem);
-         else
+         else {
+             if (trace_expr)
+                 printf("[%s:%d] combine tree expressions: op %s uppersize %d lowersize %d\n", __FUNCTION__, __LINE__, titem->value.c_str(), (int)ret->operands.size(), (int)titem->operands.size());
              for (auto oitem: titem->operands)
                  ret->operands.push_back(oitem);
+         }
     }
     if (ret->value == "?" && checkInteger(ret->operands.front(), "1"))
         ret = getRHS(ret);
@@ -498,6 +504,13 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
                 }
                 updateWidth(item, leftLen);
             }
+        }
+        ACCExpr *rhs = getRHS(ret), *lhs = ret->operands.front();
+        if (checkInteger(rhs, "0")) {
+        if (lhs->value == "==") {
+            ret = lhs;
+            ret->value = "!=";
+        }
         }
     }
     if (ret->value == "!=") {
