@@ -124,10 +124,11 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
         ACCExpr *temp = assignList[op].value;
 if (trace_assign)
 printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)temp);
-        if (temp && !expr->operands.size() && !assignList[op].noRecursion && !assignList[op].noReplace) {
+        if (temp && !expr->operands.size() && !assignList[op].noRecursion && !assignList[op].noReplace && refList[op].count < REF_COUNT_LIMIT) {
         if (replaceBlock[op]++ < 5 ) {
 if (trace_assign)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(temp).c_str());
+            decRef(op);
             ret = tree2str(temp, changed, assignReplace);
             if (changed)
                 *changed = true;
@@ -168,6 +169,13 @@ if (addParen != (oldCond && orig)) dumpOutput = true;
 //printf("[%s:%d]TTTTTTTT top '%s' expr %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), ret.c_str());
 //}
     return ret;
+}
+
+void decRef(std::string name)
+{
+return;
+    if (refList[name].count > 0)
+        refList[name].count--;
 }
 
 void walkRef (ACCExpr *expr)

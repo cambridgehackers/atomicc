@@ -24,6 +24,7 @@
 #define PARAMETER_MARKER "@{"
 #define SUBSCRIPT_CLOSE "@]"
 #define PARAMETER_CLOSE "@}"
+#define REF_COUNT_LIMIT 3000
 
 typedef struct {
     std::string argName;
@@ -99,6 +100,7 @@ ACCExpr *invertExpr(ACCExpr *expr);
 void updateWidth(ACCExpr *item, int len);
 ACCExpr *getRHS(ACCExpr *expr, int match = 1);
 void walkRef (ACCExpr *expr);
+void decRef(std::string name);
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);

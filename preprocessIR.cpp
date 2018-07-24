@@ -166,6 +166,23 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
                 expandTree(3, &item->cond, item->value, item->isAction);
             for (auto item: MI->printfList)
                 expandTree(4, &item->cond, item->value, item->isAction);
+            for (auto info: MI->storeList) {
+                info->dest = cleanupExprBit(info->dest);
+                info->cond = cleanupExprBit(info->cond);
+                info->value = cleanupExprBit(info->value);
+            }
+            for (auto info: MI->printfList) {
+                info->cond = cleanupExprBit(info->cond);
+                info->value = cleanupExprBit(info->value);
+            }
+            for (auto info: MI->callList) {
+                info->cond = cleanupExprBit(info->cond);
+                info->value = cleanupExprBit(info->value);
+            }
+            for (auto info: MI->letList) {
+                info->cond = cleanupExprBit(info->cond);
+                info->value = cleanupExprBit(info->value);
+            }
         }
     }
 }

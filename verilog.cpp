@@ -236,7 +236,8 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName, boo
             return allocExpr("1");
         }
         if (ACCExpr *assignValue = assignList[item].value)
-        if (useAssign && !assignList[item].noRecursion && !assignList[item].noReplace) {
+        if (useAssign && !assignList[item].noRecursion && !assignList[item].noReplace && refList[item].count < REF_COUNT_LIMIT) {
+        decRef(item);
         if (replaceBlock[item]++ < 5) {
             if (trace_assign)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
@@ -317,9 +318,29 @@ printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bi
     }
 }
 
-static void optimizeAssign(void)
+static void optimizeAssign(ModuleIR *IR)
 {
+    for (auto FI : IR->method) {
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        //refList[methodName].count++;
+        for (auto info: MI->storeList) {
+            walkRef(info->dest);
+            walkRef(info->cond);
+            walkRef(info->value);
+        }
+        for (auto info: MI->printfList) {
+            walkRef(info->cond);
+            walkRef(info->value->operands.front());
+        }
+    }
+
+    for (auto item: assignList)
+        if (item.second.value && (refList[item.first].out || refList[item.first].inout) &&
+            (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_MODULE))
+            refList[item.first].count++;
     // Now extend 'was referenced' from assignList items actually referenced
+#if 1
     for (auto aitem: assignList) {
         std::string temp = aitem.first;
         int ind = temp.find('[');
@@ -328,6 +349,7 @@ static void optimizeAssign(void)
         if (aitem.second.value && (refList[aitem.first].count || refList[temp].count))
             walkRef(aitem.second.value);
     }
+#endif
     if (trace_assign)
     for (auto aitem: assignList) {
         std::string temp = aitem.first;
@@ -503,11 +525,11 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
     std::string methodName = MI->name;
     std::map<std::string, std::list<std::string>> condLines;
     for (auto info: MI->storeList) {
-        ACCExpr *cond = cleanupExprBit(info->cond);
-        ACCExpr *value = cleanupExprBit(info->value);
+        ACCExpr *cond = info->cond;
+        ACCExpr *value = info->value;
+        ACCExpr *destt = info->dest;
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
-        ACCExpr *destt = info->dest;
         replaceBlock.clear();
         destt = str2tree(tree2str(destt, nullptr, true));
         walkRef(destt);
@@ -537,8 +559,8 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
     if (!hasPrintf)
     for (auto info: MI->printfList) {
 printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
-        ACCExpr *cond = cleanupExprBit(info->cond);
-        ACCExpr *value = cleanupExprBit(info->value)->operands.front();
+        ACCExpr *cond = cleanupExpr(info->cond);
+        ACCExpr *value = cleanupExpr(info->value)->operands.front();
         value->value = "(";   // change from PARAMETER_MARKER
         ACCExpr *listp = value->operands.front();
         if (endswith(listp->value, "\\n\""))
@@ -607,6 +629,7 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
              && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
             if (trace_assign)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
+            decRef(item);
             return simpleReplace(assignValue);
         }
     }
@@ -769,8 +792,8 @@ static std::list<ModData> modLine;
             ACCExpr *cond = allocExpr("&", allocExpr(getRdyName(methodName)));
             if (info->cond)
                 cond->operands.push_back(info->cond);
-            cond = cleanupExprBit(cond);
-            ACCExpr *value = cleanupExprBit(info->value);
+            cond = cleanupExpr(cond);
+            ACCExpr *value = info->value;
             if (isdigit(value->value[0]))
                 updateWidth(value, convertType(info->type));
             walkRead(MI, cond, nullptr);
@@ -786,8 +809,8 @@ static std::list<ModData> modLine;
             }
         }
         for (auto info: MI->callList) {
-            ACCExpr *cond = cleanupExprBit(info->cond);
-            ACCExpr *value = cleanupExprBit(info->value);
+            ACCExpr *cond = info->cond;
+            ACCExpr *value = info->value;
             if (isIdChar(value->value[0]) && value->operands.size() && value->operands.front()->value == PARAMETER_MARKER)
                 MI->meta[MetaInvoke][value->value].insert(tree2str(cond));
             else {
@@ -877,11 +900,12 @@ dumpExpr("READCALL", value);
         for (auto fld : IIR->fields) {
             std::string tstr = IC.target + fld.fldName,
                         sstr = IC.source + fld.fldName;
-            if (!IC.isForward) {
+            if (!IC.isForward// && !refList[tstr].out && !refList[sstr].out
+) {
                 refList[tstr].out = 0;   // for local connections, don't bias for 'output'
                 refList[sstr].out = 0;
             }
-            if (trace_connect)
+            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
                 printf("%s: IFCCCfield %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (refList[sstr].out)
                 setAssign(sstr, allocExpr(tstr), fld.type);
@@ -894,11 +918,12 @@ refList[tstr].count++;
             MethodInfo *MI = FI.second;
             std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
                         sstr = IC.source + MODULE_SEPARATOR + MI->name;
-            if (!IC.isForward) {
+            if (!IC.isForward// && !refList[tstr].out && !refList[sstr].out
+) {
                 refList[tstr].out = 0;   // for local connections, don't bias for 'output'
                 refList[sstr].out = 0;
             }
-            if (trace_connect)
+            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
                 printf("%s: IFCCCmeth %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (refList[sstr].out)
                 setAssign(sstr, allocExpr(tstr), MI->type);
@@ -910,6 +935,8 @@ refList[tstr].count++;
             sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
             for (auto info: MI->params) {
                 std::string sparm = sstr + info.name, tparm = tstr + info.name;
+                //if (!refList[tparm].out && !refList[sparm].out)
+                    //refList[tparm].out = 1;   // for local connections, don't bias for 'output'
                 if (trace_connect)
                     printf("%s: IFCCCparam %s/%d %s/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
                 if (refList[sparm].out)
@@ -925,32 +952,11 @@ refList[tparm].count++;
         setAssign(item.first, item.second, "INTEGER_1");
         //refList[item.first].count++;
     }
-    for (auto FI : IR->method) {
-        MethodInfo *MI = FI.second;
-        std::string methodName = MI->name;
-        //refList[methodName].count++;
-        for (auto info: MI->storeList) {
-            info->dest = cleanupExprBit(info->dest);
-            info->cond = cleanupExprBit(info->cond);
-            info->value = cleanupExprBit(info->value);
-            walkRef(info->dest);
-            walkRef(info->cond);
-            walkRef(info->value);
-        }
-        for (auto info: MI->printfList) {
-            info->cond = cleanupExprBit(info->cond);
-            info->value = cleanupExprBit(info->value);
-            walkRef(info->cond);
-            walkRef(info->value->operands.front());
-        }
-    }
-    for (auto item: assignList)
-        if (item.second.value && (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_MODULE))
-            refList[item.first].count++;
-    optimizeAssign();
-
     for (auto item: assignList)
         assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
+
+    optimizeAssign(IR);
+
     for (auto item: assignList) {
         int i = 0;
         if (!item.second.value)
