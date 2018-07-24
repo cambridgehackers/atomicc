@@ -28,6 +28,7 @@ static unsigned lexIndex;
 static char lexChar;
 static bool lexAllowRange;
 static ACCExpr *repeatGet1Token;
+std::map<std::string, int> replaceBlock;
 
 bool isIdChar(char ch)
 {
@@ -124,7 +125,8 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
         ACCExpr *temp = assignList[op].value;
 if (trace_assign)
 printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)temp);
-        if (temp && !expr->operands.size() && !assignList[op].noReplace && refList[op].pin != PIN_MODULE) {
+        if (temp && !expr->operands.size() && !assignList[op].noRecursion && !assignList[op].noReplace) {
+        if (replaceBlock[op]++ < 5 ) {
             refList[op].count = 0;
 if (trace_assign)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(temp).c_str());
@@ -133,6 +135,12 @@ printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2st
                 *changed = true;
             else
                 walkRef(temp);
+        } 
+        else {
+printf("[%s:%d] excessive replace of %s with %s top %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(temp).c_str(), tree2str(expr).c_str());
+if (replaceBlock[op] > 7)
+exit(-1);
+        }
         }
         else if (!changed)
             refList[op].count++;
@@ -140,19 +148,27 @@ printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2st
     }
     else if (!expr->operands.size() || ((op == "-" || op == "!")/*unary*/ && expr->operands.size() == 1))
         ret += op;
+bool dumpOutput = false;
+    bool topOp = checkOperand(expr->value) || expr->value == "," || expr->value == "[" || expr->value == PARAMETER_MARKER;
     for (auto item: expr->operands) {
         ret += sep;
-        bool operand = checkOperand(item->value) || item->value == "," || item->value == "?" || expr->operands.size() == 1;
-        if (!operand)
+        bool oldCond = !checkOperand(item->value) && item->value != ",";
+        bool addParen = !topOp && oldCond;
+bool orig = item->value != "?" || expr->operands.size() != 1;
+if (addParen != (oldCond && orig)) dumpOutput = true;
+        if (addParen)
             ret += "( ";
         ret += tree2str(item, changed, assignReplace);
-        if (!operand)
+        if (addParen)
             ret += " )";
         sep = " " + op + " ";
         if (op == "?")
             op = ":";
     }
     ret += treePost(expr);
+//if (dumpOutput) {
+//printf("[%s:%d]TTTTTTTT top '%s' expr %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), ret.c_str());
+//}
     return ret;
 }
 
@@ -353,16 +369,20 @@ void updateWidth(ACCExpr *item, int len)
 
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
 {
-    if (isIdChar(lhs->value[0]) && lhs->value == rhs->value && !lhs->operands.size() && !rhs->operands.size())
-        return true;
-    return false;
+    if (lhs->value != rhs->value || lhs->operands.size() != rhs->operands.size())
+        return false;
+    for (auto lcur = lhs->operands.begin(), lend = lhs->operands.end(), rcur = rhs->operands.begin(); lcur != lend; lcur++, rcur++)
+        if (!matchExpr(*lcur, *rcur))
+            return false;
+    return true;
 }
 
 ACCExpr *cleanupExpr(ACCExpr *expr)
 {
     if (!expr)
         return expr;
-    if (expr->value == "(" && expr->operands.size() == 1)
+    if (expr->operands.size() == 1 && (expr->value == "(" ||
+         expr->value == "&&" || expr->value == "&" || expr->value == "||" || expr->value == "|"))
         expr = expr->operands.front();
     if (expr->value == "{" && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;

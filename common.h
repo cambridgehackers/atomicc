@@ -50,6 +50,7 @@ typedef struct {
     ACCExpr    *value;
     std::string type;
     bool        noReplace;
+    bool        noRecursion;
 } AssignItem;
 enum {PIN_NONE, PIN_MODULE, PIN_OBJECT, PIN_REG, PIN_WIRE, PIN_ALIAS};
 typedef struct {
@@ -122,3 +123,4 @@ extern int trace_expand;
 extern std::map<std::string, RefItem> refList;
 extern std::map<std::string, AssignItem> assignList;
 extern std::map<std::string, ModuleIR *> mapIndex;
+extern std::map<std::string, int> replaceBlock;

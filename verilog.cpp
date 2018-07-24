@@ -64,7 +64,7 @@ if (trace_assign) {
 }
         //exit(-1);
     }
-    assignList[target] = AssignItem{value, type, noReplace};
+    assignList[target] = AssignItem{value, type, noReplace || refList[target].pin == PIN_MODULE, false};
     }
 }
 
@@ -206,8 +206,8 @@ static ACCExpr *walkRemoveParam (ACCExpr *expr)
     std::string item = expr->value;
     if (isIdChar(item[0])) {
         int pin = refList[item].pin;
-        if (pin != PIN_OBJECT && pin != PIN_REG) {
-if (trace_assign)
+        if (pin == PIN_MODULE) {
+//if (trace_assign)
 printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, item.c_str(), pin);
             return nullptr;
         }
@@ -225,16 +225,28 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName, boo
 {
     if (!expr)
         return expr;
+    if (trace_assign)
+    printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
     if (isIdChar(item[0])) {
-        if (useAssign)
-        if (ACCExpr *assignValue = assignList[item].value)
-            return walkRemoveCalledGuard(assignValue, guardName, useAssign);
         if (item == guardName) {
-if (trace_assign)
-printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
+            if (trace_assign)
+            printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
             return allocExpr("1");
+        }
+        if (ACCExpr *assignValue = assignList[item].value)
+        if (useAssign && !assignList[item].noRecursion && !assignList[item].noReplace) {
+        if (replaceBlock[item]++ < 5) {
+            if (trace_assign)
+            printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
+            return walkRemoveCalledGuard(assignValue, guardName, useAssign);
+        }
+        else if (replaceBlock[item] > 5 ) {
+printf("[%s:%d] excessive replace of %s with %s top %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str(), tree2str(expr).c_str());
+if (replaceBlock[item] > 10)
+exit(-1);
+        }
         }
     }
     for (auto item: expr->operands) {
@@ -242,6 +254,9 @@ printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION
         if (operand)
             newExpr->operands.push_back(operand);
     }
+    newExpr = cleanupExpr(newExpr);
+    if (trace_assign)
+    printf("[%s:%d] end %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(newExpr).c_str());
     return newExpr;
 }
 
@@ -253,6 +268,7 @@ static void processRecursiveAssign(void)
 if (trace_assign)
 printf("[%s:%d] checking [%s] = '%s'\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str());
             bool treeChanged = false;
+            replaceBlock.clear();
             std::string newItem = tree2str(item.second.value, &treeChanged, true);
             if (treeChanged) {
 if (trace_assign)
@@ -490,6 +506,7 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         ACCExpr *destt = info->dest;
+        replaceBlock.clear();
         destt = str2tree(tree2str(destt, nullptr, true));
         walkRef(destt);
         ACCExpr *expr = destt;
@@ -508,9 +525,11 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
             exit(-1);
             }
         }
+        replaceBlock.clear();
         std::string condStr;
         if (cond)
             condStr = "    if (" + tree2str(cond, nullptr, true) + ")";
+        replaceBlock.clear();
         condLines[condStr].push_back("    " + tree2str(destt) + " <= " + tree2str(value, nullptr, true) + ";");
     }
     if (!hasPrintf)
@@ -524,12 +543,15 @@ printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
             listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
 //dumpExpr("PRINTCOND", cond);
 //dumpExpr("PRINTF", value);
+        replaceBlock.clear();
         std::string condStr;
         if (cond)
             condStr = "    if (" + tree2str(cond, nullptr, true) + ")";
+        replaceBlock.clear();
         condLines[condStr].push_back("    $display" + tree2str(value, nullptr, true) + ";");
     }
     if (condLines.size()) {
+        replaceBlock.clear();
         ACCExpr *tempCond = allocExpr("&", allocExpr(MI->name), allocExpr(getRdyName(MI->name)));
         alwaysLines.push_back("if (" + tree2str(tempCond, nullptr, true) + ") begin");
     }
@@ -552,6 +574,45 @@ printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
         alwaysLines.push_back("end; // End of " + MI->name);
 }
 
+static bool checkRecursion(ACCExpr *expr)
+{
+    std::string item = expr->value;
+    if (isIdChar(item[0])) {
+        if (replaceBlock[item]) // flag multiple expansions of an item
+            return false;
+        ACCExpr *res = assignList[item].value;
+        if (res && !assignList[item].noRecursion) {
+            replaceBlock[item] = tree2str(res).length();
+            if (!checkRecursion(res))
+                return false;
+        }
+    }
+    for (auto item: expr->operands)
+        if (!checkRecursion(item))
+            return false;
+    return true;
+}
+
+static ACCExpr *simpleReplace (ACCExpr *expr)
+{
+    if (!expr)
+        return expr;
+    ACCExpr *newExpr = allocExpr(expr->value);
+    std::string item = expr->value;
+    if (isIdChar(item[0])) {
+        if (ACCExpr *assignValue = assignList[item].value)
+        if (refList[item].pin != PIN_MODULE && !assignList[item].noRecursion
+             && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
+            if (trace_assign)
+            printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
+            return simpleReplace(assignValue);
+        }
+    }
+    for (auto item: expr->operands)
+        newExpr->operands.push_back(simpleReplace(item));
+    return newExpr;
+}
+
 /*
  * Generate *.v and *.vh for a Verilog module
  */
@@ -570,6 +631,7 @@ static std::list<ModData> modLine;
     modLine.clear();
     modNew.clear();
     alwaysLines.clear();
+    printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
 
     // Generate module header
     generateModuleSignature(IR, "", modLine, "");
@@ -674,6 +736,10 @@ static std::list<ModData> modLine;
         if (hasPrintf)
             for (auto info: MI->printfList) // must be before callList processing
                 MI->callList.push_back(new CallListElement{printfArgs(info->value), info->cond, true});
+        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
+            refList[item.first] = RefItem{0, item.second, true, false, PIN_WIRE};
+            expandStruct(IR, item.first, item.second, 1, false, true, PIN_WIRE);
+        }
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
@@ -697,10 +763,6 @@ static std::list<ModData> modLine;
                 setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1", true);
         }
         setAssign(methodName, MI->guard, MI->type, MI->rule && !endswith(methodName, "__RDY"));  // collect the text of the return value into a single 'assign'
-        for (auto item: MI->alloca) {
-            refList[item.first] = RefItem{0, item.second, true, false, PIN_WIRE};
-            expandStruct(IR, item.first, item.second, 1, false, true, PIN_WIRE);
-        }
         for (auto info: MI->letList) {
             ACCExpr *cond = allocExpr("&", allocExpr(getRdyName(methodName)));
             if (info->cond)
@@ -744,7 +806,8 @@ dumpExpr("READCALL", value);
                 tempCond = temp;
             }
             std::string calledName = value->value;
-//printf("[%s:%d] CALLLLLL '%s'\n", __FUNCTION__, __LINE__, calledName.c_str());
+//printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
+//dumpExpr("CALLCOND", tempCond);
             if (!value->operands.size() || value->operands.front()->value != PARAMETER_MARKER) {
                 printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
                 exit(-1);
@@ -850,16 +913,48 @@ dumpExpr("READCALL", value);
             }
         }
     }
+    for (auto item: enableList)
+        setAssign(item.first, item.second, "INTEGER_1");
+    for (auto item: assignList)
+        assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
+    for (auto item: assignList) {
+        int i = 0;
+        if (!item.second.value)
+            continue;
+        while (true) {
+            replaceBlock.clear();
+            if (checkRecursion(item.second.value))
+                break;
+            std::string name;
+            int length = -1;
+            for (auto rep: replaceBlock) {
+                 if (rep.second > length && !endswith(rep.first, "__RDY") && !endswith(rep.first, "__ENA")) {
+                     name = rep.first;
+                     length = rep.second;
+                 }
+            }
+printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LINE__, name.c_str());
+            assignList[name].noRecursion = true;
+            if (i++ > 0) {
+printf("[%s:%d]SETNO\n", __FUNCTION__, __LINE__);
+exit(-1);
+            }
+        }
+    }
+    // remove dependancy of the calling __ENA line on the calling __RDY
     for (auto item: enableList) {
-        // remove dependancy of the calling __ENA line on the calling __RDY
-        ACCExpr *tempCond = cleanupExpr(walkRemoveCalledGuard(item.second, getRdyName(item.first), true));
-        setAssign(item.first, tempCond, "INTEGER_1");
+        ACCExpr *val = assignList[item.first].value;
+        replaceBlock.clear();
+        assignList[item.first].value = cleanupExpr(walkRemoveCalledGuard(val, getRdyName(item.first), true));
     }
     optimizeBitAssigns();
     processRecursiveAssign();
     for (auto item: assignList)
-        if (item.second.value && IR->method.find(item.first) != IR->method.end())
-            assignList[item.first].value = cleanupExpr(walkRemoveCalledGuard(item.second.value, getRdyName(item.first), false));
+        if (item.second.value && IR->method.find(item.first) != IR->method.end()) {
+            ACCExpr *val = cleanupExpr(item.second.value);
+            replaceBlock.clear();
+            assignList[item.first].value = cleanupExpr(walkRemoveCalledGuard(val, getRdyName(item.first), false));
+        }
 
     // last chance to optimize out single assigns to output ports
     std::map<std::string, std::string> mapPort;
@@ -873,6 +968,7 @@ dumpExpr("READCALL", value);
     for (auto mitem: modLine) {
         std::string val = mitem.value;
         if (!mitem.moduleStart) {
+            replaceBlock.clear();
             val = tree2str(allocExpr(mitem.value), nullptr, true);
             std::string temp = mapPort[val];
             if (temp != "") {
