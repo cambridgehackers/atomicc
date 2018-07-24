@@ -928,7 +928,7 @@ refList[tparm].count++;
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
-        refList[methodName].count++;
+        //refList[methodName].count++;
         for (auto info: MI->storeList) {
             info->dest = cleanupExprBit(info->dest);
             info->cond = cleanupExprBit(info->cond);
@@ -944,6 +944,9 @@ refList[tparm].count++;
             walkRef(info->value->operands.front());
         }
     }
+    for (auto item: assignList)
+        if (item.second.value && (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_MODULE))
+            refList[item.first].count++;
     optimizeAssign();
 
     for (auto item: assignList)

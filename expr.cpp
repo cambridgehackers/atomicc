@@ -190,6 +190,9 @@ item = base;
 }
         assert(refList[item].pin);
         refList[item].count++;
+        ACCExpr *temp = assignList[item].value;
+        if (temp && refList[item].count == 1)
+            walkRef(temp);
     }
     for (auto item: expr->operands)
         walkRef(item);
