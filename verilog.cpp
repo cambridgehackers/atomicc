@@ -399,12 +399,14 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                     if (ACCExpr *val = alitem.second.value)
                     if (isIdChar(val->value[0]) && val->value == item.first)
                         goto next;
+            if (refList[temp].count) {
             if (!assignList[item.first].value)
                 fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
             else if (refList[temp].count) // must have value != ""
                 fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
             else if (trace_skipped)
                 fprintf(OStr, "    skippedassign %s = %s; //temp = '%s', count = %d, pin = %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin);
+            }
 next:;
             refList[item.first].count = 0;
         }
@@ -913,8 +915,30 @@ dumpExpr("READCALL", value);
             }
         }
     }
-    for (auto item: enableList)
+    for (auto item: enableList) {
         setAssign(item.first, item.second, "INTEGER_1");
+        refList[item.first].count++;
+    }
+    for (auto FI : IR->method) {
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        for (auto info: MI->storeList) {
+            info->dest = cleanupExprBit(info->dest);
+            info->cond = cleanupExprBit(info->cond);
+            info->value = cleanupExprBit(info->value);
+            walkRef(info->dest);
+            walkRef(info->cond);
+            walkRef(info->value);
+        }
+        for (auto info: MI->printfList) {
+            info->cond = cleanupExprBit(info->cond);
+            info->value = cleanupExprBit(info->value);
+            walkRef(info->cond);
+            walkRef(info->value->operands.front());
+        }
+    }
+    optimizeAssign();
+
     for (auto item: assignList)
         assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
     for (auto item: assignList) {
@@ -968,6 +992,13 @@ exit(-1);
     for (auto mitem: modLine) {
         std::string val = mitem.value;
         if (!mitem.moduleStart) {
+            if (refList[val].count == 0) {
+                if (refList[val].out)
+                    val = "0";
+                else
+                    val = "";
+            }
+            else {
             replaceBlock.clear();
             val = tree2str(allocExpr(mitem.value), nullptr, true);
             std::string temp = mapPort[val];
@@ -977,6 +1008,7 @@ exit(-1);
                 refList[temp].count = 0;
                 val = temp;
             }
+            }
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, false});
     }
@@ -984,7 +1016,6 @@ exit(-1);
         MethodInfo *MI = FI.second;
         generateAlwaysLines(MI, hasPrintf);
     }
-    optimizeAssign();
     generateAssign(OStr);
 }
 

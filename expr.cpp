@@ -110,7 +110,6 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
             exit(-1);
         }
         std::string base = tree2str(list->operands.front(), changed, false);  // can only do bit select on net or reg (not expressions)
-        refList[base].count++;
         return base + "[" + tree2str(getRHS(list), changed, assignReplace) + extra + "]";
     }
     if (isParen(op)) {
@@ -127,7 +126,6 @@ if (trace_assign)
 printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)temp);
         if (temp && !expr->operands.size() && !assignList[op].noRecursion && !assignList[op].noReplace) {
         if (replaceBlock[op]++ < 5 ) {
-            refList[op].count = 0;
 if (trace_assign)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(temp).c_str());
             ret = tree2str(temp, changed, assignReplace);
@@ -142,8 +140,8 @@ if (replaceBlock[op] > 7)
 exit(-1);
         }
         }
-        else if (!changed)
-            refList[op].count++;
+        //else if (!changed)
+            //refList[op].count++;
         }
     }
     else if (!expr->operands.size() || ((op == "-" || op == "!")/*unary*/ && expr->operands.size() == 1))
@@ -174,6 +172,8 @@ if (addParen != (oldCond && orig)) dumpOutput = true;
 
 void walkRef (ACCExpr *expr)
 {
+    if (!expr)
+        return;
     std::string item = expr->value;
     if (isIdChar(item[0])) {
         std::string base = item;
@@ -186,7 +186,6 @@ void walkRef (ACCExpr *expr)
 {
 if (trace_assign)
 printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
-            //refList[item.substr(0,ind)].count++;
 item = base;
 }
         assert(refList[item].pin);
