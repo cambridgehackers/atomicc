@@ -822,7 +822,7 @@ dumpExpr("READCALL", value);
             walkRead(MI, value, cond);
             if (!info->isAction)
                 continue;
-            ACCExpr *tempCond = allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)));
+            ACCExpr *tempCond = allocExpr(methodName);
             if (cond) {
                 ACCExpr *temp = cond;
                 if (temp->value != "&")
