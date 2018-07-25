@@ -33,7 +33,11 @@ std::map<std::string, AssignItem> assignList;
 static std::map<std::string, std::string> replaceTarget;
 static std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
 static std::list<ModData> modNew;
-static std::map<std::string, std::map<ACCExpr *, std::list<CondInfo>>> condLines;
+typedef struct {
+    ACCExpr      *guard;
+    std::map<ACCExpr *, std::list<CondInfo>> info;
+} CondGroup;
+static std::map<std::string, CondGroup> condLines;
 
 static void setAssign(std::string target, ACCExpr *value, std::string type, bool noReplace = false)
 {
@@ -337,6 +341,14 @@ static void optimizeAssign(ModuleIR *IR)
         if (item.second.value && (refList[item.first].out || refList[item.first].inout) &&
             (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_LOCAL || refList[item.first].pin == PIN_MODULE))
             refList[item.first].count++;
+
+    for (auto tcond = condLines.begin(), tend = condLines.end(); tcond != tend; tcond++) {
+        std::string methodName = tcond->first;
+        tcond->second.guard = cleanupExpr(allocExpr("&", allocExpr(methodName),
+             allocExpr(getRdyName(methodName))));
+        walkRef(tcond->second.guard);
+    }
+
     // Now extend 'was referenced' from assignList items actually referenced
     for (auto aitem: assignList) {
         std::string temp = aitem.first;
@@ -456,12 +468,8 @@ next:;
             std::list<std::string> alwaysLines;
             for (auto tcond: condLines) {
                 std::string methodName = tcond.first;
-                if (tcond.second.size()) {
-                    replaceBlock.clear();
-                    ACCExpr *tempCond = allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)));
-                    alwaysLines.push_back("if (" + tree2str(tempCond, nullptr, true) + ") begin");
-                }
-                for (auto item: tcond.second) {
+                alwaysLines.push_back("if (" + tree2str(tcond.second.guard, nullptr, true) + ") begin");
+                for (auto item: tcond.second.info) {
                     std::string endStr;
                     std::string temp;
                     if (item.first) {
@@ -486,8 +494,7 @@ next:;
                     if (endStr != "")
                         alwaysLines.push_back(endStr);
                 }
-                if (tcond.second.size())
-                    alwaysLines.push_back("end; // End of " + methodName);
+                alwaysLines.push_back("end; // End of " + methodName);
             }
             for (auto info: alwaysLines)
                 fprintf(OStr, "        %s\n", info.c_str());
@@ -594,12 +601,13 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
 
 static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value)
 {
-    for (auto CI = condLines[methodName].begin(), CE = condLines[methodName].end(); CI != CE; CI++)
+    for (auto CI = condLines[methodName].info.begin(), CE = condLines[methodName].info.end(); CI != CE; CI++)
         if (matchExpr(cond, CI->first)) {
             CI->second.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[methodName][cond].push_back(CondInfo{dest, value});
+    condLines[methodName].guard = nullptr;
+    condLines[methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
 /*
@@ -919,6 +927,15 @@ dumpExpr("READCALL", value);
         setAssign(item.first, item.second, "INTEGER_1");
     for (auto item: assignList)
         assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
+    for (auto FI : IR->method) {
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        for (auto info: MI->storeList)
+            appendLine(methodName, info->cond, info->dest, info->value);
+        if (!hasPrintf)
+            for (auto info: MI->printfList)
+                appendLine(methodName, info->cond, nullptr, info->value);
+    }
 
     optimizeAssign(IR);
 
@@ -992,15 +1009,6 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), tem
             }
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, false});
-    }
-    for (auto FI : IR->method) {
-        MethodInfo *MI = FI.second;
-        std::string methodName = MI->name;
-        for (auto info: MI->storeList)
-            appendLine(methodName, info->cond, info->dest, info->value);
-        if (!hasPrintf)
-            for (auto info: MI->printfList)
-                appendLine(methodName, info->cond, nullptr, info->value);
     }
     generateAssign(OStr);
 }
