@@ -336,6 +336,17 @@ static void optimizeAssign(ModuleIR *IR)
             walkRef(info->value);
         }
     }
+    for (auto tcond: condLines) {
+        std::string methodName = tcond.first;
+        walkRef(tcond.second.guard);
+        for (auto item: tcond.second.info) {
+            walkRef(item.first);
+            for (auto citem: item.second) {
+                walkRef(citem.value);
+                walkRef (citem.dest);
+            }
+        }
+    }
 
     for (auto item: assignList)
         if (item.second.value && (refList[item.first].out || refList[item.first].inout) &&
@@ -599,6 +610,11 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
     return newExpr;
 }
 
+static std::string getExecute(std::string methodName)
+{
+    return methodName.substr(0, methodName.length() - 3) + "EXECUTE";
+}
+
 static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value)
 {
     for (auto CI = condLines[methodName].info.begin(), CE = condLines[methodName].info.end(); CI != CE; CI++)
@@ -699,12 +715,12 @@ static std::list<ModData> modLine;
     }
     fprintf(OStr, ");\n");
     if (!hasCLK) {
-        fprintf(OStr, "    wire CLK;\n");
         refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL};
+        refList["CLK"].count++;
     }
     if (!hasnRST) {
-        fprintf(OStr, "    wire nRST;\n");
         refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL};
+        refList["nRST"].count++;
     }
     modLine.clear();
     for (auto item: IR->interfaces)
@@ -768,6 +784,12 @@ static std::list<ModData> modLine;
             if (MI->rule)
                 setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1", true);
         }
+        if (endswith(methodName, "__ENA")) {
+            std::string mname = getExecute(methodName);
+            refList[mname] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
+            setAssign(mname, allocExpr("&", allocExpr(methodName),
+                 allocExpr(getRdyName(methodName))), "INTEGER_1", true);
+        }
         setAssign(methodName, MI->guard, MI->type, MI->rule && !endswith(methodName, "__RDY"));  // collect the text of the return value into a single 'assign'
         for (auto info: MI->storeList) {
             walkRead(MI, info->cond, nullptr);
@@ -822,12 +844,9 @@ dumpExpr("READCALL", value);
                 printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
                 exit(-1);
             }
-            // 'Or' together ENA lines from all invocations of a method from this class
-            //if (info->isAction) {
-                if (!enableList[calledName])
-                    enableList[calledName] = allocExpr("||");
-                enableList[calledName]->operands.push_back(tempCond);
-            //}
+            if (!enableList[calledName])
+                enableList[calledName] = allocExpr("||");
+            enableList[calledName]->operands.push_back(tempCond);
             MethodInfo *CI = lookupQualName(IR, calledName);
             if (!CI) {
                 printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
@@ -1003,7 +1022,7 @@ exit(-1);
             if (temp != "") {
 printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
                 refList[val].count = 0;
-                refList[temp].count = 0;
+                refList[temp].count = 0;  // 'assign' line not needed; value is assigned by object inst
                 val = temp;
             }
             }
