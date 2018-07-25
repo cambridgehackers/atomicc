@@ -250,7 +250,7 @@ static struct {
     return opPrec[ind].prec;
 }
 
-static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCurrentToken);
+static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCurrentToken, bool preserveParen);
 static ACCExpr *get1Token(void)
 {
     std::string lexToken;
@@ -316,8 +316,18 @@ static ACCExpr *get1Token(void)
         exit(-1);
     }
     ret = allocExpr(lexToken);
-    if (isParen(ret->value))
-        return getExprList(ret, treePost(ret).substr(1), false);
+    if (isParen(ret->value)) {
+        std::string val = ret->value;
+        if (trace_expr)
+            printf("[%s:%d] before subparse of '%s'\n", __FUNCTION__, __LINE__, ret->value.c_str());
+        ret = getExprList(ret, treePost(ret).substr(1), false, true);
+        if (ret->value != val)
+            ret = allocExpr(val, ret); // over optimization of '(<singleItem>)'
+        if (trace_expr) {
+            printf("[%s:%d] after subparse of '%s'\n", __FUNCTION__, __LINE__, ret->value.c_str());
+            dumpExpr("SUBPAREN", ret);
+        }
+    }
     return ret;
 }
 
@@ -387,26 +397,24 @@ bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
     return true;
 }
 
-ACCExpr *cleanupExpr(ACCExpr *expr)
+ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
 {
     if (!expr)
         return expr;
-    if (expr->operands.size() == 1 && (expr->value == "(" ||
+    if (trace_expr)
+        dumpExpr("cleanupExprSTART", expr);
+    if (expr->operands.size() == 1 && expr->operands.front()->value != "," && ((!preserveParen && expr->value == "(") ||
          expr->value == "&&" || expr->value == "&" || expr->value == "||" || expr->value == "|"))
         expr = expr->operands.front();
-    if (expr->value == "{" && expr->operands.size() == 1 && expr->operands.front()->value == ",")
+    if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
-    if (expr->value == PARAMETER_MARKER && expr->operands.size() == 1 && expr->operands.front()->value == ",")
-        expr->operands = expr->operands.front()->operands;
-    if (trace_expr)
-        dumpExpr("cleanupExpr", expr);
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
     if (v == "^" && checkInteger(getRHS(expr), "1"))
         return invertExpr(cleanupExpr(lhs));
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
-         ACCExpr *titem = cleanupExpr(item);
+         ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]));
          if (trace_expr)
              printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
          if (titem->value != ret->value || ret->value == "?" || isParen(ret->value)
@@ -561,7 +569,7 @@ ACCExpr *cleanupExprBit(ACCExpr *expr)
     return str2tree(bitTemp);              //HACK HACK HACK HACK to trigger __bitsubstr processing
 }
 
-static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCurrentToken)
+static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCurrentToken, bool preserveParen)
 {
     bool parseState = false;
     ACCExpr *currentOperand = nullptr;
@@ -570,6 +578,8 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
     int exprStackIndex = 0;
 #define TOP exprStack[exprStackIndex]
     TOP = nullptr;
+    if (trace_expr)
+        printf("[%s:%d] head %s\n", __FUNCTION__, __LINE__, head ? head->value.c_str() : "(nil)");
     if (head) {
         while ((tok = get1Token()) && tok->value != terminator) {
             if (trace_expr)
@@ -654,7 +664,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                 head = TOP;
         }
     }
-    head = cleanupExpr(head);
+    head = cleanupExpr(head, preserveParen);
     return head;
 }
 
@@ -664,5 +674,5 @@ ACCExpr *str2tree(std::string arg, bool allowRangeParam)
     lexIndex = 0;
     lexChar = lexString[lexIndex++];
     lexAllowRange = allowRangeParam;
-    return getExprList(get1Token(), "", true);
+    return getExprList(get1Token(), "", true, false);
 }

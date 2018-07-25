@@ -326,15 +326,6 @@ static void optimizeAssign(ModuleIR *IR)
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         refList[methodName].count++;
-        //for (auto info: MI->storeList) {
-            //walkRef(info->dest);
-            //walkRef(info->cond);
-            //walkRef(info->value);
-        //}
-        //for (auto info: MI->printfList) {
-            //walkRef(info->cond);
-            //walkRef(info->value);
-        //}
     }
     for (auto tcond: condLines) {
         std::string methodName = tcond.first;
@@ -342,8 +333,12 @@ static void optimizeAssign(ModuleIR *IR)
         for (auto item: tcond.second.info) {
             walkRef(item.first);
             for (auto citem: item.second) {
-                walkRef(citem.value);
-                walkRef (citem.dest);
+                if (citem.dest) {
+                    walkRef(citem.value);
+                    walkRef(citem.dest);
+                }
+                else
+                    walkRef(citem.value->operands.front());
             }
         }
     }
@@ -472,13 +467,12 @@ next:;
             std::list<std::string> alwaysLines;
             for (auto tcond: condLines) {
                 std::string methodName = tcond.first;
-                alwaysLines.push_back("if (" + tree2str(tcond.second.guard, nullptr, true) + ") begin");
+                alwaysLines.push_back("if (" + tree2str(tcond.second.guard) + ") begin");
                 for (auto item: tcond.second.info) {
                     std::string endStr;
                     std::string temp;
                     if (item.first) {
-                        replaceBlock.clear();
-                        temp = "    if (" + tree2str(item.first, nullptr, true) + ")";
+                        temp = "    if (" + tree2str(item.first) + ")";
                         if (item.second.size() > 1) {
                             temp += " begin";
                             endStr = "    end;";
@@ -486,14 +480,10 @@ next:;
                         alwaysLines.push_back(temp);
                     }
                     for (auto citem: item.second) {
-                        replaceBlock.clear();
-                        std::string val = tree2str(citem.value, nullptr, true) + ";";
-                        if (citem.dest) {
-                            replaceBlock.clear();
-                            alwaysLines.push_back("    " + tree2str(citem.dest, nullptr, true) + " <= " + val);
-                        }
+                        if (citem.dest)
+                            alwaysLines.push_back("    " + tree2str(citem.dest) + " <= " + tree2str(citem.value) + ";");
                         else
-                            alwaysLines.push_back("    $display" + val);
+                            alwaysLines.push_back("    $display" + tree2str(citem.value->operands.front()) + ";");
                     }
                     if (endStr != "")
                         alwaysLines.push_back(endStr);
@@ -610,6 +600,8 @@ static std::string getExecute(std::string methodName)
 
 static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value)
 {
+    dest = str2tree(tree2str(dest, nullptr, true));
+    value = str2tree(tree2str(value, nullptr, true));
     for (auto CI = condLines[methodName].info.begin(), CE = condLines[methodName].info.end(); CI != CE; CI++)
         if (matchExpr(cond, CI->first)) {
             CI->second.push_back(CondInfo{dest, value});
@@ -742,9 +734,8 @@ static std::list<ModData> modLine;
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
             value->value = "(";   // change from PARAMETER_MARKER
-            info->value = value;
             if (hasPrintf)
-                MI->callList.push_back(new CallListElement{printfArgs(info->value), info->cond, true});
+                MI->callList.push_back(new CallListElement{printfArgs(value), info->cond, true});
             else {
                 ACCExpr *listp = value->operands.front();
                 if (endswith(listp->value, "\\n\""))
