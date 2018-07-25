@@ -326,15 +326,15 @@ static void optimizeAssign(ModuleIR *IR)
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         refList[methodName].count++;
-        for (auto info: MI->storeList) {
-            walkRef(info->dest);
-            walkRef(info->cond);
-            walkRef(info->value);
-        }
-        for (auto info: MI->printfList) {
-            walkRef(info->cond);
-            walkRef(info->value);
-        }
+        //for (auto info: MI->storeList) {
+            //walkRef(info->dest);
+            //walkRef(info->cond);
+            //walkRef(info->value);
+        //}
+        //for (auto info: MI->printfList) {
+            //walkRef(info->cond);
+            //walkRef(info->value);
+        //}
     }
     for (auto tcond: condLines) {
         std::string methodName = tcond.first;
@@ -352,13 +352,6 @@ static void optimizeAssign(ModuleIR *IR)
         if (item.second.value && (refList[item.first].out || refList[item.first].inout) &&
             (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_LOCAL || refList[item.first].pin == PIN_MODULE))
             refList[item.first].count++;
-
-    for (auto tcond = condLines.begin(), tend = condLines.end(); tcond != tend; tcond++) {
-        std::string methodName = tcond->first;
-        tcond->second.guard = cleanupExpr(allocExpr("&", allocExpr(methodName),
-             allocExpr(getRdyName(methodName))));
-        walkRef(tcond->second.guard);
-    }
 
     // Now extend 'was referenced' from assignList items actually referenced
     for (auto aitem: assignList) {
@@ -622,7 +615,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
             CI->second.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[methodName].guard = nullptr;
+    condLines[methodName].guard = allocExpr(getExecute(methodName));
     condLines[methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
@@ -1021,7 +1014,7 @@ exit(-1);
             std::string temp = mapPort[val];
             if (temp != "") {
 printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
-                refList[val].count = 0;
+                decRef(mitem.value);
                 refList[temp].count = 0;  // 'assign' line not needed; value is assigned by object inst
                 val = temp;
             }
