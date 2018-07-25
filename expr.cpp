@@ -171,7 +171,7 @@ if (addParen != (oldCond && orig)) dumpOutput = true;
 
 void decRef(std::string name)
 {
-return;
+//return;
     if (refList[name].count > 0)
         refList[name].count--;
 }

@@ -321,6 +321,7 @@ static void optimizeAssign(ModuleIR *IR)
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
+        refList[methodName].count++;
         for (auto info: MI->storeList) {
             walkRef(info->dest);
             walkRef(info->cond);
@@ -388,7 +389,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
     for (auto item: assignList)
         if (item.second.value && refList[item.first].count && item.second.noReplace) {
             fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
-            refList[item.first].count = 0;
+            refList[item.first].count = 0; // mark that assigns have already been output
         }
     std::string endStr, sep;
     for (auto item: modNew) {
@@ -426,7 +427,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             else if (trace_skipped)
                 fprintf(OStr, "    skippedassign %s = %s; //temp = '%s', count = %d, pin = %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin);
 next:;
-            refList[item.first].count = 0;
+            refList[item.first].count = 0; // mark that assigns have already been output
         }
     }
     bool seen = false;
@@ -983,7 +984,7 @@ exit(-1);
             val = tree2str(allocExpr(mitem.value), nullptr, true);
             std::string temp = mapPort[val];
             if (temp != "") {
-//printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
+printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
                 refList[val].count = 0;
                 refList[temp].count = 0;
                 val = temp;
