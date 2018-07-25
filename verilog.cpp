@@ -321,7 +321,6 @@ static void optimizeAssign(ModuleIR *IR)
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
-        //refList[methodName].count++;
         for (auto info: MI->storeList) {
             walkRef(info->dest);
             walkRef(info->cond);
@@ -329,7 +328,7 @@ static void optimizeAssign(ModuleIR *IR)
         }
         for (auto info: MI->printfList) {
             walkRef(info->cond);
-            walkRef(info->value->operands.front());
+            walkRef(info->value);
         }
     }
 
@@ -338,7 +337,6 @@ static void optimizeAssign(ModuleIR *IR)
             (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_LOCAL || refList[item.first].pin == PIN_MODULE))
             refList[item.first].count++;
     // Now extend 'was referenced' from assignList items actually referenced
-#if 1
     for (auto aitem: assignList) {
         std::string temp = aitem.first;
         int ind = temp.find('[');
@@ -347,7 +345,6 @@ static void optimizeAssign(ModuleIR *IR)
         if (aitem.second.value && (refList[aitem.first].count || refList[temp].count))
             walkRef(aitem.second.value);
     }
-#endif
     if (trace_assign)
     for (auto aitem: assignList) {
         std::string temp = aitem.first;
@@ -377,7 +374,7 @@ static void generateAssign(FILE *OStr)
     for (auto item: refList) {
         std::string temp = item.first;
         if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL) {
-        if (refList[temp].count) {
+        if (item.second.count) {
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
 if (trace_assign && item.second.out) {
 printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
@@ -421,13 +418,13 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                     if (isIdChar(val->value[0]) && val->value == item.first)
                         goto next;
             if (refList[temp].count) {
-            if (!assignList[item.first].value)
-                fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
-            else if (refList[temp].count) // must have value != ""
-                fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
+                if (assignList[item.first].value)
+                    fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
+                else
+                    fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
+            }
             else if (trace_skipped)
                 fprintf(OStr, "    skippedassign %s = %s; //temp = '%s', count = %d, pin = %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin);
-            }
 next:;
             refList[item.first].count = 0;
         }
@@ -478,8 +475,10 @@ next:;
                     for (auto citem: item.second) {
                         replaceBlock.clear();
                         std::string val = tree2str(citem.value, nullptr, true) + ";";
-                        if (citem.dest)
-                            alwaysLines.push_back("    " + tree2str(citem.dest) + " <= " + val);
+                        if (citem.dest) {
+                            replaceBlock.clear();
+                            alwaysLines.push_back("    " + tree2str(citem.dest, nullptr, true) + " <= " + val);
+                        }
                         else
                             alwaysLines.push_back("    $display" + val);
                     }
@@ -510,9 +509,8 @@ typedef struct {
 static std::list<PrintfInfo> printfFormat;
 static int printfNumber = 1;
 #define PRINTF_PORT 0x7fff
-static ACCExpr *printfArgs(ACCExpr *value)
+static ACCExpr *printfArgs(ACCExpr *listp)
 {
-    ACCExpr *listp = value->operands.front(); // get PARAMETER_MARKER node
     ACCExpr *fitem = listp->operands.front();
     listp->operands.pop_front();
     std::string format = fitem->value;
@@ -547,54 +545,10 @@ static ACCExpr *printfArgs(ACCExpr *value)
     next->operands.push_back(allocExpr("16'd" + autostr((total_length + sizeof(int) * 8 - 1)/(sizeof(int) * 8) + 2)));
     listp->operands.clear();
     listp->operands = next->operands;
-    value = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next));
+    ACCExpr *ret = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next));
     printfFormat.push_back(PrintfInfo{format, width});
-dumpExpr("PRINTFLL", value);
-    return value;
-}
-
-static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
-{
-    std::string methodName = MI->name;
-    auto appendLine = [&](ACCExpr *cond, ACCExpr *dest, ACCExpr *value) -> void {
-        for (auto CI = condLines[methodName].begin(), CE = condLines[methodName].end(); CI != CE; CI++)
-            if (matchExpr(cond, CI->first)) {
-                CI->second.push_back(CondInfo{dest, value});
-                return;
-            }
-        condLines[methodName][cond].push_back(CondInfo{dest, value});
-    };
-    for (auto info: MI->storeList) {
-        ACCExpr *cond = info->cond;
-        ACCExpr *value = info->value;
-        ACCExpr *destt = info->dest;
-        walkRead(MI, cond, nullptr);
-        walkRead(MI, value, cond);
-        replaceBlock.clear();
-        destt = str2tree(tree2str(destt, nullptr, true));
-        walkRef(destt);
-        if (destt->value != "{") { // }
-            std::string destType = findType(destt->value);
-            if (destType == "") {
-            printf("[%s:%d] typenotfound %s\n", __FUNCTION__, __LINE__, tree2str(destt).c_str());
-            exit(-1);
-            }
-        }
-        appendLine(cond, destt, value);
-    }
-    if (!hasPrintf)
-    for (auto info: MI->printfList) {
-printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
-        ACCExpr *cond = info->cond;
-        ACCExpr *value = info->value->operands.front();
-        value->value = "(";   // change from PARAMETER_MARKER
-        ACCExpr *listp = value->operands.front();
-        if (endswith(listp->value, "\\n\""))
-            listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
-//dumpExpr("PRINTCOND", cond);
-//dumpExpr("PRINTF", value);
-        appendLine(cond, nullptr, value);
-    }
+dumpExpr("PRINTFLL", ret);
+    return ret;
 }
 
 static bool checkRecursion(ACCExpr *expr)
@@ -635,6 +589,16 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
     for (auto item: expr->operands)
         newExpr->operands.push_back(simpleReplace(item));
     return newExpr;
+}
+
+static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value)
+{
+    for (auto CI = condLines[methodName].begin(), CE = condLines[methodName].end(); CI != CE; CI++)
+        if (matchExpr(cond, CI->first)) {
+            CI->second.push_back(CondInfo{dest, value});
+            return;
+        }
+    condLines[methodName][cond].push_back(CondInfo{dest, value});
 }
 
 /*
@@ -757,9 +721,18 @@ static std::list<ModData> modLine;
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be allocated for rules
             refList[methodName] = RefItem{1, MI->type, true, false, PIN_WIRE};
-        if (hasPrintf)
-            for (auto info: MI->printfList) // must be before callList processing
+        for (auto info: MI->printfList) {
+            ACCExpr *value = info->value->operands.front();
+            value->value = "(";   // change from PARAMETER_MARKER
+            info->value = value;
+            if (hasPrintf)
                 MI->callList.push_back(new CallListElement{printfArgs(info->value), info->cond, true});
+            else {
+                ACCExpr *listp = value->operands.front();
+                if (endswith(listp->value, "\\n\""))
+                    listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
+            }
+        }
         for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
             refList[item.first] = RefItem{0, item.second, true, false, PIN_WIRE};
             expandStruct(IR, item.first, item.second, 1, false, true, PIN_WIRE);
@@ -787,6 +760,10 @@ static std::list<ModData> modLine;
                 setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1", true);
         }
         setAssign(methodName, MI->guard, MI->type, MI->rule && !endswith(methodName, "__RDY"));  // collect the text of the return value into a single 'assign'
+        for (auto info: MI->storeList) {
+            walkRead(MI, info->cond, nullptr);
+            walkRead(MI, info->value, info->cond);
+        }
         for (auto info: MI->letList) {
             ACCExpr *cond = allocExpr("&", allocExpr(getRdyName(methodName)));
             if (info->cond)
@@ -1017,7 +994,12 @@ exit(-1);
     }
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
-        generateAlwaysLines(MI, hasPrintf);
+        std::string methodName = MI->name;
+        for (auto info: MI->storeList)
+            appendLine(methodName, info->cond, info->dest, info->value);
+        if (!hasPrintf)
+            for (auto info: MI->printfList)
+                appendLine(methodName, info->cond, nullptr, info->value);
     }
     generateAssign(OStr);
 }
