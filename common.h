@@ -66,6 +66,10 @@ typedef struct {
     ACCExpr    *value;
     std::string type;
 } BitfieldPart;
+typedef struct {
+    ACCExpr *dest;
+    ACCExpr *value;
+} CondInfo;
 typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
 #define CBAct ^ ModuleIR * (FieldElement &item, std::string fldName)
 
@@ -101,6 +105,7 @@ void updateWidth(ACCExpr *item, int len);
 ACCExpr *getRHS(ACCExpr *expr, int match = 1);
 void walkRef (ACCExpr *expr);
 void decRef(std::string name);
+bool matchExpr(ACCExpr *lhs, ACCExpr *rhs);
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);

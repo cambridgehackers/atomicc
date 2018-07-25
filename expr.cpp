@@ -377,7 +377,9 @@ void updateWidth(ACCExpr *item, int len)
 
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
 {
-    if (lhs->value != rhs->value || lhs->operands.size() != rhs->operands.size())
+    if (!lhs && !rhs)
+        return true;
+    if (!lhs || !rhs || lhs->value != rhs->value || lhs->operands.size() != rhs->operands.size())
         return false;
     for (auto lcur = lhs->operands.begin(), lend = lhs->operands.end(), rcur = rhs->operands.begin(); lcur != lend; lcur++, rcur++)
         if (!matchExpr(*lcur, *rcur))

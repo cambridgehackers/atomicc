@@ -33,7 +33,7 @@ std::map<std::string, AssignItem> assignList;
 static std::map<std::string, std::string> replaceTarget;
 static std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
 static std::list<ModData> modNew;
-static std::list<std::string> alwaysLines;
+static std::map<std::string, std::map<ACCExpr *, std::list<CondInfo>>> condLines;
 
 static void setAssign(std::string target, ACCExpr *value, std::string type, bool noReplace = false)
 {
@@ -365,7 +365,8 @@ static void optimizeAssign(ModuleIR *IR)
 
 static void generateAssign(FILE *OStr)
 {
-    bool hasAlways = alwaysLines.size() > 0;
+    bool hasAlways = condLines.size() > 0;
+
     // generate local state element declarations and wires
     for (auto item: refList) {
         if (item.second.pin == PIN_REG) {
@@ -452,8 +453,42 @@ next:;
             if (item.second.pin == PIN_REG)
                 fprintf(OStr, "        %s <= 0;\n", item.first.c_str());
         fprintf(OStr, "      end // nRST\n");
-        if (alwaysLines.size() > 0) {
+        if (condLines.size() > 0) {
             fprintf(OStr, "      else begin\n");
+            std::list<std::string> alwaysLines;
+            for (auto tcond: condLines) {
+                std::string methodName = tcond.first;
+                if (tcond.second.size()) {
+                    replaceBlock.clear();
+                    ACCExpr *tempCond = allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)));
+                    alwaysLines.push_back("if (" + tree2str(tempCond, nullptr, true) + ") begin");
+                }
+                for (auto item: tcond.second) {
+                    std::string endStr;
+                    std::string temp;
+                    if (item.first) {
+                        replaceBlock.clear();
+                        temp = "    if (" + tree2str(item.first, nullptr, true) + ")";
+                        if (item.second.size() > 1) {
+                            temp += " begin";
+                            endStr = "    end;";
+                        }
+                        alwaysLines.push_back(temp);
+                    }
+                    for (auto citem: item.second) {
+                        replaceBlock.clear();
+                        std::string val = tree2str(citem.value, nullptr, true) + ";";
+                        if (citem.dest)
+                            alwaysLines.push_back("    " + tree2str(citem.dest) + " <= " + val);
+                        else
+                            alwaysLines.push_back("    $display" + val);
+                    }
+                    if (endStr != "")
+                        alwaysLines.push_back(endStr);
+                }
+                if (tcond.second.size())
+                    alwaysLines.push_back("end; // End of " + methodName);
+            }
             for (auto info: alwaysLines)
                 fprintf(OStr, "        %s\n", info.c_str());
             fprintf(OStr, "      end\n");
@@ -521,7 +556,14 @@ dumpExpr("PRINTFLL", value);
 static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
 {
     std::string methodName = MI->name;
-    std::map<std::string, std::list<std::string>> condLines;
+    auto appendLine = [&](ACCExpr *cond, ACCExpr *dest, ACCExpr *value) -> void {
+        for (auto CI = condLines[methodName].begin(), CE = condLines[methodName].end(); CI != CE; CI++)
+            if (matchExpr(cond, CI->first)) {
+                CI->second.push_back(CondInfo{dest, value});
+                return;
+            }
+        condLines[methodName][cond].push_back(CondInfo{dest, value});
+    };
     for (auto info: MI->storeList) {
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
@@ -531,69 +573,28 @@ static void generateAlwaysLines(MethodInfo *MI, bool hasPrintf)
         replaceBlock.clear();
         destt = str2tree(tree2str(destt, nullptr, true));
         walkRef(destt);
-        ACCExpr *expr = destt;
-        if (expr->value == "?") {
-            int i = 0;
-            for (auto item: expr->operands)
-                if (i++ == 1) {
-                    expr = item;
-                    break;
-                }
-        }
-        if (expr->value != "{") { // }
-            std::string destType = findType(expr->value);
+        if (destt->value != "{") { // }
+            std::string destType = findType(destt->value);
             if (destType == "") {
             printf("[%s:%d] typenotfound %s\n", __FUNCTION__, __LINE__, tree2str(destt).c_str());
             exit(-1);
             }
         }
-        replaceBlock.clear();
-        std::string condStr;
-        if (cond)
-            condStr = "    if (" + tree2str(cond, nullptr, true) + ")";
-        replaceBlock.clear();
-        condLines[condStr].push_back("    " + tree2str(destt) + " <= " + tree2str(value, nullptr, true) + ";");
+        appendLine(cond, destt, value);
     }
     if (!hasPrintf)
     for (auto info: MI->printfList) {
 printf("[%s:%d] PRINTFFFFFF\n", __FUNCTION__, __LINE__);
-        ACCExpr *cond = cleanupExpr(info->cond);
-        ACCExpr *value = cleanupExpr(info->value)->operands.front();
+        ACCExpr *cond = info->cond;
+        ACCExpr *value = info->value->operands.front();
         value->value = "(";   // change from PARAMETER_MARKER
         ACCExpr *listp = value->operands.front();
         if (endswith(listp->value, "\\n\""))
             listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
 //dumpExpr("PRINTCOND", cond);
 //dumpExpr("PRINTF", value);
-        replaceBlock.clear();
-        std::string condStr;
-        if (cond)
-            condStr = "    if (" + tree2str(cond, nullptr, true) + ")";
-        replaceBlock.clear();
-        condLines[condStr].push_back("    $display" + tree2str(value, nullptr, true) + ";");
+        appendLine(cond, nullptr, value);
     }
-    if (condLines.size()) {
-        replaceBlock.clear();
-        ACCExpr *tempCond = allocExpr("&", allocExpr(MI->name), allocExpr(getRdyName(MI->name)));
-        alwaysLines.push_back("if (" + tree2str(tempCond, nullptr, true) + ") begin");
-    }
-    for (auto item: condLines) {
-        std::string endStr;
-        std::string temp = item.first;
-        if (item.first != "") {
-            if (item.second.size() > 1) {
-                temp += " begin";
-                endStr = "    end;";
-            }
-            alwaysLines.push_back(temp);
-        }
-        for (auto citem: item.second)
-            alwaysLines.push_back(citem);
-        if (endStr != "")
-            alwaysLines.push_back(endStr);
-    }
-    if (condLines.size())
-        alwaysLines.push_back("end; // End of " + MI->name);
 }
 
 static bool checkRecursion(ACCExpr *expr)
@@ -653,7 +654,7 @@ static std::list<ModData> modLine;
     bitfieldList.clear();
     modLine.clear();
     modNew.clear();
-    alwaysLines.clear();
+    condLines.clear();
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
 
     // Generate module header
