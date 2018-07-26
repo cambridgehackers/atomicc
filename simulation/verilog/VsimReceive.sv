@@ -32,6 +32,8 @@ module VsimReceive #(parameter width = 32) (input CLK, input nRST,
 	        last = v[33];
 	        EN_beat = v[32];
 	        beat = v[31:0];
+                //if (v[32])
+                    //$display("VsimReceive: last %x beat %x", v[33], v[31:0]);
 `else
 	        { last, EN_beat, beat } = dpi_msgReceive_beat();
 `endif

@@ -62,7 +62,7 @@ const char *vcd_file_name = "dump.vcd";
 vluint64_t main_time = 0;
 vluint64_t derived_time = 0;
 
-static int trace_xsimtop = 1;
+static int trace_xsimtop;//= 1;
 static int masterfpga_fd = -1, clientfd = -1, masterfpga_number = 5;
 static uint32_t rxBuffer[MAX_REQUEST_LENGTH], txBuffer[MAX_REQUEST_LENGTH];
 static int txIndex = 1, rxLength;
@@ -100,6 +100,8 @@ top:
         long long ret = VALID_FLAG | rxBuffer[--rxLength];
         if (rxLength == 1)
             ret |= END_FLAG;
+        if (trace_xsimtop)
+            fprintf(stdout, "dpi_msgReceive_beat: beat=%16llx\n", ret);
         return ret;
     }
     if (clientfd != -1) {
@@ -141,8 +143,8 @@ top:
 
 extern "C" void dpi_msgSend_beat(int beat, int last)
 {
-    //if (trace_xsimtop)
-        //fprintf(stdout, "dpi_msgSend_beat: beat=%08x\n", beat);
+    if (trace_xsimtop)
+        fprintf(stdout, "dpi_msgSend_beat: beat=%08x last %x\n", beat, last);
 //printf("[%s:%d] index %x txBuffer[0] %x beat %x last %x\n", __FUNCTION__, __LINE__, txIndex, txBuffer[0], beat, last);
     txBuffer[txIndex++] = beat;
     if (last) {

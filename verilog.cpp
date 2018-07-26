@@ -593,11 +593,6 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
     return newExpr;
 }
 
-static std::string getExecute(std::string methodName)
-{
-    return methodName.substr(0, methodName.length() - 3) + "EXECUTE";
-}
-
 static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value)
 {
     dest = str2tree(tree2str(dest, nullptr, true));
@@ -607,7 +602,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
             CI->second.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[methodName].guard = allocExpr(getExecute(methodName));
+    condLines[methodName].guard = allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)));
     condLines[methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
@@ -767,12 +762,6 @@ static std::list<ModData> modLine;
             walkRead(MI, MI->guard, nullptr);
             if (MI->rule)
                 setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1", true);
-        }
-        if (endswith(methodName, "__ENA")) {
-            std::string mname = getExecute(methodName);
-            refList[mname] = RefItem{0, "INTEGER_1", false, false, PIN_WIRE};
-            setAssign(mname, allocExpr("&", allocExpr(methodName),
-                 allocExpr(getRdyName(methodName))), "INTEGER_1", true);
         }
         setAssign(methodName, MI->guard, MI->type, MI->rule && !endswith(methodName, "__RDY"));  // collect the text of the return value into a single 'assign'
         for (auto info: MI->storeList) {
@@ -1004,7 +993,7 @@ exit(-1);
             val = tree2str(allocExpr(mitem.value), nullptr, true);
             std::string temp = mapPort[val];
             if (temp != "") {
-printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
+//printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
                 decRef(mitem.value);
                 refList[temp].count = 0;  // 'assign' line not needed; value is assigned by object inst
                 val = temp;
