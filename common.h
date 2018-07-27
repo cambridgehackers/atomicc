@@ -95,7 +95,7 @@ std::string tree2str(ACCExpr *expr, bool *changed = nullptr, bool assignReplace 
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
 void dumpExpr(std::string tag, ACCExpr *next);
-ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen = false);
+ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen = false, bool replaceBuiltin = false);
 ACCExpr *cleanupExprBit(ACCExpr *expr);
 ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
 std::string treePost(const ACCExpr *arg);
@@ -132,3 +132,4 @@ extern std::map<std::string, RefItem> refList;
 extern std::map<std::string, AssignItem> assignList;
 extern std::map<std::string, ModuleIR *> mapIndex;
 extern std::map<std::string, int> replaceBlock;
+extern int globalExprCleanup;

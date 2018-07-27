@@ -166,6 +166,9 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
                 expandTree(3, &item->cond, item->value, item->isAction);
             for (auto item: MI->printfList)
                 expandTree(4, &item->cond, item->value, item->isAction);
+
+            // now replace __bitconcat, __bitsubstr, __phi
+            MI->guard = cleanupExprBit(MI->guard);
             for (auto info: MI->storeList) {
                 info->dest = cleanupExprBit(info->dest);
                 info->cond = cleanupExprBit(info->cond);

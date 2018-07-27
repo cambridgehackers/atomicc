@@ -92,26 +92,6 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
     if (!expr)
         return "";
     std::string ret, sep, op = expr->value;
-    if (op == "__bitconcat") {
-        ACCExpr *list = expr->operands.front();
-        if (list->value == PARAMETER_MARKER)
-            list->value = "{";
-        return tree2str(list, changed, assignReplace);
-    }
-    if (op == "__bitsubstr") {
-        std::string extra;
-        ACCExpr *list = expr->operands.front();
-        if (list->operands.size() == 3)
-            extra = ":" + tree2str(getRHS(list, 2), changed, assignReplace);
-        ACCExpr *bitem = list->operands.front();
-        if (!isIdChar(bitem->value[0])) {
-            printf("[%s:%d] can only do __bitsubstr on elementary items\n", __FUNCTION__, __LINE__);
-            dumpExpr("BITSUB", expr);
-            exit(-1);
-        }
-        std::string base = tree2str(list->operands.front(), changed, false);  // can only do bit select on net or reg (not expressions)
-        return base + "[" + tree2str(getRHS(list), changed, assignReplace) + extra + "]";
-    }
     if (isParen(op)) {
         ret += op;
         if (expr->operands.size())
@@ -407,7 +387,7 @@ bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
     return true;
 }
 
-ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
+ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
 {
     if (!expr)
         return expr;
@@ -421,10 +401,38 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
     if (v == "^" && checkInteger(getRHS(expr), "1"))
-        return invertExpr(cleanupExpr(lhs));
+        return invertExpr(cleanupExpr(lhs, false, true));
+    if (replaceBuiltin && expr->value == "__bitconcat") {
+        ACCExpr *list = expr->operands.front();
+        if (list->value == PARAMETER_MARKER)
+            list->value = "{";
+        return cleanupExpr(list, false, replaceBuiltin);
+    }
+    if (replaceBuiltin && expr->value == "__bitsubstr") {
+        ACCExpr *list = expr->operands.front();
+        ACCExpr *bitem = list->operands.front();
+        if (!isIdChar(bitem->value[0])) {  // can only do bit select on net or reg (not expressions)
+            printf("[%s:%d] can only do __bitsubstr on elementary items\n", __FUNCTION__, __LINE__);
+            dumpExpr("BITSUB", expr);
+            exit(-1);
+        }
+        bitem->operands.push_back(allocExpr("[", allocExpr(":", getRHS(list), getRHS(list, 2))));
+        return cleanupExpr(bitem, false, true);
+    }
+    if (replaceBuiltin && expr->value == "__phi") {
+        ACCExpr *list = expr->operands.front();
+        int size = list->operands.size();
+        ACCExpr *lhs = getRHS(list, 0), *rhs = getRHS(list);
+        if (size == 2 && matchExpr(getRHS(lhs, 0), invertExpr(getRHS(rhs, 0))))
+            expr = allocExpr("?", getRHS(lhs, 0), getRHS(lhs), getRHS(rhs));
+        else if (size == 2 && getRHS(lhs, 0)->value == "__default" && getRHS(rhs)->value == "!=")
+            expr = allocExpr("&", getRHS(rhs, 0), getRHS(rhs));
+        else
+            dumpExpr("PHI", list);
+    }
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
-         ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]));
+         ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]), replaceBuiltin);
          if (trace_expr)
              printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
          if (titem->value != ret->value || ret->value == "?" || isParen(ret->value)
@@ -571,7 +579,7 @@ ACCExpr *cleanupExprBit(ACCExpr *expr)
 {
     if (!expr)
         return expr;
-    ACCExpr *temp = cleanupExpr(expr);
+    ACCExpr *temp = cleanupExpr(expr, false, true);
     //return temp;
     std::string bitTemp = tree2str(temp);  //HACK HACK HACK HACK to trigger __bitsubstr processing
 //printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, bitTemp.c_str());
