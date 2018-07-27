@@ -48,9 +48,10 @@ printf("[%s:%d] ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ replace %s -
         target = temp;
     }
     bool tDir = refList[target].out;
-    if (value) {
-if (trace_assign //|| !tDir
-) printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
+    if (!value)
+        return;
+    if (trace_assign)
+        printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
     //assert(tDir || noReplace);
     if (!refList[target].pin) {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
@@ -69,7 +70,6 @@ if (trace_assign) {
         //exit(-1);
     }
     assignList[target] = AssignItem{value, type, noReplace || refList[target].pin == PIN_MODULE, false};
-    }
 }
 
 static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin)
@@ -238,7 +238,7 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName, boo
             return allocExpr("1");
         }
         if (ACCExpr *assignValue = assignList[item].value)
-        if (useAssign && !assignList[item].noRecursion && !assignList[item].noReplace && refList[item].count < REF_COUNT_LIMIT) {
+        if (useAssign && !assignList[item].noRecursion && !assignList[item].noReplace && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         decRef(item);
         if (replaceBlock[item]++ < 5) {
             if (trace_assign)
@@ -364,7 +364,7 @@ static void optimizeAssign(ModuleIR *IR)
         if (ind != -1)
             temp = temp.substr(0,ind);
         if (aitem.second.value)
-            printf("[%s:%d] ASSIGN %s = %s count %d[%d] pin %d\n", __FUNCTION__, __LINE__, aitem.first.c_str(), tree2str(aitem.second.value).c_str(), refList[aitem.first].count, refList[temp].count, refList[temp].pin);
+            printf("[%s:%d] ASSIGN %s = %s size %d count %d[%d] pin %d\n", __FUNCTION__, __LINE__, aitem.first.c_str(), tree2str(aitem.second.value).c_str(), walkCount(aitem.second.value), refList[aitem.first].count, refList[temp].count, refList[temp].pin);
     }
     for (auto item: refList)
         if (item.second.count) {

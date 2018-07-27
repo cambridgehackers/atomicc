@@ -121,22 +121,22 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
     else if (isIdChar(op[0])) {
         ret += op;
         if (assignReplace) {
-        ACCExpr *temp = assignList[op].value;
+        ACCExpr *assignValue = assignList[op].value;
 if (trace_assign)
-printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)temp);
-        if (temp && !expr->operands.size() && !assignList[op].noRecursion && !assignList[op].noReplace && refList[op].count < REF_COUNT_LIMIT) {
+printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)assignValue);
+        if (assignValue && !expr->operands.size() && !assignList[op].noRecursion && !assignList[op].noReplace && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         if (replaceBlock[op]++ < 5 ) {
 if (trace_assign)
-printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(temp).c_str());
+printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(assignValue).c_str());
             decRef(op);
-            ret = tree2str(temp, changed, assignReplace);
+            ret = tree2str(assignValue, changed, assignReplace);
             if (changed)
                 *changed = true;
             else
-                walkRef(temp);
+                walkRef(assignValue);
         } 
         else {
-printf("[%s:%d] excessive replace of %s with %s top %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(temp).c_str(), tree2str(expr).c_str());
+printf("[%s:%d] excessive replace of %s with %s top %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(assignValue).c_str(), tree2str(expr).c_str());
 if (replaceBlock[op] > 7)
 exit(-1);
         }
@@ -174,6 +174,16 @@ void decRef(std::string name)
 //return;
     if (refList[name].count > 0)
         refList[name].count--;
+}
+
+int walkCount (ACCExpr *expr)
+{
+    if (!expr)
+        return 0;
+    int count = 1;  // include this node in count
+    for (auto item: expr->operands)
+        count += walkCount(item);
+    return count;
 }
 
 void walkRef (ACCExpr *expr)
