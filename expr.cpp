@@ -110,7 +110,7 @@ printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (
 if (trace_expr)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(assignValue).c_str());
             decRef(op);
-            ret = tree2str(assignValue, changed, assignReplace);
+            ret = "(" + tree2str(assignValue, changed, assignReplace) + ")";
             if (changed)
                 *changed = true;
             else

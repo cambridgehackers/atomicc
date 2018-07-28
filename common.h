@@ -133,3 +133,4 @@ extern std::map<std::string, AssignItem> assignList;
 extern std::map<std::string, ModuleIR *> mapIndex;
 extern std::map<std::string, int> replaceBlock;
 extern int globalExprCleanup;
+extern int flagErrorsCleanup;

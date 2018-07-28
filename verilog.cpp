@@ -332,9 +332,14 @@ static void setAssignRefCount(ModuleIR *IR)
     for (auto tcond: condLines) {
         std::string methodName = tcond.first;
         walkRef(tcond.second.guard);
+        if (trace_assign)
+            printf("[%s:%d] %s: guard %s\n", __FUNCTION__, __LINE__, methodName.c_str(), tree2str(tcond.second.guard).c_str());
         for (auto item: tcond.second.info) {
             walkRef(item.first);
             for (auto citem: item.second) {
+                if (trace_assign)
+                    printf("[%s:%d] %s: %s dest %s value %s\n", __FUNCTION__, __LINE__, methodName.c_str(),
+ tree2str(item.first).c_str(), tree2str(citem.dest).c_str(), tree2str(citem.value).c_str());
                 if (citem.dest) {
                     walkRef(citem.value);
                     walkRef(citem.dest);
