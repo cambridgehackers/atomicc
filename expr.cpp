@@ -434,9 +434,8 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
             expr = allocExpr("?", getRHS(lhs, 0), getRHS(lhs), getRHS(rhs));
         else if (size == 2 && getRHS(lhs, 0)->value == "__default" && getExprType(getRHS(rhs)) == "INTEGER_1")
             expr = allocExpr("&", getRHS(rhs, 0), getRHS(rhs));
-        //else
+        else
             dumpExpr("PHI", list);
-dumpExpr("REPPPPPP", expr);
     }
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
