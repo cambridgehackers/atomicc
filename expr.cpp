@@ -387,6 +387,13 @@ bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
     return true;
 }
 
+static std::string getExprType(ACCExpr *expr)
+{
+printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+    dumpExpr("getExprType", expr);
+    return "INTEGER_1";
+}
+
 ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
 {
     if (!expr)
@@ -425,10 +432,11 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
         ACCExpr *lhs = getRHS(list, 0), *rhs = getRHS(list);
         if (size == 2 && matchExpr(getRHS(lhs, 0), invertExpr(getRHS(rhs, 0))))
             expr = allocExpr("?", getRHS(lhs, 0), getRHS(lhs), getRHS(rhs));
-        else if (size == 2 && getRHS(lhs, 0)->value == "__default" && getRHS(rhs)->value == "!=")
+        else if (size == 2 && getRHS(lhs, 0)->value == "__default" && getExprType(getRHS(rhs)) == "INTEGER_1")
             expr = allocExpr("&", getRHS(rhs, 0), getRHS(rhs));
-        else
+        //else
             dumpExpr("PHI", list);
+dumpExpr("REPPPPPP", expr);
     }
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {

@@ -320,7 +320,7 @@ printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bi
     }
 }
 
-static void optimizeAssign(ModuleIR *IR)
+static void setAssignRefCount(ModuleIR *IR)
 {
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
@@ -370,6 +370,33 @@ static void optimizeAssign(ModuleIR *IR)
         if (item.second.count) {
          std::string type = findType(item.first);
         }
+}
+
+static void walkCSE (ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    if (0)
+    if (walkCount(expr) > 3)
+    for (auto item: assignList) {
+        if (item.second.value != expr && matchExpr(expr, item.second.value)) {
+printf("[%s:%d]MMMMMMMAAAAAAAAAAAATTTTTTTCCCCCCCCHHHHHHHH %s\n", __FUNCTION__, __LINE__, item.first.c_str());
+            expr->value = item.first;
+            expr->operands.clear();
+            refList[item.first].count++;
+        }
+    }
+    for (auto item: expr->operands)
+        walkCSE(item);
+}
+
+static void collectCSE(void)
+{
+printf("[%s:%d] START\n", __FUNCTION__, __LINE__);
+    for (auto item = assignList.begin(), aend = assignList.end(); item != aend; item++) {
+         walkCSE(item->second.value);
+    }
+printf("[%s:%d] END\n", __FUNCTION__, __LINE__);
 }
 
 static void generateAssign(FILE *OStr)
@@ -929,8 +956,6 @@ dumpExpr("READCALL", value);
                 appendLine(methodName, info->cond, nullptr, info->value);
     }
 
-    optimizeAssign(IR);
-
     for (auto item: assignList) {
         int i = 0;
         if (!item.second.value)
@@ -955,12 +980,16 @@ exit(-1);
             }
         }
     }
+
     // remove dependancy of the calling __ENA line on the calling __RDY
     for (auto item: enableList) {
         ACCExpr *val = assignList[item.first].value;
         replaceBlock.clear();
         assignList[item.first].value = cleanupExpr(walkRemoveCalledGuard(val, getRdyName(item.first), true));
     }
+
+    setAssignRefCount(IR);
+    collectCSE();
     optimizeBitAssigns();
     processRecursiveAssign();
     for (auto item: assignList)
