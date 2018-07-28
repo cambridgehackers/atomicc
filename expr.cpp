@@ -29,6 +29,7 @@ static char lexChar;
 static bool lexAllowRange;
 static ACCExpr *repeatGet1Token;
 std::map<std::string, int> replaceBlock;
+int flagErrorsCleanup;
 
 bool isIdChar(char ch)
 {
@@ -102,11 +103,11 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
         ret += op;
         if (assignReplace) {
         ACCExpr *assignValue = assignList[op].value;
-if (trace_assign)
+if (trace_expr)
 printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)assignValue);
         if (assignValue && !expr->operands.size() && !assignList[op].noRecursion && !assignList[op].noReplace && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         if (replaceBlock[op]++ < 5 ) {
-if (trace_assign)
+if (trace_expr)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(assignValue).c_str());
             decRef(op);
             ret = tree2str(assignValue, changed, assignReplace);
@@ -180,7 +181,7 @@ void walkRef (ACCExpr *expr)
             printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
         if (base != item)
 {
-if (trace_assign)
+if (trace_expr)
 printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
 item = base;
 }
@@ -533,12 +534,12 @@ nexto:;
         }
         for (auto item: ret->operands) {
             if (isIdChar(item->value[0])) {
-                if(!refList[item->value].pin) {
-printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str());
-//exit(-1);
-                }
-                else
+                if(refList[item->value].pin)
                     leftLen = convertType(refList[item->value].type);
+                else if (flagErrorsCleanup) {
+                    printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str());
+                    //exit(-1);
+                }
             }
             else if (isdigit(item->value[0])) {
                 if (checkInteger(item, "0") && leftLen == 1) {
