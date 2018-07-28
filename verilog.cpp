@@ -84,8 +84,8 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
         if (fitem.base != "")
             base = fitem.base;
         std::string fnew = base + "[" + autostr(upper) + ":" + autostr(offset) + "]";
-if (trace_expand)
-printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, (int)upper, fnew.c_str());
+if (trace_expand || refList[fitem.name].pin)
+printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s pin %d\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, (int)upper, fnew.c_str(), refList[fitem.name].pin);
         assert (!refList[fitem.name].pin);
         refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin};
         refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS};
@@ -96,6 +96,8 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s\n", __
         else
             setAssign(fitem.name, allocExpr(fnew), fitem.type);
     }
+    if (force)
+        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE};
     if (itemList->operands.size())
         setAssign(fldName, itemList, type);
 }
@@ -737,10 +739,8 @@ static std::list<ModData> modLine;
     iterField(IR, CBAct {
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
-            if (startswith(itemIR->name, "l_struct_OC_")) {
-                refList[fldName] = RefItem{0, item.type, 1, false, PIN_WIRE};
+            if (startswith(itemIR->name, "l_struct_OC_"))
                 expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
-            }
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName]);
             }
@@ -764,10 +764,8 @@ static std::list<ModData> modLine;
                     listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
             }
         }
-        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
-            refList[item.first] = RefItem{0, item.second, true, false, PIN_WIRE};
+        for (auto item: MI->alloca) // be sure to define local temps before walkRemoveParam
             expandStruct(IR, item.first, item.second, 1, false, true, PIN_WIRE);
-        }
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
