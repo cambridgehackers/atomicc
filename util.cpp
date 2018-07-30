@@ -101,6 +101,24 @@ ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
     return nullptr;
 }
 
+ModuleIR *iterInterface(ModuleIR *IR, CBFun cbWorker)
+{
+    for (auto item: IR->interfaces) {
+        int64_t vecCount = item.vecCount;
+        int dimIndex = 0;
+        do {
+            std::string fldName = item.fldName;
+            if (vecCount != -1)
+                fldName += autostr(dimIndex++);
+            if (trace_iter)
+                printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+            if (auto ret = (cbWorker)(item, fldName))
+                return ret;
+        } while(--vecCount > 0);
+    }
+    return nullptr;
+}
+
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
 {
     if (IR->method.find(name) == IR->method.end()) {
@@ -133,6 +151,52 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
         if (item.fldName == fieldName)
             return lookupMethod(lookupIR(item.type), searchStr);
     return nullptr;
+}
+
+std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
+{
+    std::string fieldName, origName = searchStr;
+    std::string outName;
+    bool found = false;
+    //printf("[%s:%d] start %s\n", __FUNCTION__, __LINE__, searchStr.c_str());
+    while (1) {
+        int ind = searchStr.find(MODULE_SEPARATOR);
+        fieldName = searchStr.substr(0, ind);
+        searchStr = searchStr.substr(ind+1);
+        ModuleIR *nextIR = iterField(searchIR, CBAct {
+              if (fieldName != "" && fldName == fieldName)
+                  return lookupIR(item.type);
+              return nullptr; });
+        if (!nextIR)
+            break;
+        outName += fieldName + MODULE_SEPARATOR;
+        searchIR = nextIR;
+    };
+    //printf("[%s:%d] out %s field %s search %s\n", __FUNCTION__, __LINE__, outName.c_str(), fieldName.c_str(), searchStr.c_str());
+    while (1) {
+        if (found) {
+            int ind = searchStr.find(MODULE_SEPARATOR);
+            fieldName = searchStr.substr(0, ind);
+            searchStr = searchStr.substr(ind+1);
+        }
+        ModuleIR *nextIR = iterInterface(searchIR, CBAct {
+              if (fieldName != "" && fldName == fieldName)
+                  return lookupIR(item.type);
+              return nullptr; });
+        if (!nextIR)
+            break;
+        outName += fieldName;
+        searchIR = nextIR;
+        found = true;
+    };
+    outName += fieldName;
+    if (found)
+    for (auto item: searchIR->fields)
+        if (item.fldName == fieldName) {
+            //printf("[%s:%d] found %s\n", __FUNCTION__, __LINE__, outName.c_str());
+            return outName;
+        }
+    return origName;
 }
 
 void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force, uint64_t aoffset, bool alias, bool init)

@@ -21,6 +21,16 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+static void walkSubst (ModuleIR *IR, ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    if (isIdChar(expr->value[0]))
+         expr->value = fixupQualPin(IR, expr->value);  // fixup interface names
+    for (auto item: expr->operands)
+        walkSubst(IR, item);
+}
+
 static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
 {
     if (!expr)
@@ -170,19 +180,30 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
             // now replace __bitconcat, __bitsubstr, __phi
             MI->guard = cleanupExprBit(MI->guard);
             for (auto info: MI->storeList) {
+                walkSubst(IR, info->dest);
+                walkSubst(IR, info->cond);
+                walkSubst(IR, info->value);
                 info->dest = cleanupExprBit(info->dest);
                 info->cond = cleanupExprBit(info->cond);
                 info->value = cleanupExprBit(info->value);
             }
             for (auto info: MI->printfList) {
+                walkSubst(IR, info->cond);
+                walkSubst(IR, info->value);
                 info->cond = cleanupExprBit(info->cond);
                 info->value = cleanupExprBit(info->value);
             }
             for (auto info: MI->callList) {
+                walkSubst(IR, info->cond);
+                walkSubst(IR, info->value);
                 info->cond = cleanupExprBit(info->cond);
                 info->value = cleanupExprBit(info->value);
             }
             for (auto info: MI->letList) {
+                walkSubst(IR, info->dest);
+                walkSubst(IR, info->cond);
+                walkSubst(IR, info->value);
+                info->dest = cleanupExprBit(info->dest);
                 info->cond = cleanupExprBit(info->cond);
                 info->value = cleanupExprBit(info->value);
             }

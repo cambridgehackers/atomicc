@@ -83,6 +83,7 @@ std::string sizeProcess(std::string type);
 ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker);
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name);
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr);
+std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr);
 void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force = true, uint64_t offset = 0, bool alias = false, bool init = true);
 ModuleIR *allocIR(std::string name);
 MethodInfo *allocMethod(std::string name);
