@@ -210,7 +210,7 @@ static ACCExpr *walkRemoveParam (ACCExpr *expr)
     std::string item = expr->value;
     if (isIdChar(item[0])) {
         int pin = refList[item].pin;
-        if (pin == PIN_MODULE) {
+        if (pin != PIN_OBJECT && pin != PIN_REG) {
 //if (trace_assign)
 printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, item.c_str(), pin);
             return nullptr;
