@@ -349,6 +349,8 @@ ACCExpr *invertExpr(ACCExpr *expr)
         return allocExpr("1");
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
+    if (v == "!")
+        return lhs;
     if (v == "^" && checkInteger(getRHS(expr), "1"))
         return lhs;
     if (v == "==") {
@@ -435,9 +437,18 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
             expr = allocExpr("?", getRHS(lhs, 0), getRHS(lhs), getRHS(rhs));
         else if (size == 2 && getRHS(lhs, 0)->value == "__default" && getExprType(getRHS(rhs)) == "INTEGER_1")
             expr = allocExpr("&", getRHS(rhs, 0), getRHS(rhs));
-        else
-            dumpExpr("PHI", list);
+        else {
+            //dumpExpr("PHI", list);
+            expr = allocExpr("|");
+            for (auto item: list->operands) {
+                item->value = "?"; // Change from ':' -> '?'
+                item->operands.push_back(allocExpr("0"));
+                expr->operands.push_back(item);
+            }
+        }
     }
+    if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
+        return allocExpr("0");
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
          ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]), replaceBuiltin);
