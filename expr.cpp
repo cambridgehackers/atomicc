@@ -599,6 +599,7 @@ nexta:;
         ACCExpr *nret = allocExpr(ret->value);
         std::string checkName;
         for (auto item: ret->operands) {
+             ACCExpr *invertItem = invertExpr(item);
              if (checkInteger(item, "1")) {
                  nret = item;
                  break;
@@ -608,8 +609,14 @@ nexta:;
              else for (auto pitem: nret->operands)
                  if (matchExpr(pitem, item))  // see if we already have this operand
                      goto nexto;
+                 //else if (matchExpr(pitem, invertItem))  // see if we already have inverted operand
+                     //goto removeo;
              nret->operands.push_back(item);
+             goto nexto;
 nexto:;
+             continue;
+removeo:;
+printf("[%s:%d] REMOVE\n", __FUNCTION__, __LINE__);
         }
         ret = nret;
     }
