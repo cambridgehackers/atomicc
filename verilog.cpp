@@ -804,8 +804,7 @@ static std::list<ModData> modLine;
                 cond->operands.push_back(info->cond);
             cond = cleanupExpr(cond);
             ACCExpr *value = info->value;
-            if (isdigit(value->value[0]))
-                updateWidth(value, convertType(info->type));
+            updateWidth(value, convertType(info->type));
             walkRead(MI, cond, nullptr);
             walkRead(MI, value, cond);
             std::list<FieldItem> fieldList;
@@ -813,8 +812,10 @@ static std::list<ModData> modLine;
             for (auto fitem : fieldList) {
                 std::string dest = info->dest->value + fitem.name;
                 ACCExpr *newExpr = value;
-                if (isIdChar(value->value[0]))
+                if (isIdChar(value->value[0])) {
                     newExpr = allocExpr(value->value + fitem.name);
+                    newExpr->operands = value->operands;
+                }
                 muxValueList[dest].push_back(MuxValueEntry{cond, newExpr});
             }
         }

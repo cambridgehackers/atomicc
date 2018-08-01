@@ -63,6 +63,29 @@ std::string treePost(const ACCExpr *arg)
     return "";
 }
 
+static bool booleanOp(std::string s)
+{
+    return s == "^" || s == "!" || s == "&" || s == "|";
+}
+static bool shiftOp(std::string s)
+{
+    return s == "<<" || s == ">>";
+}
+static bool arithOp(std::string s)
+{
+    return s == "+" || s == "-" || s == "*" || s == "%" || s == "?" || s == ":";
+}
+
+static bool relationalOp(std::string s)
+{
+    return s == "==" || s == "!=" || s == "<" || s == ">" || s == "&&" || s == "||";
+}
+
+static bool checkOperator(std::string s)
+{
+    return booleanOp(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == ",";
+}
+
 bool checkOperand(std::string s)
 {
     return isIdChar(s[0]) || isdigit(s[0]) || s == "(" || s == "{" || s[0] == '"';
@@ -322,14 +345,6 @@ static ACCExpr *get1Token(void)
     return ret;
 }
 
-static bool checkOperator(std::string s)
-{
-    return s == "==" || s == "&" || s == "+" || s == "-" || s == "*" || s == "%" || s == "!="
-      || s == "?" || s == ":" || s == "^" || s == "," || s == "!"
-      || s == "|" || s == "||" || s == "<" || s == ">"
-      || s == "<<" || s == ">>";
-}
-
 static bool checkInteger(ACCExpr *expr, std::string pattern)
 {
     if (!expr)
@@ -376,10 +391,26 @@ ACCExpr *invertExpr(ACCExpr *expr)
     return allocExpr("^", expr, allocExpr("1"));
 }
 
-void updateWidth(ACCExpr *item, int len)
+void updateWidth(ACCExpr *expr, int len)
 {
-    if (len > 0 && item->value.find("'") == std::string::npos)
-        item->value = autostr(len) + "'d" + item->value;
+    if (isdigit(expr->value[0]) && len > 0 && expr->value.find("'") == std::string::npos)
+        expr->value = autostr(len) + "'d" + expr->value;
+    else if (isIdChar(expr->value[0])) {
+        int ilen = convertType(refList[expr->value].type);
+        if (ilen > len) {
+            ACCExpr *subexpr = allocExpr(":", allocExpr(autostr(len-1)));
+            if (len > 1)
+                subexpr->operands.push_back(allocExpr("0"));
+            expr->operands.push_back(allocExpr("[", subexpr));
+        }
+    }
+    else if (expr->value == "?") {
+        updateWidth(getRHS(expr, 0), len);
+        updateWidth(getRHS(expr), len);
+    }
+    else if (arithOp(expr->value))
+        for (auto item: expr->operands)
+            updateWidth(item, len);
 }
 
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
