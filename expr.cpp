@@ -349,6 +349,10 @@ ACCExpr *invertExpr(ACCExpr *expr)
         return allocExpr("1");
     ACCExpr *lhs = expr->operands.front();
     std::string v = expr->value;
+    if (checkInteger(expr, "1"))
+        return allocExpr("0");
+    if (checkInteger(expr, "0"))
+        return allocExpr("1");
     if (v == "!")
         return lhs;
     if (v == "^" && checkInteger(getRHS(expr), "1"))
@@ -449,6 +453,31 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
     }
     if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
         return allocExpr("0");
+    if (expr->value == "|" && expr->operands.size() >= 2 && getRHS(expr, 0)->value == "&") {
+        ACCExpr *andp = nullptr, *orp = allocExpr("|", allocExpr("&"));
+        for (auto itemo : expr->operands) {
+            if (!andp)
+                andp = itemo;
+            else {
+                ACCExpr *itemoInvert = invertExpr(itemo);
+                ACCExpr *newAnd = allocExpr("&");
+                bool found = false;
+                for (auto itema : andp->operands) {
+                    if (matchExpr(itema, itemoInvert)) {
+                        found = true;
+                    }
+                    else
+                        newAnd->operands.push_back(itema);
+                }
+                andp = newAnd;
+                if (found)
+                    continue;
+            }
+            orp->operands.push_back(itemo);
+        }
+        getRHS(orp, 0)->operands = andp->operands;
+        expr = orp;
+    }
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
          ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]), replaceBuiltin);
