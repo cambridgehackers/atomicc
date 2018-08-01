@@ -105,6 +105,8 @@ void dumpExpr(std::string tag, ACCExpr *next)
 ACCExpr *getRHS(ACCExpr *expr, int match)
 {
      int i = 0;
+     if (match == -1)
+         match = expr->operands.size() - 1;
      for (auto item: expr->operands)
          if (i++ == match)
              return item;
@@ -484,6 +486,37 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
     }
     if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
         return allocExpr("0");
+    if (expr->value == "|") {
+        bool found = false;
+        ACCExpr *matchItem = nullptr;
+        for (auto itemo : expr->operands) {
+            if (itemo->value == "&") {
+                ACCExpr *thisLast = getRHS(itemo, -1); // get last item
+                if (matchExpr(matchItem, thisLast))
+                    found = true;
+                else if (!found)
+                    matchItem = thisLast;
+            }
+        }
+        if (found) {
+            ACCExpr *orp = allocExpr("|");
+            ACCExpr *factorp = allocExpr("|");
+            for (auto itemo : expr->operands) {
+                ACCExpr *thisLast = getRHS(itemo, -1); // get last item
+                if (itemo->value == "&" && matchExpr(matchItem, thisLast)) {
+                    ACCExpr *andp = allocExpr("&");
+                    for (auto itema : itemo->operands)
+                        if (!matchExpr(matchItem, itema))
+                            andp->operands.push_back(itema);
+                    factorp->operands.push_back(andp);
+                }
+                else
+                    orp->operands.push_back(itemo);
+            }
+            orp->operands.push_back(allocExpr("&", cleanupExpr(factorp), matchItem));
+            expr = orp;
+        }
+    }
     if (expr->value == "|" && expr->operands.size() >= 2 && getRHS(expr, 0)->value == "&") {
         ACCExpr *andp = nullptr, *orp = allocExpr("|", allocExpr("&"));
         for (auto itemo : expr->operands) {
@@ -633,6 +666,7 @@ nexto:;
         for (auto item: ret->operands) {
             if (isIdChar(item->value[0])) {
                 if(!refList[item->value].pin) {
+if (!replaceBuiltin)
 printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str());
 //exit(-1);
                 }
