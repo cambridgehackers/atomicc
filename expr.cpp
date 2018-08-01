@@ -23,6 +23,8 @@
 #define MAX_EXPR_DEPTH 20
 
 static int trace_expr;//=1;
+static int cleanupTraceLevel;//=1; //-1;
+#define TRACE_CLEANUP_EXPR (cleanupTraceLevel && (cleanupTraceLevel == -1 || (level <= cleanupTraceLevel)))
 static std::string lexString;
 static unsigned lexIndex;
 static char lexChar;
@@ -438,22 +440,23 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
 {
     if (!expr)
         return expr;
-    if (trace_expr)
-        dumpExpr("cleanupExprSTART", expr);
+static int level;
+    level++;
+    if (TRACE_CLEANUP_EXPR)
+        dumpExpr("cleanupExprSTART" + autostr(level), expr);
     if (expr->operands.size() == 1 && expr->operands.front()->value != "," && ((!preserveParen && expr->value == "(") ||
          expr->value == "&&" || expr->value == "&" || expr->value == "||" || expr->value == "|"))
         expr = expr->operands.front();
     if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
     ACCExpr *lhs = expr->operands.front();
-    std::string v = expr->value;
-    if (v == "^" && checkInteger(getRHS(expr), "1"))
-        return invertExpr(cleanupExpr(lhs, false, true));
+    if (expr->value == "^" && checkInteger(getRHS(expr), "1"))
+        expr = invertExpr(cleanupExpr(lhs, false, true));
     if (replaceBuiltin && expr->value == "__bitconcat") {
         ACCExpr *list = expr->operands.front();
         if (list->value == PARAMETER_MARKER)
             list->value = "{";
-        return cleanupExpr(list, false, replaceBuiltin);
+        expr = cleanupExpr(list, false, replaceBuiltin);
     }
     if (replaceBuiltin && expr->value == "__bitsubstr") {
         ACCExpr *list = expr->operands.front();
@@ -464,7 +467,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
             exit(-1);
         }
         bitem->operands.push_back(allocExpr("[", allocExpr(":", getRHS(list), getRHS(list, 2))));
-        return cleanupExpr(bitem, false, true);
+        expr = cleanupExpr(bitem, false, true);
     }
     if (replaceBuiltin && expr->value == "__phi") {
         ACCExpr *list = expr->operands.front();
@@ -485,7 +488,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
         }
     }
     if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
-        return allocExpr("0");
+        expr = allocExpr("0");
     if (expr->value == "|") {
         bool found = false;
         ACCExpr *matchItem = nullptr;
@@ -545,7 +548,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
          ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]), replaceBuiltin);
-         if (trace_expr)
+         if (TRACE_CLEANUP_EXPR)
              printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
          if (titem->value != ret->value || ret->value == "?" || isParen(ret->value)
             || (  titem->value != "&" && titem->value != "|"
@@ -553,7 +556,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
                && titem->value != "+" && titem->value != "*"))
              ret->operands.push_back(titem);
          else {
-             if (trace_expr)
+             if (TRACE_CLEANUP_EXPR)
                  printf("[%s:%d] combine tree expressions: op %s uppersize %d lowersize %d\n", __FUNCTION__, __LINE__, titem->value.c_str(), (int)ret->operands.size(), (int)titem->operands.size());
              for (auto oitem: titem->operands)
                  ret->operands.push_back(oitem);
@@ -584,7 +587,7 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
              }
              else if (item->value == "!=" && checkName == item->operands.front()->value)
                  continue;
-             else if (checkInteger(item, "1") && ret->operands.size() > 1)
+             else if (checkInteger(item, "1") && ret->operands.size() > 1) // ONEONEOOOONNNNEEEE
                  continue;
              else for (auto pitem: nret->operands)
                  if (matchExpr(pitem, item))  // see if we already have this operand
@@ -606,17 +609,16 @@ nexta:;
              }
              else if (checkInteger(item, "0") && ret->operands.size() > 1)
                  continue;
-             else for (auto pitem: nret->operands)
-                 if (matchExpr(pitem, item))  // see if we already have this operand
+             else for (auto pitem = nret->operands.begin(), pend = nret->operands.end(); pitem != pend; pitem++)
+                 if (matchExpr(*pitem, item))  // see if we already have this operand
                      goto nexto;
-                 //else if (matchExpr(pitem, invertItem))  // see if we already have inverted operand
-                     //goto removeo;
+                 else if (matchExpr(*pitem, invertItem)) {  // see if we already have inverted operand
+                     pitem = nret->operands.erase(pitem);
+                     goto nexto;
+                 }
              nret->operands.push_back(item);
              goto nexto;
 nexto:;
-             continue;
-removeo:;
-printf("[%s:%d] REMOVE\n", __FUNCTION__, __LINE__);
         }
         ret = nret;
     }
@@ -693,6 +695,9 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
         ret->value = "1";
     if (ret->value == "|" && !ret->operands.size())
         ret->value = "0";
+    if (TRACE_CLEANUP_EXPR)
+        dumpExpr("cleanupExprEND" + autostr(level), ret);
+    level--;
     return ret;
 }
 ACCExpr *cleanupExprBit(ACCExpr *expr)
