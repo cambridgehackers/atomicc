@@ -458,6 +458,9 @@ bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
         return true;
     if (!lhs || !rhs || lhs->value != rhs->value || lhs->operands.size() != rhs->operands.size())
         return false;
+    if ((lhs->value == "&" || lhs->value == "|") && lhs->operands.size() == 2) // check commutativity
+        if (matchExpr(getRHS(lhs), getRHS(rhs, 0)) && matchExpr(getRHS(lhs, 0), getRHS(rhs)))
+            return true;
     for (auto lcur = lhs->operands.begin(), lend = lhs->operands.end(), rcur = rhs->operands.begin(); lcur != lend; lcur++, rcur++)
         if (!matchExpr(*lcur, *rcur))
             return false;
@@ -792,9 +795,22 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
         }
     }
     if (ret->value == "|" && ret->operands.size() > 1) {
-    // (   ( ( readBeat$out$first[15:11] != 5'd0 ) & ( readBeat$out$first[15 :11] != 5'd4 ) )
-    // | ( ( ( readBeat$out$first[15:11] == 5'd4 ) | ( readBeat$out$first[15:11] == 5'd0 ) ) & ( !portalRControl ) )
-    // )
+        auto aitem = ret->operands.begin(), aend = ret->operands.end();
+        ACCExpr *lhs = *aitem++;
+        ACCExpr *invertLhs = invertExpr(lhs);
+        bool found = false;
+        for (; aitem != aend; aitem++) {
+            if ((*aitem)->value == "&")
+                for (auto pitem: (*aitem)->operands) {
+                     if (matchExpr(invertLhs, pitem)) {
+                         pitem->value = "1";
+                         pitem->operands.clear();
+                         found = true;
+                     }
+                }
+        }
+        if (found)
+            ret = cleanupExpr(ret);
     }
     if (TRACE_CLEANUP_EXPR)
         dumpExpr("cleanupExprEND" + autostr(level), ret);
