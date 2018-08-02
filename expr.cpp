@@ -628,7 +628,7 @@ static int level;
              }
              else if (item->value == "!=" && checkName == item->operands.front()->value)
                  continue;
-             else if (checkInteger(item, "1"))// && ret->operands.size() > 1) // ONEONEOOOONNNNEEEE
+             else if (checkInteger(item, "1"))
                  continue;
              else for (auto pitem: nret->operands)
                  if (matchExpr(pitem, item))  // see if we already have this operand
@@ -759,6 +759,37 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
         }
         if (found)
             ret = cleanupExpr(ret);
+    }
+    if (ret->value == "&" && ret->operands.size() > 1) {
+        auto aitem = ret->operands.begin(), aend = ret->operands.end();
+        ACCExpr *lhs = *aitem++;
+        if (lhs->value == "==") {
+        ACCExpr *invertLhs = invertExpr(lhs);
+        ACCExpr *matchItem = getRHS(lhs, 0);
+        bool found = false;
+        for (; aitem != aend; aitem++) {
+            if ((*aitem)->value == "|")
+                for (auto oitem: (*aitem)->operands) {
+                     if (matchExpr(lhs, oitem)) {
+                         oitem->value = "1";
+                         oitem->operands.clear();
+                         found = true;
+                     }
+                     else if (matchExpr(invertLhs, oitem)) {
+                         oitem->value = "0";
+                         oitem->operands.clear();
+                         found = true;
+                     }
+                     else if (oitem->value == "!=" && matchExpr(matchItem, getRHS(oitem,0))) {
+                         oitem->value = "0";
+                         oitem->operands.clear();
+                         found = true;
+                     }
+                }
+        }
+        if (found)
+            ret = cleanupExpr(ret);
+        }
     }
     if (TRACE_CLEANUP_EXPR)
         dumpExpr("cleanupExprEND" + autostr(level), ret);
