@@ -791,6 +791,11 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
             ret = cleanupExpr(ret);
         }
     }
+    if (ret->value == "|" && ret->operands.size() > 1) {
+    // (   ( ( readBeat$out$first[15:11] != 5'd0 ) & ( readBeat$out$first[15 :11] != 5'd4 ) )
+    // | ( ( ( readBeat$out$first[15:11] == 5'd4 ) | ( readBeat$out$first[15:11] == 5'd0 ) ) & ( !portalRControl ) )
+    // )
+    }
     if (TRACE_CLEANUP_EXPR)
         dumpExpr("cleanupExprEND" + autostr(level), ret);
     level--;
