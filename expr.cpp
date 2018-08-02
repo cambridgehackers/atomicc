@@ -395,12 +395,47 @@ ACCExpr *invertExpr(ACCExpr *expr)
     return allocExpr("^", expr, allocExpr("1"));
 }
 
+int exprWidth(ACCExpr *expr)
+{
+    if (relationalOp(expr->value))
+        return 1;
+    int ind = expr->value.find("'");
+    if (isdigit(expr->value[0]) && ind > 0) {
+        std::string temp = expr->value.substr(0, ind - 1);
+        return atoi(temp.c_str());
+    }
+    if (isIdChar(expr->value[0])) {
+        ACCExpr *lhs = getRHS(expr, 0);
+        if (lhs && lhs->value == "[" && lhs->operands.size() > 0) {
+            ACCExpr *first = getRHS(lhs, 0);
+            if (first->value == ":") {
+                ACCExpr *second = getRHS(first);
+                first = getRHS(first, 0);
+                if (!second)
+                    return 1;
+                if (isdigit(first->value[0]) && isdigit(second->value[0]))
+                    return atoi(first->value.c_str()) - atoi(second->value.c_str()) + 1;
+            }
+            else if (isdigit(first->value[0]))
+                return 1;
+        }
+        return convertType(refList[expr->value].type);
+    }
+    if (expr->value == "?") {
+        if (int len = exprWidth(getRHS(expr, 1)))
+            return len;
+        if (int len = exprWidth(getRHS(expr, 2)))
+            return len;
+    }
+    return 0;
+}
+
 void updateWidth(ACCExpr *expr, int len)
 {
+    int ilen = exprWidth(expr);
     if (isdigit(expr->value[0]) && len > 0 && expr->value.find("'") == std::string::npos)
         expr->value = autostr(len) + "'d" + expr->value;
     else if (isIdChar(expr->value[0])) {
-        int ilen = convertType(refList[expr->value].type);
         if (ilen > len) {
             ACCExpr *subexpr = allocExpr(":", allocExpr(autostr(len-1)));
             if (len > 1)
@@ -564,8 +599,14 @@ static int level;
     }
     if (ret->value == "?" && checkInteger(ret->operands.front(), "1"))
         ret = getRHS(ret);
-    if (ret->value == "?" && checkInteger(getRHS(ret, 2), "0"))
-        ret = allocExpr("&", ret->operands.front(), getRHS(ret));
+    if (ret->value == "?" && checkInteger(getRHS(ret, 2), "0")) {
+        ACCExpr *rhs = getRHS(ret,1);
+        int len = exprWidth(rhs);
+        if (checkInteger(rhs, "1"))
+            ret = ret->operands.front();
+        else if (len == 1)
+            ret = allocExpr("&", ret->operands.front(), getRHS(ret));
+    }
     if (ret->value == "&") {
         bool restartFlag = false;
         do {
@@ -695,6 +736,30 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
         ret->value = "1";
     if (ret->value == "|" && !ret->operands.size())
         ret->value = "0";
+    if (ret->value == "&" && ret->operands.size() >= 2) {
+        auto aitem = ret->operands.begin(), aend = ret->operands.end();
+        ACCExpr *first = *aitem++;
+        ACCExpr *invertFirst = invertExpr(first);
+        bool found = false;
+        for (;aitem != aend; aitem++) {
+            if ((*aitem)->value == "|") {
+                for (auto oitem: (*aitem)->operands) {
+                    if (matchExpr(oitem, invertFirst)) {
+                        oitem->value = "0";
+                        oitem->operands.clear();
+                        found = true;
+                    }
+                    else if (matchExpr(oitem, first)) {
+                        oitem->value = "1";
+                        oitem->operands.clear();
+                        found = true;
+                    }
+                }
+            }
+        }
+        if (found)
+            ret = cleanupExpr(ret);
+    }
     if (TRACE_CLEANUP_EXPR)
         dumpExpr("cleanupExprEND" + autostr(level), ret);
     level--;
