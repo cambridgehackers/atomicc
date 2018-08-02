@@ -587,7 +587,7 @@ static int level;
              }
              else if (item->value == "!=" && checkName == item->operands.front()->value)
                  continue;
-             else if (checkInteger(item, "1") && ret->operands.size() > 1) // ONEONEOOOONNNNEEEE
+             else if (checkInteger(item, "1"))// && ret->operands.size() > 1) // ONEONEOOOONNNNEEEE
                  continue;
              else for (auto pitem: nret->operands)
                  if (matchExpr(pitem, item))  // see if we already have this operand
@@ -609,15 +609,15 @@ nexta:;
              }
              else if (checkInteger(item, "0") && ret->operands.size() > 1)
                  continue;
-             else for (auto pitem = nret->operands.begin(), pend = nret->operands.end(); pitem != pend; pitem++)
-                 if (matchExpr(*pitem, item))  // see if we already have this operand
+             else for (auto pitem : nret->operands)
+                 if (matchExpr(pitem, item))  // see if we already have this operand
                      goto nexto;
-                 else if (matchExpr(*pitem, invertItem)) {  // see if we already have inverted operand
-                     pitem = nret->operands.erase(pitem);
+                 else if (matchExpr(pitem, invertItem)) {  // see if we already have inverted operand
+                     pitem->value = "1";
+                     pitem->operands.clear();
                      goto nexto;
                  }
              nret->operands.push_back(item);
-             goto nexto;
 nexto:;
         }
         ret = nret;
