@@ -474,6 +474,12 @@ printf("[%s:%d]\n", __FUNCTION__, __LINE__);
     return "INTEGER_1";
 }
 
+static void replaceValue(ACCExpr *expr, std::string value)
+{
+    expr->value = value;
+    expr->operands.clear();
+}
+
 bool factorExpr(ACCExpr *expr)
 {
     bool changed = false;
@@ -495,8 +501,7 @@ dumpExpr("FACT" + autostr(level), expr);
             ACCExpr *invertItem = invertExpr(*itemo);
             for (auto jtemo = expr->operands.begin(); jtemo != itemo; jtemo++)
                  if (matchExpr(*jtemo, invertItem)) {
-                     expr->value = "1";
-                     expr->operands.clear();
+                     replaceValue(expr, "1");
                      changed = true;
                      goto skiplabel1;
                  }
@@ -514,8 +519,7 @@ skiplabel1:;
             ACCExpr *invertItem = invertExpr(*itemo);
             for (auto jtemo = expr->operands.begin(); jtemo != itemo; jtemo++)
                  if (matchExpr(*jtemo, invertItem)) {
-                     expr->value = "0";
-                     expr->operands.clear();
+                     replaceValue(expr, "0");
                      changed = true;
                      goto skiplabel2;
                  }
@@ -572,8 +576,7 @@ skiplabel2:;
                     goto skipitem1;
                 }
             if (checkInteger(*item, "0")) {
-                expr->value = "0";
-                expr->operands.clear();
+                replaceValue(expr, "0");
                 goto nextlab;
             }
             item++;
@@ -588,8 +591,7 @@ skipitem1:;
                     goto skipitem2;
                 }
             if (checkInteger(*item, "1")) {
-                expr->value = "1";
-                expr->operands.clear();
+                replaceValue(expr, "1");
                 goto nextlab;
             }
             item++;
@@ -601,9 +603,9 @@ skipitem2:;
         expr->operands = lhs->operands;
     }
     else if (expr->value == "&" && !expr->operands.size())
-        expr->value = "1";
+        replaceValue(expr, "1");
     else if (expr->value == "|" && !expr->operands.size())
-        expr->value = "0";
+        replaceValue(expr, "0");
     else
         break;  // all done, no more updates
 nextlab:;
@@ -818,13 +820,11 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
             if ((*aitem)->value == "|") {
                 for (auto oitem: (*aitem)->operands) {
                     if (matchExpr(oitem, invertFirst)) {
-                        oitem->value = "0";
-                        oitem->operands.clear();
+                        replaceValue(oitem, "0");
                         found = true;
                     }
                     else if (matchExpr(oitem, first)) {
-                        oitem->value = "1";
-                        oitem->operands.clear();
+                        replaceValue(oitem, "1");
                         found = true;
                     }
                 }
@@ -844,18 +844,15 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
             if ((*aitem)->value == "|")
                 for (auto oitem: (*aitem)->operands) {
                      if (matchExpr(lhs, oitem)) {
-                         oitem->value = "1";
-                         oitem->operands.clear();
+                         replaceValue(oitem, "1");
                          found = true;
                      }
                      else if (matchExpr(invertLhs, oitem)) {
-                         oitem->value = "0";
-                         oitem->operands.clear();
+                         replaceValue(oitem, "0");
                          found = true;
                      }
                      else if (oitem->value == "!=" && matchExpr(matchItem, getRHS(oitem,0))) {
-                         oitem->value = "0";
-                         oitem->operands.clear();
+                         replaceValue(oitem, "0");
                          found = true;
                      }
                 }
@@ -873,8 +870,7 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
             if ((*aitem)->value == "&")
                 for (auto pitem: (*aitem)->operands) {
                      if (matchExpr(invertLhs, pitem)) {
-                         pitem->value = "1";
-                         pitem->operands.clear();
+                         replaceValue(pitem, "1");
                          found = true;
                      }
                 }
