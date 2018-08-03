@@ -486,7 +486,6 @@ dumpExpr("FACT" + autostr(level), expr);
     while(1) {
         bool found = false;
     if (expr->value == "|") {
-        ACCExpr *matchItem = nullptr;
         for (auto itemo = expr->operands.begin(), iend = expr->operands.end(); itemo != iend;) {
             if (checkInteger(*itemo, "0")) {
                  itemo = expr->operands.erase(itemo);
@@ -494,18 +493,38 @@ dumpExpr("FACT" + autostr(level), expr);
                  continue;
             }
             ACCExpr *invertItem = invertExpr(*itemo);
-            for (auto jtemo = expr->operands.begin(); jtemo != itemo; jtemo++) {
+            for (auto jtemo = expr->operands.begin(); jtemo != itemo; jtemo++)
                  if (matchExpr(*jtemo, invertItem)) {
-                     (*jtemo)->value = "1";
-                     (*jtemo)->operands.clear();
-                     itemo = expr->operands.erase(itemo);
+                     expr->value = "1";
+                     expr->operands.clear();
                      changed = true;
-                     goto skiplabel;
+                     goto skiplabel1;
                  }
-            }
             itemo++;
-skiplabel:;
         }
+    }
+skiplabel1:;
+    if (expr->value == "&") {
+        for (auto itemo = expr->operands.begin(), iend = expr->operands.end(); itemo != iend;) {
+            if (checkInteger(*itemo, "1")) {
+                 itemo = expr->operands.erase(itemo);
+                 changed = true;
+                 continue;
+            }
+            ACCExpr *invertItem = invertExpr(*itemo);
+            for (auto jtemo = expr->operands.begin(); jtemo != itemo; jtemo++)
+                 if (matchExpr(*jtemo, invertItem)) {
+                     expr->value = "0";
+                     expr->operands.clear();
+                     changed = true;
+                     goto skiplabel2;
+                 }
+            itemo++;
+        }
+    }
+skiplabel2:;
+    if (expr->value == "|") {
+        ACCExpr *matchItem = nullptr;
         for (auto itemo : expr->operands) {
             if (itemo->value == "&") {
                 ACCExpr *thisLast = getRHS(itemo, -1); // get last item
@@ -550,7 +569,7 @@ skiplabel:;
                 if (matchExpr(*item, *jitem)) {
                     item = expr->operands.erase(item);
                     changed = true;
-                    goto skipitem;
+                    goto skipitem1;
                 }
             if (checkInteger(*item, "0")) {
                 expr->value = "0";
@@ -558,7 +577,23 @@ skiplabel:;
                 goto nextlab;
             }
             item++;
-skipitem:;
+skipitem1:;
+        }
+    if (expr->value == "|")
+        for (auto item = expr->operands.begin(), iend = expr->operands.end(); item != iend;) {
+            for (auto jitem = expr->operands.begin(); jitem != item; jitem++)
+                if (matchExpr(*item, *jitem)) {
+                    item = expr->operands.erase(item);
+                    changed = true;
+                    goto skipitem2;
+                }
+            if (checkInteger(*item, "1")) {
+                expr->value = "1";
+                expr->operands.clear();
+                goto nextlab;
+            }
+            item++;
+skipitem2:;
         }
     if (expr->operands.size() == 1 && booleanBinop(expr->value)) {
         ACCExpr *lhs = getRHS(expr, 0);
@@ -692,10 +727,6 @@ static int level;
         ACCExpr *nret = allocExpr(ret->value);
         std::string checkName;
         for (auto item: ret->operands) {
-             if (checkInteger(item, "0")) {
-                 nret = item;
-                 break;
-             }
              if (item->value == "==")
                  checkName = item->operands.front()->value;
              else if (item->value == "&") {
@@ -706,43 +737,11 @@ static int level;
              }
              else if (item->value == "!=" && checkName == item->operands.front()->value)
                  continue;
-             else if (checkInteger(item, "1"))
-                 continue;
-             else for (auto pitem: nret->operands)
-                 if (matchExpr(pitem, item))  // see if we already have this operand
-                     goto nexta;
              nret->operands.push_back(item);
-nexta:;
         }
         ret = nret;
         } while (restartFlag);
     }
-    if (ret->value == "|") {
-        ACCExpr *nret = allocExpr(ret->value);
-        std::string checkName;
-        for (auto item: ret->operands) {
-             ACCExpr *invertItem = invertExpr(item);
-             if (checkInteger(item, "1")) {
-                 nret = item;
-                 break;
-             }
-             else if (checkInteger(item, "0") && ret->operands.size() > 1)
-                 continue;
-             else for (auto pitem : nret->operands)
-                 if (matchExpr(pitem, item))  // see if we already have this operand
-                     goto nexto;
-                 else if (matchExpr(pitem, invertItem)) {  // see if we already have inverted operand
-                     pitem->value = "1";
-                     pitem->operands.clear();
-                     goto nexto;
-                 }
-             nret->operands.push_back(item);
-nexto:;
-        }
-        ret = nret;
-    }
-    if (ret->operands.size() == 1 && (ret->value == "&" || ret->value == "|"))
-        ret = ret->operands.front();
     if (ret->value == "!=") {
         if (isdigit(ret->operands.front()->value[0])) { // move constants to RHS
             ACCExpr *lhs = ret->operands.front();
