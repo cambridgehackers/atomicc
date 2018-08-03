@@ -480,6 +480,14 @@ static void replaceValue(ACCExpr *expr, std::string value)
     expr->operands.clear();
 }
 
+ACCExpr *dupExpr(ACCExpr *expr)
+{
+    auto ext = allocExpr(expr->value);
+    for (auto item: expr->operands)
+        ext->operands.push_back(dupExpr(item));
+    return ext;
+}
+
 bool factorExpr(ACCExpr *expr)
 {
     bool changed = false;
@@ -530,7 +538,7 @@ skiplabel2:;
     if (expr->value == "|") {
         ACCExpr *matchItem = nullptr;
         for (auto itemo : expr->operands) {
-            if (itemo->value == "&") {
+            if (itemo->value == "&" && itemo->operands.size()) {
                 ACCExpr *thisLast = getRHS(itemo, -1); // get last item
                 if (matchExpr(matchItem, thisLast))
                     found = true;
@@ -539,7 +547,6 @@ skiplabel2:;
             }
         }
         if (found) {
-//dumpExpr("BEFORERRRR", expr);
             ACCExpr *factorp = allocExpr("|");
             for (auto itemo = expr->operands.begin(), iend = expr->operands.end(); itemo != iend;) {
                 ACCExpr *thisLast = getRHS(*itemo, -1); // get last item
@@ -558,9 +565,25 @@ skiplabel2:;
             }
             changed |= factorExpr(factorp);
             expr->operands.push_back(allocExpr("&", factorp, matchItem));
-//dumpExpr("AFTERRR", expr);
-//exit(-1);
             continue;
+        }
+    }
+    ACCExpr *lhs = getRHS(expr, 0);
+    if (expr->value == "|" && expr->operands.size() >= 2 && lhs->value == "&" && lhs->operands.size()) {
+        auto itemo = expr->operands.begin(), iend = expr->operands.end();
+        ACCExpr *andp = *itemo++, *used = allocExpr("");
+        for (; itemo != iend; itemo++) {
+            ACCExpr *itemoInvert = invertExpr(*itemo);
+            auto itema = andp->operands.begin(), aend = andp->operands.end();
+            for (; itema != aend;) {
+                if (matchExpr(*itema, itemoInvert)) {
+                    used->operands.push_back(*itema);
+                    itema = andp->operands.erase(itema);
+                    found |= true;
+                }
+                else
+                    itema++;
+            }
         }
     }
     for (auto item: expr->operands)
@@ -669,31 +692,6 @@ static int level;
     }
     if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
         expr = allocExpr("0");
-    if (expr->value == "|" && expr->operands.size() >= 2 && getRHS(expr, 0)->value == "&") {
-        ACCExpr *andp = nullptr, *orp = allocExpr("|", allocExpr("&"));
-        for (auto itemo : expr->operands) {
-            if (!andp)
-                andp = itemo;
-            else {
-                ACCExpr *itemoInvert = invertExpr(itemo);
-                ACCExpr *newAnd = allocExpr("&");
-                bool found = false;
-                for (auto itema : andp->operands) {
-                    if (matchExpr(itema, itemoInvert)) {
-                        found = true;
-                    }
-                    else
-                        newAnd->operands.push_back(itema);
-                }
-                andp = newAnd;
-                if (found)
-                    continue;
-            }
-            orp->operands.push_back(itemo);
-        }
-        getRHS(orp, 0)->operands = andp->operands;
-        expr = orp;
-    }
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
          ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]), replaceBuiltin);
