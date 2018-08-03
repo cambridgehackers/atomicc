@@ -24,7 +24,7 @@
 int trace_assign;//= 1;
 int trace_connect;//= 1;
 int trace_expand;//= 1;
-int trace_skipped;//= 1;
+int trace_skipped= 1;
 
 std::map<std::string, RefItem> refList;
 std::map<std::string, ModuleIR *> mapIndex;
@@ -87,8 +87,8 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
 if (trace_expand || refList[fitem.name].pin)
 printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s pin %d\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, (int)upper, fnew.c_str(), refList[fitem.name].pin);
         assert (!refList[fitem.name].pin);
-        refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin};
-        refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS};
+        refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false};
+        refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false};
         if (!fitem.alias && out)
             itemList->operands.push_front(allocExpr(fitem.name));
         else if (out)
@@ -97,7 +97,7 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s pin %d
             setAssign(fitem.name, allocExpr(fnew), fitem.type);
     }
     if (force)
-        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE};
+        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false};
     if (itemList->operands.size())
         setAssign(fldName, itemList, type);
 }
@@ -158,7 +158,7 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
     auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam, bool islocal) -> void {
         int refPin = instance != "" ? PIN_OBJECT: (islocal ? PIN_LOCAL: PIN_MODULE);
         if (!islocal || instance == "")
-        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0 || refPin == PIN_LOCAL, inout, refPin};
+        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0 || refPin == PIN_LOCAL, inout, refPin, false};
         if (!islocal)
         modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam});
         if (!isparam)
@@ -432,9 +432,9 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         }
     }
     for (auto item: assignList)
-        if (item.second.value && refList[item.first].count && item.second.noReplace) {
+        if (item.second.value && refList[item.first].count && item.second.noReplace && !refList[item.first].done) {
             fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
-            refList[item.first].count = 0; // mark that assigns have already been output
+            refList[item.first].done = true; // mark that assigns have already been output
         }
     std::string endStr, sep;
     for (auto item: modNew) {
@@ -463,6 +463,8 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                     if (ACCExpr *val = alitem.second.value)
                     if (isIdChar(val->value[0]) && val->value == item.first)
                         goto next;
+            if (refList[temp].done)
+                continue;
             if (refList[temp].count) {
                 if (assignList[item.first].value)
                     fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
@@ -470,9 +472,9 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                     fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
             }
             else if (trace_skipped)
-                fprintf(OStr, "    skippedassign %s = %s; //temp = '%s', count = %d, pin = %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin);
+                fprintf(OStr, "    //skippedassign %s = %s; //temp = '%s', count = %d, pin = %d done %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin, refList[temp].done);
 next:;
-            refList[item.first].count = 0; // mark that assigns have already been output
+            refList[item.first].done = true; // mark that assigns have already been output
         }
     }
     bool seen = false;
@@ -481,7 +483,7 @@ next:;
         int ind = temp.find('[');
         if (ind != -1)
             temp = temp.substr(0,ind);
-        if (item.second.value && refList[temp].count) {
+        if (item.second.value && refList[temp].count && !refList[temp].done) {
             if (!seen)
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
             seen = true;
@@ -729,11 +731,11 @@ static std::list<ModData> modLine;
     }
     fprintf(OStr, ");\n");
     if (!hasCLK) {
-        refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL};
+        refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL, false};
         refList["CLK"].count++;
     }
     if (!hasnRST) {
-        refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL};
+        refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL, false};
         refList["nRST"].count++;
     }
     modLine.clear();
@@ -750,14 +752,14 @@ static std::list<ModData> modLine;
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName]);
             }
             else if (convertType(item.type) != 0)
-                refList[fldName] = RefItem{0, item.type, false, false, PIN_REG};
+                refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false};
           return nullptr;
           });
     for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be allocated for rules
-            refList[methodName] = RefItem{1, MI->type, true, false, PIN_WIRE};
+            refList[methodName] = RefItem{1, MI->type, true, false, PIN_WIRE, false};
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
             value->value = "(";   // change from PARAMETER_MARKER
@@ -1016,7 +1018,8 @@ exit(-1);
         std::string val = mitem.value;
         if (!mitem.moduleStart) {
             if (refList[val].count == 0) {
-                if (refList[val].out)
+                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
+                if (refList[val].out && !refList[val].inout)
                     val = "0";
                 else
                     val = "";
@@ -1028,7 +1031,7 @@ exit(-1);
             if (temp != "") {
 //printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
                 decRef(mitem.value);
-                refList[temp].count = 0;  // 'assign' line not needed; value is assigned by object inst
+                refList[mitem.value].done = true;  // 'assign' line not needed; value is assigned by object inst
                 val = temp;
             }
             }

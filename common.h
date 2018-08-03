@@ -60,6 +60,7 @@ typedef struct {
     bool        out;
     bool        inout;
     int         pin;
+    bool        done;
 } RefItem;
 typedef struct {
     uint64_t    upper;
