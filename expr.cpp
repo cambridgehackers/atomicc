@@ -65,9 +65,9 @@ std::string treePost(const ACCExpr *arg)
     return "";
 }
 
-static bool booleanOp(std::string s)
+static bool booleanBinop(std::string s)
 {
-    return s == "^" || s == "!" || s == "&" || s == "|";
+    return s == "^" || s == "&" || s == "|" || s == "&&" || s == "||";
 }
 static bool shiftOp(std::string s)
 {
@@ -80,12 +80,12 @@ static bool arithOp(std::string s)
 
 static bool relationalOp(std::string s)
 {
-    return s == "==" || s == "!=" || s == "<" || s == ">" || s == "&&" || s == "||";
+    return s == "==" || s == "!=" || s == "<" || s == ">";
 }
 
 static bool checkOperator(std::string s)
 {
-    return booleanOp(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == ",";
+    return booleanBinop(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == "," || s == "!";
 }
 
 bool checkOperand(std::string s)
@@ -474,6 +474,112 @@ printf("[%s:%d]\n", __FUNCTION__, __LINE__);
     return "INTEGER_1";
 }
 
+bool factorExpr(ACCExpr *expr)
+{
+    bool changed = false;
+    if (!expr)
+        return false;
+static int level = 999;
+    level++;
+if (level == 1)
+dumpExpr("FACT" + autostr(level), expr);
+    while(1) {
+        bool found = false;
+    if (expr->value == "|") {
+        ACCExpr *matchItem = nullptr;
+        for (auto itemo = expr->operands.begin(), iend = expr->operands.end(); itemo != iend;) {
+            if (checkInteger(*itemo, "0")) {
+                 itemo = expr->operands.erase(itemo);
+                 changed = true;
+                 continue;
+            }
+            ACCExpr *invertItem = invertExpr(*itemo);
+            for (auto jtemo = expr->operands.begin(); jtemo != itemo; jtemo++) {
+                 if (matchExpr(*jtemo, invertItem)) {
+                     (*jtemo)->value = "1";
+                     (*jtemo)->operands.clear();
+                     itemo = expr->operands.erase(itemo);
+                     changed = true;
+                     goto skiplabel;
+                 }
+            }
+            itemo++;
+skiplabel:;
+        }
+        for (auto itemo : expr->operands) {
+            if (itemo->value == "&") {
+                ACCExpr *thisLast = getRHS(itemo, -1); // get last item
+                if (matchExpr(matchItem, thisLast))
+                    found = true;
+                else if (!found)
+                    matchItem = thisLast;
+            }
+        }
+        if (found) {
+//dumpExpr("BEFORERRRR", expr);
+            ACCExpr *factorp = allocExpr("|");
+            for (auto itemo = expr->operands.begin(), iend = expr->operands.end(); itemo != iend;) {
+                ACCExpr *thisLast = getRHS(*itemo, -1); // get last item
+                if ((*itemo)->value == "&" && matchExpr(matchItem, thisLast)) {
+                    ACCExpr *andp = allocExpr("&");
+                    for (auto itema : (*itemo)->operands)
+                        if (!matchExpr(matchItem, itema))
+                            andp->operands.push_back(itema);
+                    if (andp->operands.size())
+                        factorp->operands.push_back(andp);
+                    itemo = expr->operands.erase(itemo);
+                    changed = true;
+                }
+                else
+                    itemo++;
+            }
+            changed |= factorExpr(factorp);
+            expr->operands.push_back(allocExpr("&", factorp, matchItem));
+//dumpExpr("AFTERRR", expr);
+//exit(-1);
+            continue;
+        }
+    }
+    for (auto item: expr->operands)
+        found |= factorExpr(item);
+    if (found)
+        goto nextlab;
+    if (expr->value == "&")
+        for (auto item = expr->operands.begin(), iend = expr->operands.end(); item != iend;) {
+            for (auto jitem = expr->operands.begin(); jitem != item; jitem++)
+                if (matchExpr(*item, *jitem)) {
+                    item = expr->operands.erase(item);
+                    changed = true;
+                    goto skipitem;
+                }
+            if (checkInteger(*item, "0")) {
+                expr->value = "0";
+                expr->operands.clear();
+                goto nextlab;
+            }
+            item++;
+skipitem:;
+        }
+    if (expr->operands.size() == 1 && booleanBinop(expr->value)) {
+        ACCExpr *lhs = getRHS(expr, 0);
+        expr->value = lhs->value;
+        expr->operands = lhs->operands;
+    }
+    else if (expr->value == "&" && !expr->operands.size())
+        expr->value = "1";
+    else if (expr->value == "|" && !expr->operands.size())
+        expr->value = "0";
+    else
+        break;  // all done, no more updates
+nextlab:;
+    changed = true;
+    }
+if (level == 1 && changed && expr->operands.size())
+dumpExpr("FOVER" + autostr(level), expr);
+    level--;
+    return changed;
+}
+
 ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
 {
     if (!expr)
@@ -482,8 +588,7 @@ static int level;
     level++;
     if (TRACE_CLEANUP_EXPR)
         dumpExpr("cleanupExprSTART" + autostr(level), expr);
-    if (expr->operands.size() == 1 && expr->operands.front()->value != "," && ((!preserveParen && expr->value == "(") ||
-         expr->value == "&&" || expr->value == "&" || expr->value == "||" || expr->value == "|"))
+    if (expr->operands.size() == 1 && expr->operands.front()->value != "," && (!preserveParen && expr->value == "("))
         expr = expr->operands.front();
     if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
@@ -527,37 +632,6 @@ static int level;
     }
     if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
         expr = allocExpr("0");
-    if (expr->value == "|") {
-        bool found = false;
-        ACCExpr *matchItem = nullptr;
-        for (auto itemo : expr->operands) {
-            if (itemo->value == "&") {
-                ACCExpr *thisLast = getRHS(itemo, -1); // get last item
-                if (matchExpr(matchItem, thisLast))
-                    found = true;
-                else if (!found)
-                    matchItem = thisLast;
-            }
-        }
-        if (found) {
-            ACCExpr *orp = allocExpr("|");
-            ACCExpr *factorp = allocExpr("|");
-            for (auto itemo : expr->operands) {
-                ACCExpr *thisLast = getRHS(itemo, -1); // get last item
-                if (itemo->value == "&" && matchExpr(matchItem, thisLast)) {
-                    ACCExpr *andp = allocExpr("&");
-                    for (auto itema : itemo->operands)
-                        if (!matchExpr(matchItem, itema))
-                            andp->operands.push_back(itema);
-                    factorp->operands.push_back(andp);
-                }
-                else
-                    orp->operands.push_back(itemo);
-            }
-            orp->operands.push_back(allocExpr("&", cleanupExpr(factorp), matchItem));
-            expr = orp;
-        }
-    }
     if (expr->value == "|" && expr->operands.size() >= 2 && getRHS(expr, 0)->value == "&") {
         ACCExpr *andp = nullptr, *orp = allocExpr("|", allocExpr("&"));
         for (auto itemo : expr->operands) {
@@ -600,6 +674,7 @@ static int level;
                  ret->operands.push_back(oitem);
          }
     }
+    factorExpr(ret);
     if (ret->value == "?" && checkInteger(ret->operands.front(), "1"))
         ret = getRHS(ret);
     if (ret->value == "?" && checkInteger(getRHS(ret, 2), "0")) {
@@ -735,10 +810,6 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
             }
         }
     }
-    if (ret->value == "&" && !ret->operands.size())
-        ret->value = "1";
-    if (ret->value == "|" && !ret->operands.size())
-        ret->value = "0";
     if (ret->value == "&" && ret->operands.size() >= 2) {
         auto aitem = ret->operands.begin(), aend = ret->operands.end();
         ACCExpr *first = *aitem++;
@@ -819,14 +890,7 @@ printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str
 }
 ACCExpr *cleanupExprBit(ACCExpr *expr)
 {
-    if (!expr)
-        return expr;
-    ACCExpr *temp = cleanupExpr(expr, false, true);
-    //return temp;
-    std::string bitTemp = tree2str(temp);  //HACK HACK HACK HACK to trigger __bitsubstr processing
-//printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, bitTemp.c_str());
-//dumpExpr("EXPR", expr);
-    return str2tree(bitTemp);              //HACK HACK HACK HACK to trigger __bitsubstr processing
+    return cleanupExpr(expr, false, true);
 }
 
 static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCurrentToken, bool preserveParen)
@@ -924,6 +988,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                 head = TOP;
         }
     }
+    factorExpr(head);
     head = cleanupExpr(head, preserveParen);
     return head;
 }
