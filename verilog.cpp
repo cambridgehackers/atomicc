@@ -25,6 +25,7 @@ int trace_assign;//= 1;
 int trace_connect;//= 1;
 int trace_expand;//= 1;
 int trace_skipped= 1;
+int trace_removeGuard;//= 1;
 
 std::map<std::string, RefItem> refList;
 std::map<std::string, ModuleIR *> mapIndex;
@@ -229,13 +230,13 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName, boo
 {
     if (!expr)
         return expr;
-    if (trace_assign)
+    if (trace_removeGuard)
     printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
     if (isIdChar(item[0])) {
         if (item == guardName) {
-            if (trace_assign)
+            if (trace_removeGuard)
             printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
             return allocExpr("1");
         }
@@ -243,7 +244,7 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName, boo
         if (useAssign && !assignList[item].noRecursion && !assignList[item].noReplace && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         decRef(item);
         if (replaceBlock[item]++ < 5) {
-            if (trace_assign)
+            if (trace_removeGuard)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
             return walkRemoveCalledGuard(assignValue, guardName, useAssign);
         }
@@ -260,7 +261,7 @@ exit(-1);
             newExpr->operands.push_back(operand);
     }
     newExpr = cleanupExpr(newExpr);
-    if (trace_assign)
+    if (trace_removeGuard)
     printf("[%s:%d] end %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(newExpr).c_str());
     return newExpr;
 }
@@ -428,7 +429,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
 }
         }
         else if (trace_assign)
-            printf("[%s:%d] PINNOTALLOC %s\n", __FUNCTION__, __LINE__, item.first.c_str());
+            printf("[%s:%d] WIRENOTNEEDED %s\n", __FUNCTION__, __LINE__, item.first.c_str());
         }
     }
     for (auto item: assignList)
@@ -488,6 +489,7 @@ next:;
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
             seen = true;
             fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
+            refList[temp].done = true; // mark that assigns have already been output
         }
     }
 
@@ -1017,23 +1019,33 @@ exit(-1);
     for (auto mitem: modLine) {
         std::string val = mitem.value;
         if (!mitem.moduleStart) {
-            if (refList[val].count == 0) {
-                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
-                if (refList[val].out && !refList[val].inout)
+if (trace_assign)
+printf("[%s:%d] replaceParam '%s' for '%s' count %d done %d\n", __FUNCTION__, __LINE__, val.c_str(), mitem.value.c_str(), refList[val].count, refList[val].done);
+            if (refList[mitem.value].count == 0) {
+                refList[mitem.value].done = true;  // 'assign' line not needed; value is assigned by object inst
+                if (refList[mitem.value].out && !refList[mitem.value].inout)
                     val = "0";
                 else
                     val = "";
             }
             else {
             replaceBlock.clear();
+            if (refList[mitem.value].count <= 1) {
             val = tree2str(allocExpr(mitem.value), nullptr, true);
             std::string temp = mapPort[val];
             if (temp != "") {
-//printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
+if (trace_assign)
+printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, val.c_str(), temp.c_str());
                 decRef(mitem.value);
-                refList[mitem.value].done = true;  // 'assign' line not needed; value is assigned by object inst
                 val = temp;
             }
+            }
+            }
+            if (val != mitem.value) {
+                refList[mitem.value].done = true;  // 'assign' line not needed; value is assigned by object inst
+                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
+if (trace_assign)
+printf("[%s:%d] set done '%s' val %s\n", __FUNCTION__, __LINE__, mitem.value.c_str(), val.c_str());
             }
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, false});
