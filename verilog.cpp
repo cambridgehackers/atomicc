@@ -156,14 +156,14 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
  */
 static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params)
 {
-    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam, bool islocal) -> void {
-        int refPin = instance != "" ? PIN_OBJECT: (islocal ? PIN_LOCAL: PIN_MODULE);
-        if (!islocal || instance == "")
-        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0 || refPin == PIN_LOCAL, inout, refPin, false};
-        if (!islocal)
+    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam, bool isLocal) -> void {
+        int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
+        if (!isLocal || instance == "")
+        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, false};
+        if (!isLocal)
         modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam});
         if (!isparam)
-        expandStruct(IR, instance + name, type, dir || refPin == PIN_LOCAL, inout, false, PIN_WIRE);
+        expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     std::string moduleInstantiation = IR->name;
@@ -413,6 +413,8 @@ static void generateAssign(FILE *OStr)
 
     // generate local state element declarations and wires
     for (auto item: refList) {
+        if (trace_assign)
+            printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str());
         if (item.second.pin == PIN_REG) {
         hasAlways = true;
         fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
@@ -907,17 +909,24 @@ dumpExpr("READCALL", value);
         if (!IIR)
             dumpModule("MISSINGCONNECT", IR);
         assert(IIR && "interfaceConnect interface type");
+        bool targetLocal = false, sourceLocal = false;
+        for (auto item: IR->interfaces) {
+            if (item.fldName == IC.target)
+                targetLocal = true;
+            if (item.fldName == IC.source)
+                sourceLocal = true;
+        }
         if (trace_connect)
-            printf("%s: CONNECT target %s source %s forward %d\n", __FUNCTION__, IC.target.c_str(), IC.source.c_str(), IC.isForward);
+            printf("%s: CONNECT target %s/%d source %s/%d forward %d\n", __FUNCTION__, IC.target.c_str(), targetLocal, IC.source.c_str(), sourceLocal, IC.isForward);
         for (auto fld : IIR->fields) {
             std::string tstr = IC.target + fld.fldName,
                         sstr = IC.source + fld.fldName;
+            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
+                printf("%s: IFCCCfield %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (!IC.isForward) {
                 refList[tstr].out = 1;   // for local connections, don't bias for 'output'
                 refList[sstr].out = 0;
             }
-            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
-                printf("%s: IFCCCfield %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (refList[sstr].out)
                 setAssign(sstr, allocExpr(tstr), fld.type);
             else
@@ -928,8 +937,8 @@ dumpExpr("READCALL", value);
             std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
                         sstr = IC.source + MODULE_SEPARATOR + MI->name;
             if (!IC.isForward) {
-                refList[tstr].out = 1;   // for local connections, don't bias for 'output'
-                refList[sstr].out = 0;
+                refList[tstr].out ^= targetLocal;
+                refList[sstr].out ^= sourceLocal;
             }
             if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
                 printf("%s: IFCCCmeth %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
@@ -941,6 +950,10 @@ dumpExpr("READCALL", value);
             sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
             for (auto info: MI->params) {
                 std::string sparm = sstr + info.name, tparm = tstr + info.name;
+                if (!IC.isForward) {
+                    refList[tparm].out ^= targetLocal;
+                    refList[sparm].out ^= sourceLocal;
+                }
                 if (trace_connect)
                     printf("%s: IFCCCparam %s/%d %s/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
                 if (refList[sparm].out)
