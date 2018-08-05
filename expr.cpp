@@ -764,21 +764,15 @@ static int level;
             ret->operands.push_back(lhs);
         }
         for (auto item: ret->operands) {
-            if (isIdChar(item->value[0])) {
-                if(refList[item->value].pin)
-                    leftLen = convertType(refList[item->value].type);
-                else if (flagErrorsCleanup) {
-                    printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str());
-                    //exit(-1);
-                }
-            }
-            else if (isdigit(item->value[0])) {
+            if (isdigit(item->value[0])) {
                 if (checkInteger(item, "0") && leftLen == 1) {
                     ret = allocExpr("!", ret->operands.front());
                     break;
                 }
                 updateWidth(item, leftLen);
             }
+            else if (int len = exprWidth(item))
+                leftLen = len;
         }
         ACCExpr *rhs = getRHS(ret), *lhs = ret->operands.front();
         if (checkInteger(rhs, "0")) {
@@ -791,22 +785,15 @@ static int level;
     if (ret->value == "!=") {
         int leftLen = -1;
         for (auto item: ret->operands) {
-            if (isIdChar(item->value[0])) {
-                if(!refList[item->value].pin) {
-if (!replaceBuiltin)
-printf("[%s:%d] unknown %s in '=='\n", __FUNCTION__, __LINE__, item->value.c_str());
-//exit(-1);
-                }
-                else
-                    leftLen = convertType(refList[item->value].type);
-            }
-            else if (isdigit(item->value[0])) {
+            if (isdigit(item->value[0])) {
                 if (checkInteger(item, "0") && leftLen == 1) {
                     ret = ret->operands.front();
                     break;
                 }
                 updateWidth(item, leftLen);
             }
+            else if (int len = exprWidth(item))
+                leftLen = len;
         }
     }
     if (ret->value == "&" && ret->operands.size() >= 2) {

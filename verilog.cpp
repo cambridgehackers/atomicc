@@ -85,17 +85,16 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
         if (fitem.base != "")
             base = fitem.base;
         std::string fnew = base + "[" + autostr(upper) + ":" + autostr(offset) + "]";
+        ACCExpr *fexpr = allocExpr(base, allocExpr("[", allocExpr(":", allocExpr(autostr(upper)), allocExpr(autostr(offset)))));
 if (trace_expand || refList[fitem.name].pin)
-printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s pin %d\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, (int)upper, fnew.c_str(), refList[fitem.name].pin);
+printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, (int)upper, fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
         assert (!refList[fitem.name].pin);
         refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false};
         refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false};
         if (!fitem.alias && out)
             itemList->operands.push_front(allocExpr(fitem.name));
-        else if (out)
-            replaceTarget[fitem.name] = fnew;
         else
-            setAssign(fitem.name, allocExpr(fnew), fitem.type);
+            setAssign(fitem.name, fexpr, fitem.type);
     }
     if (force)
         refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false};
@@ -813,6 +812,9 @@ static std::list<ModData> modLine;
             updateWidth(value, convertType(info->type));
             walkRead(MI, cond, nullptr);
             walkRead(MI, value, cond);
+            if (info->dest->operands.size() || value->operands.size())
+                muxValueList[tree2str(info->dest)].push_back(MuxValueEntry{cond, value});
+            else {
             std::list<FieldItem> fieldList;
             getFieldList(fieldList, "", "", info->type, false, true);
             for (auto fitem : fieldList) {
@@ -823,6 +825,7 @@ static std::list<ModData> modLine;
                     newExpr->operands = value->operands;
                 }
                 muxValueList[dest].push_back(MuxValueEntry{cond, newExpr});
+            }
             }
         }
         for (auto info: MI->callList) {
