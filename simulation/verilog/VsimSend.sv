@@ -21,10 +21,10 @@
 // SOFTWARE.
 
 module VsimSend #(parameter width = 32) (input CLK, input nRST,
-    output EN_beat, input RDY_beat, input [width-1:0] beat$v, input beat$last);
+    input EN_beat, output RDY_beat, input [width-1:0] beat$v, input beat$last);
 
     import "DPI-C" function void dpi_msgSend_beat(input int beat, input int last);
-    assign EN_beat = RDY_beat;
+    assign RDY_beat = 1;
     always @(posedge CLK) begin
         if (nRST != `BSV_RESET_VALUE) begin
             if (EN_beat) begin
