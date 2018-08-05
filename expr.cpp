@@ -467,13 +467,6 @@ bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
     return true;
 }
 
-static std::string getExprType(ACCExpr *expr)
-{
-printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-    dumpExpr("getExprType", expr);
-    return "INTEGER_1";
-}
-
 static void replaceValue(ACCExpr *expr, std::string value)
 {
     expr->value = value;
@@ -486,6 +479,56 @@ ACCExpr *dupExpr(ACCExpr *expr)
     for (auto item: expr->operands)
         ext->operands.push_back(dupExpr(item));
     return ext;
+}
+
+void walkReplaceBuiltin(ACCExpr *expr)
+{
+    while(1) {
+    if (expr->value == "__bitconcat") {
+        ACCExpr *list = expr->operands.front();
+        if (list->value == PARAMETER_MARKER)
+            list->value = "{";
+        expr->value = list->value;
+        expr->operands = list->operands;
+    }
+    else if (expr->value == "__bitsubstr") {
+        ACCExpr *list = expr->operands.front();
+        ACCExpr *bitem = list->operands.front();
+        if (!isIdChar(bitem->value[0])) {  // can only do bit select on net or reg (not expressions)
+            printf("[%s:%d] can only do __bitsubstr on elementary items\n", __FUNCTION__, __LINE__);
+            dumpExpr("BITSUB", expr);
+            exit(-1);
+        }
+        bitem->operands.push_back(allocExpr("[", allocExpr(":", getRHS(list), getRHS(list, 2))));
+        expr->value = bitem->value;
+        expr->operands = bitem->operands;
+    }
+    else if (expr->value == "__phi") {
+        ACCExpr *list = expr->operands.front();
+        int size = list->operands.size();
+        ACCExpr *lhs = getRHS(list, 0), *rhs = getRHS(list);
+        ACCExpr *newe = nullptr;
+        if (size == 2 && matchExpr(getRHS(lhs, 0), invertExpr(getRHS(rhs, 0))))
+            newe = allocExpr("?", getRHS(lhs, 0), getRHS(lhs), getRHS(rhs));
+        else if (size == 2 && getRHS(lhs, 0)->value == "__default" && exprWidth(getRHS(rhs)) == 1)
+            newe = allocExpr("&", getRHS(rhs, 0), getRHS(rhs));
+        else {
+            //dumpExpr("PHI", list);
+            newe = allocExpr("|");
+            for (auto item: list->operands) {
+                item->value = "?"; // Change from ':' -> '?'
+                item->operands.push_back(allocExpr("0"));
+                newe->operands.push_back(item);
+            }
+        }
+        expr->value = newe->value;
+        expr->operands = newe->operands;
+    }
+    else
+        break;
+    }
+    for (auto item: expr->operands)
+        walkReplaceBuiltin(item);
 }
 
 bool factorExpr(ACCExpr *expr)
@@ -586,10 +629,6 @@ skiplabel2:;
             }
         }
     }
-    for (auto item: expr->operands)
-        found |= factorExpr(item);
-    if (found)
-        goto nextlab;
     if (expr->value == "&")
         for (auto item = expr->operands.begin(), iend = expr->operands.end(); item != iend;) {
             for (auto jitem = expr->operands.begin(); jitem != item; jitem++)
@@ -620,6 +659,10 @@ skipitem1:;
             item++;
 skipitem2:;
         }
+    for (auto item: expr->operands)
+        found |= factorExpr(item);
+    if (found)
+        goto nextlab;
     if (expr->operands.size() == 1 && booleanBinop(expr->value)) {
         ACCExpr *lhs = getRHS(expr, 0);
         expr->value = lhs->value;
@@ -655,41 +698,6 @@ static int level;
     ACCExpr *lhs = expr->operands.front();
     if (expr->value == "^" && checkInteger(getRHS(expr), "1"))
         expr = invertExpr(cleanupExpr(lhs, false, true));
-    if (replaceBuiltin && expr->value == "__bitconcat") {
-        ACCExpr *list = expr->operands.front();
-        if (list->value == PARAMETER_MARKER)
-            list->value = "{";
-        expr = cleanupExpr(list, false, replaceBuiltin);
-    }
-    if (replaceBuiltin && expr->value == "__bitsubstr") {
-        ACCExpr *list = expr->operands.front();
-        ACCExpr *bitem = list->operands.front();
-        if (!isIdChar(bitem->value[0])) {  // can only do bit select on net or reg (not expressions)
-            printf("[%s:%d] can only do __bitsubstr on elementary items\n", __FUNCTION__, __LINE__);
-            dumpExpr("BITSUB", expr);
-            exit(-1);
-        }
-        bitem->operands.push_back(allocExpr("[", allocExpr(":", getRHS(list), getRHS(list, 2))));
-        expr = cleanupExpr(bitem, false, true);
-    }
-    if (replaceBuiltin && expr->value == "__phi") {
-        ACCExpr *list = expr->operands.front();
-        int size = list->operands.size();
-        ACCExpr *lhs = getRHS(list, 0), *rhs = getRHS(list);
-        if (size == 2 && matchExpr(getRHS(lhs, 0), invertExpr(getRHS(rhs, 0))))
-            expr = allocExpr("?", getRHS(lhs, 0), getRHS(lhs), getRHS(rhs));
-        else if (size == 2 && getRHS(lhs, 0)->value == "__default" && getExprType(getRHS(rhs)) == "INTEGER_1")
-            expr = allocExpr("&", getRHS(rhs, 0), getRHS(rhs));
-        else {
-            //dumpExpr("PHI", list);
-            expr = allocExpr("|");
-            for (auto item: list->operands) {
-                item->value = "?"; // Change from ':' -> '?'
-                item->operands.push_back(allocExpr("0"));
-                expr->operands.push_back(item);
-            }
-        }
-    }
     if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
         expr = allocExpr("0");
     ACCExpr *ret = allocExpr(expr->value);
@@ -870,6 +878,9 @@ static int level;
 }
 ACCExpr *cleanupExprBit(ACCExpr *expr)
 {
+    if (!expr)
+        return expr;
+    walkReplaceBuiltin(expr);
     return cleanupExpr(expr, false, true);
 }
 
