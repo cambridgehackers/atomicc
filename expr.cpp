@@ -128,7 +128,7 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
     }
     else if (isIdChar(op[0])) {
         ret += op;
-        if (assignReplace) {
+        if (assignReplace && !expr->operands.size()) {
         ACCExpr *assignValue = assignList[op].value;
 if (trace_expr)
 printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)assignValue);
@@ -683,7 +683,7 @@ dumpExpr("FOVER" + autostr(level), expr);
     return changed;
 }
 
-ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen, bool replaceBuiltin)
+ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
 {
     if (!expr)
         return expr;
@@ -697,12 +697,12 @@ static int level;
         expr->operands = expr->operands.front()->operands;
     ACCExpr *lhs = expr->operands.front();
     if (expr->value == "^" && checkInteger(getRHS(expr), "1"))
-        expr = invertExpr(cleanupExpr(lhs, false, true));
+        expr = invertExpr(cleanupExpr(lhs));
     if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
         expr = allocExpr("0");
     ACCExpr *ret = allocExpr(expr->value);
     for (auto item: expr->operands) {
-         ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]), replaceBuiltin);
+         ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]));
          if (TRACE_CLEANUP_EXPR)
              printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
          if (titem->value != ret->value || ret->value == "?" || isParen(ret->value)
@@ -881,7 +881,7 @@ ACCExpr *cleanupExprBit(ACCExpr *expr)
     if (!expr)
         return expr;
     walkReplaceBuiltin(expr);
-    return cleanupExpr(expr, false, true);
+    return cleanupExpr(expr);
 }
 
 static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCurrentToken, bool preserveParen)

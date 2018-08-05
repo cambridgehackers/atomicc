@@ -242,7 +242,7 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName, boo
         if (ACCExpr *assignValue = assignList[item].value)
         if (useAssign && !assignList[item].noRecursion && !assignList[item].noReplace && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         decRef(item);
-        if (replaceBlock[item]++ < 5) {
+        if (expr->operands.size() == 0 && replaceBlock[item]++ < 5) {
             if (trace_removeGuard)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
             return walkRemoveCalledGuard(assignValue, guardName, useAssign);
@@ -595,7 +595,7 @@ dumpExpr("PRINTFLL", ret);
 static bool checkRecursion(ACCExpr *expr)
 {
     std::string item = expr->value;
-    if (isIdChar(item[0])) {
+    if (isIdChar(item[0]) && !expr->operands.size()) {
         if (replaceBlock[item]) // flag multiple expansions of an item
             return false;
         ACCExpr *res = assignList[item].value;
@@ -617,7 +617,7 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
         return expr;
     ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
-    if (isIdChar(item[0])) {
+    if (isIdChar(item[0]) && !expr->operands.size()) {
         if (ACCExpr *assignValue = assignList[item].value)
         if (refList[item].pin != PIN_MODULE && !assignList[item].noRecursion
              && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
@@ -1027,7 +1027,7 @@ exit(-1);
     std::map<std::string, std::string> mapPort;
     for (auto item: assignList)
         if (refList[item.first].out && refList[item.first].pin == PIN_MODULE
-          && item.second.value && isIdChar(item.second.value->value[0])
+          && item.second.value && isIdChar(item.second.value->value[0]) && !item.second.value->operands.size()
           && refList[item.second.value->value].pin != PIN_MODULE) {
             mapPort[item.second.value->value] = item.first;
         }
