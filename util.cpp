@@ -147,9 +147,14 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
             break;
         searchIR = nextIR;
     };
+    std::string nullInterface;
     for (auto item: searchIR->interfaces)
         if (item.fldName == fieldName)
             return lookupMethod(lookupIR(item.type), searchStr);
+        else if (item.fldName == "")
+            nullInterface = item.type;
+    if (nullInterface != "")
+        return lookupMethod(lookupIR(nullInterface), searchStr);
     return nullptr;
 }
 

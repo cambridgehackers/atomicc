@@ -131,9 +131,12 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
 {
     for (auto item : IR->interfaces) {
         ModuleIR *IIR = lookupIR(item.type);
+        std::string interfaceName = item.fldName;
+        if (interfaceName != "")
+            interfaceName += MODULE_SEPARATOR;
         for (auto FI: IIR->method) {
             MethodInfo *MI = FI.second;
-            std::string name = methodPrefix + item.fldName + MODULE_SEPARATOR + MI->name;
+            std::string name = methodPrefix + interfaceName + MI->name;
             bool out = instance ^ item.isPtr;
             pinMethods.push_back(PinInfo{MI->type, name, out, false, isLocal || item.isLocalInterface, MI});
         }
@@ -146,7 +149,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
                 pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr});
         }
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
-            methodPrefix + item.fldName + MODULE_SEPARATOR, isLocal || item.isLocalInterface);
+            methodPrefix + interfaceName, isLocal || item.isLocalInterface);
     }
 }
 
@@ -161,6 +164,8 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
         refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, false};
         if (!isLocal)
         modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam});
+        if (trace_connect)
+            printf("[%s:%d] instance %s name %s\n", __FUNCTION__, __LINE__, instance.c_str(), name.c_str());
         if (!isparam)
         expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
     };
@@ -197,6 +202,8 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
             checkWire(item.name, item.type, item.isOutput, item.isInout, true, item.isLocal);
     for (auto item: pinMethods) {
         checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, false, item.isLocal);
+        if (trace_connect)
+            printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.name.c_str(), item.type.c_str());
         for (auto pitem: item.MI->params)
             checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, false, item.isLocal);
     }
@@ -350,6 +357,10 @@ static void setAssignRefCount(ModuleIR *IR)
         }
     }
 
+    for (auto item: refList)
+        if (  (item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL || item.second.pin == PIN_MODULE)
+           && (item.second.out || item.second.inout))
+            item.second.count++;
     for (auto item: assignList)
         if (item.second.value && (refList[item.first].out || refList[item.first].inout) &&
             (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_LOCAL || refList[item.first].pin == PIN_MODULE))
@@ -937,6 +948,12 @@ dumpExpr("READCALL", value);
         }
         for (auto FI : IIR->method) {
             MethodInfo *MI = FI.second;
+            if (trace_connect)
+                printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.target.substr(IC.target.length()-1).c_str(), IC.source.c_str());
+            if (IC.target.substr(IC.target.length()-1) == MODULE_SEPARATOR)
+                IC.target = IC.target.substr(0, IC.target.length()-1);
+            if (IC.source.substr(IC.source.length()-1) == MODULE_SEPARATOR)
+                IC.source = IC.source.substr(0, IC.source.length()-1);
             std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
                         sstr = IC.source + MODULE_SEPARATOR + MI->name;
             if (!IC.isForward) {
@@ -1026,7 +1043,7 @@ exit(-1);
     // last chance to optimize out single assigns to output ports
     std::map<std::string, std::string> mapPort;
     for (auto item: assignList)
-        if (refList[item.first].out && refList[item.first].pin == PIN_MODULE
+        if ((refList[item.first].out || refList[item.first].inout) && refList[item.first].pin == PIN_MODULE
           && item.second.value && isIdChar(item.second.value->value[0]) && !item.second.value->operands.size()
           && refList[item.second.value->value].pin != PIN_MODULE) {
             mapPort[item.second.value->value] = item.first;
@@ -1036,7 +1053,7 @@ exit(-1);
         std::string val = mitem.value;
         if (!mitem.moduleStart) {
 if (trace_assign)
-printf("[%s:%d] replaceParam '%s' for '%s' count %d done %d\n", __FUNCTION__, __LINE__, val.c_str(), mitem.value.c_str(), refList[val].count, refList[val].done);
+printf("[%s:%d] replaceParam '%s' count %d done %d\n", __FUNCTION__, __LINE__, mitem.value.c_str(), refList[val].count, refList[val].done);
             if (refList[mitem.value].count == 0) {
                 refList[mitem.value].done = true;  // 'assign' line not needed; value is assigned by object inst
                 if (refList[mitem.value].out && !refList[mitem.value].inout)
