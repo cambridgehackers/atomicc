@@ -132,7 +132,7 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
         ACCExpr *assignValue = assignList[op].value;
 if (trace_expr)
 printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)assignValue);
-        if (assignValue && !expr->operands.size() && !assignList[op].noRecursion && !assignList[op].noReplace && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
+        if (assignValue && !expr->operands.size() && !assignList[op].noRecursion && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         if (replaceBlock[op]++ < 5 ) {
 if (trace_expr)
 printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(assignValue).c_str());

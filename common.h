@@ -50,7 +50,6 @@ typedef struct {
 typedef struct {
     ACCExpr    *value;
     std::string type;
-    bool        noReplace;
     bool        noRecursion;
 } AssignItem;
 enum {PIN_NONE, PIN_MODULE, PIN_OBJECT, PIN_REG, PIN_WIRE, PIN_ALIAS, PIN_LOCAL};

@@ -24,7 +24,7 @@
 int trace_assign;//= 1;
 int trace_connect;//= 1;
 int trace_expand;//= 1;
-int trace_skipped= 1;
+int trace_skipped;//= 1;
 int trace_removeGuard;//= 1;
 
 std::map<std::string, RefItem> refList;
@@ -40,7 +40,7 @@ typedef struct {
 } CondGroup;
 static std::map<std::string, CondGroup> condLines;
 
-static void setAssign(std::string target, ACCExpr *value, std::string type, bool noReplace = false)
+static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
     std::string temp = replaceTarget[target];
     if (temp != "") {
@@ -53,12 +53,11 @@ printf("[%s:%d] ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ replace %s -
         return;
     if (trace_assign)
         printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
-    //assert(tDir || noReplace);
     if (!refList[target].pin) {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         exit(-1);
     }
-    if (isIdChar(value->value[0]) && !noReplace) {
+    if (isIdChar(value->value[0])) {
         bool sDir = refList[value->value].out;
         if (trace_assign)
         printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
@@ -70,7 +69,7 @@ if (trace_assign) {
 }
         //exit(-1);
     }
-    assignList[target] = AssignItem{value, type, noReplace || refList[target].pin == PIN_MODULE, false};
+    assignList[target] = AssignItem{value, type, false};
 }
 
 static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin)
@@ -247,7 +246,7 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName, boo
             return allocExpr("1");
         }
         if (ACCExpr *assignValue = assignList[item].value)
-        if (useAssign && !assignList[item].noRecursion && !assignList[item].noReplace && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
+        if (useAssign && !assignList[item].noRecursion && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         decRef(item);
         if (expr->operands.size() == 0 && replaceBlock[item]++ < 5) {
             if (trace_removeGuard)
@@ -357,13 +356,8 @@ static void setAssignRefCount(ModuleIR *IR)
         }
     }
 
-    for (auto item: refList)
-        if (  (item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL || item.second.pin == PIN_MODULE)
-           && (item.second.out || item.second.inout))
-            item.second.count++;
     for (auto item: assignList)
-        if (item.second.value && (refList[item.first].out || refList[item.first].inout) &&
-            (refList[item.first].pin == PIN_OBJECT || refList[item.first].pin == PIN_LOCAL || refList[item.first].pin == PIN_MODULE))
+        if (item.second.value && refList[item.first].pin == PIN_OBJECT)
             refList[item.first].count++;
 
     // Now extend 'was referenced' from assignList items actually referenced
@@ -444,11 +438,6 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             printf("[%s:%d] WIRENOTNEEDED %s\n", __FUNCTION__, __LINE__, item.first.c_str());
         }
     }
-    for (auto item: assignList)
-        if (item.second.value && refList[item.first].count && item.second.noReplace && !refList[item.first].done) {
-            fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
-            refList[item.first].done = true; // mark that assigns have already been output
-        }
     std::string endStr, sep;
     for (auto item: modNew) {
         if (item.moduleStart) {
@@ -517,7 +506,7 @@ next:;
             std::list<std::string> alwaysLines;
             for (auto tcond: condLines) {
                 std::string methodName = tcond.first;
-                alwaysLines.push_back("if (" + tree2str(tcond.second.guard) + ") begin");
+                alwaysLines.push_back("if (" + tree2str(tcond.second.guard) + ") begin // " + methodName);
                 for (auto item: tcond.second.info) {
                     std::string endStr;
                     std::string temp;
@@ -807,9 +796,9 @@ static std::list<ModData> modLine;
         if (!endswith(methodName, "__RDY")) {
             walkRead(MI, MI->guard, nullptr);
             if (MI->rule)
-                setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1", true);
+                setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1");
         }
-        setAssign(methodName, MI->guard, MI->type, MI->rule && !endswith(methodName, "__RDY"));  // collect the text of the return value into a single 'assign'
+        setAssign(methodName, MI->guard, MI->type); // collect the text of the return value into a single 'assign'
         for (auto info: MI->storeList) {
             walkRead(MI, info->cond, nullptr);
             walkRead(MI, info->value, info->cond);
