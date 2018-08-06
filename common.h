@@ -92,9 +92,10 @@ void dumpModule(std::string name, ModuleIR *IR);
 std::string findType(std::string name);
 
 // expr.cpp
-std::string tree2str(ACCExpr *expr, bool *changed = nullptr, bool assignReplace = false);
+std::string tree2str(ACCExpr *expr);
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
+bool isParen(std::string ch);
 void dumpExpr(std::string tag, ACCExpr *next);
 ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen = false);
 ACCExpr *cleanupExprBit(ACCExpr *expr);
@@ -108,6 +109,7 @@ void walkRef (ACCExpr *expr);
 void decRef(std::string name);
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs);
 int walkCount (ACCExpr *expr);
+ACCExpr *dupExpr(ACCExpr *expr);
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);

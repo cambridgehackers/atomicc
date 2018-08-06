@@ -38,7 +38,7 @@ bool isIdChar(char ch)
     return isalpha(ch) || ch == '_' || ch == '$';
 }
 
-static bool isParen(std::string ch)
+bool isParen(std::string ch)
 {
     return ch == "[" || ch == "(" || ch == "{" || ch == SUBSCRIPT_MARKER || ch == PARAMETER_MARKER;
 }
@@ -115,7 +115,7 @@ ACCExpr *getRHS(ACCExpr *expr, int match)
      return nullptr;
 }
 
-std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
+std::string tree2str(ACCExpr *expr)
 {
     if (!expr)
         return "";
@@ -128,42 +128,16 @@ std::string tree2str(ACCExpr *expr, bool *changed, bool assignReplace)
     }
     else if (isIdChar(op[0])) {
         ret += op;
-        if (assignReplace && !expr->operands.size()) {
-        ACCExpr *assignValue = assignList[op].value;
-if (trace_expr)
-printf("[%s:%d] check '%s' exprtree %p\n", __FUNCTION__, __LINE__, op.c_str(), (void *)assignValue);
-        if (assignValue && !expr->operands.size() && !assignList[op].noRecursion && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
-        if (replaceBlock[op]++ < 5 ) {
-if (trace_expr)
-printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(assignValue).c_str());
-            decRef(op);
-            ret = "(" + tree2str(assignValue, changed, assignReplace) + ")";
-            if (changed)
-                *changed = true;
-            else
-                walkRef(assignValue);
-        } 
-        else {
-printf("[%s:%d] excessive replace of %s with %s top %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(assignValue).c_str(), tree2str(expr).c_str());
-if (replaceBlock[op] > 7)
-exit(-1);
-        }
-        }
-        }
     }
     else if (!expr->operands.size() || ((op == "-" || op == "!")/*unary*/ && expr->operands.size() == 1))
         ret += op;
-bool dumpOutput = false;
     bool topOp = checkOperand(expr->value) || expr->value == "," || expr->value == "[" || expr->value == PARAMETER_MARKER;
     for (auto item: expr->operands) {
         ret += sep;
-        bool oldCond = !checkOperand(item->value) && item->value != ",";
-        bool addParen = !topOp && oldCond;
-bool orig = item->value != "?" || expr->operands.size() != 1;
-if (addParen != (oldCond && orig)) dumpOutput = true;
+        bool addParen = !topOp && !checkOperand(item->value) && item->value != ",";
         if (addParen)
             ret += "( ";
-        ret += tree2str(item, changed, assignReplace);
+        ret += tree2str(item);
         if (addParen)
             ret += " )";
         sep = " " + op + " ";
@@ -171,9 +145,6 @@ if (addParen != (oldCond && orig)) dumpOutput = true;
             op = ":";
     }
     ret += treePost(expr);
-//if (dumpOutput) {
-//printf("[%s:%d]TTTTTTTT top '%s' expr %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), ret.c_str());
-//}
     return ret;
 }
 
