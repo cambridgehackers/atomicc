@@ -195,21 +195,21 @@ int main(int argc, char **argv, char **env)
 
   fprintf(stderr, "starting simulation\n");
   top->CLK = 0;
-  top->RST_N = BSV_RESET_VALUE;
+  top->nRST = BSV_RESET_VALUE;
   top->CLK_derivedClock = 0;
   top->CLK_sys_clk = 0;
-  top->RST_N_derivedReset = BSV_RESET_VALUE;
+  top->nRST_derivedReset = BSV_RESET_VALUE;
   while (!Verilated::gotFinish()) {
     if (main_time >= 10) {
-      if ((top->CLK == BSV_RESET_EDGE) && (top->RST_N == BSV_RESET_VALUE)) {
+      if ((top->CLK == BSV_RESET_EDGE) && (top->nRST == BSV_RESET_VALUE)) {
 	fprintf(stderr, "time=%ld leaving reset new value %d\n", (long)main_time, !BSV_RESET_VALUE);
-	top->RST_N = !BSV_RESET_VALUE;
+	top->nRST = !BSV_RESET_VALUE;
       }
     }
     if (derived_time >= 10) {
-      if ((top->CLK_derivedClock == BSV_RESET_EDGE) && (top->RST_N_derivedReset == BSV_RESET_VALUE)) {
+      if ((top->CLK_derivedClock == BSV_RESET_EDGE) && (top->nRST_derivedReset == BSV_RESET_VALUE)) {
 	fprintf(stderr, "time=%ld deasserting derivedReset new value %d\n", (long)main_time, !BSV_RESET_VALUE);
-	top->RST_N_derivedReset = !BSV_RESET_VALUE;
+	top->nRST_derivedReset = !BSV_RESET_VALUE;
       }
     }
 

@@ -1,7 +1,7 @@
 
 THISDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CONNECTALDIR = $(THISDIR)/../../connectal
-VERILOG_PATH = $(DTOP)/verilog $(THISDIR)/verilog $(DTOP)/generated
+VERILOG_PATH = $(THISDIR)/verilog $(DTOP)/generated
 VERILATOR_ARGS= -O3 -CFLAGS "-I$(CONNECTALDIR)/cpp -I$(DTOP)/jni -I$(DTOP)/verilator -O " -LDFLAGS "-O " \
     -Wno-fatal -exe --profile-cfuncs --output-split 20000 $(VERILOG_PATH:%=-y %) \
     -DDerivedClockPeriod=4 -DMainClockPeriod=4
@@ -32,7 +32,7 @@ $(DTOP)/verilator/bin/libconnectal-sim.so: $(SIM_OBJECTS)
 $(DTOP)/verilator/obj_dir/vlsim.mk: $(DTOP)/verilator/bin/libconnectal-sim.so
 	rm -fr $(DTOP)/verilator/obj_dir
 	cd $(DTOP)/verilator; verilator -o $(DTOP)/verilator/bin/vlsim --prefix vlsim $(VERILATOR_ARGS) -cc \
-	    --top-module mkVsimTop $(DTOP)/verilog/mkVsimTop.v \
+	    --top-module VsimTop $(DTOP)/generated/VsimTop.v \
 	    $(THISDIR)/cpp/verilatortop.cpp -LDFLAGS -L$(DTOP)/verilator/bin
 
 $(DTOP)/verilator/bin/vlsim: $(DTOP)/verilator/obj_dir/vlsim.mk
