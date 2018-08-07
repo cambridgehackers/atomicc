@@ -15,11 +15,44 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 #include <stdio.h>
-#include <stdlib.h> // atol
-#include <string.h>
-#include <assert.h>
+//#include <string.h>
+//#include <assert.h>
 #include "AtomiccIR.h"
 #include "common.h"
+
+static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
+{
+    std::string baseDir = OutputDir;
+    int ind = baseDir.rfind('/');
+    if (ind > 0)
+        baseDir = baseDir.substr(0, ind+1);
+    for (auto IR : irSeq) {
+        static std::list<ModData> modLineTop;
+        modLineTop.clear();
+        generateModuleDef(IR, modLineTop);         // Collect/process verilog info
+
+        FILE *OStrV = fopen((baseDir + IR->name + ".v").c_str(), "w");
+        if (!OStrV) {
+            printf("veriloggen: unable to open '%s'\n", (baseDir + IR->name + ".v").c_str());
+            exit(-1);
+        }
+        fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
+        fprintf(OStrV, "`default_nettype none\n");
+        generateVerilogOutput(OStrV, modLineTop);
+        fprintf(OStrV, "`default_nettype wire    // set back to default value\n");
+        fclose(OStrV);
+    }
+    if (printfFormat.size()) {
+    FILE *OStrP = fopen((OutputDir + ".printf").c_str(), "w");
+    for (auto item: printfFormat) {
+        fprintf(OStrP, "%s ", item.format.c_str());
+        for (auto witem: item.width)
+            fprintf(OStrP, "%d ", witem);
+        fprintf(OStrP, "\n");
+    }
+    fclose(OStrP);
+    }
+}
 
 int main(int argc, char **argv)
 {

@@ -62,7 +62,7 @@ typedef struct {
     bool        done;
 } RefItem;
 typedef struct {
-    uint64_t    upper;
+    long        upper;
     ACCExpr    *value;
     std::string type;
 } BitfieldPart;
@@ -70,6 +70,15 @@ typedef struct {
     ACCExpr *dest;
     ACCExpr *value;
 } CondInfo;
+typedef struct {
+    ACCExpr      *guard;
+    std::map<ACCExpr *, std::list<CondInfo>> info;
+} CondGroup;
+typedef struct {
+    std::string format;
+    std::list<int> width;
+} PrintfInfo;
+
 typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
 #define CBAct ^ ModuleIR * (FieldElement &item, std::string fldName)
 
@@ -127,13 +136,20 @@ void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string 
 void preprocessIR(std::list<ModuleIR *> &irSeq);
 
 // verilog.cpp
-void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir);
+void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);
+
+// filegen.cpp
+void generateVerilogOutput(FILE *OStr, std::list<ModData> &modLineTop);
 
 extern int trace_assign;
 extern int trace_expand;
+extern int trace_skipped;
 extern std::map<std::string, RefItem> refList;
 extern std::map<std::string, AssignItem> assignList;
 extern std::map<std::string, ModuleIR *> mapIndex;
 extern std::map<std::string, int> replaceBlock;
+extern std::list<ModData> modNew;
+extern std::map<std::string, CondGroup> condLines;
+extern std::list<PrintfInfo> printfFormat;
 extern int globalExprCleanup;
 extern int flagErrorsCleanup;

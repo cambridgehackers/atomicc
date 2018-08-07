@@ -25,20 +25,15 @@ int trace_assign;//= 1;
 int trace_connect;//= 1;
 int trace_expand;//= 1;
 int trace_skipped;//= 1;
-int trace_removeGuard;//= 1;
 
 std::map<std::string, RefItem> refList;
 std::map<std::string, ModuleIR *> mapIndex;
+std::list<PrintfInfo> printfFormat;
+std::list<ModData> modNew;
+std::map<std::string, CondGroup> condLines;
 
 std::map<std::string, AssignItem> assignList;
 static std::map<std::string, std::string> replaceTarget;
-static std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
-static std::list<ModData> modNew;
-typedef struct {
-    ACCExpr      *guard;
-    std::map<ACCExpr *, std::list<CondInfo>> info;
-} CondGroup;
-static std::map<std::string, CondGroup> condLines;
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
@@ -208,6 +203,26 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
     }
     for (auto item: pinPorts)
         checkWire(item.name, item.type, item.isOutput, item.isInout, false, item.isLocal);
+    if (instance != "")
+        return;
+    bool hasCLK = false, hasnRST = false;
+    bool handleCLK = !pinPorts.size();
+    for (auto mitem: modParam)
+        if (!mitem.moduleStart && !mitem.isparam) {
+            if (handleCLK) {
+                hasCLK = true;
+                hasnRST = true;
+                handleCLK = false;
+            }
+            if (mitem.value == "CLK")
+                hasCLK = true;
+            if (mitem.value == "nRST")
+                hasnRST = true;
+        }
+    if (!handleCLK && !hasCLK)
+        refList["CLK"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false};
+    if (!handleCLK && !hasnRST)
+        refList["nRST"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false};
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -223,24 +238,22 @@ printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, i
         }
         //assert(refList[item].pin);
     }
-    for (auto item: expr->operands) {
-        ACCExpr *operand = walkRemoveParam(item);
-        if (operand)
+    for (auto item: expr->operands)
+        if (ACCExpr *operand = walkRemoveParam(item))
             newExpr->operands.push_back(operand);
-    }
     return newExpr;
 }
 
-static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName)
+static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "")
 {
     if (!expr)
         return expr;
-    if (trace_removeGuard)
+    if (trace_assign)
     printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     std::string item = expr->value;
     if (isIdChar(item[0]) && !expr->operands.size()) {
         if (item == guardName) {
-            if (trace_removeGuard)
+            if (trace_assign)
             printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
             return allocExpr("1");
         }
@@ -248,51 +261,34 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName)
         if (!assignList[item].noRecursion && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         decRef(item);
         walkRef(assignValue);
-        if (trace_removeGuard)
+        if (trace_assign)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
-        return walkRemoveCalledGuard(assignValue, guardName);
+        return replaceAssign(assignValue, guardName);
         }
     }
     ACCExpr *newExpr = allocExpr(expr->value);
     for (auto item: expr->operands)
-        if (ACCExpr *operand = walkRemoveCalledGuard(item, guardName))
-            newExpr->operands.push_back(operand);
+        newExpr->operands.push_back(replaceAssign(item, guardName));
     newExpr = cleanupExpr(newExpr, true);
-    if (trace_removeGuard)
+    if (trace_assign)
     printf("[%s:%d] end %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(newExpr).c_str());
     return newExpr;
-}
-static ACCExpr *replaceAssign(ACCExpr *expr)
-{
-    return walkRemoveCalledGuard(expr, "");
-}
-
-static void processRecursiveAssign(void)
-{
-    // recursively process all replacements internal to the list of 'setAssign' items
-    for (auto item: assignList)
-        if (item.second.value) {
-            if (trace_assign)
-                printf("[%s:%d] checking [%s] = '%s'\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str());
-            assignList[item.first].value = replaceAssign(item.second.value);
-        }
 }
 
 static void optimizeBitAssigns(void)
 {
+    std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
     // gather bitfield assigns together
     for (auto item: assignList) {
         int ind = item.first.find('[');
-        uint64_t lower, upper;
+        uint64_t lower;
         if (ind != -1) {
             lower = atol(item.first.substr(ind+1).c_str());
             std::string temp = item.first.substr(0, ind);
             ind = item.first.find(':');
-            if (ind != -1) {
-                upper = atol(item.first.substr(ind+1).c_str());
-                if (item.second.value)
-                    bitfieldList[temp][lower] = BitfieldPart{upper, item.second.value, item.second.type};
-            }
+            if (ind != -1 && item.second.value)
+                bitfieldList[temp][lower] = BitfieldPart{
+                    atol(item.first.substr(ind+1).c_str()), item.second.value, item.second.type};
         }
     }
     // concatenate bitfield assigns
@@ -393,138 +389,11 @@ printf("[%s:%d]MMMMMMMAAAAAAAAAAAATTTTTTTCCCCCCCCHHHHHHHH %s\n", __FUNCTION__, _
 
 static void collectCSE(void)
 {
-printf("[%s:%d] START\n", __FUNCTION__, __LINE__);
+//printf("[%s:%d] START\n", __FUNCTION__, __LINE__);
     for (auto item = assignList.begin(), aend = assignList.end(); item != aend; item++) {
          walkCSE(item->second.value);
     }
-printf("[%s:%d] END\n", __FUNCTION__, __LINE__);
-}
-
-static void generateAssign(FILE *OStr)
-{
-    bool hasAlways = condLines.size() > 0;
-
-    // generate local state element declarations and wires
-    for (auto item: refList) {
-        if (trace_assign)
-            printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str());
-        if (item.second.pin == PIN_REG) {
-        hasAlways = true;
-        fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
-        }
-    }
-    for (auto item: refList) {
-        std::string temp = item.first;
-        if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL) {
-        if (item.second.count) {
-            fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
-if (trace_assign && item.second.out) {
-printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
-//exit(-1);
-}
-        }
-        else if (trace_assign)
-            printf("[%s:%d] WIRENOTNEEDED %s\n", __FUNCTION__, __LINE__, item.first.c_str());
-        }
-    }
-    std::string endStr, sep;
-    for (auto item: modNew) {
-        if (item.moduleStart) {
-            fprintf(OStr, "%s (%s", (endStr + "    " + item.value).c_str(),
-                item.noDefaultClock ? "" : ".CLK(CLK), .nRST(nRST),");
-            sep = "";
-        }
-        else {
-            std::string val = tree2str(cleanupExpr(str2tree(item.value)));
-            fprintf(OStr, "%s", (sep + "\n        ." + item.argName + "(" + val + ")").c_str());
-            sep = ",";
-        }
-        endStr = ");\n";
-    }
-    fprintf(OStr, "%s", endStr.c_str());
-
-    for (auto item: refList) {
-        std::string temp = item.first;
-        int ind = temp.find('[');
-        if (ind != -1)
-            temp = temp.substr(0,ind);
-        if ((item.second.out || item.second.inout) && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL)) {
-            if (item.second.inout && !assignList[item.first].value)
-                for (auto alitem: assignList)
-                    if (ACCExpr *val = alitem.second.value)
-                    if (isIdChar(val->value[0]) && val->value == item.first)
-                        goto next;
-            if (refList[temp].done)
-                continue;
-            if (refList[temp].count) {
-                if (assignList[item.first].value)
-                    fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
-                else
-                    fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
-            }
-            else if (trace_skipped)
-                fprintf(OStr, "    //skippedassign %s = %s; //temp = '%s', count = %d, pin = %d done %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin, refList[temp].done);
-next:;
-            refList[item.first].done = true; // mark that assigns have already been output
-        }
-    }
-    bool seen = false;
-    for (auto item: assignList) {
-        std::string temp = item.first;
-        int ind = temp.find('[');
-        if (ind != -1)
-            temp = temp.substr(0,ind);
-        if (item.second.value && refList[temp].count && !refList[temp].done) {
-            if (!seen)
-                fprintf(OStr, "    // Extra assigments, not to output wires\n");
-            seen = true;
-            fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
-            refList[temp].done = true; // mark that assigns have already been output
-        }
-    }
-
-    // generate clocked updates to state elements
-    if (hasAlways) {
-        fprintf(OStr, "\n    always @( posedge CLK) begin\n      if (!nRST) begin\n");
-        for (auto item: refList)
-            if (item.second.pin == PIN_REG)
-                fprintf(OStr, "        %s <= 0;\n", item.first.c_str());
-        fprintf(OStr, "      end // nRST\n");
-        if (condLines.size() > 0) {
-            fprintf(OStr, "      else begin\n");
-            std::list<std::string> alwaysLines;
-            for (auto tcond: condLines) {
-                std::string methodName = tcond.first;
-                alwaysLines.push_back("if (" + tree2str(tcond.second.guard) + ") begin // " + methodName);
-                for (auto item: tcond.second.info) {
-                    std::string endStr;
-                    std::string temp;
-                    if (item.first) {
-                        temp = "    if (" + tree2str(item.first) + ")";
-                        if (item.second.size() > 1) {
-                            temp += " begin";
-                            endStr = "    end;";
-                        }
-                        alwaysLines.push_back(temp);
-                    }
-                    for (auto citem: item.second) {
-                        if (citem.dest)
-                            alwaysLines.push_back("    " + tree2str(citem.dest) + " <= " + tree2str(citem.value) + ";");
-                        else
-                            alwaysLines.push_back("    $display" + tree2str(citem.value->operands.front()) + ";");
-                    }
-                    if (endStr != "")
-                        alwaysLines.push_back(endStr);
-                }
-                alwaysLines.push_back("end; // End of " + methodName);
-            }
-            for (auto info: alwaysLines)
-                fprintf(OStr, "        %s\n", info.c_str());
-            fprintf(OStr, "      end\n");
-        }
-        fprintf(OStr, "    end // always @ (posedge CLK)\n");
-    }
-    fprintf(OStr, "endmodule \n\n");
+//printf("[%s:%d] END\n", __FUNCTION__, __LINE__);
 }
 
 int exprSize(ACCExpr *expr)
@@ -532,11 +401,6 @@ int exprSize(ACCExpr *expr)
     return 16;
 }
 
-typedef struct {
-    std::string format;
-    std::list<int> width;
-} PrintfInfo;
-static std::list<PrintfInfo> printfFormat;
 static int printfNumber = 1;
 #define PRINTF_PORT 0x7fff
 static ACCExpr *printfArgs(ACCExpr *listp)
@@ -637,100 +501,23 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
 /*
  * Generate *.v and *.vh for a Verilog module
  */
-static void generateModuleDef(ModuleIR *IR, FILE *OStr)
+void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop)
 {
 static std::list<ModData> modLine;
+    refList.clear();
+    assignList.clear();
+    replaceTarget.clear();
+    modNew.clear();
+    condLines.clear();
+    generateModuleSignature(IR, "", modLineTop, "");
     bool hasPrintf = false;
     std::map<std::string, ACCExpr *> enableList;
-    refList.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
     std::map<std::string, std::list<MuxValueEntry>> muxValueList;
 
-    assignList.clear();
-    replaceTarget.clear();
-    bitfieldList.clear();
     modLine.clear();
-    modNew.clear();
-    condLines.clear();
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
 
-    // Generate module header
-    generateModuleSignature(IR, "", modLine, "");
-    std::string sep;
-    bool hasCLK = false, hasnRST = false;
-    bool handleCLK = false;
-    bool paramSeen = false;
-    for (auto mitem: modLine) {
-        static const char *dirStr[] = {"input wire", "output wire"};
-        if (mitem.moduleStart) {
-            fprintf(OStr, "module %s ", mitem.value.c_str());
-            handleCLK = !mitem.noDefaultClock;
-            if (handleCLK)
-                sep = "(";
-            else
-                sep = "(\n    ";
-        }
-        else if (mitem.isparam) {
-            if (!paramSeen) {
-                fprintf(OStr, "#(\n    ");
-                sep = "";
-                paramSeen = true;
-            }
-            std::string typ = "UNKNOWN_PARAM_TYPE[" + mitem.type + "] ";
-            std::string init = "\"FALSE\"";
-            if (mitem.type == "FLOAT") {
-                typ = "real ";
-                init = "0.0";
-            }
-            else if (mitem.type == "POINTER")
-                typ = "";
-            else if (startswith(mitem.type, "INTEGER_")) {
-                typ = "integer ";
-                init = "0";
-            }
-            fprintf(OStr, "%sparameter %s%s = %s", sep.c_str(), typ.c_str(), mitem.value.c_str(), init.c_str());
-            sep = ",\n    ";
-        }
-        else {
-            if (paramSeen) {
-                fprintf(OStr, ")(\n    ");
-                sep = "";
-                paramSeen = false;
-            }
-            fprintf(OStr, "%s", sep.c_str());
-            sep = ",\n    ";
-            if (handleCLK) {
-                fprintf(OStr, "input wire CLK, input wire nRST,\n    ");
-                hasCLK = true;
-                hasnRST = true;
-                handleCLK = false;
-            }
-            std::string dirs = dirStr[mitem.out];
-            if (mitem.inout)
-                dirs = "inout wire";
-            fprintf(OStr, "%s %s%s", dirs.c_str(), sizeProcess(mitem.type).c_str(), mitem.value.c_str());
-            if (mitem.value == "CLK")
-                hasCLK = true;
-            if (mitem.value == "nRST")
-                hasnRST = true;
-        }
-    }
-    if (handleCLK) {
-        fprintf(OStr, "%sinput CLK, input nRST", sep.c_str());
-        hasCLK = true;
-        hasnRST = true;
-        handleCLK = false;
-    }
-    fprintf(OStr, ");\n");
-    if (!hasCLK) {
-        refList["CLK"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL, false};
-        refList["CLK"].count++;
-    }
-    if (!hasnRST) {
-        refList["nRST"] = RefItem{0, "INTEGER_1", false, false, PIN_LOCAL, false};
-        refList["nRST"].count++;
-    }
-    modLine.clear();
     for (auto item: IR->interfaces)
         if (item.fldName == "printfp")
             hasPrintf = true;
@@ -1002,13 +789,15 @@ exit(-1);
 
     // remove dependancy of the calling __ENA line on the calling __RDY
     for (auto item: enableList)
-        assignList[item.first].value = walkRemoveCalledGuard(
+        assignList[item.first].value = replaceAssign(
            assignList[item.first].value, getRdyName(item.first));
 
     setAssignRefCount(IR);
     collectCSE();
     optimizeBitAssigns();
-    processRecursiveAssign();
+    // recursively process all replacements internal to the list of 'setAssign' items
+    for (auto item = assignList.begin(), iend = assignList.end(); item != iend; item++)
+        item->second.value = replaceAssign(item->second.value);
 
     // last chance to optimize out single assigns to output ports
     std::map<std::string, std::string> mapPort;
@@ -1047,36 +836,5 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, mitem.value.c_st
             }
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, false});
-    }
-    generateAssign(OStr);
-}
-
-void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
-{
-    std::string baseDir = OutputDir;
-    int ind = baseDir.rfind('/');
-    if (ind > 0)
-        baseDir = baseDir.substr(0, ind+1);
-    for (auto IR : irSeq) {
-        FILE *OStrV = fopen((baseDir + IR->name + ".v").c_str(), "w");
-        if (!OStrV) {
-            printf("veriloggen: unable to open '%s'\n", (baseDir + IR->name + ".v").c_str());
-            exit(-1);
-        }
-        fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
-        fprintf(OStrV, "`default_nettype none\n");
-        generateModuleDef(IR, OStrV); // Generate verilog
-        fprintf(OStrV, "`default_nettype wire    // set back to default value\n");
-        fclose(OStrV);
-    }
-    if (printfFormat.size()) {
-    FILE *OStrP = fopen((OutputDir + ".printf").c_str(), "w");
-    for (auto item: printfFormat) {
-        fprintf(OStrP, "%s ", item.format.c_str());
-        for (auto witem: item.width)
-            fprintf(OStrP, "%d ", witem);
-        fprintf(OStrP, "\n");
-    }
-    fclose(OStrP);
     }
 }

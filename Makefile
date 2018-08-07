@@ -16,7 +16,7 @@
 #
 
 SOURCES = main.cpp verilog.cpp util.cpp interfaces.cpp \
-    expr.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp
+    expr.cpp filegen.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp
 LLVMDIR = ../llvm/lib/Target/Atomicc
 
 all: veriloggen atomiccImport
