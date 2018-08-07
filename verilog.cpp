@@ -237,9 +237,8 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName)
         return expr;
     if (trace_removeGuard)
     printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
-    ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
-    if (isIdChar(item[0])) {
+    if (isIdChar(item[0]) && !expr->operands.size()) {
         if (item == guardName) {
             if (trace_removeGuard)
             printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
@@ -248,46 +247,24 @@ static ACCExpr *walkRemoveCalledGuard (ACCExpr *expr, std::string guardName)
         if (ACCExpr *assignValue = assignList[item].value)
         if (!assignList[item].noRecursion && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
         decRef(item);
-        if (expr->operands.size() == 0 && replaceBlock[item]++ < 5) {
-            if (trace_removeGuard)
+        walkRef(assignValue);
+        if (trace_removeGuard)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
-            return walkRemoveCalledGuard(assignValue, guardName);
-        }
-        else if (replaceBlock[item] > 5 ) {
-printf("[%s:%d] excessive replace of %s with %s top %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str(), tree2str(expr).c_str());
-if (replaceBlock[item] > 10)
-exit(-1);
-        }
+        return walkRemoveCalledGuard(assignValue, guardName);
         }
     }
-    for (auto item: expr->operands) {
-        ACCExpr *operand = walkRemoveCalledGuard(item, guardName);
-        if (operand)
+    ACCExpr *newExpr = allocExpr(expr->value);
+    for (auto item: expr->operands)
+        if (ACCExpr *operand = walkRemoveCalledGuard(item, guardName))
             newExpr->operands.push_back(operand);
-    }
-    newExpr = cleanupExpr(newExpr);
+    newExpr = cleanupExpr(newExpr, true);
     if (trace_removeGuard)
     printf("[%s:%d] end %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(newExpr).c_str());
     return newExpr;
 }
 static ACCExpr *replaceAssign(ACCExpr *expr)
 {
-    if (!expr)
-        return expr;
-    std::string op = expr->value;
-    if (isIdChar(op[0]) && !expr->operands.size())
-    if (ACCExpr *assignValue = assignList[op].value)
-    if (assignValue && !assignList[op].noRecursion && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
-if (trace_assign)
-printf("[%s:%d] changed %s -> %s\n", __FUNCTION__, __LINE__, op.c_str(), tree2str(assignValue).c_str());
-        decRef(op);
-        walkRef(assignValue);
-        expr = assignValue;
-    }
-    ACCExpr *ret = allocExpr(expr->value);
-    for (auto item: expr->operands)
-        ret->operands.push_back(replaceAssign(item));
-    return cleanupExpr(ret, true);
+    return walkRemoveCalledGuard(expr, "");
 }
 
 static void processRecursiveAssign(void)
@@ -297,7 +274,6 @@ static void processRecursiveAssign(void)
         if (item.second.value) {
             if (trace_assign)
                 printf("[%s:%d] checking [%s] = '%s'\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str());
-            replaceBlock.clear();
             assignList[item.first].value = replaceAssign(item.second.value);
         }
 }
@@ -1025,10 +1001,9 @@ exit(-1);
     }
 
     // remove dependancy of the calling __ENA line on the calling __RDY
-    for (auto item: enableList) {
-        replaceBlock.clear();
-        assignList[item.first].value = cleanupExpr(walkRemoveCalledGuard(assignList[item.first].value, getRdyName(item.first)));
-    }
+    for (auto item: enableList)
+        assignList[item.first].value = walkRemoveCalledGuard(
+           assignList[item.first].value, getRdyName(item.first));
 
     setAssignRefCount(IR);
     collectCSE();
