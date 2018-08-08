@@ -320,7 +320,7 @@ static ACCExpr *get1Token(void)
     return ret;
 }
 
-static bool checkInteger(ACCExpr *expr, std::string pattern)
+bool checkInteger(ACCExpr *expr, std::string pattern)
 {
     if (!expr)
         return false;

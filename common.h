@@ -118,6 +118,7 @@ void decRef(std::string name);
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs);
 int walkCount (ACCExpr *expr);
 ACCExpr *dupExpr(ACCExpr *expr);
+bool checkInteger(ACCExpr *expr, std::string pattern);
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);

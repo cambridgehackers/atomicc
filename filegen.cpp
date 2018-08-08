@@ -173,8 +173,13 @@ next:;
             fprintf(OStr, "      else begin\n");
             std::list<std::string> alwaysLines;
             for (auto tcond: condLines) {
-                std::string methodName = tcond.first;
-                alwaysLines.push_back("if (" + tree2str(tcond.second.guard) + ") begin // " + methodName);
+                std::string methodName = tcond.first, endStr;
+                if (checkInteger(tcond.second.guard, "1"))
+                    alwaysLines.push_back("// " + methodName);
+                else {
+                    alwaysLines.push_back("if (" + tree2str(tcond.second.guard) + ") begin // " + methodName);
+                    endStr = "end; ";
+                }
                 for (auto item: tcond.second.info) {
                     std::string endStr;
                     std::string temp;
@@ -195,7 +200,7 @@ next:;
                     if (endStr != "")
                         alwaysLines.push_back(endStr);
                 }
-                alwaysLines.push_back("end; // End of " + methodName);
+                alwaysLines.push_back(endStr + "// End of " + methodName);
             }
             for (auto info: alwaysLines)
                 fprintf(OStr, "        %s\n", info.c_str());

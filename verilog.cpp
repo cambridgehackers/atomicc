@@ -315,12 +315,13 @@ printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bi
 
 static void setAssignRefCount(ModuleIR *IR)
 {
-    for (auto tcond: condLines) {
-        std::string methodName = tcond.first;
-        walkRef(tcond.second.guard);
+    for (auto tcond = condLines.begin(), tend = condLines.end(); tcond != tend; tcond++) {
+        std::string methodName = tcond->first;
+        walkRef(tcond->second.guard);
+        tcond->second.guard = replaceAssign(tcond->second.guard);
         if (trace_assign)
-            printf("[%s:%d] %s: guard %s\n", __FUNCTION__, __LINE__, methodName.c_str(), tree2str(tcond.second.guard).c_str());
-        for (auto item: tcond.second.info) {
+            printf("[%s:%d] %s: guard %s\n", __FUNCTION__, __LINE__, methodName.c_str(), tree2str(tcond->second.guard).c_str());
+        for (auto item: tcond->second.info) {
             walkRef(item.first);
             for (auto citem: item.second) {
                 if (trace_assign)
