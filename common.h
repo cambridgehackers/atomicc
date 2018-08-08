@@ -83,9 +83,8 @@ typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
 #define CBAct ^ ModuleIR * (FieldElement &item, std::string fldName)
 
 // util.cpp
-std::string getRdyName(std::string basename);
+std::string getRdyName(std::string basename, bool suppressHack = false);
 uint64_t convertType(std::string arg);
-std::string getRdyName(std::string basename);
 ModuleIR *lookupIR(std::string ind);
 uint64_t convertType(std::string arg);
 std::string sizeProcess(std::string type);

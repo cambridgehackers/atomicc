@@ -22,12 +22,12 @@
 #include "common.h"
 
 static int trace_iter;//=1;
-std::string getRdyName(std::string basename)
+std::string getRdyName(std::string basename, bool suppressHack)
 {
     std::string rdyName = basename;
     if (endswith(rdyName, "__ENA"))
         rdyName = rdyName.substr(0, rdyName.length()-5);
-    if (endswith(rdyName, "out$first")) //HACK HACK HACK HACK for fifo
+    if (!suppressHack && endswith(rdyName, "out$first")) //HACK HACK HACK HACK for fifo
         rdyName = rdyName.substr(0, rdyName.length() - 5) + "deq";   // temp hack to simplify Fifo expressions
     return rdyName + "__RDY";
 }

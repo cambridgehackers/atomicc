@@ -231,7 +231,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 }
                 if (checkItem("="))
                     MI->guard = getExpression();
-                std::string rdyName = getRdyName(methodName);
+                std::string rdyName = getRdyName(methodName, true);
                 MethodInfo *MIRdy = allocMethod(rdyName);
                 addMethod(IR, MIRdy);
                 MIRdy->rule = MI->rule;
