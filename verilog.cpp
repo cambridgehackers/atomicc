@@ -315,11 +315,6 @@ printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bi
 
 static void setAssignRefCount(ModuleIR *IR)
 {
-    for (auto FI : IR->method) {
-        MethodInfo *MI = FI.second;
-        std::string methodName = MI->name;
-        refList[methodName].count++;
-    }
     for (auto tcond: condLines) {
         std::string methodName = tcond.first;
         walkRef(tcond.second.guard);
@@ -538,7 +533,7 @@ static std::list<ModData> modLine;
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be allocated for rules
-            refList[methodName] = RefItem{1, MI->type, true, false, PIN_WIRE, false};
+            refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false};
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
             value->value = "(";   // change from PARAMETER_MARKER
