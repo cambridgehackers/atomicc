@@ -37,10 +37,6 @@ typedef struct {
     bool        isparam;
 } ModData;
 typedef struct {
-    ACCExpr    *cond;
-    ACCExpr    *value;
-} MuxValueEntry;
-typedef struct {
     std::string name;
     std::string base;
     std::string type;

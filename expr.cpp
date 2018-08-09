@@ -477,12 +477,14 @@ void walkReplaceBuiltin(ACCExpr *expr)
     else if (expr->value == "__phi") {
         ACCExpr *list = expr->operands.front();
         int size = list->operands.size();
-        ACCExpr *lhs = getRHS(list, 0), *rhs = getRHS(list);
+        ACCExpr *firstInList = getRHS(list, 0), *secondInList = getRHS(list);
         ACCExpr *newe = nullptr;
-        if (size == 2 && matchExpr(getRHS(lhs, 0), invertExpr(getRHS(rhs, 0))))
-            newe = allocExpr("?", getRHS(lhs, 0), getRHS(lhs), getRHS(rhs));
-        else if (size == 2 && getRHS(lhs, 0)->value == "__default" && exprWidth(getRHS(rhs)) == 1)
-            newe = allocExpr("&", getRHS(rhs, 0), getRHS(rhs));
+        if (size == 2 && matchExpr(getRHS(firstInList, 0), invertExpr(getRHS(secondInList, 0))))
+            newe = allocExpr("?", getRHS(firstInList, 0), getRHS(firstInList), getRHS(secondInList));
+        else if (size == 2 && getRHS(firstInList, 0)->value == "__default" && exprWidth(getRHS(secondInList)) == 1)
+            newe = allocExpr("&", getRHS(secondInList, 0), getRHS(secondInList));
+        else if (size == 1)
+            newe = getRHS(firstInList);
         else {
             //dumpExpr("PHI", list);
             newe = allocExpr("|");

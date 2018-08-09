@@ -494,6 +494,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
     condLines[methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
+
 /*
  * Generate *.v and *.vh for a Verilog module
  */
@@ -509,8 +510,16 @@ static std::list<ModData> modLine;
     bool hasPrintf = false;
     std::map<std::string, ACCExpr *> enableList;
     // 'Mux' together parameter settings from all invocations of a method from this class
-    std::map<std::string, std::list<MuxValueEntry>> muxValueList;
+    std::map<std::string, ACCExpr *> muxValueList;
 
+    auto appendMux = [&](std::string name, ACCExpr *cond, ACCExpr *value) -> void {
+        ACCExpr *args = muxValueList[name];
+        if (!args) {
+            args = allocExpr("(");
+            muxValueList[name] = args;
+        }
+        args->operands.push_back(allocExpr(":", cond, value));
+    };
     modLine.clear();
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
 
@@ -585,7 +594,7 @@ static std::list<ModData> modLine;
             walkRead(MI, cond, nullptr);
             walkRead(MI, value, cond);
             if (info->dest->operands.size() || value->operands.size())
-                muxValueList[tree2str(info->dest)].push_back(MuxValueEntry{cond, value});
+                appendMux(tree2str(info->dest), cond, value);
             else {
             std::list<FieldItem> fieldList;
             getFieldList(fieldList, "", "", info->type, false, true);
@@ -596,7 +605,7 @@ static std::list<ModData> modLine;
                     newExpr = allocExpr(value->value + fitem.name);
                     newExpr->operands = value->operands;
                 }
-                muxValueList[dest].push_back(MuxValueEntry{cond, newExpr});
+                appendMux(dest, cond, newExpr);
             }
             }
         }
@@ -641,44 +650,17 @@ dumpExpr("READCALL", value);
             std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
             int argCount = CI->params.size();
             ACCExpr *param = value->operands.front();
-//printf("[%s:%d] param '%s'\n", __FUNCTION__, __LINE__, tree2str(param).c_str());
-//dumpExpr("param", param);
             for (auto item: param->operands) {
                 if(argCount-- > 0) {
-//printf("[%s:%d] infmuxVL[%s] = cond '%s' tree '%s'\n", __FUNCTION__, __LINE__, (pname + AI->name).c_str(), tree2str(tempCond).c_str(), tree2str(item).c_str());
-                    muxValueList[pname + AI->name].push_back(MuxValueEntry{tempCond, item});
-                    //typeList[pname + AI->name] = AI->type;
+                    appendMux(pname + AI->name, tempCond, item);
                     AI++;
                 }
             }
         }
     }
     // combine mux'ed assignments into a single 'assign' statement
-    // Context: before local state declarations, to allow inlining
-    for (auto item: muxValueList) {
-        ACCExpr *prevCond = nullptr, *prevValue = nullptr;
-        ACCExpr *temp = nullptr, *head = nullptr;
-        std::string type = refList[item.first].type;
-        for (auto element: item.second) {
-            if (prevCond) {
-                ACCExpr *newExpr = allocExpr("?", prevCond, prevValue);
-                if (temp)
-                    temp->operands.push_back(newExpr);
-                temp = newExpr;
-                if (!head)
-                    head = temp;
-            }
-            prevCond = element.cond;
-            prevValue = element.value;
-        }
-        if (type == "INTEGER_1" && prevCond) // since bools are also used for rdy/ena, be pedantic in calculating conditionalized value
-            prevValue = allocExpr("?", prevCond, prevValue, allocExpr("0"));
-        if (temp)
-            temp->operands.push_back(prevValue);
-        else
-            head = prevValue;
-        setAssign(item.first, head, type);
-    }
+    for (auto item: muxValueList)
+        setAssign(item.first, cleanupExprBit(allocExpr("__phi", item.second)), refList[item.first].type);
     for (auto IC : IR->interfaceConnect) {
         ModuleIR *IIR = lookupIR(IC.type);
         if (!IIR)
@@ -767,18 +749,22 @@ dumpExpr("READCALL", value);
             if (checkRecursion(item.second.value))
                 break;
             std::string name;
-            int length = -1;
+            int length = 0;
             for (auto rep: replaceBlock) {
                  if (rep.second > length && !endswith(rep.first, "__RDY") && !endswith(rep.first, "__ENA")) {
                      name = rep.first;
                      length = rep.second;
                  }
             }
+            if (name == "")
+                break;
 printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LINE__, name.c_str());
             assignList[name].noRecursion = true;
             if (i++ > 1000) {
-printf("[%s:%d]SETNO error; exit\n", __FUNCTION__, __LINE__);
-exit(-1);
+                printf("[%s:%d]checkRecursion loop; exit\n", __FUNCTION__, __LINE__);
+                for (auto rep: replaceBlock)
+                    printf("[%s:%d] name %s length %d\n", __FUNCTION__, __LINE__, rep.first.c_str(), rep.second);
+                exit(-1);
             }
         }
     }
