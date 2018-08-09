@@ -494,6 +494,75 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
     condLines[methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
+static void connectInterfaces(ModuleIR *IR)
+{
+    for (auto IC : IR->interfaceConnect) {
+        ModuleIR *IIR = lookupIR(IC.type);
+        if (!IIR)
+            dumpModule("MISSINGCONNECT", IR);
+        assert(IIR && "interfaceConnect interface type");
+        bool targetLocal = false, sourceLocal = false;
+        for (auto item: IR->interfaces) {
+            if (item.fldName == IC.target)
+                targetLocal = true;
+            if (item.fldName == IC.source)
+                sourceLocal = true;
+        }
+        if (trace_connect)
+            printf("%s: CONNECT target %s/%d source %s/%d forward %d\n", __FUNCTION__, IC.target.c_str(), targetLocal, IC.source.c_str(), sourceLocal, IC.isForward);
+        for (auto fld : IIR->fields) {
+            std::string tstr = IC.target + fld.fldName,
+                        sstr = IC.source + fld.fldName;
+            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
+                printf("%s: IFCCCfield %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+            if (!IC.isForward) {
+                refList[tstr].out = 1;   // for local connections, don't bias for 'output'
+                refList[sstr].out = 0;
+            }
+            if (refList[sstr].out)
+                setAssign(sstr, allocExpr(tstr), fld.type);
+            else
+                setAssign(tstr, allocExpr(sstr), fld.type);
+        }
+        for (auto FI : IIR->method) {
+            MethodInfo *MI = FI.second;
+            if (trace_connect)
+                printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.target.substr(IC.target.length()-1).c_str(), IC.source.c_str());
+            if (IC.target.substr(IC.target.length()-1) == MODULE_SEPARATOR)
+                IC.target = IC.target.substr(0, IC.target.length()-1);
+            if (IC.source.substr(IC.source.length()-1) == MODULE_SEPARATOR)
+                IC.source = IC.source.substr(0, IC.source.length()-1);
+            std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
+                        sstr = IC.source + MODULE_SEPARATOR + MI->name;
+            if (!IC.isForward) {
+                refList[tstr].out ^= targetLocal;
+                refList[sstr].out ^= sourceLocal;
+            }
+            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
+                printf("%s: IFCCCmeth %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+            if (refList[sstr].out)
+                setAssign(sstr, allocExpr(tstr), MI->type);
+            else
+                setAssign(tstr, allocExpr(sstr), MI->type);
+            tstr = tstr.substr(0, tstr.length()-5) + MODULE_SEPARATOR;
+            sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
+            for (auto info: MI->params) {
+                std::string sparm = sstr + info.name, tparm = tstr + info.name;
+                if (!IC.isForward) {
+                    refList[tparm].out ^= targetLocal;
+                    refList[sparm].out ^= sourceLocal;
+                }
+                if (trace_connect)
+                    printf("%s: IFCCCparam %s/%d %s/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
+                if (refList[sparm].out)
+                    setAssign(sparm, allocExpr(tparm), info.type);
+                else
+                    setAssign(tparm, allocExpr(sparm), info.type);
+            }
+        }
+    }
+}
+
 
 /*
  * Generate *.v and *.vh for a Verilog module
@@ -639,7 +708,7 @@ dumpExpr("READCALL", value);
                 exit(-1);
             }
             if (!enableList[calledName])
-                enableList[calledName] = allocExpr("||");
+                enableList[calledName] = allocExpr("|");
             enableList[calledName]->operands.push_back(tempCond);
             MethodInfo *CI = lookupQualName(IR, calledName);
             if (!CI) {
@@ -661,73 +730,9 @@ dumpExpr("READCALL", value);
     // combine mux'ed assignments into a single 'assign' statement
     for (auto item: muxValueList)
         setAssign(item.first, cleanupExprBit(allocExpr("__phi", item.second)), refList[item.first].type);
-    for (auto IC : IR->interfaceConnect) {
-        ModuleIR *IIR = lookupIR(IC.type);
-        if (!IIR)
-            dumpModule("MISSINGCONNECT", IR);
-        assert(IIR && "interfaceConnect interface type");
-        bool targetLocal = false, sourceLocal = false;
-        for (auto item: IR->interfaces) {
-            if (item.fldName == IC.target)
-                targetLocal = true;
-            if (item.fldName == IC.source)
-                sourceLocal = true;
-        }
-        if (trace_connect)
-            printf("%s: CONNECT target %s/%d source %s/%d forward %d\n", __FUNCTION__, IC.target.c_str(), targetLocal, IC.source.c_str(), sourceLocal, IC.isForward);
-        for (auto fld : IIR->fields) {
-            std::string tstr = IC.target + fld.fldName,
-                        sstr = IC.source + fld.fldName;
-            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
-                printf("%s: IFCCCfield %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
-            if (!IC.isForward) {
-                refList[tstr].out = 1;   // for local connections, don't bias for 'output'
-                refList[sstr].out = 0;
-            }
-            if (refList[sstr].out)
-                setAssign(sstr, allocExpr(tstr), fld.type);
-            else
-                setAssign(tstr, allocExpr(sstr), fld.type);
-        }
-        for (auto FI : IIR->method) {
-            MethodInfo *MI = FI.second;
-            if (trace_connect)
-                printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.target.substr(IC.target.length()-1).c_str(), IC.source.c_str());
-            if (IC.target.substr(IC.target.length()-1) == MODULE_SEPARATOR)
-                IC.target = IC.target.substr(0, IC.target.length()-1);
-            if (IC.source.substr(IC.source.length()-1) == MODULE_SEPARATOR)
-                IC.source = IC.source.substr(0, IC.source.length()-1);
-            std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
-                        sstr = IC.source + MODULE_SEPARATOR + MI->name;
-            if (!IC.isForward) {
-                refList[tstr].out ^= targetLocal;
-                refList[sstr].out ^= sourceLocal;
-            }
-            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
-                printf("%s: IFCCCmeth %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
-            if (refList[sstr].out)
-                setAssign(sstr, allocExpr(tstr), MI->type);
-            else
-                setAssign(tstr, allocExpr(sstr), MI->type);
-            tstr = tstr.substr(0, tstr.length()-5) + MODULE_SEPARATOR;
-            sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
-            for (auto info: MI->params) {
-                std::string sparm = sstr + info.name, tparm = tstr + info.name;
-                if (!IC.isForward) {
-                    refList[tparm].out ^= targetLocal;
-                    refList[sparm].out ^= sourceLocal;
-                }
-                if (trace_connect)
-                    printf("%s: IFCCCparam %s/%d %s/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
-                if (refList[sparm].out)
-                    setAssign(sparm, allocExpr(tparm), info.type);
-                else
-                    setAssign(tparm, allocExpr(sparm), info.type);
-            }
-        }
-    }
-    for (auto item: enableList)
-        setAssign(item.first, item.second, "INTEGER_1");
+    connectInterfaces(IR);
+    for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
+        setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "INTEGER_1");
     for (auto item: assignList)
         assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
     for (auto FI : IR->method) {
@@ -768,11 +773,6 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
             }
         }
     }
-
-    // remove dependancy of the calling __ENA line on the calling __RDY
-    for (auto item: enableList)
-        assignList[item.first].value = replaceAssign(
-           assignList[item.first].value, getRdyName(item.first));
 
     setAssignRefCount(IR);
     collectCSE();

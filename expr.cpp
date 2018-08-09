@@ -398,6 +398,16 @@ int exprWidth(ACCExpr *expr)
         if (int len = exprWidth(getRHS(expr, 2)))
             return len;
     }
+    if (expr->value == "&") {
+        for (auto item: expr->operands)
+            if (exprWidth(item) != 1)
+                goto nextand;
+        return 1;
+nextand:;
+    }
+    if (expr->value == "!") {
+        return exprWidth(expr->operands.front());
+    }
     return 0;
 }
 
