@@ -1,16 +1,16 @@
 \infannex{gram}{Grammar summary}
 
 \pnum
-\indextext{grammar}%
-\indextext{summary!syntax}%
-This summary of \Cpp{} grammar is intended to be an aid to comprehension.
-It is not an exact statement of the language.
-In particular, the grammar described here accepts
-a superset of valid \Cpp{} constructs.
-Disambiguation rules~(\ref{stmt.ambig}, \ref{dcl.spec}, \ref{class.member.lookup})
-must be applied to distinguish expressions from declarations.
-Further, access control, ambiguity, and type rules must be used
-to weed out syntactically valid but meaningless constructs.
+Summary of grammar
+
+\FlushAndPrintGrammar
+
+\input{std-gram.ext}
+
+\infannex{gram}{Grammar integration with C++ summary}
+
+\pnum
+Summary of C++ grammar
 
 \rSec1[gram.key]{Keywords}
 
@@ -58,11 +58,4 @@ Note that a
 naming a class is also a
 \grammarterm{class-name}\iref{class.name}.
 
-\FlushAndPrintGrammar
-%%%\makeatletter
-%%%\immediate\closeout\XTR@out
-%%%\immediate\openout\XTR@out=std-gram-dummy.tmp
-%%%\makeatother
-%%%\def\gramSec[#1]#2{\rSec1[#1]{#2}}
-%%%\input{std-gram.ext}
-%%%\input{std-grammar.tex}
+\input{std-grammar.tex}
