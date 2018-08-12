@@ -1,0 +1,93 @@
+%!TEX root = std.tex
+\rSec0[atomicc.module]{Modularization}
+
+\rSec1[atomicc.compilation]{Independant compilation of modules}
+
+The design is separated into modules that can export and import interfaces to other modules.
+Each source language module compiles into a single verilog module.  Modules are independantly
+compiled, depending only on the interface definitions for referenced modules.
+Referencing modules do not depend on the internal implementation of referenced modules,
+even if they textually exist in the same compilation unit.
+
+\rSec1[atomicc.verilog]{Interfacing with verilog modules}
+
+To reference a module in verilog, fields can be declared in __interface items.
+For example:
+
+\begin{codeblock}
+     __interface CNCONNECTNET2 {
+         __input  __int(1)         IN1;
+         __input  __int(1)         IN2;
+         __output __int(1)         OUT1;
+         __output __int(1)         OUT2;
+     };
+     __emodule CONNECTNET2 {
+         CNCONNECTNET2 _;
+     };
+\end{codeblock}
+
+This will allow references/instantiation of an externally defined verilog module CONNECTNET2
+that has 2 'input' ports, IN1 and IN2, as well as 2 'output' ports, OUT1 and OUT2.
+
+\rSec2[atomicc.param]{Parameterized modules}
+
+Verilog modules that have module instantiation parameters can also be declared/referenced.
+For example:
+
+\begin{codeblock}
+     __interface Mmcme2MMCME2_ADV {
+         __parameter const char *  BANDWIDTH;
+         __parameter float         CLKFBOUT_MULT_F;
+         __input  __uint(1)        CLKFBIN;
+         __output __uint(1)        CLKFBOUT;
+         __output __uint(1)        CLKFBOUTB;
+     };
+     __emodule MMCME2_ADV {
+         Mmcme2MMCME2_ADV _;
+     };
+\end{codeblock}
+
+This example can be instantiated as:
+
+\begin{codeblock}
+     __module Test {
+         ...
+         MMCME2_ADV#(BANDWIDTH="WIDE",CLKFBOUT_MULT_F=1.0) mmcm;
+         ...
+         Test() {
+            __rule initRule {
+                mmcm._.CLKFBIN = mmcm._.CLKFBOUT;
+            }
+         }
+     }
+\end{codeblock}
+
+\rSec2[atomicc.refsyntax]{Reference syntax}
+
+For declaring ports in an interface:
+\begin{codeblock}
+     __interface <interfaceName> {
+          __input/__output/__inout/__parameter <elementType> <elementName>;
+     }
+\end{codeblock}
+For '__parameter' items, supported datatypes include: "const char *", "float", "int".
+
+\rSec2[atomicc.ifactor]{Factoring of interfaces into sub interfaces is also supported}
+
+\rSec2[atomicc.clockReset]{Clock/reset ports}
+Note that if interface port pins are declared in a module interface declaration, then
+CLK and nRST are _not_ automatically declared/instantiated.  (Since the user needs the
+flexibility to not require them when interfacing with legacy code).
+
+Note that this also allows arbitrary signals (like the output of clock generators) to be
+passed to modules as CLK/nRST signals.  (For Atomicc generated modules, please note that the
+default clock/reset signals for a module will always have these names)
+
+\rSec2[atomicc.itool]{Import tooling}
+
+There is a tool to automate the creation of AtomicC header files from verilog source files.
+For example:
+\begin{codeblock}
+     atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 zynq.lib
+     atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
+\end{codeblock}
