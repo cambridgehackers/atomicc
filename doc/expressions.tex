@@ -1,0 +1,143 @@
+%!TEX root = std.tex
+\rSec0[expr]{Expressions}
+
+\gramSec[gram.expr]{Expressions}
+
+\indextext{\idxcode{operator new}|seealso{\tcode{new}}}%
+\indextext{\idxcode{operator delete}|seealso{\tcode{delete}}}%
+\indextext{usual arithmetic conversions|see{conversion, usual arithmetic}}%
+\indextext{\idxcode{==}|see{operator, equality}}%
+\indextext{\idxcode{"!=}|see{operator, inequality}}
+\indextext{\idxcode{static_cast}|see{cast, static}}%
+\indextext{\idxcode{dynamic_cast}|see{cast, dynamic}}%
+\indextext{\idxcode{const_cast}|see{cast, const}}%
+\indextext{\idxcode{reinterpret_cast}|see{cast, reinterpret}}
+
+\rSec1[expr.pre]{Preamble}
+
+\pnum
+\indextext{expression|(}%
+\begin{note}
+\ref{expr} defines the syntax, order of evaluation, and meaning
+of expressions.\footnote{The precedence of operators is not directly specified, but it can be
+derived from the syntax.}
+An expression is a sequence of operators and operands that specifies a
+computation. An expression can result in a value and can cause side
+effects.
+\end{note}
+
+\pnum
+\indextext{operator!overloaded}%
+\begin{note}
+Operators can be overloaded, that is, given meaning when applied to
+expressions of class type\iref{class} or enumeration
+type\iref{dcl.enum}. Uses of overloaded operators are transformed into
+function calls as described in~\ref{over.oper}. Overloaded operators
+obey the rules for syntax and evaluation order specified in \ref{expr.compound},
+but the requirements of operand type and value category are replaced
+by the rules for function call. Relations between operators, such as
+\tcode{++a} meaning \tcode{a+=1}, are not guaranteed for overloaded
+operators\iref{over.oper}.
+\end{note}
+
+\rSec2[expr.cast]{Explicit type conversion (cast notation)}%
+\indextext{expression!cast|(}
+
+\pnum
+The result of the expression \tcode{(T)} \grammarterm{cast-expression} is
+of type \tcode{T}. The result is an lvalue if \tcode{T} is an lvalue
+reference type or an rvalue reference to function type and an xvalue if \tcode{T}
+is an rvalue reference to object type; otherwise the result is a prvalue.
+\begin{note}
+If \tcode{T} is a non-class type that is cv-qualified, the
+\grammarterm{cv-qualifier}{s} are discarded when determining the type of the
+resulting prvalue; see \ref{expr.prop}.
+\end{note}
+
+\pnum
+An explicit type conversion can be expressed using functional
+notation\iref{expr.type.conv}, a type conversion operator
+(\tcode{dynamic_cast}, \tcode{static_cast}, \tcode{reinterpret_cast},
+\tcode{const_cast}), or the \term{cast} notation.
+
+\begin{bnf}
+\nontermdef{cast-expression}\br
+    unary-expression\br
+    \terminal{(} type-id \terminal{)} cast-expression
+\end{bnf}
+
+\pnum
+Any type conversion not mentioned below and not explicitly defined by
+the user\iref{class.conv} is ill-formed.
+
+\pnum
+The conversions performed by
+
+\begin{itemize}
+\indextext{cast!const}%
+\indextext{cast!static}%
+\indextext{cast!reinterpret}%
+\item a \tcode{const_cast}\iref{expr.const.cast},
+\item a \tcode{static_cast}\iref{expr.static.cast},
+\item a \tcode{static_cast} followed by a \tcode{const_cast},
+\item a \tcode{reinterpret_cast}\iref{expr.reinterpret.cast}, or
+\item a \tcode{reinterpret_cast} followed by a \tcode{const_cast},
+\end{itemize}
+
+can be performed using the cast notation of explicit type conversion.
+The same semantic restrictions and behaviors apply, with the exception
+that in performing a \tcode{static_cast} in the following situations the
+conversion is valid even if the base class is inaccessible:
+
+\begin{itemize}
+\item a pointer to an object of derived class type or an lvalue or
+rvalue of derived class type may be explicitly converted to a pointer or
+reference to an unambiguous base class type, respectively;
+
+\item a pointer to member of derived class type may be explicitly
+converted to a pointer to member of an unambiguous non-virtual base
+class type;
+
+\item a pointer to an object of an unambiguous non-virtual base class
+type, a glvalue of an unambiguous non-virtual base class type,
+or a pointer to member of an unambiguous non-virtual base class type may
+be explicitly converted to a pointer, a reference, or a pointer to
+member of a derived class type, respectively.
+\end{itemize}
+
+If a conversion can be interpreted in more than one of the ways listed
+above, the interpretation that appears first in the list is used, even
+if a cast resulting from that interpretation is ill-formed. If a
+conversion can be interpreted in more than one way as a
+\tcode{static_cast} followed by a \tcode{const_cast}, the conversion is
+ill-formed.
+\begin{example}
+
+\begin{codeblock}
+struct A { };
+struct I1 : A { };
+struct I2 : A { };
+struct D : I1, I2 { };
+A* foo( D* p ) {
+  return (A*)( p );             // ill-formed \tcode{static_cast} interpretation
+}
+\end{codeblock}
+\end{example}
+
+\pnum
+\indextext{class!cast to incomplete}%
+The operand of a cast using the cast notation can be a prvalue of type
+``pointer to incomplete class type''. The destination type of a cast
+using the cast notation can be ``pointer to incomplete class type''. If
+both the operand and destination types are class types and one or both
+are incomplete, it is unspecified whether the \tcode{static_cast} or the
+\tcode{reinterpret_cast} interpretation is used, even if there is an
+inheritance relationship between the two classes.
+\begin{note}
+For example, if the classes were defined later in the translation unit,
+a multi-pass compiler would be permitted to interpret a cast between
+pointers to the classes as if the class types were complete at the point
+of the cast.
+\end{note}%
+\indextext{expression!cast|)}
+

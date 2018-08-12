@@ -1,8 +1,8 @@
 %!TEX root = std.tex
-\rSec0[dcl.xxdcl]{xxDeclarations}%
+\rSec0[dcl.dcl]{Declarations}%
 \indextext{declaration|(}
 
-\gramSec[gram.xxdcl]{xxDeclarations}
+\gramSec[gram.dcl]{Declarations}
 
 \indextext{linkage specification|see{specification, linkage}}
 
@@ -11,7 +11,7 @@ Declarations generally specify how names are to be interpreted. Declarations hav
 the form
 
 \begin{bnf}
-\nontermdef{xxsimple-type-specifier}\br
+\nontermdef{simple-type-specifier}\br
     \opt{nested-name-specifier} type-name\br
     nested-name-specifier \terminal{template} simple-template-id\br
     \opt{nested-name-specifier} template-name\br
@@ -41,23 +41,23 @@ Function definitions have the form
 \indextext{\idxgram{function-definition}}%
 %
 \begin{bnf}
-\nontermdef{xxfunction-definition}\br
+\nontermdef{function-definition}\br
     \opt{decl-specifier-seq} interface-qualifier-seq identifier parameters-and-qualifiers function-body \atomicc\br
     \opt{attribute-specifier-seq} \opt{decl-specifier-seq} declarator \opt{virt-specifier-seq} function-body\br
     \opt{attribute-specifier-seq} \opt{decl-specifier-seq} declarator requires-clause function-body
 \end{bnf}
 
 \begin{bnf}
-\nontermdef{xxinterface-qualifier} \atomicc\br
+\nontermdef{interface-qualifier} \atomicc\br
     identifier \terminal{.} \atomicc
 
-\nontermdef{xxinterface-qualifier-seq} \atomicc\br
+\nontermdef{interface-qualifier-seq} \atomicc\br
     interface-qualifier \atomicc\br
     interface-qualifier-seq interface-qualifier \atomicc
 \end{bnf}
 
 \begin{bnf}
-\nontermdef{xxfunction-body}\br
+\nontermdef{function-body}\br
     \opt{ctor-initializer} \opt{if-guard} compound-statement \atomicc\br
     function-try-block\br
     \terminal{= default ;}\br

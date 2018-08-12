@@ -1,8 +1,8 @@
 %!TEX root = std.tex
-\rSec0[xxclass]{xxClasses}%
-\indextext{xxclass|(}
+\rSec0[class]{Classes}%
+\indextext{class|(}
 
-\gramSec[gram.xxclass]{xxClasses}
+\gramSec[gram.class]{Classes}
 
 \indextext{class!member function|see{member function, class}}
 
@@ -17,7 +17,7 @@ Its name becomes a \grammarterm{class-name}\iref{class.name} within its
 scope.
 
 \begin{bnf}
-\nontermdef{xxclass-key}\br
+\nontermdef{class-key}\br
     \terminal{class}\br
     \terminal{struct}\br
     \terminal{union}\br
@@ -27,7 +27,7 @@ scope.
 \end{bnf}
 
 \begin{bnf}
-\nontermdef{xxmember-declaration}\br
+\nontermdef{member-declaration}\br
     \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;} \atomicc\br
     function-definition\br
     using-declaration\br
@@ -42,7 +42,7 @@ scope.
 \end{bnf}
 
 \begin{bnf}
-\nontermdef{xxpin-type} \atomicc\br
+\nontermdef{pin-type} \atomicc\br
     \terminal{__input} \atomicc\br
     \terminal{__output} \atomicc\br
     \terminal{__inout} \atomicc\br
