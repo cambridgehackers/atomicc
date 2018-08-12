@@ -3,20 +3,10 @@
 
 \gramSec[gram.expr]{Expressions}
 
-\indextext{\idxcode{operator new}|seealso{\tcode{new}}}%
-\indextext{\idxcode{operator delete}|seealso{\tcode{delete}}}%
-\indextext{usual arithmetic conversions|see{conversion, usual arithmetic}}%
-\indextext{\idxcode{==}|see{operator, equality}}%
-\indextext{\idxcode{"!=}|see{operator, inequality}}
-\indextext{\idxcode{static_cast}|see{cast, static}}%
-\indextext{\idxcode{dynamic_cast}|see{cast, dynamic}}%
-\indextext{\idxcode{const_cast}|see{cast, const}}%
-\indextext{\idxcode{reinterpret_cast}|see{cast, reinterpret}}
 
 \rSec1[expr.pre]{Preamble}
 
 \pnum
-\indextext{expression|(}%
 \begin{note}
 \ref{expr} defines the syntax, order of evaluation, and meaning
 of expressions.\footnote{The precedence of operators is not directly specified, but it can be
@@ -27,7 +17,6 @@ effects.
 \end{note}
 
 \pnum
-\indextext{operator!overloaded}%
 \begin{note}
 Operators can be overloaded, that is, given meaning when applied to
 expressions of class type\iref{class} or enumeration
@@ -41,7 +30,6 @@ operators\iref{over.oper}.
 \end{note}
 
 \rSec2[expr.cast]{Explicit type conversion (cast notation)}%
-\indextext{expression!cast|(}
 
 \pnum
 The result of the expression \tcode{(T)} \grammarterm{cast-expression} is
@@ -74,9 +62,6 @@ the user\iref{class.conv} is ill-formed.
 The conversions performed by
 
 \begin{itemize}
-\indextext{cast!const}%
-\indextext{cast!static}%
-\indextext{cast!reinterpret}%
 \item a \tcode{const_cast}\iref{expr.const.cast},
 \item a \tcode{static_cast}\iref{expr.static.cast},
 \item a \tcode{static_cast} followed by a \tcode{const_cast},
@@ -105,39 +90,9 @@ be explicitly converted to a pointer, a reference, or a pointer to
 member of a derived class type, respectively.
 \end{itemize}
 
-If a conversion can be interpreted in more than one of the ways listed
-above, the interpretation that appears first in the list is used, even
-if a cast resulting from that interpretation is ill-formed. If a
-conversion can be interpreted in more than one way as a
-\tcode{static_cast} followed by a \tcode{const_cast}, the conversion is
-ill-formed.
-\begin{example}
 
-\begin{codeblock}
-struct A { };
-struct I1 : A { };
-struct I2 : A { };
-struct D : I1, I2 { };
-A* foo( D* p ) {
-  return (A*)( p );             // ill-formed \tcode{static_cast} interpretation
-}
-\end{codeblock}
-\end{example}
+\rSec2[atomicc.bitsize]{__bitsize}
+New builtin function to return size in bits of a type or variable.
 
-\pnum
-\indextext{class!cast to incomplete}%
-The operand of a cast using the cast notation can be a prvalue of type
-``pointer to incomplete class type''. The destination type of a cast
-using the cast notation can be ``pointer to incomplete class type''. If
-both the operand and destination types are class types and one or both
-are incomplete, it is unspecified whether the \tcode{static_cast} or the
-\tcode{reinterpret_cast} interpretation is used, even if there is an
-inheritance relationship between the two classes.
-\begin{note}
-For example, if the classes were defined later in the translation unit,
-a multi-pass compiler would be permitted to interpret a cast between
-pointers to the classes as if the class types were complete at the point
-of the cast.
-\end{note}%
-\indextext{expression!cast|)}
-
+\rSec2[atomicc.cast]{__bit_cast}
+This can now be used to cast any datatype to/from __int(A), allowing operations to be performed on a bit level.

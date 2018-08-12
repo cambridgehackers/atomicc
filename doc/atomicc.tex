@@ -1,266 +1,5 @@
 %!TEX root = std.tex
-\rSec0[basic]{Basics}
-
-\gramSec[gram.basic]{Basics}
-
-\pnum
-\begin{note} This Clause presents the basic concepts of the \Cpp{} language.
-It explains the difference between an object and a
-name and how they relate to the value categories for expressions.
-It introduces the concepts of a
-declaration and a definition and presents \Cpp{}'s
-notion of type, scope, linkage, and
-storage duration. The mechanisms for starting and
-terminating a program are discussed. Finally, this Clause presents the
-fundamental types of the language and lists the ways of constructing
-compound types from these.\end{note}
-
-\pnum
-\begin{note} This Clause does not cover concepts that affect only a single
-part of the language. Such concepts are discussed in the relevant
-Clauses. \end{note}
-
-\pnum
-\indextext{type}%
-\indextext{object}%
-\indextext{storage class}%
-\indextext{scope}%
-\indextext{linkage}%
-\indextext{region!declarative}%
-An \defn{entity} is a value, object, reference,
-structured binding,
-function, enumerator, type,
-class member, bit-field, template, template specialization, namespace, or
-pack.
-
-\pnum
-A \defn{name} is a use of an \grammarterm{identifier}\iref{lex.name},
-\grammarterm{operator-function-id}\iref{over.oper},
-\grammarterm{literal-operator-id}\iref{over.literal},
-\grammarterm{conversion-function-id}\iref{class.conv.fct}, or
-\grammarterm{template-id}\iref{temp.names} that denotes an entity or
-label~(\ref{stmt.goto}, \ref{stmt.label}).
-
-\pnum
-Every name that denotes an entity is introduced by a
-\defn{declaration}. Every name that denotes a label is introduced
-either by a \tcode{goto} statement\iref{stmt.goto} or a
-\grammarterm{labeled-statement}\iref{stmt.label}.
-
-\pnum
-A \defn{variable} is introduced by the
-declaration of
-a reference other than a non-static data member or of
-an object. The variable's name, if any, denotes the reference or object.
-
-\pnum
-A \defn{local entity} is a variable with
-automatic storage duration\iref{basic.stc.auto},
-a structured binding\iref{dcl.struct.bind}
-whose corresponding variable is such an entity,
-or the \tcode{*this} object\iref{expr.prim.this}.
-
-\pnum
-Some names denote types or templates. In general,
-whenever a name is encountered it is necessary to determine whether that name denotes
-one of these entities before continuing to parse the program that contains it. The
-process that determines this is called
-\defnx{name lookup}{lookup!name}\iref{basic.lookup}.
-
-\pnum
-Two names are \defnx{the same}{name!same} if
-\begin{itemize}
-\item they are \grammarterm{identifier}{s} composed of the same character sequence, or
-\item they are \grammarterm{operator-function-id}{s} formed with
-the same operator, or
-\item they are \grammarterm{conversion-function-id}{s} formed
-with the same type, or
-\item they are \grammarterm{template-id}{s} that refer to the same class,
-function, or variable\iref{temp.type}, or
-\item they are the names of literal operators\iref{over.literal} formed with
-the same literal suffix identifier.
-\end{itemize}
-
-\pnum
-\indextext{translation unit!name and}%
-\indextext{linkage}%
-A name used in more than one translation unit can potentially
-refer to the same entity in these translation units depending on the
-linkage\iref{basic.link} of the name specified in each
-translation unit.
-
-\rSec1[basic.def]{Declarations and definitions}
-
-\pnum
-\indextext{declaration!definition versus}%
-\indextext{declaration}%
-\indextext{declaration!name}%
-A declaration\iref{dcl.dcl} may introduce
-one or more names into a translation
-unit or redeclare names introduced by previous declarations.
-If so, the
-declaration specifies the interpretation and attributes of these names.
-A declaration may also have effects including:
-\begin{itemize}
-\item a static assertion\iref{dcl.dcl},
-\item controlling template instantiation\iref{temp.explicit},
-\item guiding template argument deduction for constructors\iref{temp.deduct.guide},
-\item use of attributes\iref{dcl.dcl}, and
-\item nothing (in the case of an \grammarterm{empty-declaration}).
-\end{itemize}
-
-\pnum
-\indextext{declaration!function}%
-\indextext{definition}%
-Each entity declared by a \grammarterm{declaration} is
-also \defnx{defined}{define} by that declaration unless:
-\begin{itemize}
-\item
-it declares a function
-without specifying the function's body\iref{dcl.fct.def},
-\item
-it contains
-the
-\indextext{declaration!\idxcode{extern}}%
-\tcode{extern} specifier\iref{dcl.stc} or a
-\grammarterm{linkage-specification}\footnote{Appearing inside the brace-enclosed
-\grammarterm{declaration-seq} in a \grammarterm{linkage-specification} does
-not affect whether a declaration is a definition.}\iref{dcl.link}
-and neither an \grammarterm{initializer} nor a
-\grammarterm{function-body},
-\item
-\indextext{declaration!static member@\tcode{static} member}%
-it declares a non-inline static data member in a class
-definition~(\ref{class.mem}, \ref{class.static}),
-\item
-it declares a static data member outside a class definition
-and the variable was defined within the class with the \tcode{constexpr}
-specifier (this usage is deprecated; see \ref{depr.static_constexpr}),
-\item
-\indextext{declaration!class name}%
-it is introduced by an \grammarterm{elaborated-type-specifier}\iref{class.name},
-\item
-it is an
-\indextext{declaration!opaque enum}%
-\grammarterm{opaque-enum-declaration}\iref{dcl.enum},
-\item
-it is a
-\indextext{parameter!template}\indextext{template parameter}%
-\grammarterm{template-parameter}\iref{temp.param},
-\item
-it is a
-\indextext{declaration!parameter}\indextext{parameter declaration}%
-\grammarterm{parameter-declaration}\iref{dcl.fct} in a function
-\indextext{declarator}%
-declarator that is not the \grammarterm{declarator} of a
-\grammarterm{function-definition},
-\item
-it is a
-\indextext{declaration!\idxcode{typedef}}%
-\tcode{typedef} declaration\iref{dcl.typedef},
-\item it is
-an \grammarterm{alias-declaration}\iref{dcl.typedef},
-\item it is
-a
-\grammarterm{using-declaration}\iref{namespace.udecl},
-\item it is
-a \grammarterm{deduction-guide}\iref{temp.deduct.guide},
-\item it is
-a \grammarterm{static_assert-declaration}\iref{dcl.dcl},
-\item
-it is an
-\grammarterm{attribute-declaration}\iref{dcl.dcl},
-\item
-it is an
-\grammarterm{empty-declaration}\iref{dcl.dcl},
-\item it is
-a \grammarterm{using-directive}\iref{namespace.udir},
-\item it is
-an explicit instantiation declaration\iref{temp.explicit}, or
-\item it is
-an explicit specialization\iref{temp.expl.spec} whose
-\grammarterm{declaration} is not a definition.
-\end{itemize}
-A declaration is said to be a \defn{definition} of each entity that it defines.
-\begin{example} All but one of the following are definitions:
-\begin{codeblock}
-int a;                          // defines \tcode{a}
-extern const int c = 1;         // defines \tcode{c}
-int f(int x) { return x+a; }    // defines \tcode{f} and defines \tcode{x}
-struct S { int a; int b; };     // defines \tcode{S}, \tcode{S::a}, and \tcode{S::b}
-struct X {                      // defines \tcode{X}
-  int x;                        // defines non-static data member \tcode{x}
-  static int y;                 // declares static data member \tcode{y}
-  X(): x(0) { }                 // defines a constructor of \tcode{X}
-};
-int X::y = 1;                   // defines \tcode{X::y}
-enum { up, down };              // defines \tcode{up} and \tcode{down}
-namespace N { int d; }          // defines \tcode{N} and \tcode{N::d}
-namespace N1 = N;               // defines \tcode{N1}
-X anX;                          // defines \tcode{anX}
-
-\end{codeblock}
-whereas these are just declarations:
-\begin{codeblock}
-extern int a;                   // declares \tcode{a}
-extern const int c;             // declares \tcode{c}
-int f(int);                     // declares \tcode{f}
-struct S;                       // declares \tcode{S}
-typedef int Int;                // declares \tcode{Int}
-extern X anotherX;              // declares \tcode{anotherX}
-using N::d;                     // declares \tcode{d}
-\end{codeblock}
-\end{example}
-
-\pnum
-\begin{note}
-\indextext{implementation-generated}%
-In some circumstances, \Cpp{} implementations implicitly define the
-default constructor\iref{class.ctor},
-copy constructor, move constructor\iref{class.copy.ctor},
-copy assignment operator, move assignment operator\iref{class.copy.assign},
-or destructor\iref{class.dtor} member functions.
-\end{note}
-\begin{example} Given
-\begin{codeblock}
-#include <string>
-
-struct C {
-  std::string s;                // \tcode{std::string} is the standard library class\iref{strings}
-};
-
-int main() {
-  C a;
-  C b = a;
-  b = a;
-}
-\end{codeblock}
-the implementation will implicitly define functions to make the
-definition of \tcode{C} equivalent to
-\begin{codeblock}
-struct C {
-  std::string s;
-  C() : s() { }
-  C(const C& x): s(x.s) { }
-  C(C&& x): s(static_cast<std::string&&>(x.s)) { }
-      @\rlap{\normalfont\itshape //}@    : s(std::move(x.s)) { }
-  C& operator=(const C& x) { s = x.s; return *this; }
-  C& operator=(C&& x) { s = static_cast<std::string&&>(x.s); return *this; }
-      @\rlap{\normalfont\itshape //}@                { s = std::move(x.s); return *this; }
-  ~C() { }
-};
-\end{codeblock}
-\end{example}
-
-\pnum
-\begin{note}
-A class name can also be implicitly declared by an
-\grammarterm{elaborated-type-specifier}\iref{dcl.type.elab}.
-\end{note}
-
-
-
-\rSec1[atomicc.intro]{Introduction}
+\rSec0[atomicc.intro]{Introduction}
 
 AtomicC is a structural hardware description language that extends C++
 with Bluespec-style modules, rules, interfaces, and methods.
@@ -306,151 +45,6 @@ within a cycle.
 
 AtomicC incorporates several concepts from BSV: interfaces, modules, guards on methods, and rules.
 
-\rSec2[atomicc.interface]{__interface}
-
-An AtomicC interface is essentially an abstract class similar to a
-Java interface. All the methods are virtual and no default
-implementations are provided. AtomicC style uses composition of
-interfaces rather than inheritance.
-
-The __interface keyword defines a list of methods that are exposed from an object.
-Instead of using object inheritance to define reusable interfaces,
-they are defined/exported explicitly by objects, allowing fine-grained
-specification of interface method visibility.
-
-Methods of a module are translated to value ports for passing the
-method arguments and a pair of handshaking ports used for scheduling
-method invocations.
-
-References to an object can only be done through interface methods.  State element
-declarations inside an object (member variables) are private.
-
-Example:
-\begin{codeblock}
->        __interface EchoRequest {
->            void say(__int(32) v);
->            void say2(__int(16) a, __int(16) b);
->        };
-\end{codeblock}
-
-\rSec2[atomicc.module]{__module, __emodule}
-
-A module is defined using the keyword "__module", resulting in generation of verilog.
-It includes local state elements, interfaces exported, interfaces imported
-and rules for clustering operations into atomic units.
-
-Example:
-\begin{codeblock}
->        __module Echo {
->            EchoRequest      request;               // exported interface
->            EchoIndication   *indication;           // imported interface
->            bool busy;
->            __int(32) itemSay;
->            ...
->            // implementation of method request.say(). Note the guard "if (!busy)".
->            void request.say(__int(32) v) if(!busy) {
->                itemSay = v;
->                ...
->            }
->            void request.saw(__int(16) a, __int(16) b) if(!busy) {
->                ...
->            }
->        };
-\end{codeblock}
-
-To reference a separately compiled module, use "__emodule".  These external
-module definitions only need to include the exported/imported interfaces.
-
-Example:
-\begin{codeblock}
->        __module EchoResponder {
->            EchoIndication   indication;           // exported interface
->        };
-\end{codeblock}
-
-\rSec2[atomicc.guard]{guard clauses on methods}
-
-Rules are only ready to fire if the rule's guard is true and all the
-guards on methods invoked within the rule are also true.
-
-\begin{codeblock}
->            void request.say(__int(32) v) if(!busy) {
->                itemSay = v;
->                ...
->            }
-\end{codeblock}
-
-\rSec2[atomicc.connect]{__connect}
-The __connect statement allows exported interface declarations to be connected
-with imported interface references between objects within a module declaration.
-
-Example:
-\begin{codeblock}
->        __interface ExampleRequest {
->            void say(__int(32) v);
->        };
->
->        __module A {
->             ExampleRequest callIn;
->        };
->
->        __module B {
->            ExampleRequest *callOut;
->        };
->
->        __module C {
->            A consumer;
->            B producer;
->            __connect producer.callOut = consumer.callIn;
->        };
-\end{codeblock}
-
-* Comparision with BSV
-    The declaration for 'A' is just like BSV.
-    In BSV, the declaration for B requires the interface be passed in as
-    an interface parameter (forcing a textual ordering to the source code
-    declaration sequence).
-    <br>
-    In AtomicC, the interfaces are stitched together outside in any
-    convenient sequence in a location where both the concrete instances
-    for A and B are visible.
-
-\rSec2[atomicc.export]{To export interfaces from contained objects}
-
-Example:
-\begin{codeblock}
->        __module CWrapper {
->            A consumer;
->            ExampleRequest request = A.callIn;
->         };
-\end{codeblock}
-
-CWrapper just forwards the interface 'request' down into the instance 'consumer'.
-
-\rSec2[atomicc.rule]{__rule}
-
-Rules specify the behavior with a design. A rule operates
-transactionally: when a rule's guard and the guards of all of its
-method invocations are satisfied, then it is ready to fire. It will be
-fire on a clock cycle when it does not conflict with any higher
-priority rule. A rule executes atomically.
-
-\begin{codeblock}
->        // default guard is true
->        __rule respond_rule {
->            fifo->out.deq();
->            ind->heard(fifo->out.first());
->        }
-\end{codeblock}
-
-\rSec2[atomicc.bitdecl]{integer bit width: __int(A)}
-
-
-\rSec2[atomicc.bitsize]{__bitsize}
-New builtin function to return size in bits of a type or variable.
-
-\rSec2[atomicc.cast]{__bit_cast}
-This can now be used to cast any datatype to/from __int(A), allowing operations to be performed on a bit level.
 
 
 \rSec1[atomicc.execution]{Execution Semantics}
@@ -504,15 +98,15 @@ To reference a module in verilog, fields can be declared in __interface items.
 For example:
 
 \begin{codeblock}
->        __interface CNCONNECTNET2 {
->            __input  __int(1)         IN1;
->            __input  __int(1)         IN2;
->            __output __int(1)         OUT1;
->            __output __int(1)         OUT2;
->        };
->        __emodule CONNECTNET2 {
->            CNCONNECTNET2 _;
->        };
+     __interface CNCONNECTNET2 {
+         __input  __int(1)         IN1;
+         __input  __int(1)         IN2;
+         __output __int(1)         OUT1;
+         __output __int(1)         OUT2;
+     };
+     __emodule CONNECTNET2 {
+         CNCONNECTNET2 _;
+     };
 \end{codeblock}
 
 This will allow references/instantiation of an externally defined verilog module CONNECTNET2
@@ -524,40 +118,40 @@ Verilog modules that have module instantiation parameters can also be declared/r
 For example:
 
 \begin{codeblock}
->        __interface Mmcme2MMCME2_ADV {
->            __parameter const char *  BANDWIDTH;
->            __parameter float         CLKFBOUT_MULT_F;
->            __input  __uint(1)        CLKFBIN;
->            __output __uint(1)        CLKFBOUT;
->            __output __uint(1)        CLKFBOUTB;
->        };
->        __emodule MMCME2_ADV {
->            Mmcme2MMCME2_ADV _;
->        };
+     __interface Mmcme2MMCME2_ADV {
+         __parameter const char *  BANDWIDTH;
+         __parameter float         CLKFBOUT_MULT_F;
+         __input  __uint(1)        CLKFBIN;
+         __output __uint(1)        CLKFBOUT;
+         __output __uint(1)        CLKFBOUTB;
+     };
+     __emodule MMCME2_ADV {
+         Mmcme2MMCME2_ADV _;
+     };
 \end{codeblock}
 
 This example can be instantiated as:
 
 \begin{codeblock}
->        __module Test {
->            ...
->            MMCME2_ADV#(BANDWIDTH="WIDE",CLKFBOUT_MULT_F=1.0) mmcm;
->            ...
->            Test() {
->               __rule initRule {
->                   mmcm._.CLKFBIN = mmcm._.CLKFBOUT;
->               }
->            }
->        }
+     __module Test {
+         ...
+         MMCME2_ADV#(BANDWIDTH="WIDE",CLKFBOUT_MULT_F=1.0) mmcm;
+         ...
+         Test() {
+            __rule initRule {
+                mmcm._.CLKFBIN = mmcm._.CLKFBOUT;
+            }
+         }
+     }
 \end{codeblock}
 
 \rSec2[atomicc.refsyntax]{Reference syntax}
 
 For declaring ports in an interface:
 \begin{codeblock}
->        __interface <interfaceName> {
->             __input/__output/__inout/__parameter <elementType> <elementName>;
->        }
+     __interface <interfaceName> {
+          __input/__output/__inout/__parameter <elementType> <elementName>;
+     }
 \end{codeblock}
 For '__parameter' items, supported datatypes include: "const char *", "float", "int".
 
@@ -577,8 +171,8 @@ default clock/reset signals for a module will always have these names)
 There is a tool to automate the creation of AtomicC header files from verilog source files.
 For example:
 \begin{codeblock}
->        atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 zynq.lib
->        atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
+     atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 zynq.lib
+     atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
 \end{codeblock}
 
 Command line switches...

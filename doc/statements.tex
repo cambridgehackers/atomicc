@@ -1,19 +1,32 @@
 %!TEX root = std.tex
 \rSec0[stmt.stmt]{Statements}%
-\indextext{statement|(}
 
 \gramSec[gram.stmt]{Statements}
-
-\indextext{block statement|see{statement, compound}}
 
 \pnum
 Except as indicated, statements are executed in sequence.
 
+\rSec2[atomicc.rule]{__rule}
+
+Rules specify the behavior with a design. A rule operates
+transactionally: when a rule's guard and the guards of all of its
+method invocations are satisfied, then it is ready to fire. It will be
+fire on a clock cycle when it does not conflict with any higher
+priority rule. A rule executes atomically.
+
+\begin{codeblock}
+     // default guard is true
+     __rule respond_rule {
+         fifo->out.deq();
+         ind->heard(fifo->out.first());
+     }
+\end{codeblock}
+
 \begin{bnf}
 \nontermdef{rule-statement}\br
-    \terminal{__rule} identifier \opt{if-guard} compound-statement \atomicc\br
+    \terminal{__rule} identifier \opt{if-guard} compound-statement\br
 
-\nontermdef{if-guard} \atomicc\br
-    \terminal{if (} condition \terminal{)} \atomicc
+\nontermdef{if-guard}\br
+    \terminal{if (} condition \terminal{)}
 
 \end{bnf}

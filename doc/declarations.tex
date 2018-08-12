@@ -1,43 +1,39 @@
 %!TEX root = std.tex
 \rSec0[dcl.dcl]{Declarations}%
-\indextext{declaration|(}
 
 \gramSec[gram.dcl]{Declarations}
-
-\indextext{linkage specification|see{specification, linkage}}
 
 \pnum
 Declarations generally specify how names are to be interpreted. Declarations have
 the form
 
+\rSec2[atomicc.bitdecl]{integer bit width: __int(A)}
+
 \begin{bnf}
 \nontermdef{bit-type-specifier}\br
-    \terminal{__uint} \terminal{(} constant-expression \terminal{)} \atomicc \br
-    \terminal{__int} \terminal{(} constant-expression \terminal{)} \atomicc
+    \terminal{__uint} \terminal{(} constant-expression \terminal{)} \br
+    \terminal{__int} \terminal{(} constant-expression \terminal{)}
 \end{bnf}
 
 \pnum
-\indextext{body!function}%
 Function definitions have the form
 
-\indextext{\idxgram{function-definition}}%
-%
 \begin{bnf}
 \nontermdef{atomicc-method-definition}\br
-    \opt{decl-specifier-seq} interface-qualifier-seq identifier parameters-and-qualifiers function-body \atomicc
+    \opt{decl-specifier-seq} interface-qualifier-seq identifier parameters-and-qualifiers function-body
 \end{bnf}
 
 \begin{bnf}
-\nontermdef{interface-qualifier} \atomicc\br
-    identifier \terminal{.} \atomicc
+\nontermdef{interface-qualifier}\br
+    identifier \terminal{.}
 
-\nontermdef{interface-qualifier-seq} \atomicc\br
-    interface-qualifier \atomicc\br
-    interface-qualifier-seq interface-qualifier \atomicc
+\nontermdef{interface-qualifier-seq} \br
+    interface-qualifier \br
+    interface-qualifier-seq interface-qualifier
 \end{bnf}
 
 \begin{bnf}
 \nontermdef{atomicc-function-body}\br
-    \opt{ctor-initializer} \opt{if-guard} compound-statement \atomicc\br
+    \opt{ctor-initializer} \opt{if-guard} compound-statement
 \end{bnf}
 
