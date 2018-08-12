@@ -1,0 +1,260 @@
+%!TEX root = std.tex
+\rSec0[basic]{Basics}
+
+\gramSec[gram.basic]{Basics}
+
+\pnum
+\begin{note} This Clause presents the basic concepts of the \Cpp{} language.
+It explains the difference between an object and a
+name and how they relate to the value categories for expressions.
+It introduces the concepts of a
+declaration and a definition and presents \Cpp{}'s
+notion of type, scope, linkage, and
+storage duration. The mechanisms for starting and
+terminating a program are discussed. Finally, this Clause presents the
+fundamental types of the language and lists the ways of constructing
+compound types from these.\end{note}
+
+\pnum
+\begin{note} This Clause does not cover concepts that affect only a single
+part of the language. Such concepts are discussed in the relevant
+Clauses. \end{note}
+
+\pnum
+\indextext{type}%
+\indextext{object}%
+\indextext{storage class}%
+\indextext{scope}%
+\indextext{linkage}%
+\indextext{region!declarative}%
+An \defn{entity} is a value, object, reference,
+structured binding,
+function, enumerator, type,
+class member, bit-field, template, template specialization, namespace, or
+pack.
+
+\pnum
+A \defn{name} is a use of an \grammarterm{identifier}\iref{lex.name},
+\grammarterm{operator-function-id}\iref{over.oper},
+\grammarterm{literal-operator-id}\iref{over.literal},
+\grammarterm{conversion-function-id}\iref{class.conv.fct}, or
+\grammarterm{template-id}\iref{temp.names} that denotes an entity or
+label~(\ref{stmt.goto}, \ref{stmt.label}).
+
+\pnum
+Every name that denotes an entity is introduced by a
+\defn{declaration}. Every name that denotes a label is introduced
+either by a \tcode{goto} statement\iref{stmt.goto} or a
+\grammarterm{labeled-statement}\iref{stmt.label}.
+
+\pnum
+A \defn{variable} is introduced by the
+declaration of
+a reference other than a non-static data member or of
+an object. The variable's name, if any, denotes the reference or object.
+
+\pnum
+A \defn{local entity} is a variable with
+automatic storage duration\iref{basic.stc.auto},
+a structured binding\iref{dcl.struct.bind}
+whose corresponding variable is such an entity,
+or the \tcode{*this} object\iref{expr.prim.this}.
+
+\pnum
+Some names denote types or templates. In general,
+whenever a name is encountered it is necessary to determine whether that name denotes
+one of these entities before continuing to parse the program that contains it. The
+process that determines this is called
+\defnx{name lookup}{lookup!name}\iref{basic.lookup}.
+
+\pnum
+Two names are \defnx{the same}{name!same} if
+\begin{itemize}
+\item they are \grammarterm{identifier}{s} composed of the same character sequence, or
+\item they are \grammarterm{operator-function-id}{s} formed with
+the same operator, or
+\item they are \grammarterm{conversion-function-id}{s} formed
+with the same type, or
+\item they are \grammarterm{template-id}{s} that refer to the same class,
+function, or variable\iref{temp.type}, or
+\item they are the names of literal operators\iref{over.literal} formed with
+the same literal suffix identifier.
+\end{itemize}
+
+\pnum
+\indextext{translation unit!name and}%
+\indextext{linkage}%
+A name used in more than one translation unit can potentially
+refer to the same entity in these translation units depending on the
+linkage\iref{basic.link} of the name specified in each
+translation unit.
+
+\rSec1[basic.def]{Declarations and definitions}
+
+\pnum
+\indextext{declaration!definition versus}%
+\indextext{declaration}%
+\indextext{declaration!name}%
+A declaration\iref{dcl.dcl} may introduce
+one or more names into a translation
+unit or redeclare names introduced by previous declarations.
+If so, the
+declaration specifies the interpretation and attributes of these names.
+A declaration may also have effects including:
+\begin{itemize}
+\item a static assertion\iref{dcl.dcl},
+\item controlling template instantiation\iref{temp.explicit},
+\item guiding template argument deduction for constructors\iref{temp.deduct.guide},
+\item use of attributes\iref{dcl.dcl}, and
+\item nothing (in the case of an \grammarterm{empty-declaration}).
+\end{itemize}
+
+\pnum
+\indextext{declaration!function}%
+\indextext{definition}%
+Each entity declared by a \grammarterm{declaration} is
+also \defnx{defined}{define} by that declaration unless:
+\begin{itemize}
+\item
+it declares a function
+without specifying the function's body\iref{dcl.fct.def},
+\item
+it contains
+the
+\indextext{declaration!\idxcode{extern}}%
+\tcode{extern} specifier\iref{dcl.stc} or a
+\grammarterm{linkage-specification}\footnote{Appearing inside the brace-enclosed
+\grammarterm{declaration-seq} in a \grammarterm{linkage-specification} does
+not affect whether a declaration is a definition.}\iref{dcl.link}
+and neither an \grammarterm{initializer} nor a
+\grammarterm{function-body},
+\item
+\indextext{declaration!static member@\tcode{static} member}%
+it declares a non-inline static data member in a class
+definition~(\ref{class.mem}, \ref{class.static}),
+\item
+it declares a static data member outside a class definition
+and the variable was defined within the class with the \tcode{constexpr}
+specifier (this usage is deprecated; see \ref{depr.static_constexpr}),
+\item
+\indextext{declaration!class name}%
+it is introduced by an \grammarterm{elaborated-type-specifier}\iref{class.name},
+\item
+it is an
+\indextext{declaration!opaque enum}%
+\grammarterm{opaque-enum-declaration}\iref{dcl.enum},
+\item
+it is a
+\indextext{parameter!template}\indextext{template parameter}%
+\grammarterm{template-parameter}\iref{temp.param},
+\item
+it is a
+\indextext{declaration!parameter}\indextext{parameter declaration}%
+\grammarterm{parameter-declaration}\iref{dcl.fct} in a function
+\indextext{declarator}%
+declarator that is not the \grammarterm{declarator} of a
+\grammarterm{function-definition},
+\item
+it is a
+\indextext{declaration!\idxcode{typedef}}%
+\tcode{typedef} declaration\iref{dcl.typedef},
+\item it is
+an \grammarterm{alias-declaration}\iref{dcl.typedef},
+\item it is
+a
+\grammarterm{using-declaration}\iref{namespace.udecl},
+\item it is
+a \grammarterm{deduction-guide}\iref{temp.deduct.guide},
+\item it is
+a \grammarterm{static_assert-declaration}\iref{dcl.dcl},
+\item
+it is an
+\grammarterm{attribute-declaration}\iref{dcl.dcl},
+\item
+it is an
+\grammarterm{empty-declaration}\iref{dcl.dcl},
+\item it is
+a \grammarterm{using-directive}\iref{namespace.udir},
+\item it is
+an explicit instantiation declaration\iref{temp.explicit}, or
+\item it is
+an explicit specialization\iref{temp.expl.spec} whose
+\grammarterm{declaration} is not a definition.
+\end{itemize}
+A declaration is said to be a \defn{definition} of each entity that it defines.
+\begin{example} All but one of the following are definitions:
+\begin{codeblock}
+int a;                          // defines \tcode{a}
+extern const int c = 1;         // defines \tcode{c}
+int f(int x) { return x+a; }    // defines \tcode{f} and defines \tcode{x}
+struct S { int a; int b; };     // defines \tcode{S}, \tcode{S::a}, and \tcode{S::b}
+struct X {                      // defines \tcode{X}
+  int x;                        // defines non-static data member \tcode{x}
+  static int y;                 // declares static data member \tcode{y}
+  X(): x(0) { }                 // defines a constructor of \tcode{X}
+};
+int X::y = 1;                   // defines \tcode{X::y}
+enum { up, down };              // defines \tcode{up} and \tcode{down}
+namespace N { int d; }          // defines \tcode{N} and \tcode{N::d}
+namespace N1 = N;               // defines \tcode{N1}
+X anX;                          // defines \tcode{anX}
+
+\end{codeblock}
+whereas these are just declarations:
+\begin{codeblock}
+extern int a;                   // declares \tcode{a}
+extern const int c;             // declares \tcode{c}
+int f(int);                     // declares \tcode{f}
+struct S;                       // declares \tcode{S}
+typedef int Int;                // declares \tcode{Int}
+extern X anotherX;              // declares \tcode{anotherX}
+using N::d;                     // declares \tcode{d}
+\end{codeblock}
+\end{example}
+
+\pnum
+\begin{note}
+\indextext{implementation-generated}%
+In some circumstances, \Cpp{} implementations implicitly define the
+default constructor\iref{class.ctor},
+copy constructor, move constructor\iref{class.copy.ctor},
+copy assignment operator, move assignment operator\iref{class.copy.assign},
+or destructor\iref{class.dtor} member functions.
+\end{note}
+\begin{example} Given
+\begin{codeblock}
+#include <string>
+
+struct C {
+  std::string s;                // \tcode{std::string} is the standard library class\iref{strings}
+};
+
+int main() {
+  C a;
+  C b = a;
+  b = a;
+}
+\end{codeblock}
+the implementation will implicitly define functions to make the
+definition of \tcode{C} equivalent to
+\begin{codeblock}
+struct C {
+  std::string s;
+  C() : s() { }
+  C(const C& x): s(x.s) { }
+  C(C&& x): s(static_cast<std::string&&>(x.s)) { }
+      @\rlap{\normalfont\itshape //}@    : s(std::move(x.s)) { }
+  C& operator=(const C& x) { s = x.s; return *this; }
+  C& operator=(C&& x) { s = static_cast<std::string&&>(x.s); return *this; }
+      @\rlap{\normalfont\itshape //}@                { s = std::move(x.s); return *this; }
+  ~C() { }
+};
+\end{codeblock}
+\end{example}
+
+\pnum
+\begin{note}
+A class name can also be implicitly declared by an
+\grammarterm{elaborated-type-specifier}\iref{dcl.type.elab}.
+\end{note}
+

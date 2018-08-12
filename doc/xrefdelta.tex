@@ -1,0 +1,162 @@
+%!TEX root = std.tex
+
+\newcommand{\secref}[1]{\hyperref[\indexescape{#1}]{\indexescape{#1}}}
+
+% Turn off page numbers for this glossary, they're not useful.
+\newcommand{\swallow}[1]{}
+\changeglossnumformat[xrefdelta]{|swallow}
+
+\newcommand{\oldxref}[2]{\glossary[xrefdelta]{\indexescape{#1}}{#2}}
+\newcommand{\removedxref}[1]{\oldxref{#1}{\textit{removed}}}
+\newcommand{\movedxrefs}[2]{\oldxref{#1}{\textit{see} #2}}
+\newcommand{\movedxref}[2]{\movedxrefs{#1}{\secref{#2}}}
+\newcommand{\movedxrefii}[3]{\movedxrefs{#1}{\secref{#2}, \secref{#3}}}
+\newcommand{\movedxrefiii}[4]{\movedxrefs{#1}{\secref{#2}, \secref{#3}, \secref{#4}}}
+\newcommand{\deprxref}[1]{\oldxref{#1}{\textit{see} \secref{depr.#1}}}
+
+% Removed features.
+%\removedxref{removed.label}
+\removedxref{variant.traits}
+
+% [facets.examples] was removed.
+\removedxref{facets.examples}
+
+% Renamed sections.
+%\movedxref{old.label}{new.label}
+%\movedxrefii{old.label}{new.label.1}{new.label.2}
+%\movedxrefiii{old.label}{new.label.1}{new.label.2}{new.label.3}
+%\movedxrefs{old.label}{new place (eg \tref{blah})}
+
+% P0588 replaced function prototype scope with function parameter scope.
+\movedxref{basic.scope.proto}{basic.scope.param}
+
+\movedxref{utility.from.chars}{charconv.from.chars}
+\movedxref{utility.to.chars}{charconv.to.chars}
+
+% [fs.definitions] and its contents were integrated into the main text.
+% Note that ISO C++17 does not contain the [fs.def.*] subclauses.
+\movedxrefs{fs.definitions}{%
+  \secref{fs.class.path},
+  \secref{fs.conform.os},
+  \secref{fs.general},
+  \secref{fs.path.fmt.cvt},
+  \secref{fs.path.generic},
+  \secref{fs.race.behavior}}
+
+% Single-item array subclauses were dissolved.
+\movedxref{array.size}{array.members}
+\movedxref{array.data}{array.members}
+\movedxref{array.fill}{array.members}
+\movedxref{array.swap}{array.members}
+
+% Contents of [util.smartptr] was integrated into the parent.
+\removedxref{util.smartptr}
+
+% Avoid duplication with synopsis.
+\movedxref{re.regex.const}{re.regex}
+
+% Single-item [insert.iterators] subclauses were dissolved.
+\movedxref{back.insert.iter.cons}{back.insert.iter.ops}
+\movedxref{back.insert.iter.op=}{back.insert.iter.ops}
+\movedxref{back.insert.iter.op*}{back.insert.iter.ops}
+\movedxref{back.insert.iter.op++}{back.insert.iter.ops}
+
+\movedxref{front.insert.iter.cons}{front.insert.iter.ops}
+\movedxref{front.insert.iter.op=}{front.insert.iter.ops}
+\movedxref{front.insert.iter.op*}{front.insert.iter.ops}
+\movedxref{front.insert.iter.op++}{front.insert.iter.ops}
+
+\movedxref{insert.iter.cons}{insert.iter.ops}
+\movedxref{insert.iter.op=}{insert.iter.ops}
+\movedxref{insert.iter.op*}{insert.iter.ops}
+\movedxref{insert.iter.op++}{insert.iter.ops}
+
+\movedxref{insert.iter.cons}{insert.iter.ops}
+\movedxref{insert.iter.op=}{insert.iter.ops}
+\movedxref{insert.iter.op*}{insert.iter.ops}
+\movedxref{insert.iter.op++}{insert.iter.ops}
+
+% Single-item [reverse.iterators] subclauses were dissolved.
+\movedxref{reverse.iter.op=}{reverse.iter.cons}
+
+\movedxref{reverse.iter.op==}{reverse.iter.cmp}
+\movedxref{reverse.iter.op<}{reverse.iter.cmp}
+\movedxref{reverse.iter.op!=}{reverse.iter.cmp}
+\movedxref{reverse.iter.op>}{reverse.iter.cmp}
+\movedxref{reverse.iter.op>=}{reverse.iter.cmp}
+\movedxref{reverse.iter.op<=}{reverse.iter.cmp}
+
+\movedxref{reverse.iter.op.star}{reverse.iter.elem}
+\movedxref{reverse.iter.opref}{reverse.iter.elem}
+\movedxref{reverse.iter.opindex}{reverse.iter.elem}
+
+\movedxref{reverse.iter.op+}{reverse.iter.nav}
+\movedxref{reverse.iter.op-}{reverse.iter.nav}
+\movedxref{reverse.iter.op++}{reverse.iter.nav}
+\movedxref{reverse.iter.op+=}{reverse.iter.nav}
+\movedxref{reverse.iter.op\dcr}{reverse.iter.nav}
+\movedxref{reverse.iter.op-=}{reverse.iter.nav}
+
+\movedxref{reverse.iter.opdiff}{reverse.iter.nonmember}
+\movedxref{reverse.iter.opsum}{reverse.iter.nonmember}
+\movedxref{reverse.iter.make}{reverse.iter.nonmember}
+
+\removedxref{reverse.iter.ops}
+
+% Single-item [move.iterators] subclauses were dissolved.
+\movedxref{move.iter.op=}{move.iter.cons}
+\movedxref{move.iter.op.const}{move.iter.cons}
+
+\movedxref{move.iter.op.star}{move.iter.elem}
+\movedxref{move.iter.op.ref}{move.iter.elem}
+\movedxref{move.iter.op.index}{move.iter.elem}
+
+\movedxref{move.iter.op.+}{move.iter.nav}
+\movedxref{move.iter.op.-}{move.iter.nav}
+\movedxref{move.iter.op.incr}{move.iter.nav}
+\movedxref{move.iter.op.+=}{move.iter.nav}
+\movedxref{move.iter.op.decr}{move.iter.nav}
+\movedxref{move.iter.op.-=}{move.iter.nav}
+
+\removedxref{move.iter.ops}
+
+% Individual swap sections were removed.
+\removedxref{deque.special}
+\removedxref{forwardlist.special}
+\removedxref{list.special}
+\removedxref{vector.special}
+\removedxref{map.special}
+\removedxref{multimap.special}
+\removedxref{set.special}
+\removedxref{multiset.special}
+\removedxref{unord.map.swap}
+\removedxref{unord.multimap.swap}
+\removedxref{unord.set.swap}
+\removedxref{unord.multiset.swap}
+
+% Deprecated features were removed.
+\removedxref{depr.except.spec}
+\removedxref{depr.cpp.headers}
+\removedxref{depr.uncaught}
+\removedxref{depr.func.adaptor.binding}
+\removedxref{depr.weak.result_type}
+\removedxref{depr.func.adaptor.typedefs}
+\removedxref{depr.negators}
+\removedxref{depr.default.allocator}
+\removedxref{depr.storage.iterator}
+\removedxref{depr.temporary.buffer}
+\removedxref{depr.util.smartptr.shared.obs}
+
+% Deprecated <cfoo> headers were removed for some <foo.h> headers
+\movedxref{depr.ccomplex.syn}{depr.complex.h.syn}
+\movedxref{depr.cstdalign.syn}{depr.stdalign.h.syn}
+\movedxref{depr.cstdbool.syn}{depr.stdbool.h.syn}
+\movedxref{depr.ctgmath.syn}{depr.tgmath.h.syn}
+
+\movedxref{class.copy}{class.mem}
+
+% Deprecated features.
+%\deprxref{old.label}  (if moved to depr.old.label, otherwise use \movedxref)
+
+% Deprecated free-function atomic access to shared pointers
+\deprxref{util.smartptr.shared.atomic}
