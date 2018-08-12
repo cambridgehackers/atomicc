@@ -14,8 +14,14 @@ software, using interfaces to specify hardware/software communication
 in a type safe way. The AtomicC compiler generates the code to pass
 arguments between hardware and software.
 
-AtomicC execution consists of 3 phases: netlist generation, netlist
-compilation or implementation, and runtime.  During netlist
+AtomicC execution consists of 3 phases:
+\begin{itemize}
+\item netlist generation, 
+\item netlist compilation or implementation
+\item and runtime.
+\end{itemize}
+
+During netlist
 generation, modules are instantiated by executing their
 constructors. During this phase, any C++ constructs may be used, but
 the resulting netlist may only contain synthesizeable components.
@@ -45,8 +51,6 @@ within a cycle.
 
 AtomicC incorporates several concepts from BSV: interfaces, modules, guards on methods, and rules.
 
-
-
 \rSec1[atomicc.execution]{Execution Semantics}
 
 \rSec2[atomicc.execution]{Execution control}
@@ -66,13 +70,17 @@ Each rule has a set of state elements that it reads and another set of element t
 Valid sequential orderings require that every state element must be logically read before it is logically
 written ("read before write").
 
-* Scheduling is done by building a graph:
-1. Nodes are rules/guards within a module.
-2. For all state elements, insert a directed links from each node that writes the state element to every node that reads it.
+Scheduling is done by building a graph:
+\begin{itemize}
+\item Nodes are rules/guards within a module.
+\item For all state elements, insert a directed links from each node that writes the state element to every node that reads it.
+\end{itemize}
 
-* Cycles can be broken in 2 ways:
-1. Rules default to have lower priority than methods within a module.  If the designer wants the rule to take precedence, a "priority" statement can be specified.
-2. "priority" statements in source text can be used to break cycles, if necessary.
+Cycles can be broken in 2 ways:
+\begin{itemize}
+\item Rules default to have lower priority than methods within a module.  If the designer wants the rule to take precedence, a "priority" statement can be specified.
+\item "priority" statements in source text can be used to break cycles, if necessary.
+\end{itemize}
 
 To permit rule scheduling to be dependent on the "enable" signals of methods and other rules, rules use "ready/valid" scheduling.
 
@@ -87,10 +95,11 @@ in generated/xxx.generated.printf along with a list of the bit lengths for each
 parameter to the printf.
 
 To use the NOC printf:
-   1) add the following line to the __module being tested:
-           __printf;
-   2) add a line similar to the following (with the 'xxx' replaced) to the test program:
+\begin{itemize}
+\item add the following line to the __module being tested: __printf;
+\item add a line similar to the following (with the 'xxx' replaced) to the test program:
            atomiccPrintfInit("generated/rulec.generated.printf");
+\end{itemize}
 
 \rSec1[atomicc.verilog]{Interfacing with verilog modules}
 
@@ -175,6 +184,5 @@ For example:
      atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
 \end{codeblock}
 
+\rSec1[atomicc.command]{Command line switches}
 Command line switches...
-
-That's it!
