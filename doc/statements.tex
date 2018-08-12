@@ -1,0 +1,27 @@
+%!TEX root = std.tex
+\rSec0[stmt.xxstmt]{xxStatements}%
+\indextext{statement|(}
+
+\gramSec[gram.xxstmt]{xxStatements}
+
+\indextext{block statement|see{statement, compound}}
+
+\pnum
+Except as indicated, statements are executed in sequence.
+
+\begin{bnf}
+\nontermdef{xxstatement}\br
+    labeled-statement\br
+    \opt{attribute-specifier-seq} expression-statement\br
+    \opt{attribute-specifier-seq} compound-statement\br
+    \opt{attribute-specifier-seq} selection-statement\br
+    \opt{attribute-specifier-seq} iteration-statement\br
+    \opt{attribute-specifier-seq} jump-statement\br
+    declaration-statement\br
+    \opt{attribute-specifier-seq} try-block\br
+    \terminal{__rule} identifier \opt{if-guard} compound-statement \atomicc\br
+
+\nontermdef{xxif-guard} \atomicc\br
+    \terminal{if (} condition \terminal{)} \atomicc
+
+\end{bnf}

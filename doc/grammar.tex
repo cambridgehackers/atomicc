@@ -58,7 +58,11 @@ Note that a
 naming a class is also a
 \grammarterm{class-name}\iref{class.name}.
 
-\makeatletter
-\newwrite\XTR@out
-\makeatother
 \FlushAndPrintGrammar
+%%%\makeatletter
+%%%\immediate\closeout\XTR@out
+%%%\immediate\openout\XTR@out=std-gram-dummy.tmp
+%%%\makeatother
+%%%\def\gramSec[#1]#2{\rSec1[#1]{#2}}
+%%%\input{std-gram.ext}
+%%%\input{std-grammar.tex}

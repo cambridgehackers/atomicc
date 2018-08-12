@@ -43,6 +43,7 @@
             plainpages=false
            ]{hyperref}
 \usepackage{memhfixc}     % fix interactions between hyperref and memoir
+\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnf,simplebnf}]{extract} % Grammar extraction
 \usepackage{amssymb}
 \newcommand{\atomicc}{\marginpar{\scriptsize \raggedright {\vspace{-1em} \textbf{ $\blacksquare \blacksquare$ }} } }
 
@@ -99,6 +100,10 @@
 \setglobalstyles
 
 \include{atomicc}
+%%%\include{expressions}
+\include{statements}
+\include{declarations}
+\include{classes}
 
 %%--------------------------------------------------
 %% appendices

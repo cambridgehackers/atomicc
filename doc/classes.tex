@@ -1,0 +1,51 @@
+%!TEX root = std.tex
+\rSec0[xxclass]{xxClasses}%
+\indextext{xxclass|(}
+
+\gramSec[gram.xxclass]{xxClasses}
+
+\indextext{class!member function|see{member function, class}}
+
+\pnum
+\indextext{\idxcode{\{\}}!class declaration}%
+\indextext{\idxcode{\{\}}!class definition}%
+\indextext{type!class and}%
+\indextext{object class|seealso{class object}}%
+A class is a type.
+\indextext{name class|see{class name}}%
+Its name becomes a \grammarterm{class-name}\iref{class.name} within its
+scope.
+
+\begin{bnf}
+\nontermdef{xxclass-key}\br
+    \terminal{class}\br
+    \terminal{struct}\br
+    \terminal{union}\br
+    \terminal{__interface} \atomicc\br
+    \terminal{__emodule} \atomicc\br
+    \terminal{__module} \atomicc
+\end{bnf}
+
+\begin{bnf}
+\nontermdef{xxmember-declaration}\br
+    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;} \atomicc\br
+    function-definition\br
+    using-declaration\br
+    static_assert-declaration\br
+    template-declaration\br
+    deduction-guide\br
+    alias-declaration\br
+    \terminal{__connect} identifier \terminal{=} identifier \terminal{;} \atomicc \br
+    \terminal{__forward} identifier \terminal{=} identifier \terminal{;} \atomicc \br
+    \terminal{__printf ;} \atomicc \br
+    empty-declaration
+\end{bnf}
+
+\begin{bnf}
+\nontermdef{xxpin-type} \atomicc\br
+    \terminal{__input} \atomicc\br
+    \terminal{__output} \atomicc\br
+    \terminal{__inout} \atomicc\br
+    \terminal{__parameter} \atomicc
+\end{bnf}
+
