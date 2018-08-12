@@ -840,10 +840,7 @@
     \opt{attribute-specifier-seq} jump-statement\br
     declaration-statement\br
     \opt{attribute-specifier-seq} try-block\br
-    \terminal{__rule} identifier \opt{if-guard} compound-statement \atomicc\br
-
-\nontermdef{if-guard} \atomicc\br
-    \terminal{if (} condition \terminal{)} \atomicc
+    rule-statement \atomicc\br
 
 \nontermdef{init-statement}\br
     expression-statement\br
@@ -1073,8 +1070,7 @@
     \terminal{void}\br
     \terminal{auto}\br
     decltype-specifier\br
-    \terminal{__uint} \terminal{(} constant-expression \terminal{)} \atomicc \br
-    \terminal{__int} \terminal{(} constant-expression \terminal{)} \atomicc
+    bit-type-specifier \atomicc
 \end{bnf}
 
 \begin{bnf}
@@ -1290,23 +1286,14 @@
 
 \begin{bnf}
 \nontermdef{function-definition}\br
-    \opt{decl-specifier-seq} interface-qualifier-seq identifier parameters-and-qualifiers function-body \atomicc\br
+    atomicc-method-definition \atomicc\br
     \opt{attribute-specifier-seq} \opt{decl-specifier-seq} declarator \opt{virt-specifier-seq} function-body\br
     \opt{attribute-specifier-seq} \opt{decl-specifier-seq} declarator requires-clause function-body
 \end{bnf}
 
 \begin{bnf}
-\nontermdef{interface-qualifier} \atomicc\br
-    identifier \terminal{.} \atomicc
-
-\nontermdef{interface-qualifier-seq} \atomicc\br
-    interface-qualifier \atomicc\br
-    interface-qualifier-seq interface-qualifier \atomicc
-\end{bnf}
-
-\begin{bnf}
 \nontermdef{function-body}\br
-    \opt{ctor-initializer} \opt{if-guard} compound-statement \atomicc\br
+    atomicc-function-body \atomicc\br
     function-try-block\br
     \terminal{= default ;}\br
     \terminal{= delete ;}
@@ -1572,9 +1559,7 @@
     \terminal{class}\br
     \terminal{struct}\br
     \terminal{union}\br
-    \terminal{__interface} \atomicc\br
-    \terminal{__emodule} \atomicc\br
-    \terminal{__module} \atomicc
+    atomicc-class-key \atomicc
 \end{bnf}
 
 \begin{bnf}
@@ -1585,25 +1570,18 @@
 
 \begin{bnf}
 \nontermdef{member-declaration}\br
-    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;} \atomicc\br
+    \opt{attribute-specifier-seq} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;}\br
+    atomicc-method-declaration \atomicc\br
     function-definition\br
     using-declaration\br
     static_assert-declaration\br
     template-declaration\br
     deduction-guide\br
     alias-declaration\br
-    \terminal{__connect} identifier \terminal{=} identifier \terminal{;} \atomicc \br
-    \terminal{__forward} identifier \terminal{=} identifier \terminal{;} \atomicc \br
-    \terminal{__printf ;} \atomicc \br
+    connect-declaration \atomicc \br
+    forward-declaration \atomicc \br
+    printf-declaration \atomicc \br
     empty-declaration
-\end{bnf}
-
-\begin{bnf}
-\nontermdef{pin-type} \atomicc\br
-    \terminal{__input} \atomicc\br
-    \terminal{__output} \atomicc\br
-    \terminal{__inout} \atomicc\br
-    \terminal{__parameter} \atomicc
 \end{bnf}
 
 \begin{bnf}

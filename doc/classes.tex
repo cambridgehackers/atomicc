@@ -17,28 +17,25 @@ Its name becomes a \grammarterm{class-name}\iref{class.name} within its
 scope.
 
 \begin{bnf}
-\nontermdef{class-key}\br
-    \terminal{class}\br
-    \terminal{struct}\br
-    \terminal{union}\br
+\nontermdef{atomicc-class-key}\br
     \terminal{__interface} \atomicc\br
     \terminal{__emodule} \atomicc\br
     \terminal{__module} \atomicc
 \end{bnf}
 
 \begin{bnf}
-\nontermdef{member-declaration}\br
-    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;} \atomicc\br
-    function-definition\br
-    using-declaration\br
-    static_assert-declaration\br
-    template-declaration\br
-    deduction-guide\br
-    alias-declaration\br
-    \terminal{__connect} identifier \terminal{=} identifier \terminal{;} \atomicc \br
-    \terminal{__forward} identifier \terminal{=} identifier \terminal{;} \atomicc \br
-    \terminal{__printf ;} \atomicc \br
-    empty-declaration
+\nontermdef{atomicc-method-declaration}\br
+    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;} \atomicc
+
+\nontermdef{connect-declaration}\br
+    \terminal{__connect} identifier \terminal{=} identifier \terminal{;} \atomicc
+
+\nontermdef{forward-declaration}\br
+    \terminal{__forward} identifier \terminal{=} identifier \terminal{;} \atomicc
+
+\nontermdef{printf-declaration}\br
+    \terminal{__printf ;} \atomicc
+
 \end{bnf}
 
 \begin{bnf}

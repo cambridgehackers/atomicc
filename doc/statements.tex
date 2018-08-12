@@ -10,15 +10,7 @@
 Except as indicated, statements are executed in sequence.
 
 \begin{bnf}
-\nontermdef{statement}\br
-    labeled-statement\br
-    \opt{attribute-specifier-seq} expression-statement\br
-    \opt{attribute-specifier-seq} compound-statement\br
-    \opt{attribute-specifier-seq} selection-statement\br
-    \opt{attribute-specifier-seq} iteration-statement\br
-    \opt{attribute-specifier-seq} jump-statement\br
-    declaration-statement\br
-    \opt{attribute-specifier-seq} try-block\br
+\nontermdef{rule-statement}\br
     \terminal{__rule} identifier \opt{if-guard} compound-statement \atomicc\br
 
 \nontermdef{if-guard} \atomicc\br

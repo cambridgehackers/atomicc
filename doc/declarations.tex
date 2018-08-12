@@ -11,25 +11,7 @@ Declarations generally specify how names are to be interpreted. Declarations hav
 the form
 
 \begin{bnf}
-\nontermdef{simple-type-specifier}\br
-    \opt{nested-name-specifier} type-name\br
-    nested-name-specifier \terminal{template} simple-template-id\br
-    \opt{nested-name-specifier} template-name\br
-    \terminal{char}\br
-    \terminal{char16_t}\br
-    \terminal{char32_t}\br
-    \terminal{wchar_t}\br
-    \terminal{bool}\br
-    \terminal{short}\br
-    \terminal{int}\br
-    \terminal{long}\br
-    \terminal{signed}\br
-    \terminal{unsigned}\br
-    \terminal{float}\br
-    \terminal{double}\br
-    \terminal{void}\br
-    \terminal{auto}\br
-    decltype-specifier\br
+\nontermdef{bit-type-specifier}\br
     \terminal{__uint} \terminal{(} constant-expression \terminal{)} \atomicc \br
     \terminal{__int} \terminal{(} constant-expression \terminal{)} \atomicc
 \end{bnf}
@@ -41,10 +23,8 @@ Function definitions have the form
 \indextext{\idxgram{function-definition}}%
 %
 \begin{bnf}
-\nontermdef{function-definition}\br
-    \opt{decl-specifier-seq} interface-qualifier-seq identifier parameters-and-qualifiers function-body \atomicc\br
-    \opt{attribute-specifier-seq} \opt{decl-specifier-seq} declarator \opt{virt-specifier-seq} function-body\br
-    \opt{attribute-specifier-seq} \opt{decl-specifier-seq} declarator requires-clause function-body
+\nontermdef{atomicc-method-definition}\br
+    \opt{decl-specifier-seq} interface-qualifier-seq identifier parameters-and-qualifiers function-body \atomicc
 \end{bnf}
 
 \begin{bnf}
@@ -57,10 +37,7 @@ Function definitions have the form
 \end{bnf}
 
 \begin{bnf}
-\nontermdef{function-body}\br
+\nontermdef{atomicc-function-body}\br
     \opt{ctor-initializer} \opt{if-guard} compound-statement \atomicc\br
-    function-try-block\br
-    \terminal{= default ;}\br
-    \terminal{= delete ;}
 \end{bnf}
 
