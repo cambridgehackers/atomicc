@@ -1,6 +1,7 @@
 %!TEX root = std.tex
-\rSec0[atomicc.intro]{Introduction}
+\rSec0[atomicc.basic]{Basic}
 
+\rSec1[atomicc.intro]{Introduction}
 AtomicC is a structural hardware description language that extends C++
 with Bluespec-style modules, rules, interfaces, and methods.
 
@@ -19,6 +20,8 @@ Like Connectal, AtomicC designs may include both hardware and
 software, using interfaces to specify hardware/software communication
 in a type safe way. The AtomicC compiler generates the code to pass
 arguments between hardware and software.
+
+\rSec1[atomicc.compilation]{Compilation}
 
 AtomicC execution consists of 3 phases:
 \begin{itemize}
@@ -40,18 +43,6 @@ Proof Assistant, etc.
 
 \rSec1[atomicc.execution]{Execution Semantics}
 
-\rSec2[atomicc.execution]{Execution control}
-
-\rSec3[atomicc.readyEnable]{Asymmetric (ready/enable signalling)}
-A method/rule is invoked by asserting the "enable" signal.  This signal can only be
-asserted if the "ready" signal was valid, allowing the called module to restrict
-permissible execution sequences.
-
-\rSec3[atomicc.readyValid]{Symmetric (ready/valid signalling)}
-Both caller/callee have "able to be executed" signals.  Execution is deemed to take
-place in each cycle where both "ready" (from the callee) and "valid" (from the caller)
-are asserted.
-
 \rSec2[atomicc.schedule]{Scheduling}
 Each rule has a set of state elements that it reads and another set of element that it writes.
 Valid sequential orderings require that every state element must be logically read before it is logically
@@ -70,23 +61,3 @@ Cycles can be broken in 2 ways:
 \end{itemize}
 
 To permit rule scheduling to be dependent on the "enable" signals of methods and other rules, rules use "ready/valid" scheduling.
-
-\rSec1[atomicc.printf]{debugging with printf}
-
-To aid debugging with a simulator, "printf" statements in __module declarations are
-translated to "\$display" statements in the generated verilog.
-For debugging with synthesized hardware, "printf" statements are translated into
-indication packets sent through the NOC back to the software side host program.
-The format strings for the printf statements are placed into a generated file
-in generated/xxx.generated.printf along with a list of the bit lengths for each
-parameter to the printf.
-
-To use the NOC printf:
-\begin{itemize}
-\item add the following line to the __module being tested: __printf;
-\item add a line similar to the following (with the 'xxx' replaced) to the test program:
-           atomiccPrintfInit("generated/rulec.generated.printf");
-\end{itemize}
-
-\rSec1[atomicc.command]{Command line switches}
-Command line switches...

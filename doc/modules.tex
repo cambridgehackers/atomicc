@@ -8,6 +8,29 @@ Each source language module compiles into a single verilog module.  Modules are 
 compiled, depending only on the interface definitions for referenced modules.
 Referencing modules do not depend on the internal implementation of referenced modules,
 even if they textually exist in the same compilation unit.
+Scheduling of rules in a module is performed "inside out", with the resulting schedule dependancies written to a metadata file during compilation.
+
+\rSec1[atomicc.execution]{Execution control}
+
+There are 2 common styles for communication of execution control information for a method:
+\begin{itemize}
+\item Asymmetric (ready/enable signalling)
+A method/rule is invoked by asserting the "enable" signal.  This signal can only be
+asserted if the "ready" signal was valid, allowing the called module to restrict
+permissible execution sequences.
+
+\item Symmetric (ready/valid signalling)
+Both caller/callee have "able to be executed" signals.  Execution is deemed to take
+place in each cycle where both "ready" (from the callee) and "valid" (from the caller)
+are asserted.
+\end{itemize}
+
+Bluespec uses the Asymmetric signalling style, collecting all scheduling control into a central location for analysis/generation.
+AtomicC uses the Symmetric signalling style, giving modules local control over their allowable execution patterns.  Conflicts between local schedules for modules when they are connected together are detected by the linker.
+
+\rSec1[atomicc.linker]{Linking of groups of modules}
+
+To verify that an instantiated group of modules has SC compliant execution characteristics, a linker is used to cross check information from the metadata files for each module.
 
 \rSec1[atomicc.verilog]{Interfacing with verilog modules}
 

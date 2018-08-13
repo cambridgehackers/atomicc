@@ -1,61 +1,6 @@
 \infannex{gram}{Grammar summary}
 
 \pnum
-Summary of grammar
-
-\FlushAndPrintGrammar
+Summary of grammar.
 
 \input{std-gram.ext}
-
-\infannex{gram}{Grammar integration with C++ summary}
-
-\pnum
-Summary of C++ grammar
-
-\rSec1[gram.key]{Keywords}
-
-\pnum
-\indextext{keyword}%
-New context-dependent keywords are introduced into a program by
-\tcode{typedef}\iref{dcl.typedef},
-\tcode{namespace}\iref{namespace.def},
-class\iref{class}, enumeration\iref{dcl.enum}, and
-\tcode{template}\iref{temp}
-declarations.
-
-\begin{ncbnf}
-typedef-name:\br
-	identifier
-\end{ncbnf}
-
-\begin{ncbnf}
-namespace-name:\br
-	identifier\br
-	namespace-alias
-
-namespace-alias:\br
-	identifier
-\end{ncbnf}
-
-\begin{ncbnf}
-class-name:\br
-	identifier\br
-	simple-template-id
-\end{ncbnf}
-
-\begin{ncbnf}
-enum-name:\br
-	identifier
-\end{ncbnf}
-
-\begin{ncbnf}
-template-name:\br
-	identifier
-\end{ncbnf}
-
-Note that a
-\grammarterm{typedef-name}
-naming a class is also a
-\grammarterm{class-name}\iref{class.name}.
-
-\input{std-gram-from-cpp.tex}
