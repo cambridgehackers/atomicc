@@ -3,16 +3,19 @@
 
 \gramSec[agram.stmt]{Statements}
 
-\pnum
-Except as indicated, statements are executed in sequence.
-
-\rSec2[atomicc.rule]{__rule}
+\rSec1[atomicc.rule]{__rule}
 
 Rules specify the behavior with a design. A rule operates
 transactionally: when a rule's guard and the guards of all of its
-method invocations are satisfied, then it is ready to fire. It will be
+method invocations are satisfied, then it is ready to fire. It will
 fire on a clock cycle when it does not conflict with any higher
 priority rule. A rule executes atomically.
+
+\begin{bnf}
+\nontermdef{rule-statement}\br
+    \terminal{__rule} identifier \opt{if-guard} compound-statement\br
+
+\end{bnf}
 
 \begin{example}
 \begin{codeblock}
@@ -23,9 +26,3 @@ priority rule. A rule executes atomically.
      }
 \end{codeblock}
 \end{example}
-
-\begin{bnf}
-\nontermdef{rule-statement}\br
-    \terminal{__rule} identifier \opt{if-guard} compound-statement\br
-
-\end{bnf}

@@ -92,6 +92,11 @@ This example can be instantiated as:
 \rSec2[atomicc.refsyntax]{Reference syntax}
 
 \begin{bnf}
+\nontermdef{atomicc-method-declaration}\br
+    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;}
+\end{bnf}
+
+\begin{bnf}
 \nontermdef{pin-type} \br
     \terminal{__input} \br
     \terminal{__output} \br
@@ -99,17 +104,19 @@ This example can be instantiated as:
     \terminal{__parameter}
 \end{bnf}
 
-For declaring ports in an interface:
 \begin{example}
 \begin{codeblock}
      __interface <interfaceName> {
-          __input/__output/__inout/__parameter <elementType> <elementName>;
+          __input __uint(1) executeMethod;
+          __input __uint(16) methodArgument;
+          __output __uint(1) methodReady;
      }
 \end{codeblock}
 \end{example}
+
 For '__parameter' items, supported datatypes include: "const char *", "float", "int".
 
-\rSec2[atomicc.ifactor]{Factoring of interfaces into sub interfaces is also supported}
+Factoring of interfaces into sub interfaces is also supported.
 
 \rSec2[atomicc.clockReset]{Clock/reset ports}
 Note that if interface port pins are declared in a module interface declaration, then

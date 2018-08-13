@@ -58,22 +58,9 @@ than any rules that read the same state element.
 Scheduling is done by building a graph:
 \begin{itemize}
 \item Nodes are rules/methods within a module.
-\item For all state elements, insert a directed links from each node that writes the state element to every node that reads it.
+\item For all state elements, insert directed links from each node that writes the state element to every node that reads it.
+\item Verify that this graph has no cycles (that it can be linearized into an SC sequence)
 \end{itemize}
-
-\begin{importgraphic}
-{Simple ordering example}
-{fig:schedule1}
-{figschedule1.pdf}
-\end{importgraphic}
-A simple SC example is shown in Figure~\ref{fig:schedule1}.  There are 3 rules: RuleA, RuleB and RuleC.  There are 3 state elements: E1, E2 and E3.
-
-\begin{importgraphic}
-{non-SC ordering example}
-{fig:schedule2}
-{figschedule2.pdf}
-\end{importgraphic}
-A non-SC example is shown in Figure~\ref{fig:schedule2}.
 
 Cycles can be broken in 2 ways:
 \begin{itemize}

@@ -3,54 +3,18 @@
 
 \gramSec[agram.class]{Classes}
 
-\pnum
-A class is a type.
-Its name becomes a \grammarterm{class-name}\iref{class.name} within its
-scope.
+\rSec1[atomicc.module]{__module, __emodule}
 
-\begin{bnf}
-\nontermdef{atomicc-class-key}\br
-    \terminal{__interface} \br
-    \terminal{__emodule} \br
-    \terminal{__module}
-
-\nontermdef{atomicc-method-declaration}\br
-    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;}
-\end{bnf}
-
-\rSec2[atomicc.interface]{__interface}
-
-An AtomicC interface is essentially an abstract class similar to a
-Java interface. All the methods are virtual and no default
-implementations are provided. AtomicC style uses composition of
-interfaces rather than inheritance.
-
-The __interface keyword defines a list of methods that are exposed from an object.
-Instead of using object inheritance to define reusable interfaces,
-they are defined/exported explicitly by objects, allowing fine-grained
-specification of interface method visibility.
-
-Methods of a module are translated to value ports for passing the
-method arguments and a pair of handshaking ports used for scheduling
-method invocations.
-
-References to an object can only be done through interface methods.  State element
-declarations inside an object (member variables) are private.
-
-\begin{example}
-\begin{codeblock}
-     __interface EchoRequest {
-         void say(__int(32) v);
-         void say2(__int(16) a, __int(16) b);
-     };
-\end{codeblock}
-\end{example}
-
-\rSec2[atomicc.module]{__module, __emodule}
-
-A module is defined using the keyword "__module", resulting in generation of verilog.
+A module is defined using the keyword "__module", resulting in generation of 
+a corresponding output verilog module.
 It includes local state elements, interfaces exported, interfaces imported
-and rules for clustering operations into atomic units.
+and rules for clustering operations into atomic transactions.
+
+Modules are independently compiled, even if they exist in the same compilation
+unit.  Rule and interface method scheduling logic is generated as part of the
+generated module.  Scheduling constraints (read set, write set and relation to
+other scheduled elements) are generated into a metadata file, allowing
+schedule consistency between modules to be verified by the linker.
 
 \begin{example}
 \begin{codeblock}
@@ -83,10 +47,38 @@ module definitions only need to include the exported/imported interfaces.
 \end{codeblock}
 \end{example}
 
-\rSec2[atomicc.guard]{guard clauses on module interface methods}
+\rSec1[atomicc.interface]{__interface}
+
+An AtomicC interface is essentially an abstract class similar to a
+Java interface. All the methods are virtual and no default
+implementations are provided. AtomicC style uses composition of
+interfaces rather than inheritance.
+
+The __interface keyword defines a list of methods that are exposed from an object.
+Instead of using object inheritance to define reusable interfaces,
+they are defined/exported explicitly by objects, allowing fine-grained
+specification of interface method visibility.
+
+Methods of a module are translated to value ports for passing the
+method arguments and a pair of handshaking ports used for scheduling
+method invocations.
+
+References to an object can only be done through interface methods.  State element
+declarations inside an object (member variables) are private.
+
+\begin{example}
+\begin{codeblock}
+     __interface EchoRequest {
+         void say(__int(32) v);
+         void say2(__int(16) a, __int(16) b);
+     };
+\end{codeblock}
+\end{example}
+
+\rSec1[atomicc.guard]{guard clauses on module interface methods}
 
 \pnum
-Method definitions have the form:
+Method definitions in __module declarations have the form:
 
 \begin{bnf}
 \nontermdef{atomicc-method-definition}\br
@@ -122,7 +114,7 @@ guards on methods invoked within the rule are also true.
          }
 \end{codeblock}
 
-\rSec2[atomicc.connect]{__connect}
+\rSec1[atomicc.connect]{__connect}
 The __connect statement allows exported interface declarations to be connected
 with imported interface references between objects within a module declaration.
 
@@ -163,7 +155,7 @@ with imported interface references between objects within a module declaration.
     convenient sequence in a location where both the concrete instances
     for A and B are visible.
 
-\rSec2[atomicc.export]{To export interfaces from contained objects}
+\rSec1[atomicc.export]{To export interfaces from contained objects}
 
 \begin{bnf}
 \nontermdef{forward-declaration}\br
@@ -180,3 +172,11 @@ with imported interface references between objects within a module declaration.
 \end{example}
 
 CWrapper just forwards the interface 'request' down into the instance 'consumer'.
+
+\rSec1[atomicc.classsyn]{Syntax extension to C++}
+\begin{bnf}
+\nontermdef{atomicc-class-key}\br
+    \terminal{__interface} \br
+    \terminal{__emodule} \br
+    \terminal{__module}
+\end{bnf}
