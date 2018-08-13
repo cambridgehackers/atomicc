@@ -145,15 +145,16 @@ with imported interface references between objects within a module declaration.
 \end{codeblock}
 \end{example}
 
-* Comparision with BSV
-    The declaration for 'A' is just like BSV.
-    In BSV, the declaration for B requires the interface be passed in as
-    an interface parameter (forcing a textual ordering to the source code
-    declaration sequence).
-    <br>
-    In AtomicC, the interfaces are stitched together outside in any
-    convenient sequence in a location where both the concrete instances
-    for A and B are visible.
+Comparision with BSV:
+\begin{itemize}
+\item The declaration for 'A' is just like BSV.
+In BSV, the declaration for B requires the interface be passed in as
+an interface parameter (forcing a textual ordering to the source code
+declaration sequence).
+\item In AtomicC, the interfaces are stitched together outside in any
+convenient sequence in a location where both the concrete instances
+for A and B are visible.
+\end{itemize}
 
 \rSec1[atomicc.export]{To export interfaces from contained objects}
 

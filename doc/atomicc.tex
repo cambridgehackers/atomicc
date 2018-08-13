@@ -45,7 +45,7 @@ Even though all concurrent rules are executed during the same clock cycle, SC al
 effects of each rule independant of any rules that could be executing at the same time.
 
 Each rule has a set of state elements that it reads and another set of element that it writes.
-For the execution of a group of rules to be considered to be "sequentially consistent", the following must
+For the execution of a group of rules to be considered to be SC, the following must
 be true:
 
 \begin{itemize}
@@ -59,12 +59,15 @@ Scheduling is done by building a graph:
 \begin{itemize}
 \item Nodes are rules/methods within a module.
 \item For all state elements, insert directed links from each node that writes the state element to every node that reads it.
-\item Verify that this graph has no cycles (that it can be linearized into an SC sequence)
+\item Verify that this graph has no cycles.
 \end{itemize}
 
 Cycles can be broken in 2 ways:
 \begin{itemize}
 \item Rules default to have lower priority than methods within a module.
-\item In the source text, "priority" statements can be used to break cycles if necessary.
+\item In the source text, "priority" statements can be used to break cycles when necessary.
 \end{itemize}
+
+The compiler and linker do not break cycles automatically and issue and require the user to annotate
+the source text with "priority" statements to resolve conflicts.
 
