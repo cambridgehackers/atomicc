@@ -23,7 +23,7 @@ clean:
 refresh:
 	$(STDPDF)
 
-rebuild:
+rebuild: $(FIGURES)
 	$(STDPDF)
 	$(STDPDF)
 	$(STDPDF)

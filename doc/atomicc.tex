@@ -10,12 +10,6 @@ netlist are explicit in the source code of the design. AtomicC is a
 timed HDL, using SystemC terminology. 
 Atomic actions (rules and method invocations) execute in a single clock cycle.
 
-To permit reasonable analysis of the program behavior, rules (transactions) can only be
-executed in a "sequentially consistent" manner.  Since concurrent rules are all executed in a
-single clock cycle, in practice this means that we have to prove at compilation time that
-all possible executions can always be considered as some linear sequentially ordered instantiation
-within a cycle.
-
 Like Connectal, AtomicC designs may include both hardware and
 software, using interfaces to specify hardware/software communication
 in a type safe way. The AtomicC compiler generates the code to pass
@@ -41,24 +35,45 @@ synthesis. Alternate translations are possible: to native code via
 LLVM, to System C, to Gallina for formal verification with the Coq
 Proof Assistant, etc.
 
-\rSec1[atomicc.execution]{Execution Semantics}
+\rSec1[atomicc.schedule]{Scheduling}
 
-\rSec2[atomicc.schedule]{Scheduling}
+Unlike C++'s serialized execution model, AtomicC allows all 'ready' rules (transactions) to be executed on
+every clock cycle.  The AtomicC compiler verifies that it is possible to consider
+all rules executed during a given clock cycle
+as though they were serialized into some linear, atomic ordering (in other words, "sequentially consistent"(SC)).
+Even though all concurrent rules are executed during the same clock cycle, SC allows us to examine the
+effects of each rule independant of any rules that could be executing at the same time.
+
 Each rule has a set of state elements that it reads and another set of element that it writes.
-Valid sequential orderings require that every state element must be logically read before it is logically
-written ("read before write").
+For the execution of a group of rules to be considered to be "sequentially consistent", the following must
+be true:
+
+\begin{itemize}
+\item Atomic: All operations for a given rule occur at the same point in the sequence.
+\item Read-before-write:  A rule that writes a state element must occur later in the sequence
+than any rules that read the same state element.
+\item Non-conflicting: A given state element cannot be written by more than one concurrently executing rule.
+\end{itemize}
 
 Scheduling is done by building a graph:
 \begin{itemize}
-\item Nodes are rules/guards within a module.
+\item Nodes are rules/methods within a module.
 \item For all state elements, insert a directed links from each node that writes the state element to every node that reads it.
 \end{itemize}
 
 \begin{importgraphic}
 {Simple ordering example}
-{fig:figschedule1}
+{fig:schedule1}
 {figschedule1.pdf}
 \end{importgraphic}
+A simple SC example is shown in Figure~\ref{fig:schedule1}.  There are 3 rules: RuleA, RuleB and RuleC.  There are 3 state elements: E1, E2 and E3.
+
+\begin{importgraphic}
+{non-SC ordering example}
+{fig:schedule2}
+{figschedule2.pdf}
+\end{importgraphic}
+A non-SC example is shown in Figure~\ref{fig:schedule2}.
 
 Cycles can be broken in 2 ways:
 \begin{itemize}

@@ -2,7 +2,7 @@ digraph figschedule1
 {
   rankdir=RL;
   ruleA [label="RuleA\nread = {E1, E2}"];
-  ruleB [label="RuleC\nread = {E3}\nwrite = {E2}"];
+  ruleB [label="RuleB\nread = {E3}\nwrite = {E2}"];
   ruleC [label="RuleC\nwrite={E1,E3}"];
 
   ruleC -> ruleB [label="{E3}"];
