@@ -35,8 +35,8 @@ To verify that an instantiated group of modules has SC compliant execution chara
 \rSec1[atomicc.verilog]{Interfacing with verilog modules}
 
 To reference a module in verilog, fields can be declared in __interface items.
-For example:
 
+\begin{example}
 \begin{codeblock}
      __interface CNCONNECTNET2 {
          __input  __int(1)         IN1;
@@ -48,6 +48,7 @@ For example:
          CNCONNECTNET2 _;
      };
 \end{codeblock}
+\end{example}
 
 This will allow references/instantiation of an externally defined verilog module CONNECTNET2
 that has 2 'input' ports, IN1 and IN2, as well as 2 'output' ports, OUT1 and OUT2.
@@ -55,8 +56,8 @@ that has 2 'input' ports, IN1 and IN2, as well as 2 'output' ports, OUT1 and OUT
 \rSec2[atomicc.param]{Parameterized modules}
 
 Verilog modules that have module instantiation parameters can also be declared/referenced.
-For example:
 
+\begin{example}
 \begin{codeblock}
      __interface Mmcme2MMCME2_ADV {
          __parameter const char *  BANDWIDTH;
@@ -69,9 +70,11 @@ For example:
          Mmcme2MMCME2_ADV _;
      };
 \end{codeblock}
+\end{example}
 
 This example can be instantiated as:
 
+\begin{example}
 \begin{codeblock}
      __module Test {
          ...
@@ -84,15 +87,26 @@ This example can be instantiated as:
          }
      }
 \end{codeblock}
+\end{example}
 
 \rSec2[atomicc.refsyntax]{Reference syntax}
 
+\begin{bnf}
+\nontermdef{pin-type} \br
+    \terminal{__input} \br
+    \terminal{__output} \br
+    \terminal{__inout} \br
+    \terminal{__parameter}
+\end{bnf}
+
 For declaring ports in an interface:
+\begin{example}
 \begin{codeblock}
      __interface <interfaceName> {
           __input/__output/__inout/__parameter <elementType> <elementName>;
      }
 \end{codeblock}
+\end{example}
 For '__parameter' items, supported datatypes include: "const char *", "float", "int".
 
 \rSec2[atomicc.ifactor]{Factoring of interfaces into sub interfaces is also supported}
@@ -109,8 +123,9 @@ default clock/reset signals for a module will always have these names)
 \rSec2[atomicc.itool]{Import tooling}
 
 There is a tool to automate the creation of AtomicC header files from verilog source files.
-For example:
+\begin{example}
 \begin{codeblock}
      atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 zynq.lib
      atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
 \end{codeblock}
+\end{example}

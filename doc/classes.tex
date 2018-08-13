@@ -13,6 +13,9 @@ scope.
     \terminal{__interface} \br
     \terminal{__emodule} \br
     \terminal{__module}
+
+\nontermdef{atomicc-method-declaration}\br
+    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;}
 \end{bnf}
 
 \rSec2[atomicc.interface]{__interface}
@@ -34,13 +37,14 @@ method invocations.
 References to an object can only be done through interface methods.  State element
 declarations inside an object (member variables) are private.
 
-Example:
+\begin{example}
 \begin{codeblock}
      __interface EchoRequest {
          void say(__int(32) v);
          void say2(__int(16) a, __int(16) b);
      };
 \end{codeblock}
+\end{example}
 
 \rSec2[atomicc.module]{__module, __emodule}
 
@@ -48,7 +52,7 @@ A module is defined using the keyword "__module", resulting in generation of ver
 It includes local state elements, interfaces exported, interfaces imported
 and rules for clustering operations into atomic units.
 
-Example:
+\begin{example}
 \begin{codeblock}
      __module Echo {
          EchoRequest      request;               // exported interface
@@ -66,18 +70,47 @@ Example:
          }
      };
 \end{codeblock}
+\end{example}
 
 To reference a separately compiled module, use "__emodule".  These external
 module definitions only need to include the exported/imported interfaces.
 
-Example:
+\begin{example}
 \begin{codeblock}
      __module EchoResponder {
          EchoIndication   indication;           // exported interface
      };
 \end{codeblock}
+\end{example}
 
-\rSec2[atomicc.guard]{guard clauses on methods}
+\rSec2[atomicc.guard]{guard clauses on module interface methods}
+
+\pnum
+Method definitions have the form:
+
+\begin{bnf}
+\nontermdef{atomicc-method-definition}\br
+    \opt{decl-specifier-seq} interface-qualifier-seq identifier parameters-and-qualifiers function-body
+\end{bnf}
+
+\begin{bnf}
+\nontermdef{interface-qualifier}\br
+    identifier \terminal{.}
+
+\nontermdef{interface-qualifier-seq} \br
+    interface-qualifier \br
+    interface-qualifier-seq interface-qualifier
+\end{bnf}
+
+\begin{bnf}
+\nontermdef{atomicc-function-body}\br
+    \opt{ctor-initializer} \opt{if-guard} compound-statement
+
+\nontermdef{if-guard}\br
+    \terminal{if (} condition \terminal{)}
+
+\end{bnf}
+
 
 Rules are only ready to fire if the rule's guard is true and all the
 guards on methods invoked within the rule are also true.
@@ -93,7 +126,12 @@ guards on methods invoked within the rule are also true.
 The __connect statement allows exported interface declarations to be connected
 with imported interface references between objects within a module declaration.
 
-Example:
+\begin{bnf}
+\nontermdef{connect-declaration}\br
+    \terminal{__connect} identifier \terminal{=} identifier \terminal{;}
+\end{bnf}
+
+\begin{example}
 \begin{codeblock}
      __interface ExampleRequest {
          void say(__int(32) v);
@@ -113,6 +151,7 @@ Example:
          __connect producer.callOut = consumer.callIn;
      };
 \end{codeblock}
+\end{example}
 
 * Comparision with BSV
     The declaration for 'A' is just like BSV.
@@ -126,36 +165,18 @@ Example:
 
 \rSec2[atomicc.export]{To export interfaces from contained objects}
 
-Example:
+\begin{bnf}
+\nontermdef{forward-declaration}\br
+    \terminal{__forward} identifier \terminal{=} identifier \terminal{;}
+\end{bnf}
+
+\begin{example}
 \begin{codeblock}
      __module CWrapper {
          A consumer;
          ExampleRequest request = A.callIn;
       };
 \end{codeblock}
+\end{example}
 
 CWrapper just forwards the interface 'request' down into the instance 'consumer'.
-
-\begin{bnf}
-\nontermdef{atomicc-method-declaration}\br
-    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;}
-
-\nontermdef{connect-declaration}\br
-    \terminal{__connect} identifier \terminal{=} identifier \terminal{;}
-
-\nontermdef{forward-declaration}\br
-    \terminal{__forward} identifier \terminal{=} identifier \terminal{;}
-
-\nontermdef{printf-declaration}\br
-    \terminal{__printf ;}
-
-\end{bnf}
-
-\begin{bnf}
-\nontermdef{pin-type} \br
-    \terminal{__input} \br
-    \terminal{__output} \br
-    \terminal{__inout} \br
-    \terminal{__parameter}
-\end{bnf}
-

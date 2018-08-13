@@ -54,10 +54,15 @@ Scheduling is done by building a graph:
 \item For all state elements, insert a directed links from each node that writes the state element to every node that reads it.
 \end{itemize}
 
+\begin{importgraphic}
+{Simple ordering example}
+{fig:figschedule1}
+{figschedule1.pdf}
+\end{importgraphic}
+
 Cycles can be broken in 2 ways:
 \begin{itemize}
-\item Rules default to have lower priority than methods within a module.  If the designer wants the rule to take precedence, a "priority" statement can be specified.
-\item "priority" statements in source text can be used to break cycles, if necessary.
+\item Rules default to have lower priority than methods within a module.
+\item In the source text, "priority" statements can be used to break cycles if necessary.
 \end{itemize}
 
-To permit rule scheduling to be dependent on the "enable" signals of methods and other rules, rules use "ready/valid" scheduling.

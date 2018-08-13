@@ -14,6 +14,7 @@ method invocations are satisfied, then it is ready to fire. It will be
 fire on a clock cycle when it does not conflict with any higher
 priority rule. A rule executes atomically.
 
+\begin{example}
 \begin{codeblock}
      // default guard is true
      __rule respond_rule {
@@ -21,12 +22,10 @@ priority rule. A rule executes atomically.
          ind->heard(fifo->out.first());
      }
 \end{codeblock}
+\end{example}
 
 \begin{bnf}
 \nontermdef{rule-statement}\br
     \terminal{__rule} identifier \opt{if-guard} compound-statement\br
-
-\nontermdef{if-guard}\br
-    \terminal{if (} condition \terminal{)}
 
 \end{bnf}

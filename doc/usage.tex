@@ -18,5 +18,15 @@ To use the NOC printf:
 \begin{itemize}
 \item add the following line to the __module being tested: __printf;
 \item add a line similar to the following (with the 'xxx' replaced) to the test program:
+
+\begin{example}
+\begin{codeblock}
            atomiccPrintfInit("generated/rulec.generated.printf");
+\end{codeblock}
+\end{example}
 \end{itemize}
+
+\begin{bnf}
+\nontermdef{printf-declaration}\br
+    \terminal{__printf ;}
+\end{bnf}
