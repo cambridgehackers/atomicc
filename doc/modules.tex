@@ -1,7 +1,7 @@
 %!TEX root = std.tex
-\rSec0[atomicc.module]{Modularization}
+\rSec0[atomicc.modularization]{Modularization}
 
-\rSec1[atomicc.compilation]{Independant compilation of modules}
+\rSec1[atomicc.independant]{Independant compilation of modules}
 
 The design is separated into modules that can export and import interfaces to other modules.
 Each source language module compiles into a single verilog module.  Modules are independantly
@@ -10,7 +10,7 @@ Referencing modules do not depend on the internal implementation of referenced m
 even if they textually exist in the same compilation unit.
 Scheduling of rules in a module is performed "inside out", with the resulting schedule dependancies written to a metadata file during compilation.
 
-\rSec1[atomicc.execution]{Execution control}
+\rSec1[atomicc.econtrol]{Execution control}
 
 There are 2 common styles for communication of execution control information for a method:
 \begin{itemize}
