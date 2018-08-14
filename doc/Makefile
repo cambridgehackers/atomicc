@@ -1,51 +1,49 @@
-### -*- mode: makefile-gmake -*-
-
-# Note: If building on Mac OS X, and if you use MacPorts, the following ports
-# should be installed:
-#
-#   texlive-latex
-#   texlive-plain-extra
-#   texlive-latex-recommended
-#   texlive-latex-extra
-#   texlive-fonts-recommended
-#   texlive-fonts-extra
-#   texlive-generic-recommended
+.PHONY: *.tex language.pdf
+.SUFFIXES : .tex .pdf .dvi .ps
 
 FIGURES = $(patsubst %.dot,%.pdf,$(wildcard *.dot))
-
 STDPDF = pdflatex language | grep -v "^Overfull"
 
 default: rebuild
 
-clean:
-	rm -f *.aux *.pdf std-gram.ext *.idx *.ilg *.ind *.log *.lot *.lof *.tmp *.out *.glo *.gls *.fls *.fdb* *.toc *.xtr
-
-refresh:
+rebuild: $(FIGURES) language.pdf
 	$(STDPDF)
-
-rebuild: $(FIGURES)
+	bibtex language
 	$(STDPDF)
 	$(STDPDF)
-	$(STDPDF)
-
-full: $(FIGURES) reindex
 
 %.pdf: %.dot
 	dot -o $@ -Tpdf $<
 
-reindex:
-	$(STDPDF)
-	$(STDPDF)
-	$(STDPDF)
-	makeindex generalindex
-	makeindex headerindex
-	makeindex libraryindex
-	makeindex grammarindex
-	makeindex impldefindex
-	$(STDPDF)
-	makeindex -s basic.gst -o xrefindex.gls xrefindex.glo
-	makeindex -s basic.gst -o xrefdelta.gls xrefdelta.glo
-	$(STDPDF)
-	$(STDPDF)
+.tex.pdf: ${*}.tex
+	pdflatex ${*}.tex
+	bibtex ${*}
+	pdflatex ${*}.tex
+	pdflatex ${*}.tex
 
-### Makefile ends here
+.tex.dvi: ${*}.tex
+	latex ${*}.tex
+	bibtex ${*}
+	latex ${*}.tex
+	latex ${*}.tex
+
+clean:
+	rm -f *.aux *.pdf std-gram.ext *.idx *.ilg *.ind *.log *.lot *.lof *.tmp *.out *.glo *.gls *.fls *.fdb* *.toc *.xtr
+
+#refresh:
+#	$(STDPDF)
+#full: $(FIGURES) reindex
+#reindex:
+#	$(STDPDF)
+#	$(STDPDF)
+#	$(STDPDF)
+#	makeindex generalindex
+#	makeindex headerindex
+#	makeindex libraryindex
+#	makeindex grammarindex
+#	makeindex impldefindex
+#	$(STDPDF)
+#	makeindex -s basic.gst -o xrefindex.gls xrefindex.glo
+#	makeindex -s basic.gst -o xrefdelta.gls xrefdelta.glo
+#	$(STDPDF)
+#	$(STDPDF)
