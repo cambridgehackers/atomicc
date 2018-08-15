@@ -14,6 +14,11 @@ The format strings for the printf statements are placed into a generated file
 in generated/xxx.generated.printf along with a list of the bit lengths for each
 parameter to the printf.
 
+\begin{bnf}
+\nontermdef{printf-declaration}\br
+    \terminal{__printf ;}
+\end{bnf}
+
 To use the NOC printf:
 \begin{itemize}
 \item add the following line to the __module being tested:
@@ -25,8 +30,3 @@ To use the NOC printf:
      atomiccPrintfInit("generated/rulec.generated.printf");
 \end{codeblock}
 \end{itemize}
-
-\begin{bnf}
-\nontermdef{printf-declaration}\br
-    \terminal{__printf ;}
-\end{bnf}
