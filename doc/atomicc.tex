@@ -56,20 +56,7 @@ than any rules that read the same state element.
 \item Non-conflicting: A given state element cannot be written by more than one concurrently executing rule.
 \end{itemize}
 
-Scheduling is done by building a graph:
-\begin{itemize}
-\item Nodes are rules/methods within a module.
-\item For all state elements, insert directed links from each node that writes the state element to every node that reads it.
-\item Verify that this graph has no cycles.
-\end{itemize}
-
-Cycles can be broken in 2 ways:
-\begin{itemize}
-\item Rules default to have lower priority than methods within a module.
-\item In the source text, "priority" statements can be used to break cycles when necessary.
-\end{itemize}
-
-The compiler and linker do not break cycles automatically and issue and require the user to annotate
+The compiler and linker do not break SC violations automatically. Error require the user to annotate
 the source text with "priority" statements to resolve conflicts.
 
 \rSec2[atomicc.scheddefs]{Definitions}
@@ -85,35 +72,41 @@ the source text with "priority" statements to resolve conflicts.
 \item read set: $R_{i}.read$
 \item write set: $R_{i}.write$
 \item sensitivity set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
+\item schedule set: all rules that could possibly conflict (rules that share elements in sensitivity set)
 \end{itemize}
 
 \rSec2[atomicc.schedalg]{Algorithm}
 
 \begin{lstlisting}[mathescape=true]
-Initialize: $U = \{ R_{i} \}$  // Make a set of all rules
-While $U \neq \emptyset$       // While there are unscheduled rules
-    Extract a rule, $T \in U$
-    $P_{i} = \{ T \}$          // Create new schedule set
-    $\forall E \in U \mid S(E) \cap S(P_{i}) \neq \emptyset$
-        Move E from U to $P_{i}$ // Populate schedule set with all rules that could possibly conflict
+// Partition rules into disjoint "schedule sets"
+U = { $R_{i}, M_{i}$ forall i }   // Construct set of unscheduled rules
+While $U \neq \emptyset$           // While there are unscheduled rules
+    Extract a rule, T, from U
+    $P_{i} = \{ T \}$          // Create next schedule set
+    forall E in U
+        if $S(E) \cap S(P_{i}) \neq \emptyset$
+            Move E from U to $P_{i}$
 
-// Create/check 'read-before-write' graphs for each schedule set
-$\forall P_{i}$
-    Initialize graph G to have nodes for all $T \in P_{i}$
-    $\forall T \in P_{i}$
-        $\forall W \in T.write$
-            $\forall J \in P_{i}$
-                $\forall R \in J.write$
-                    if $W.name == R.name$
+forall $P_{i}$
+    // Create 'read-before-write' graph
+    Initialize graph G to have nodes for all elements in $P_{i}$
+    forall T in $P_{i}$
+        forall W in T.write
+            forall J in $P_{i}$
+                forall R in J.read
+                    if W.name == R.name
                         add arc [$T \Rightarrow J$; guard: $(W.cond\ \&\&\ R.cond\ \&\&\ \pi(T)\ \&\&\ \pi(J))$]
-    $\forall loops\ L \in G$
+    // Check/repair 'read-before-write' graph to be SC
+    forall loops L in G
        loopcondition = true
-       $\forall arcs\ A \in L$ 
-          $loopcondition = loopcondition\ \&\ A.guard$
+       forall arcs A in L 
+          loopcondition = loopcondition & A.guard
        if loopcondition is not identically false
-          Use priority rules to break loop.
-              if source code has $"priority\ R_{i} > R_{j}"\ \&\ R_{i} \in L\ \&\ R_{j} \in L$
-                 $\pi(R_{j}) = \pi(R_{j})\ \&\&\ \neg \pi(R_{i})$
-          If loops still exist, report error
+          if loop has some method $M_{i}$ and some rule $R_{j}$
+              $ready(R_{j}) = ready(R_{j})\ \&\&\ \neg \pi(M_{i})$
+          else if source code has "priority $R_{i} > R_{j}$" & $R_{i}$ in L & $R_{j}$ in L
+              $ready(R_{j}) = ready(R_{j})\ \&\&\ \neg \pi(R_{i})$
+          else
+              loop still exists, report error
 \end{lstlisting}
 
