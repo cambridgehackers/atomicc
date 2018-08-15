@@ -89,18 +89,31 @@ the source text with "priority" statements to resolve conflicts.
 
 \rSec2[atomicc.schedalg]{Algorithm}
 
-\begin{itemize}
-\item Partition rules into "schedule sets"
-\begin{itemize}
-\item set $Unsched = \{ R_{i} \}$
-\item Select a rule, T, from Unsched, creating partition $P_{i} = \{ T \}$
-\item Expand $P_{i} = P_{i} + \{\forall E \in Unsched \mid S(E) \cap S(P_{i}) \neq \emptyset \}$
-\item $Unsched = Unsched - P_{i}$
-\item From "unscheduled rules", gather all rules whose readSet or writeSet intersects the current schedule set.
-\end{itemize}
-\item For each schedule set, construct a directed graph
-\item For each loop in the graph, "and" together all conditions.
-\item If aggregate guard for loop is non-null, use priority rules to break loop.
-\item If loops still exist, report error
-\end{itemize}
+\begin{lstlisting}[mathescape=true]
+Initialize: $U = \{ R_{i} \}$  // Make a set of all rules
+While $U \neq \emptyset$       // While there are unscheduled rules
+    Extract a rule, $T \in U$
+    $P_{i} = \{ T \}$          // Create new schedule set
+    $\forall E \in U \mid S(E) \cap S(P_{i}) \neq \emptyset$
+        Move E from U to $P_{i}$ // Populate schedule set with all rules that could possibly conflict
+
+// Create/check 'read-before-write' graphs for each schedule set
+$\forall P_{i}$
+    Initialize graph G to have nodes for all $T \in P_{i}$
+    $\forall T \in P_{i}$
+        $\forall W \in T.write$
+            $\forall J \in P_{i}$
+                $\forall R \in J.write$
+                    if $W.name == R.name$
+                        add arc [$T \Rightarrow J$; guard: $(W.cond\ \&\&\ R.cond\ \&\&\ \pi(T)\ \&\&\ \pi(J))$]
+    $\forall loops\ L \in G$
+       loopcondition = true
+       $\forall arcs\ A \in L$ 
+          $loopcondition = loopcondition\ \&\ A.guard$
+       if loopcondition is not identically false
+          Use priority rules to break loop.
+              if source code has $"priority\ R_{i} > R_{j}"\ \&\ R_{i} \in L\ \&\ R_{j} \in L$
+                 $\pi(R_{j}) = \pi(R_{j})\ \&\&\ \neg \pi(R_{i})$
+          If loops still exist, report error
+\end{lstlisting}
 

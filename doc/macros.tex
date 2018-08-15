@@ -393,6 +393,10 @@
  \CodeBlockSetup
  \lstset{deletestring=[b]{'}}
 }{}
+\lstnewenvironment{codeblockmath}{
+ \CodeBlockSetup
+ \lstset{escapeinside={(*}{*)}}
+}{}
 
 % Permit use of '@' inside codeblock blocks (don't ask)
 \makeatletter
