@@ -5,11 +5,12 @@
 
 \rSec1[atomicc.rule]{__rule}
 
-Rules specify the behavior with a design. A rule operates
+Rules specify a group of operations that must execute as an atomiclly.
+A rule operates
 transactionally: when a rule's guard and the guards of all of its
 method invocations are satisfied, then it is ready to fire. It will
 fire on a clock cycle when it does not conflict with any higher
-priority rule. A rule executes atomically.
+priority rule.
 
 \begin{bnf}
 \nontermdef{rule-statement}\br
@@ -19,8 +20,7 @@ priority rule. A rule executes atomically.
 
 \begin{example}
 \begin{codeblock}
-     // default guard is true
-     __rule respond_rule {
+     __rule respond_rule if (responseAvail) {
          fifo->out.deq();
          ind->heard(fifo->out.first());
      }

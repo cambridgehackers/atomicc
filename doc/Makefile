@@ -28,7 +28,7 @@ rebuild: $(FIGURES) language.pdf
 	latex ${*}.tex
 
 clean:
-	rm -f *.aux *.pdf std-gram.ext *.idx *.ilg *.ind *.log *.lot *.lof *.tmp *.out *.glo *.gls *.fls *.fdb* *.toc *.xtr
+	rm -f *.aux *.pdf std-gram.ext *.idx *.ilg *.ind *.log *.lot *.lof *.tmp *.out *.glo *.gls *.fls *.fdb* *.toc *.xtr language.bbl language.blg
 
 #refresh:
 #	$(STDPDF)

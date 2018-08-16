@@ -5,11 +5,28 @@
 AtomicC is a structural hardware description language that extends C++
 with Bluespec-style\cite{Bluespec:www,Hoe:Thesis,HoeArvind:TRS_Synthesis2}
 modules, rules, interfaces, and methods.
+The compiler automatically synthesizes control signals that allow rules to fire
+only when their dependant elements are ready and when there are no conflicts with
+other rules executing in the same cycle.  The removal of this analytic burden on
+the engineer increases productivity as well as improves reliability of the
+resulting design.
 
 AtomicC is structural in that all state elements in the hardware
 netlist are explicit in the source code of the design. AtomicC is a
 timed HDL, using SystemC terminology. 
 Atomic actions (rules and method invocations) execute in a single clock cycle.
+AtomicC does not attempt to replicate the behavior of all C++ constructs in hardware.
+Instead, it uses the C++ text to specify the necessary single static assignment(SSA) computations
+and performing these computations under an atomic rule-based execution model.
+In addition, an interface definition scheme is used to explicitly and flexibly
+manage the visibility of interface methods to a module.
+
+Unlike C++'s serialized execution model, AtomicC allows all firing rules to be atomically executed on
+every clock cycle.  The AtomicC compiler verifies that it is valid to consider
+all rules executed during a given clock cycle
+as if they were serialized into a linear, atomic ordering ("sequentially consistent"(SC)).
+Even though all concurrent rules are executed during the same clock cycle, SC allows us to compute the
+outcome of each rule independantly of any other rules that could be executing at the same time.
 
 Like Connectal, AtomicC designs may include both hardware and
 software, using interfaces to specify hardware/software communication
@@ -37,13 +54,6 @@ LLVM, to System C, to Gallina for formal verification with the Coq
 Proof Assistant, etc.
 
 \rSec1[atomicc.schedule]{Scheduling}
-
-Unlike C++'s serialized execution model, AtomicC allows all 'ready' rules (transactions) to be executed on
-every clock cycle.  The AtomicC compiler verifies that it is possible to consider
-all rules executed during a given clock cycle
-as though they were serialized into some linear, atomic ordering (in other words, "sequentially consistent"(SC)).
-Even though all concurrent rules are executed during the same clock cycle, SC allows us to examine the
-effects of each rule independant of any rules that could be executing at the same time.
 
 Each rule has a set of state elements that it reads and another set of element that it writes.
 For the execution of a group of rules to be considered to be SC, the following must
