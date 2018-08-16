@@ -26,3 +26,22 @@ priority rule.
      }
 \end{codeblock}
 \end{example}
+
+\rSec1[atomicc.nostmt]{Restrictions on C++ statements}
+
+Unlike the serialized execution model of C++, AtomicC supports a fully parallel,
+single cycle execution of rules which satisfy which are able to fire.
+
+Since AtomicC does not generate any extra logic to support sequential execution behavior from
+language constructs,
+traditional C++ statements with non-static control flow behavior are not supported.
+
+Examples include:
+\begin{itemize}
+\item Non-constant bound "for" statements.  Constant bound "for" statements that can be fully unrolled
+are supported.
+\item "do", "while" statements
+\item Usages of "goto" that result in a cyclic directed graph of execution blocks
+\item Method and function calls that are not inlinable at compilation time (for example, recursion is prohibited)
+\end{itemize}
+

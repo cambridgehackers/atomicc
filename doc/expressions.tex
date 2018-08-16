@@ -5,17 +5,17 @@
 
 \rSec1[atomicc.builtin]{Built-in functions}
 
-\rSec2[atomicc.bitsize]{__bitsize}
+\rSec2[atomicc.bitsize]{__bitsize(expression)}
 Function to return size in bits of a type or variable.
 
-\rSec2[atomicc.bitsubstr]{__bitsubstr}
+\rSec2[atomicc.bitsubstr]{__bitsubstr(identifier, <end-subscript> \[, <start-subscript> \]}
 Function to return bit slice of bitstring
 
 \rSec2[atomicc.bitconcat]{__bitconcat}
-Function to bitstring that is the concatenation of all of the member values of the call.
+All of the parameter values of the call are concatenated into a single bitstring result for the call.
 
 \rSec1[atomicc.cast]{__bit_cast}
-This can now be used to cast any datatype to/from __int(A), allowing operations to be performed on a bit level.
+This is used to cast any datatype to/from __uint(A), allowing operations to be performed on a bit level.
 
 \begin{bnf}
 \nontermdef{atomic-bit-cast}\br
