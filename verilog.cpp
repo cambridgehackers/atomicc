@@ -74,14 +74,19 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
     getFieldList(fieldList, fldName, "", type, out != 0, force);
     for (auto fitem : fieldList) {
         uint64_t offset = fitem.offset;
-        uint64_t upper = offset + convertType(fitem.type) - 1;
+        uint64_t uppern = offset - 1;
+        std::string upper = autostr(uppern);
+        if (fitem.type[0] == '@')
+            upper = fitem.type.substr(1) + "+ (" + upper + ")";
+        else
+            upper = autostr(uppern + convertType(fitem.type));
         std::string base = fldName;
         if (fitem.base != "")
             base = fitem.base;
-        std::string fnew = base + "[" + autostr(upper) + ":" + autostr(offset) + "]";
-        ACCExpr *fexpr = allocExpr(base, allocExpr("[", allocExpr(":", allocExpr(autostr(upper)), allocExpr(autostr(offset)))));
+        std::string fnew = base + "[" + upper + ":" + autostr(offset) + "]";
+        ACCExpr *fexpr = allocExpr(base, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(autostr(offset)))));
 if (trace_expand || refList[fitem.name].pin)
-printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %d] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, (int)upper, fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
+printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
         assert (!refList[fitem.name].pin);
         refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false};
         refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false};
@@ -124,8 +129,12 @@ std::list<PinInfo> pinPorts, pinMethods, paramPorts;
 static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal)
 {
     for (auto item : IR->interfaces) {
-        ModuleIR *IIR = lookupIR(item.type);
         std::string interfaceName = item.fldName;
+        ModuleIR *IIR = lookupIR(item.type);
+        if (!IIR) {
+            printf("%s: in module '%s', interface lookup '%s' name '%s' failed\n", __FUNCTION__, IR->name.c_str(), item.type.c_str(), interfaceName.c_str());
+            exit(-1);
+        }
         if (interfaceName != "")
             interfaceName += MODULE_SEPARATOR;
         for (auto FI: IIR->method) {
@@ -164,6 +173,10 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
         expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
+    pinPorts.clear();
+    pinMethods.clear();
+    paramPorts.clear();
+    collectInterfacePins(IR, instance != "", "", "", false);
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
 //printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.substr(0,instance.length()-1).c_str(), params.c_str());
@@ -186,10 +199,6 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
             moduleInstantiation += "#(" + actual + ")";
         }
     }
-    pinPorts.clear();
-    pinMethods.clear();
-    paramPorts.clear();
-    collectInterfacePins(IR, instance != "", "", "", false);
     modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, pinPorts.size() > 0, 0, false, false});
     if (instance == "")
         for (auto item: paramPorts)

@@ -62,6 +62,10 @@ uint64_t convertType(std::string arg)
             bp++;
         return arr * convertType(bp);
     }
+    if (checkT("@")) {
+printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
+        return 666666;
+    }
     if (auto IR = lookupIR(bp)) {
         uint64_t total = 0;
         for (auto item: IR->fields) {
@@ -78,10 +82,16 @@ uint64_t convertType(std::string arg)
 
 std::string sizeProcess(std::string type)
 {
-    uint64_t val = convertType(type);
-    if (val > 1)
-        return "[" + autostr(val - 1) + ":0]";
-    return "";
+    std::string upper;
+    if (type[0] == '@')
+        upper = type.substr(1) + "- 1";
+    else {
+        uint64_t val = convertType(type);
+        if (val <= 1)
+            return "";
+        upper = autostr(val - 1);
+    }
+    return "[" + upper + ":0]";
 }
 
 ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
@@ -270,8 +280,11 @@ void addMethod(ModuleIR *IR, MethodInfo *MI)
 
 void dumpModule(std::string name, ModuleIR *IR)
 {
+    int interfaceNumber = 0;
     if (!IR)
         return;
+    for (auto item: IR->interfaces)
+        dumpModule(name + "_INTERFACE_" + autostr(interfaceNumber++), lookupIR(item.type));
 printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
     for (auto item: IR->fields) {
         std::string ret = "    FIELD";
@@ -306,7 +319,7 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, n
             printf("%s%s %s", sep.c_str(), param.type.c_str(), param.name.c_str());
             sep = ", ";
         }
-        printf(") = %s {\n", tree2str(MI->guard).c_str());
+        printf(") %s = %s {\n", MI->type.c_str(), tree2str(MI->guard).c_str());
         for (auto item: MI->callList)
             printf("      CALL%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
         printf("       }\n");

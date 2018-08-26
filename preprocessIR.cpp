@@ -110,8 +110,78 @@ static ACCExpr *cloneReplaceTree (ACCExpr *expr, ACCExpr *target)
     return newExpr;
 }
 
+static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pname)
+{
+    auto updateType = [&](std::string type) -> std::string {
+        if (type == PLACE_NAME)
+            return "@" + pname;
+        return type;
+    };
+
+    ModuleIR *genericIR = allocIR(irName);
+    genericIR->metaList = IR->metaList;
+    genericIR->softwareName = IR->softwareName;
+    genericIR->priority = IR->priority;
+    genericIR->params = IR->params;
+    genericIR->unionList = IR->unionList;
+    genericIR->interfaceConnect = IR->interfaceConnect;
+    for (auto item : IR->fields)
+        genericIR->fields.push_back(FieldElement{item.fldName,
+            item.vecCount, updateType(item.type), item.isPtr,
+            item.isInput, item.isOutput, item.isInout,
+            item.isParameter, item.isLocalInterface});
+    for (auto FI : IR->method) {
+        MethodInfo *MI = FI.second;
+        MethodInfo *newMI = allocMethod(MI->name);
+        addMethod(genericIR, newMI);
+        newMI->type = updateType(MI->type);
+        newMI->guard = MI->guard;
+        newMI->rule = MI->rule;
+        newMI->storeList = MI->storeList;
+        newMI->letList = MI->letList;
+        newMI->callList = MI->callList;
+        newMI->printfList = MI->printfList;
+        newMI->type = updateType(MI->type);
+        newMI->alloca = MI->alloca;
+        //newMI->meta = MI->meta;
+        for (auto item : MI->params)
+            newMI->params.push_back(ParamElement{item.name, updateType(item.type)});
+    }
+    for (auto item : IR->interfaces) {
+        std::string iname = "l_ainterface_OC_" + irName + MODULE_SEPARATOR + item.fldName;
+        buildGeneric(lookupIR(item.type), iname, pname);
+        genericIR->interfaces.push_back(FieldElement{item.fldName,
+             item.vecCount, iname, item.isPtr, item.isInput,
+             item.isOutput, item.isInout,
+             item.isParameter, item.isLocalInterface});
+    }
+    return genericIR;
+}
+
 void preprocessIR(std::list<ModuleIR *> &irSeq)
 {
+    for (auto IR : irSeq) {
+        int ind = IR->name.find(MODULE_SEPARATOR "__PARAM__" MODULE_SEPARATOR);
+        if (ind > 0)
+        if (endswith(IR->name, MODULE_SEPARATOR GENERIC_INT_TEMPLATE_FLAG_STRING)) {
+            std::string irName = IR->name.substr(0, ind);
+            std::string parg = IR->name.substr(ind + 11);
+            std::string pname;
+            while (parg != "") {
+                int ind = parg.find(MODULE_SEPARATOR);
+                if (ind <= 0)
+                    break;
+                pname = parg.substr(0, ind);
+                parg = parg.substr(ind + strlen(MODULE_SEPARATOR GENERIC_INT_TEMPLATE_FLAG_STRING));
+            }
+            ModuleIR *genericIR = buildGeneric(IR, irName, pname);
+            irSeq.push_back(genericIR);
+            ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM");
+            genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false});
+            paramIR->fields.push_back(FieldElement{pname, -1, "INTEGER_32", false, false, false, false, true, false});
+            dumpModule("GENERIC", genericIR);
+        }
+    }
     for (auto IR : irSeq) {
         std::map<std::string, int> localConnect;
         for (auto IC : IR->interfaceConnect)
