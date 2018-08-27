@@ -278,6 +278,27 @@ void addMethod(ModuleIR *IR, MethodInfo *MI)
     IR->method[methodName] = MI;
 }
 
+void dumpMethod(std::string name, MethodInfo *MI)
+{
+    std::string methodName = MI->name;
+    printf("%s    METHOD%s %s(", name.c_str(), MI->rule ? "/Rule" : "", methodName.c_str());
+    std::string sep;
+    for (auto param: MI->params) {
+        printf("%s%s %s", sep.c_str(), param.type.c_str(), param.name.c_str());
+        sep = ", ";
+    }
+    printf(") %s = %s {\n", MI->type.c_str(), tree2str(MI->guard).c_str());
+    for (auto item: MI->alloca)
+        printf("      ALLOCA %s %s\n", item.second.type.c_str(), item.first.c_str());
+    for (auto item: MI->letList)
+        printf("      LET %s %s: %s=%s\n", item->type.c_str(), tree2str(item->cond).c_str(), tree2str(item->dest).c_str(), tree2str(item->value).c_str());
+    for (auto item: MI->storeList)
+        printf("      STORE %s: %s=%s\n", tree2str(item->cond).c_str(), tree2str(item->dest).c_str(), tree2str(item->value).c_str());
+    for (auto item: MI->callList)
+        printf("      CALL%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
+    printf("    }\n");
+}
+
 void dumpModule(std::string name, ModuleIR *IR)
 {
     int interfaceNumber = 0;
@@ -310,20 +331,8 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, n
     }
     for (auto item: IR->interfaceConnect)
         printf("    INTERFACECONNECT %s %s %s\n", item.target.c_str(), item.source.c_str(), item.type.c_str());
-    for (auto FI: IR->method) {
-        MethodInfo *MI = FI.second;
-        std::string methodName = MI->name;
-        printf("    METHOD %s(", methodName.c_str());
-        std::string sep;
-        for (auto param: MI->params) {
-            printf("%s%s %s", sep.c_str(), param.type.c_str(), param.name.c_str());
-            sep = ", ";
-        }
-        printf(") %s = %s {\n", MI->type.c_str(), tree2str(MI->guard).c_str());
-        for (auto item: MI->callList)
-            printf("      CALL%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
-        printf("       }\n");
-    }
+    for (auto FI: IR->method)
+        dumpMethod("", FI.second);
 printf("}\n");
 }
 

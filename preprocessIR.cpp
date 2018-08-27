@@ -178,6 +178,59 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
 
 void preprocessIR(std::list<ModuleIR *> &irSeq)
 {
+    for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
+        bool deleteme = false;
+#if 0
+typedef struct {
+    std::string name;
+    std::string type;
+} ParamElement;
+typedef struct {
+    ACCExpr                   *guard;
+    std::string                name;
+    std::string                type;
+    std::list<ParamElement>    params;
+} MethodInfo;
+#endif
+        FieldElement field;
+        if ((*IR)->interfaceConnect.size()
+         || (*IR)->unionList.size()
+         || (*IR)->params.size()
+         || (*IR)->priority.size()
+         || (*IR)->softwareName.size()
+         || (*IR)->metaList.size()
+         || (*IR)->fields.size() != 1)
+            goto skipLab;
+        {
+        field = (*IR)->fields.front();
+        ModuleIR *fieldIR = lookupIR(field.type);
+        if (!fieldIR || field.vecCount != -1 || field.isPtr || field.isInput
+          || field.isOutput || field.isInout || field.isParameter || field.isLocalInterface)
+            goto skipLab;
+        for (auto FI: (*IR)->method) {
+            MethodInfo *MI = FI.second;
+            if (endswith(MI->name, "__RDY") && !MI->callList.size())
+               continue;
+            if (MI->rule || MI->storeList.size() || MI->callList.size() != 1
+|| 1
+             || MI->alloca.size() || MI->letList.size() || MI->printfList.size())
+                goto skipLab;
+            CallListElement *call = MI->callList.front();
+            if (call->cond || call->value->value != (field.fldName + MODULE_SEPARATOR + MI->name))
+                goto skipLab;
+        }
+printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), field.fldName.c_str(), field.type.c_str());
+        for (auto mIR : irSeq) {
+             for (auto item = mIR->fields.begin(), iteme = mIR->fields.end(); item != iteme; item++)
+                 if (item->type == (*IR)->name)
+                     item->type = field.type;
+        }
+        IR = irSeq.erase(IR);
+        continue;
+        }
+skipLab:;
+        IR++;
+    }
     for (auto IR : irSeq) {
         int ind = IR->name.find(MODULE_SEPARATOR "__PARAM__" MODULE_SEPARATOR);
         if (ind > 0)
@@ -198,7 +251,7 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM");
             genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false});
             paramIR->fields.push_back(FieldElement{pname, -1, "INTEGER_32", false, false, false, false, true, false});
-            dumpModule("GENERIC", genericIR);
+            //dumpModule("GENERIC", genericIR);
         }
     }
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {

@@ -96,6 +96,7 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
 ModuleIR *allocIR(std::string name);
 MethodInfo *allocMethod(std::string name);
 void addMethod(ModuleIR *IR, MethodInfo *MI);
+void dumpMethod(std::string name, MethodInfo *MI);
 void dumpModule(std::string name, ModuleIR *IR);
 std::string findType(std::string name);
 

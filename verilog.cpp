@@ -637,7 +637,7 @@ static std::list<ModData> modLine;
             }
         }
         for (auto item: MI->alloca) // be sure to define local temps before walkRemoveParam
-            expandStruct(IR, item.first, item.second, 1, false, true, PIN_WIRE);
+            expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE);
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))

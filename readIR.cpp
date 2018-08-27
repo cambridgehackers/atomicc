@@ -111,7 +111,7 @@ static std::string cleanInterface(std::string name)
  * rewrite method call parameter and subscript markers, since '[' and '{'
  * are needed in verilog output
  */
-static void rewriteExpr(ACCExpr *expr)
+static void rewriteExpr(MethodInfo *MI, ACCExpr *expr)
 {
     if (!expr)
         return;
@@ -119,30 +119,88 @@ static void rewriteExpr(ACCExpr *expr)
         expr->value = SUBSCRIPT_MARKER;
     else if (expr->value == "{")
         expr->value = PARAMETER_MARKER;
+    else if (isIdChar(expr->value[0])) {
+        auto ptr = MI->alloca.upper_bound(expr->value);
+        if (ptr != MI->alloca.begin()) {
+            --ptr;
+            if (expr->value != ptr->first && startswith(expr->value, ptr->first)) {
+                ptr->second.noReplace = true;
+printf("[%s:%d] %s: expr %s first %s\n", __FUNCTION__, __LINE__, MI->name.c_str(), expr->value.c_str(), ptr->first.c_str());
+}
+        }
+    }
     for (auto item: expr->operands)
-        rewriteExpr(item);
+        rewriteExpr(MI, item);
 }
 
-static void postParseCleanup(MethodInfo *MI)
+static ACCExpr *walkReplaceExpr (ACCExpr *expr, ACCExpr *pattern, ACCExpr *replacement)
 {
-    rewriteExpr(MI->guard);
+    if (!expr)
+        return expr;
+    if (matchExpr(expr, pattern))
+        return replacement;
+    ACCExpr *newExpr = allocExpr(expr->value);
+    std::string item = expr->value;
+    for (auto item: expr->operands)
+        if (ACCExpr *operand = walkReplaceExpr(item, pattern, replacement))
+            newExpr->operands.push_back(operand);
+    return newExpr;
+}
+void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement)
+{
+    MI->guard = walkReplaceExpr(MI->guard, pattern, replacement);
     for (auto item: MI->storeList) {
-        rewriteExpr(item->dest);
-        rewriteExpr(item->value);
-        rewriteExpr(item->cond);
+        item->dest = walkReplaceExpr(item->dest, pattern, replacement);
+        item->value = walkReplaceExpr(item->value, pattern, replacement);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
     }
     for (auto item: MI->letList) {
-        rewriteExpr(item->dest);
-        rewriteExpr(item->value);
-        rewriteExpr(item->cond);
+        //item->dest = walkReplaceExpr(item->dest, pattern, replacement);
+        item->value = walkReplaceExpr(item->value, pattern, replacement);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
     }
     for (auto item: MI->callList) {
-        rewriteExpr(item->value);
-        rewriteExpr(item->cond);
+        item->value = walkReplaceExpr(item->value, pattern, replacement);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
     }
     for (auto item: MI->printfList) {
-        rewriteExpr(item->value);
-        rewriteExpr(item->cond);
+        item->value = walkReplaceExpr(item->value, pattern, replacement);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
+    }
+}
+static void postParseCleanup(MethodInfo *MI)
+{
+    rewriteExpr(MI, MI->guard);
+    for (auto item: MI->storeList) {
+        rewriteExpr(MI, item->dest);
+        rewriteExpr(MI, item->value);
+        rewriteExpr(MI, item->cond);
+    }
+    for (auto item: MI->letList) {
+        rewriteExpr(MI, item->dest);
+        rewriteExpr(MI, item->value);
+        rewriteExpr(MI, item->cond);
+    }
+    for (auto item: MI->callList) {
+        rewriteExpr(MI, item->value);
+        rewriteExpr(MI, item->cond);
+    }
+    for (auto item: MI->printfList) {
+        rewriteExpr(MI, item->value);
+        rewriteExpr(MI, item->cond);
+    }
+    for (auto item = MI->letList.begin(), iteme = MI->letList.end(); item != iteme;) {
+        std::string dest = tree2str((*item)->dest);
+        if (!(*item)->cond && MI->alloca.find(dest) != MI->alloca.end() && !MI->alloca[dest].noReplace) {
+printf("[%s:%d] simplify\n", __FUNCTION__, __LINE__);
+dumpMethod("BEFORE", MI);
+            replaceMethodExpr(MI, (*item)->dest, (*item)->value);
+            MI->alloca.erase(dest);
+            item = MI->letList.erase(item);
+dumpMethod("AFTER", MI);
+            continue;
+        }
+        item++;
     }
 }
 
@@ -249,7 +307,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                         if (checkItem("ALLOCA")) {
                             std::string type = getToken();
                             std::string name = getToken();
-                            MI->alloca[name] = type;
+                            MI->alloca[name] = AllocaItem{type, false};
                         }
                         else if (checkItem("STORE")) {
                             ACCExpr *cond = getExpression();
