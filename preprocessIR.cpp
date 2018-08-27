@@ -21,6 +21,24 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+std::map<std::string, int> genericModule;
+std::string genericName(std::string name)
+{
+    int ind = name.find(MODULE_SEPARATOR "__PARAM__" MODULE_SEPARATOR);
+    if (ind > 0) {
+        name = name.substr(0, ind);
+        if (genericModule[name])
+            return name;
+    }
+    return "";
+}
+std::string genericModuleParam(std::string name)
+{
+    int ind = name.rfind(MODULE_SEPARATOR);
+    if (ind > 0)
+        return name.substr(ind+1);
+    return "";
+}
 static void walkSubst (ModuleIR *IR, ACCExpr *expr)
 {
     if (!expr)
@@ -176,11 +194,18 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
             }
             ModuleIR *genericIR = buildGeneric(IR, irName, pname);
             irSeq.push_back(genericIR);
+            genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM");
             genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false});
             paramIR->fields.push_back(FieldElement{pname, -1, "INTEGER_32", false, false, false, false, true, false});
             dumpModule("GENERIC", genericIR);
         }
+    }
+    for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
+        if (genericName((*IR)->name) != "")
+            IR = irSeq.erase(IR);
+        else
+            IR++;
     }
     for (auto IR : irSeq) {
         std::map<std::string, int> localConnect;

@@ -134,6 +134,8 @@ void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string 
 
 // preprocessIR.cpp
 void preprocessIR(std::list<ModuleIR *> &irSeq);
+std::string genericName(std::string name);
+std::string genericModuleParam(std::string name);
 
 // verilog.cpp
 void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);
@@ -151,5 +153,6 @@ extern std::map<std::string, int> replaceBlock;
 extern std::list<ModData> modNew;
 extern std::map<std::string, CondGroup> condLines;
 extern std::list<PrintfInfo> printfFormat;
+extern std::map<std::string, int> genericModule;
 extern int globalExprCleanup;
 extern int flagErrorsCleanup;

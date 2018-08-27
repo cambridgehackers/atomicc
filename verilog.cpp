@@ -179,6 +179,9 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
     collectInterfacePins(IR, instance != "", "", "", false);
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
+        std::string genericMName = genericName(IR->name);
+        if (genericMName != "")
+            moduleInstantiation = genericMName + "#(" + genericModuleParam(IR->name) + ")";
 //printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.substr(0,instance.length()-1).c_str(), params.c_str());
         if (params != "") {
             std::string actual, sep;
