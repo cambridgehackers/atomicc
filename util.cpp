@@ -35,7 +35,7 @@ std::string getRdyName(std::string basename, bool suppressHack)
 
 ModuleIR *lookupIR(std::string ind)
 {
-    if (ind == "")
+    if (ind == "" || mapIndex.find(ind) == mapIndex.end())
         return nullptr;
     return mapIndex[ind];
 }

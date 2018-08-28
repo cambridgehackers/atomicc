@@ -179,7 +179,6 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
 void preprocessIR(std::list<ModuleIR *> &irSeq)
 {
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
-        bool deleteme = false;
 #if 0
 typedef struct {
     std::string name;
@@ -212,7 +211,6 @@ typedef struct {
             if (endswith(MI->name, "__RDY") && !MI->callList.size())
                continue;
             if (MI->rule || MI->storeList.size() || MI->callList.size() != 1
-|| 1
              || MI->alloca.size() || MI->letList.size() || MI->printfList.size())
                 goto skipLab;
             CallListElement *call = MI->callList.front();

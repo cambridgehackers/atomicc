@@ -193,15 +193,24 @@ static void postParseCleanup(MethodInfo *MI)
     for (auto item = MI->letList.begin(), iteme = MI->letList.end(); item != iteme;) {
         std::string dest = tree2str((*item)->dest);
         if (!(*item)->cond && MI->alloca.find(dest) != MI->alloca.end() && !MI->alloca[dest].noReplace) {
-printf("[%s:%d] simplify\n", __FUNCTION__, __LINE__);
-dumpMethod("BEFORE", MI);
             replaceMethodExpr(MI, (*item)->dest, (*item)->value);
             MI->alloca.erase(dest);
             item = MI->letList.erase(item);
-dumpMethod("AFTER", MI);
             continue;
         }
         item++;
+    }
+    for (auto item: MI->alloca) {
+        if (!item.second.noReplace)
+            continue;
+        ACCExpr *itemList = allocExpr("{");
+        std::list<FieldItem> fieldList;
+        getFieldList(fieldList, item.first, "", item.second.type, true, true);
+        for (auto fitem : fieldList)
+            if (!fitem.alias)
+                itemList->operands.push_front(allocExpr(fitem.name));
+        if (itemList->operands.size() > 1)
+            replaceMethodExpr(MI, allocExpr(item.first), itemList);
     }
 }
 

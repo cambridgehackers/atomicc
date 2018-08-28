@@ -201,6 +201,9 @@ void processInterfaces(std::list<ModuleIR *> &irSeq)
 {
     for (auto mapp: mapIndex) {
         ModuleIR *IR = mapp.second;
+        if (!IR) {
+printf("[%s:%d] module pointer missing %s\n", __FUNCTION__, __LINE__, mapp.first.c_str());
+        }
         if (startswith(IR->name, "l_serialize_"))
             processSerialize(IR);
         if (startswith(IR->name, "P2M")) {

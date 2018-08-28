@@ -33,16 +33,9 @@ std::list<ModData> modNew;
 std::map<std::string, CondGroup> condLines;
 
 std::map<std::string, AssignItem> assignList;
-static std::map<std::string, std::string> replaceTarget;
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
-    std::string temp = replaceTarget[target];
-    if (temp != "") {
-        if (trace_assign)
-printf("[%s:%d] ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ replace %s -> %s\n", __FUNCTION__, __LINE__, target.c_str(), temp.c_str());
-        target = temp;
-    }
     bool tDir = refList[target].out;
     if (!value)
         return;
@@ -67,7 +60,7 @@ if (trace_assign) {
     assignList[target] = AssignItem{value, type, false};
 }
 
-static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin)
+static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign = true)
 {
     ACCExpr *itemList = allocExpr("{");
     std::list<FieldItem> fieldList;
@@ -92,12 +85,12 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d
         refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false};
         if (!fitem.alias && out)
             itemList->operands.push_front(allocExpr(fitem.name));
-        else
+        else if (assign)
             setAssign(fitem.name, fexpr, fitem.type);
     }
     if (force)
         refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false};
-    if (itemList->operands.size())
+    if (itemList->operands.size() > 1 && assign)
         setAssign(fldName, itemList, type);
 }
 
@@ -584,7 +577,6 @@ void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop)
 static std::list<ModData> modLine;
     refList.clear();
     assignList.clear();
-    replaceTarget.clear();
     modNew.clear();
     condLines.clear();
     generateModuleSignature(IR, "", modLineTop, "");
@@ -637,7 +629,7 @@ static std::list<ModData> modLine;
             }
         }
         for (auto item: MI->alloca) // be sure to define local temps before walkRemoveParam
-            expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE);
+            expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE, false); // no longer generate setAssign
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
@@ -666,29 +658,12 @@ static std::list<ModData> modLine;
             walkRead(MI, info->value, info->cond);
         }
         for (auto info: MI->letList) {
-            ACCExpr *cond = allocExpr("&", allocExpr(getRdyName(methodName)));
-            if (info->cond)
-                cond->operands.push_back(info->cond);
-            cond = cleanupExpr(cond);
+            ACCExpr *cond = cleanupExpr(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
             ACCExpr *value = info->value;
             updateWidth(value, convertType(info->type));
             walkRead(MI, cond, nullptr);
             walkRead(MI, value, cond);
-            if (info->dest->operands.size() || value->operands.size())
-                appendMux(tree2str(info->dest), cond, value);
-            else {
-            std::list<FieldItem> fieldList;
-            getFieldList(fieldList, "", "", info->type, false, true);
-            for (auto fitem : fieldList) {
-                std::string dest = info->dest->value + fitem.name;
-                ACCExpr *newExpr = value;
-                if (isIdChar(value->value[0])) {
-                    newExpr = allocExpr(value->value + fitem.name);
-                    newExpr->operands = value->operands;
-                }
-                appendMux(dest, cond, newExpr);
-            }
-            }
+            appendMux(tree2str(info->dest), cond, value);
         }
         for (auto info: MI->callList) {
             ACCExpr *cond = info->cond;
