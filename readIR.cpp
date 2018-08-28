@@ -180,6 +180,7 @@ static void postParseCleanup(MethodInfo *MI)
         rewriteExpr(MI, item->dest);
         rewriteExpr(MI, item->value);
         rewriteExpr(MI, item->cond);
+        updateWidth(item->value, convertType(item->type));
     }
     for (auto item: MI->callList) {
         rewriteExpr(MI, item->value);
