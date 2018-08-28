@@ -628,8 +628,10 @@ static std::list<ModData> modLine;
                     listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
             }
         }
-        for (auto item: MI->alloca) // be sure to define local temps before walkRemoveParam
+        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
             expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE, false); // no longer generate setAssign
+            refList[item.first].count++;
+        }
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
