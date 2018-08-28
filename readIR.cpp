@@ -146,7 +146,7 @@ static ACCExpr *walkReplaceExpr (ACCExpr *expr, ACCExpr *pattern, ACCExpr *repla
             newExpr->operands.push_back(operand);
     return newExpr;
 }
-void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement)
+void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest = false)
 {
     MI->guard = walkReplaceExpr(MI->guard, pattern, replacement);
     for (auto item: MI->storeList) {
@@ -155,7 +155,8 @@ void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement)
         item->cond = walkReplaceExpr(item->cond, pattern, replacement);
     }
     for (auto item: MI->letList) {
-        //item->dest = walkReplaceExpr(item->dest, pattern, replacement);
+        if (replaceLetDest)
+            item->dest = walkReplaceExpr(item->dest, pattern, replacement);
         item->value = walkReplaceExpr(item->value, pattern, replacement);
         item->cond = walkReplaceExpr(item->cond, pattern, replacement);
     }
