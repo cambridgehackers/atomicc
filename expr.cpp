@@ -368,6 +368,8 @@ ACCExpr *invertExpr(ACCExpr *expr)
 
 int exprWidth(ACCExpr *expr)
 {
+    if (!expr)
+        return 0;
     if (relationalOp(expr->value))
         return 1;
     int ind = expr->value.find("'");

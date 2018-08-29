@@ -50,12 +50,12 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         if (trace_assign)
         printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
     }
-    if (assignList[target].type != "") {
-if (trace_assign) {
+    if (assignList[target].type != "" && assignList[target].value->value != "{") { // aggregate alloca items always start with an expansion expr
+//if (trace_assign) {
         printf("[%s:%d] duplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
-}
-        //exit(-1);
+//}
+        exit(-1);
     }
     assignList[target] = AssignItem{value, type, false};
 }
@@ -90,7 +90,7 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d
     }
     if (force)
         refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false};
-    if (itemList->operands.size() > 1 && assign)
+    if (itemList->operands.size() > 0 && assign)
         setAssign(fldName, itemList, type);
 }
 
@@ -628,10 +628,8 @@ static std::list<ModData> modLine;
                     listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
             }
         }
-        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
-            expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE, false); // no longer generate setAssign
-            refList[item.first].count++;
-        }
+        for (auto item: MI->alloca) // be sure to define local temps before walkRemoveParam
+            expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE);
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
@@ -665,7 +663,33 @@ static std::list<ModData> modLine;
             updateWidth(value, convertType(info->type));
             walkRead(MI, cond, nullptr);
             walkRead(MI, value, cond);
-            appendMux(tree2str(info->dest), cond, value);
+            std::string dest = tree2str(info->dest);
+            std::list<FieldItem> fieldList;
+            getFieldList(fieldList, dest, "", info->type, 1, true);
+            if (fieldList.size() == 1) {
+                std::string first = fieldList.front().name;
+                appendMux(dest, cond, value);
+                if (first != dest)
+                    appendMux(first, cond, value);
+            }
+            else {
+            std::string splitItem = tree2str(value);
+            if ((value->operands.size() || !isIdChar(value->value[0]))) {
+                splitItem = dest + "$lettemp";
+                appendMux(splitItem, cond, value);
+            }
+            for (auto fitem : fieldList) {
+                uint64_t offset = fitem.offset;
+                uint64_t uppern = offset - 1;
+                std::string upper = autostr(uppern);
+                if (fitem.type[0] == '@')
+                    upper = fitem.type.substr(1) + "+ (" + upper + ")";
+                else
+                    upper = autostr(uppern + convertType(fitem.type));
+                appendMux(fitem.name, cond,
+                    allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(autostr(offset))))));
+            }
+            }
         }
         for (auto info: MI->callList) {
             ACCExpr *cond = info->cond;
