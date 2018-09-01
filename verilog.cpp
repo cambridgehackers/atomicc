@@ -608,7 +608,7 @@ static std::list<ModData> modLine;
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName]);
             }
-            else if (convertType(item.type) != 0)
+            else// if (convertType(item.type) != 0)
                 refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false};
           return nullptr;
           });
