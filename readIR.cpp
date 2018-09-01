@@ -125,7 +125,7 @@ static void rewriteExpr(MethodInfo *MI, ACCExpr *expr)
             --ptr;
             if (expr->value != ptr->first && startswith(expr->value, ptr->first)) {
                 ptr->second.noReplace = true;
-printf("[%s:%d] %s: expr %s first %s\n", __FUNCTION__, __LINE__, MI->name.c_str(), expr->value.c_str(), ptr->first.c_str());
+//printf("[%s:%d] %s: expr %s first %s\n", __FUNCTION__, __LINE__, MI->name.c_str(), expr->value.c_str(), ptr->first.c_str());
 }
         }
     }

@@ -27,7 +27,7 @@ std::string genericName(std::string name)
     int ind = name.find(MODULE_SEPARATOR "__PARAM__" MODULE_SEPARATOR);
     if (ind > 0) {
         name = name.substr(0, ind);
-        if (genericModule[name])
+        //if (genericModule[name])   // actual body could be declared externally
             return name;
     }
     return "";
