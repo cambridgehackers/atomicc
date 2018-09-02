@@ -32,7 +32,7 @@ $(DTOP)/verilator/bin/libconnectal-sim.so: $(SIM_OBJECTS)
 $(DTOP)/verilator/obj_dir/vlsim.mk: $(DTOP)/verilator/bin/libconnectal-sim.so
 	rm -fr $(DTOP)/verilator/obj_dir
 	cd $(DTOP)/verilator; verilator -o $(DTOP)/verilator/bin/vlsim --prefix vlsim $(VERILATOR_ARGS) -cc \
-	    --top-module VsimTop $(DTOP)/generated/VsimTop.v \
+	    --top-module VsimTop $(DTOP)/../../lib/generated/VsimTop.v \
 	    $(THISDIR)/cpp/verilatortop.cpp -LDFLAGS -L$(DTOP)/verilator/bin
 
 $(DTOP)/verilator/bin/vlsim: $(DTOP)/verilator/obj_dir/vlsim.mk
