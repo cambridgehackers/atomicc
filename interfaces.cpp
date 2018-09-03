@@ -21,6 +21,10 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+//////////////////HACKHACK /////////////////
+#define IfcNames_EchoIndicationH2S 5
+#define PORTALNUM IfcNames_EchoIndicationH2S
+//////////////////HACKHACK /////////////////
 int trace_software;//= 1;
 static void processSerialize(ModuleIR *IR)
 {
@@ -67,12 +71,11 @@ static void processM2P(ModuleIR *IR)
     std::string host, target;
     uint64_t pipeArgSize = -1;
     for (auto inter: IR->interfaces) {
-        if (inter.isPtr)
-{
+        if (inter.isPtr) {
             target = inter.fldName;
-    if (trace_software)
-dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
-}
+            if (trace_software)
+                dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
+        }
         else {
             HIR = lookupIR(inter.type);
             host = inter.fldName;
@@ -119,8 +122,9 @@ exit(-1);
         if (pipeArgSize > dataLength)
             call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
         MInew->callList.push_back(new CallListElement{
-             allocExpr(target + "$enq__ENA", allocExpr(PARAMETER_MARKER, allocExpr("{ " + call
-                 + "16'd" + autostr(counter) + ", 16'd" + autostr(dataLength/32) + "}"))), nullptr, true});
+             allocExpr(target + "$enq__ENA", allocExpr(PARAMETER_MARKER,
+                 allocExpr("{ " + call + "16'd" + autostr(counter) + ", 16'd" + autostr(PORTALNUM) + "}"),
+                 allocExpr("16'd" + autostr(dataLength/32)))), nullptr, true});
         counter++;
     }
     if (trace_software)

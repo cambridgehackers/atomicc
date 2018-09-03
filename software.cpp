@@ -158,26 +158,27 @@ dumpModule("MUX", muxDef);
             bool outcall = item.second.field.isPtr;
             std::string userTypeName = item.second.inter->name;
             std::string userInterface = item.second.field.fldName;
+            std::string pName = pipeName + (outcall ? "H" : "");
             std::string fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             ModuleIR *ifcIR = allocIR(fieldName);
             ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall, false, false, false, false, false});
-            ifcIR->interfaces.push_back(FieldElement{"pipe", -1, pipeName, outcall, false, false, false, false, false});
+            ifcIR->interfaces.push_back(FieldElement{"pipe", -1, pName, outcall, false, false, false, false, false});
             IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false, false, false, false, false, false});
-            IR->interfaces.push_back(FieldElement{userInterface, -1, pipeName, outcall, false, false, false, false, false});
+            IR->interfaces.push_back(FieldElement{userInterface, -1, pName, outcall, false, false, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 localName + userInterface,
                 fieldName + MODULE_SEPARATOR + "method", userTypeName, true});
             if (outcall && hasPrintf) {
                 IR->interfaceConnect.push_back(InterfaceConnectType{
-                    muxName + "in", fieldName + MODULE_SEPARATOR + "pipe", pipeName, true});
+                    muxName + "in", fieldName + MODULE_SEPARATOR + "pipe", pName, true});
                 IR->interfaceConnect.push_back(InterfaceConnectType{
-                    muxName + "forward", localName + "printfp", pipeName, true});
+                    muxName + "forward", localName + "printfp", pName, true});
                 IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
-                    muxName + "out", pipeName, true});
+                    muxName + "out", pName, true});
             }
             else
                 IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
-                    fieldName + MODULE_SEPARATOR + "pipe", pipeName, true});
+                    fieldName + MODULE_SEPARATOR + "pipe", pName, true});
         }
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
