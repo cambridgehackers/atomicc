@@ -437,10 +437,11 @@ static ACCExpr *printfArgs(ACCExpr *listp)
     }
     next->operands.push_back(allocExpr("16'd" + autostr(printfNumber++)));
     next->operands.push_back(allocExpr("16'd" + autostr(PRINTF_PORT)));
-    next->operands.push_back(allocExpr("16'd" + autostr((total_length + sizeof(int) * 8 - 1)/(sizeof(int) * 8) + 2)));
+    std::string lenstr = "16'd" + autostr((total_length + sizeof(int) * 8 - 1)/(sizeof(int) * 8) + 2);
+    next->operands.push_back(allocExpr(lenstr));
     listp->operands.clear();
     listp->operands = next->operands;
-    ACCExpr *ret = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next));
+    ACCExpr *ret = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next, allocExpr(lenstr)));
     printfFormat.push_back(PrintfInfo{format, width});
 dumpExpr("PRINTFLL", ret);
     return ret;
