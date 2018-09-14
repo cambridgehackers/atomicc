@@ -374,7 +374,7 @@ int exprWidth(ACCExpr *expr)
         return 1;
     int ind = expr->value.find("'");
     if (isdigit(expr->value[0]) && ind > 0) {
-        std::string temp = expr->value.substr(0, ind - 1);
+        std::string temp = expr->value.substr(0, ind);
         return atoi(temp.c_str());
     }
     if (isIdChar(expr->value[0])) {
@@ -711,7 +711,7 @@ static int level;
         if (checkInteger(rhs, "1"))
             ret = ret->operands.front();
         else if (len == 1)
-            ret = allocExpr("&", ret->operands.front(), getRHS(ret));
+            ret = allocExpr("&", ret->operands.front(), rhs);
     }
     if (ret->value == "&") {
         bool restartFlag = false;
