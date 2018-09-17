@@ -215,6 +215,90 @@ static void postParseCleanup(MethodInfo *MI)
     }
 }
 
+static void readMethodInfo(MethodInfo *MI, MethodInfo *MIRdy)
+{
+    if (checkItem("(")) {
+        bool first = true;
+        while (!checkItem(")")) {
+            if (!first)
+                ParseCheck(checkItem(","), "',' missing");
+            std::string type = getToken();
+            MI->params.push_back(ParamElement{getToken(), type});
+            first = false;
+        }
+    }
+    bool foundOpenBrace = checkItem("{");
+    bool foundIf = false;
+    if (!foundOpenBrace) {
+        foundIf = checkItem("if");
+        if (!foundIf)
+            MI->type = getToken();
+    }
+    if (checkItem("="))
+        MI->guard = getExpression();
+    if (foundIf || (!foundOpenBrace && checkItem("if"))) {
+        MIRdy->guard = getExpression();
+        std::string v = MIRdy->guard->value;
+        if (v != "1" && v != "==" && v != "!=" && v != "&" && v != "|")
+            MIRdy->guard = allocExpr("!=", allocExpr("0"), MIRdy->guard);
+    }
+    else
+        MIRdy->guard = allocExpr("1");
+    if (foundOpenBrace || checkItem("{")) {
+        while (readLine() && !checkItem("}")) {
+            if (checkItem("ALLOCA")) {
+                std::string type = getToken();
+                std::string name = getToken();
+                MI->alloca[name] = AllocaItem{type, false};
+            }
+            else if (checkItem("STORE")) {
+                ACCExpr *cond = getExpression();
+                ParseCheck(checkItem(":"), "':' missing");
+                ACCExpr *dest = getExpression();
+                ParseCheck(checkItem("="), "store = missing");
+                ACCExpr *expr = str2tree(bufp);
+                MI->storeList.push_back(new StoreListElement{dest, expr, cond});
+            }
+            else if (checkItem("LET")) {
+                std::string type = getToken();
+                ACCExpr *cond = getExpression();
+                ParseCheck(checkItem(":"), "':' missing");
+                ACCExpr *dest = getExpression();
+                ParseCheck(checkItem("="), "store = missing");
+                ACCExpr *expr = str2tree(bufp);
+                MI->letList.push_back(new LetListElement{dest, expr, cond, type});
+            }
+            else if (checkItem("CALL")) {
+                bool isAction = checkItem("/Action");
+                ACCExpr *cond = getExpression();
+                ParseCheck(checkItem(":"), "':' missing");
+                ACCExpr *expr = str2tree(bufp);
+                MI->callList.push_back(new CallListElement{expr, cond, isAction});
+            }
+            else if (checkItem("PRINTF")) {
+                ACCExpr *cond = getExpression();
+                ParseCheck(checkItem(":"), "':' missing");
+                ACCExpr *expr = str2tree(bufp);
+                MI->printfList.push_back(new CallListElement{expr, cond, false});
+            }
+            else if (checkItem("GENERATE")) {
+                ACCExpr *cond = getExpression();
+                ParseCheck(checkItem(":"), "':' missing");
+                ACCExpr *init = getExpression();
+                ParseCheck(checkItem(","), "generate ',' missing");
+                ACCExpr *term = getExpression();
+                ParseCheck(checkItem(","), "generate ',' missing");
+                ACCExpr *incr = getExpression();
+                ParseCheck(checkItem(","), "generate ',' missing");
+                MI->generateFor.push_back(GenerateForItem{cond, init, term, incr, bufp});
+            }
+            else
+                ParseCheck(false, "unknown method item");
+        }
+    }
+    postParseCleanup(MI);
+}
+
 static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
@@ -281,80 +365,12 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 MethodInfo *MI = allocMethod(methodName);
                 MI->rule = rule;
                 addMethod(IR, MI);
-                if (checkItem("(")) {
-                    bool first = true;
-                    while (!checkItem(")")) {
-                        if (!first)
-                            ParseCheck(checkItem(","), "',' missing");
-                        std::string type = getToken();
-                        MI->params.push_back(ParamElement{getToken(), type});
-                        first = false;
-                    }
-                }
-                bool foundOpenBrace = checkItem("{");
-                bool foundIf = false;
-                if (!foundOpenBrace) {
-                    foundIf = checkItem("if");
-                    if (!foundIf)
-                        MI->type = getToken();
-                }
-                if (checkItem("="))
-                    MI->guard = getExpression();
                 std::string rdyName = getRdyName(methodName, true);
                 MethodInfo *MIRdy = allocMethod(rdyName);
                 addMethod(IR, MIRdy);
                 MIRdy->rule = MI->rule;
                 MIRdy->type = "INTEGER_1";
-                if (foundIf || (!foundOpenBrace && checkItem("if"))) {
-                    MIRdy->guard = getExpression();
-                    std::string v = MIRdy->guard->value;
-                    if (v != "1" && v != "==" && v != "!=" && v != "&" && v != "|")
-                        MIRdy->guard = allocExpr("!=", allocExpr("0"), MIRdy->guard);
-                }
-                else
-                    MIRdy->guard = allocExpr("1");
-                if (foundOpenBrace || checkItem("{")) {
-                    while (readLine() && !checkItem("}")) {
-                        if (checkItem("ALLOCA")) {
-                            std::string type = getToken();
-                            std::string name = getToken();
-                            MI->alloca[name] = AllocaItem{type, false};
-                        }
-                        else if (checkItem("STORE")) {
-                            ACCExpr *cond = getExpression();
-                            ParseCheck(checkItem(":"), "':' missing");
-                            ACCExpr *dest = getExpression();
-                            ParseCheck(checkItem("="), "store = missing");
-                            ACCExpr *expr = str2tree(bufp);
-                            MI->storeList.push_back(new StoreListElement{dest, expr, cond});
-                        }
-                        else if (checkItem("LET")) {
-                            std::string type = getToken();
-                            ACCExpr *cond = getExpression();
-                            ParseCheck(checkItem(":"), "':' missing");
-                            ACCExpr *dest = getExpression();
-                            ParseCheck(checkItem("="), "store = missing");
-                            ACCExpr *expr = str2tree(bufp);
-                            MI->letList.push_back(new LetListElement{dest, expr, cond, type});
-                        }
-                        else if (checkItem("CALL")) {
-                            bool isAction = checkItem("/Action");
-                            ACCExpr *cond = getExpression();
-                            ParseCheck(checkItem(":"), "':' missing");
-                            ACCExpr *expr = str2tree(bufp);
-                            MI->callList.push_back(new CallListElement{expr, cond, isAction});
-                        }
-                        else if (checkItem("PRINTF")) {
-                            ACCExpr *cond = getExpression();
-                            ParseCheck(checkItem(":"), "':' missing");
-                            ACCExpr *expr = str2tree(bufp);
-                            MI->printfList.push_back(new CallListElement{expr, cond, false});
-                        }
-                        else
-                            ParseCheck(false, "unknown method item");
-                    }
-                }
-                postParseCleanup(MI);
+                readMethodInfo(MI, MIRdy);
             }
             else
                 ParseCheck(false, "unknown module item");
