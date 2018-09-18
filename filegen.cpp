@@ -95,7 +95,7 @@ void generateVerilogOutput(FILE *OStr, std::list<ModData> &modLineTop)
     for (auto item: refList) {
         std::string temp = item.first;
         if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL) {
-        if (item.second.count) {
+        if (item.second.count && !item.second.isGenerated) {
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
 if (trace_assign && item.second.out) {
 printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
@@ -107,21 +107,44 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         }
     }
     std::string endStr, sep;
-    for (auto item: modNew) {
-        if (item.moduleStart) {
-            fprintf(OStr, "%s    %s (", endStr.c_str(), item.value.c_str());
-            if (!item.noDefaultClock)
-                fprintf(OStr, ".CLK(CLK), .nRST(nRST),");
+    bool isGenerate = false;
+    std::list<std::string> tempOutput;
+    auto flushOut = [&](void) -> void {
+        if (isGenerate)
+            fprintf(OStr, "  ");
+        for (auto item: tempOutput)
+            fprintf(OStr, "%s", item.c_str());
+        fprintf(OStr, "%s", endStr.c_str());
+        if (isGenerate) {
+            fprintf(OStr, "    end;\n");
+        }
+        tempOutput.clear();
+    };
+    for (auto mitem: modNew) {
+        if (mitem.moduleStart) {
+            flushOut();
+            isGenerate = mitem.vecCount != -1;
+            std::string instName = mitem.argName;
+            if (isGenerate) {
+                fprintf(OStr, "    genvar __inst$Genvar;\n");
+                fprintf(OStr, "    generateFor(__inst$Genvar = 0; __inst$Genvar < %d; __inst$Genvar = __inst$Genvar + 1) begin %s:\n", mitem.vecCount, mitem.argName.c_str());
+                instName = "data";
+            }
+            tempOutput.push_back("    " + mitem.value + " " + instName + " (");
+            if (!mitem.noDefaultClock)
+                tempOutput.push_back(".CLK(CLK), .nRST(nRST),");
             sep = "";
         }
         else {
-            fprintf(OStr, "%s\n        .%s(%s)", sep.c_str(), item.argName.c_str(),
-                tree2str(cleanupExpr(str2tree(item.value))).c_str());
+            std::string val = tree2str(cleanupExpr(str2tree(mitem.value)));
+            if (isGenerate)
+                fprintf(OStr, "      wire %s;\n", (sizeProcess(mitem.type) + val).c_str());
+            tempOutput.push_back(sep + "\n        ." + mitem.argName + "(" + val + ")");
             sep = ",";
         }
         endStr = ");\n";
     }
-    fprintf(OStr, "%s", endStr.c_str());
+    flushOut();
 
     for (auto item: refList) {
         std::string temp = item.first;

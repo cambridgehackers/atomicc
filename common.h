@@ -39,6 +39,7 @@ typedef struct {
     int         out;
     bool        inout;
     bool        isparam;
+    int         vecCount;
 } ModData;
 typedef struct {
     std::string name;
@@ -60,6 +61,7 @@ typedef struct {
     bool        inout;
     int         pin;
     bool        done;
+    bool        isGenerated;
 } RefItem;
 typedef struct {
     long        upper;
@@ -79,8 +81,8 @@ typedef struct {
     std::list<int> width;
 } PrintfInfo;
 
-typedef ModuleIR *(^CBFun)(FieldElement &item, std::string fldName);
-#define CBAct ^ ModuleIR * (FieldElement &item, std::string fldName)
+typedef ModuleIR *(^CBFun)(FieldElement &item);
+#define CBAct ^ ModuleIR * (FieldElement &item)
 
 // util.cpp
 std::string getRdyName(std::string basename, bool suppressHack = false);

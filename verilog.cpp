@@ -81,15 +81,15 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
 if (trace_expand || refList[fitem.name].pin)
 printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
         assert (!refList[fitem.name].pin);
-        refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false};
-        refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false};
+        refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false};
+        refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false, false};
         if (!fitem.alias && out)
             itemList->operands.push_front(allocExpr(fitem.name));
         else if (assign)
             setAssign(fitem.name, fexpr, fitem.type);
     }
     if (force)
-        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false};
+        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false};
     if (itemList->operands.size() > 0 && assign)
         setAssign(fldName, itemList, type);
 }
@@ -152,14 +152,15 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
 /*
  * Generate verilog module header for class definition or reference
  */
-static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params)
+static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params,
+bool dontDeclare = false, int vecCount = -1)
 {
     auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam, bool isLocal) -> void {
         int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
-        if (!isLocal || instance == "")
-        refList[instance + name] = RefItem{(dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, false};
-        if (!isLocal)
-        modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam});
+        if ((!isLocal || instance == "" || dontDeclare) && vecCount == -1)
+        refList[instance + name] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare};
+        if (!isLocal && !dontDeclare)
+        modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam, vecCount});
         if (trace_connect)
             printf("[%s:%d] instance %s name %s\n", __FUNCTION__, __LINE__, instance.c_str(), name.c_str());
         if (!isparam)
@@ -169,6 +170,9 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
     pinPorts.clear();
     pinMethods.clear();
     paramPorts.clear();
+    std::string minst;
+    if (instance != "")
+        minst = instance.substr(0, instance.length()-1);
     collectInterfacePins(IR, instance != "", "", "", false);
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
@@ -195,7 +199,8 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
             moduleInstantiation += "#(" + actual + ")";
         }
     }
-    modParam.push_back(ModData{"", moduleInstantiation + ((instance != "") ? " " + instance.substr(0, instance.length()-1):""), "", true, pinPorts.size() > 0, 0, false, false});
+    if (!dontDeclare)
+        modParam.push_back(ModData{minst, moduleInstantiation, "", true, pinPorts.size() > 0, 0, false, false, vecCount});
     if (instance == "")
         for (auto item: paramPorts)
             checkWire(item.name, item.type, item.isOutput, item.isInout, true, item.isLocal);
@@ -224,10 +229,10 @@ static void generateModuleSignature(ModuleIR *IR, std::string instance, std::lis
             if (mitem.value == "nRST")
                 hasnRST = true;
         }
-    if (!handleCLK && !hasCLK)
-        refList["CLK"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false};
-    if (!handleCLK && !hasnRST)
-        refList["nRST"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false};
+    if (!handleCLK && !hasCLK && vecCount == -1)
+        refList["CLK"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false, dontDeclare};
+    if (!handleCLK && !hasnRST && vecCount == -1)
+        refList["nRST"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false, dontDeclare};
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -602,22 +607,39 @@ static std::list<ModData> modLine;
             hasPrintf = true;
 
     iterField(IR, CBAct {
+        int dimIndex = 0;
+        int vecCount = item.vecCount;
+        if (vecCount != -1) {
+            std::string fldName = item.fldName;
+printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), vecCount, item.type.c_str());
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
             if (startswith(itemIR->name, "l_struct_OC_"))
                 expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
             else
-                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName]);
+                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount);
+            }
+        }
+        do {
+            std::string fldName = item.fldName;
+            if (vecCount != -1)
+                fldName += autostr(dimIndex++);
+            ModuleIR *itemIR = lookupIR(item.type);
+            if (itemIR && !item.isPtr) {
+            if (startswith(itemIR->name, "l_struct_OC_"))
+                expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
+            else
+                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != -1);
             }
             else// if (convertType(item.type) != 0)
-                refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false};
-          return nullptr;
-          });
+                refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false, false};
+        } while(--vecCount > 0);
+        return nullptr; });
     for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be allocated for rules
-            refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false};
+            refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false, false};
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
             value->value = "(";   // change from PARAMETER_MARKER
@@ -804,9 +826,13 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
             mapPort[item.second.value->value] = item.first;
         }
     // process assignList replacements, mark referenced items
+    bool skipReplace = false;
     for (auto mitem: modLine) {
         std::string val = mitem.value;
-        if (!mitem.moduleStart) {
+        if (mitem.moduleStart) {
+            skipReplace = mitem.vecCount != -1;
+        }
+        else if (!skipReplace) {
 if (trace_assign)
 printf("[%s:%d] replaceParam '%s' count %d done %d\n", __FUNCTION__, __LINE__, mitem.value.c_str(), refList[val].count, refList[val].done);
             if (refList[mitem.value].count == 0) {
@@ -831,6 +857,6 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, mitem.value.c_st
             }
             }
         }
-        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, false});
+        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, false, mitem.vecCount});
     }
 }

@@ -97,17 +97,10 @@ std::string sizeProcess(std::string type)
 ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
 {
     for (auto item: IR->fields) {
-        int64_t vecCount = item.vecCount;
-        int dimIndex = 0;
-        do {
-            std::string fldName = item.fldName;
-            if (vecCount != -1)
-                fldName += autostr(dimIndex++);
-            if (trace_iter)
-                printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
-            if (auto ret = (cbWorker)(item, fldName))
-                return ret;
-        } while(--vecCount > 0);
+        if (trace_iter)
+            printf("[%s:%d] item.fldname %s vec %d\n", __FUNCTION__, __LINE__, item.fldName.c_str(), (int)item.vecCount);
+        if (auto ret = (cbWorker)(item))
+            return ret;
     }
     return nullptr;
 }
@@ -115,17 +108,10 @@ ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
 ModuleIR *iterInterface(ModuleIR *IR, CBFun cbWorker)
 {
     for (auto item: IR->interfaces) {
-        int64_t vecCount = item.vecCount;
-        int dimIndex = 0;
-        do {
-            std::string fldName = item.fldName;
-            if (vecCount != -1)
-                fldName += autostr(dimIndex++);
-            if (trace_iter)
-                printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
-            if (auto ret = (cbWorker)(item, fldName))
-                return ret;
-        } while(--vecCount > 0);
+        if (trace_iter)
+            printf("[%s:%d] item.fldname %s vec %d\n", __FUNCTION__, __LINE__, item.fldName.c_str(), (int)item.vecCount);
+        if (auto ret = (cbWorker)(item))
+            return ret;
     }
     return nullptr;
 }
@@ -151,8 +137,17 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
         fieldName = searchStr.substr(0, ind);
         searchStr = searchStr.substr(ind+1);
         ModuleIR *nextIR = iterField(searchIR, CBAct {
-              if (ind != -1 && fldName == fieldName)
-                  return lookupIR(item.type);
+              int dimIndex = 0;
+              int vecCount = item.vecCount;
+              do {
+                  std::string fldName = item.fldName;
+                  if (vecCount != -1)
+                      fldName += autostr(dimIndex++);
+                  if (trace_iter)
+                      printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+                  if (ind != -1 && fldName == fieldName)
+                      return lookupIR(item.type);
+              } while(--vecCount > 0);
               return nullptr; });
         if (!nextIR)
             break;
@@ -180,9 +175,18 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
         fieldName = searchStr.substr(0, ind);
         searchStr = searchStr.substr(ind+1);
         ModuleIR *nextIR = iterField(searchIR, CBAct {
-              if (fieldName != "" && fldName == fieldName)
-                  return lookupIR(item.type);
-              return nullptr; });
+            int dimIndex = 0;
+            int vecCount = item.vecCount;
+            do {
+                std::string fldName = item.fldName;
+                if (vecCount != -1)
+                    fldName += autostr(dimIndex++);
+                if (trace_iter)
+                    printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+                if (fieldName != "" && fldName == fieldName)
+                    return lookupIR(item.type);
+            } while(--vecCount > 0);
+            return nullptr; });
         if (!nextIR)
             break;
         outName += fieldName + MODULE_SEPARATOR;
@@ -196,9 +200,18 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
             searchStr = searchStr.substr(ind+1);
         }
         ModuleIR *nextIR = iterInterface(searchIR, CBAct {
-              if (fieldName != "" && fldName == fieldName)
-                  return lookupIR(item.type);
-              return nullptr; });
+            int dimIndex = 0;
+            int vecCount = item.vecCount;
+            do {
+                std::string fldName = item.fldName;
+                if (vecCount != -1)
+                    fldName += autostr(dimIndex++);
+                if (trace_iter)
+                    printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+                if (fieldName != "" && fldName == fieldName)
+                    return lookupIR(item.type);
+            } while(--vecCount > 0);
+            return nullptr; });
         if (!nextIR)
             break;
         outName += fieldName;
@@ -234,12 +247,20 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
             getFieldList(fieldList, sname + item.name, tname, item.type, out, true, toff, true, false);
         }
         iterField(IR, CBAct {
-          if (!item.isParameter) {
-          getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
-          offset += convertType(item.type);
-          }
-          return nullptr;
-          });
+            int dimIndex = 0;
+            int vecCount = item.vecCount;
+            do {
+                std::string fldName = item.fldName;
+                if (vecCount != -1)
+                    fldName += autostr(dimIndex++);
+                if (trace_iter)
+                    printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+                if (!item.isParameter) {
+                    getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
+                    offset += convertType(item.type);
+                }
+            } while(--vecCount > 0);
+            return nullptr; });
     }
     else if (force) {
         if (trace_expand)
