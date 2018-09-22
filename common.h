@@ -63,6 +63,7 @@ typedef struct {
     int         pin;
     bool        done;
     bool        isGenerated;
+    int         vecCount;
 } RefItem;
 typedef struct {
     long        upper;

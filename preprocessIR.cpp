@@ -79,7 +79,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
         }
 printf("[%s:%d] ARRAAA size %d '%s' post '%s' subscriptval %s\n", __FUNCTION__, __LINE__, size, fieldName.c_str(), post.c_str(), subscript->value.c_str());
     assert (!isdigit(subscript->value[0]));
-    std::string lastElement = fieldName + autostr(size - 1) + post;
+    std::string lastElement = fieldName + "[" + autostr(size - 1) + "]" + post;
     expr->value = lastElement; // if only 1 element
     for (int i = 0; i < size - 1; i++) {
         std::string ind = autostr(i);
@@ -175,6 +175,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
 {
 
     ModuleIR *genericIR = allocIR(irName);
+    genericIR->genvarCount = IR->genvarCount;
     genericIR->metaList = IR->metaList;
     genericIR->softwareName = IR->softwareName;
     genericIR->priority = IR->priority;
@@ -243,7 +244,7 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
                         MI->printfList.push_back(new CallListElement{newExpand, newCond, isAction});
                 }
             }
-            expr->value = fieldName + "0" + post;
+            expr->value = fieldName + "[0]" + post;
         }
     };
     for (auto item: MI->storeList)

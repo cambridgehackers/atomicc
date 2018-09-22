@@ -60,7 +60,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     assignList[target] = AssignItem{value, type, false};
 }
 
-static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign = true)
+static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign = true, int vecCount = -1)
 {
     ACCExpr *itemList = allocExpr("{");
     std::list<FieldItem> fieldList;
@@ -81,15 +81,15 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
 if (trace_expand || refList[fitem.name].pin)
 printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
         assert (!refList[fitem.name].pin);
-        refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false};
-        refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false, false};
+        refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false, vecCount};
+        refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false, false, vecCount};
         if (!fitem.alias && out)
             itemList->operands.push_front(allocExpr(fitem.name));
         else if (assign)
             setAssign(fitem.name, fexpr, fitem.type);
     }
     if (force)
-        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false};
+        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false, vecCount};
     if (itemList->operands.size() > 0 && assign)
         setAssign(fldName, itemList, type);
 }
@@ -168,7 +168,7 @@ bool dontDeclare = false, int vecCount = -1, int dimIndex = 0)
                 instName = name;
         }
         if (!isLocal || instance == "" || dontDeclare)
-        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare};
+        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare, -1};
         if (!isLocal && !dontDeclare)
         modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
         if (trace_connect)
@@ -237,9 +237,9 @@ bool dontDeclare = false, int vecCount = -1, int dimIndex = 0)
                 hasnRST = true;
         }
     if (!handleCLK && !hasCLK && vecCount == -1)
-        refList["CLK"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false, dontDeclare};
+        refList["CLK"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false, dontDeclare, -1};
     if (!handleCLK && !hasnRST && vecCount == -1)
-        refList["nRST"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false, dontDeclare};
+        refList["nRST"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false, dontDeclare, -1};
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -622,7 +622,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
             if (startswith(itemIR->name, "l_struct_OC_"))
-                expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
+                expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG, true, vecCount);
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount, -1);
             }
@@ -631,20 +631,22 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             std::string fldName = item.fldName;
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
-            if (startswith(itemIR->name, "l_struct_OC_"))
-                expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
+            if (startswith(itemIR->name, "l_struct_OC_")) {
+                if (vecCount == -1)
+                    expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
+            }
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != -1, vecCount, dimIndex++);
             }
             else// if (convertType(item.type) != 0)
-                refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false, false};
+                refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false, false, -1};
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
         return nullptr; });
     for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be allocated for rules
-            refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false, false};
+            refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false, false, -1};
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
             value->value = "(";   // change from PARAMETER_MARKER

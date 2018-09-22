@@ -79,14 +79,28 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
 
 void generateVerilogOutput(FILE *OStr)
 {
+    bool isGenerate = false;
     std::list<std::string> resetList;
     // generate local state element declarations and wires
     for (auto item: refList) {
         if (trace_assign)
             printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str());
+        isGenerate = item.second.vecCount != -1;
         if (item.second.pin == PIN_REG) {
-            fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
-            resetList.push_back(item.first);
+            // HACK HACK HACK HACK
+            std::string vecCountStr = item.second.vecCount == GENERIC_INT_TEMPLATE_FLAG ? "iovecWidth" : autostr(item.second.vecCount);
+            if (isGenerate) {
+                std::string g = GENVAR_NAME + autostr(1);
+                fprintf(OStr, "    for(%s = 0; %s < %s; %s = %s + 1) begin : %s\n",
+                    g.c_str(), g.c_str(), vecCountStr.c_str(), g.c_str(), g.c_str(), item.first.c_str());
+                fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + "data").c_str());
+                fprintf(OStr, "    end;\n");
+                //resetList.push_back(item.first);
+            }
+            else {
+                fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
+                resetList.push_back(item.first);
+            }
         }
     }
     for (auto item: refList) {
@@ -104,7 +118,6 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         }
     }
     std::string endStr, sep;
-    bool isGenerate = false;
     std::list<std::string> tempOutput;
     auto flushOut = [&](void) -> void {
         if (isGenerate)
@@ -122,10 +135,12 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             flushOut();
             isGenerate = mitem.vecCount != -1;
             std::string instName = mitem.argName;
+            // HACK HACK HACK HACK
             std::string vecCountStr = mitem.vecCount == GENERIC_INT_TEMPLATE_FLAG ? "iovecWidth" : autostr(mitem.vecCount);
             if (isGenerate) {
-                fprintf(OStr, "    genvar __inst$Genvar1;\n");
-                fprintf(OStr, "    for(__inst$Genvar1 = 0; __inst$Genvar1 < %s; __inst$Genvar1 = __inst$Genvar1 + 1) begin %s:\n", vecCountStr.c_str(), mitem.argName.c_str());
+                std::string g = GENVAR_NAME + autostr(1);
+                fprintf(OStr, "    for(%s = 0; %s < %s; %s = %s + 1) begin : %s\n",
+                    g.c_str(), g.c_str(), vecCountStr.c_str(), g.c_str(), g.c_str(), mitem.argName.c_str());
                 instName = "data";
             }
             tempOutput.push_back("    " + mitem.value + " " + instName + " (");

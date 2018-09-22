@@ -215,7 +215,7 @@ static void postParseCleanup(MethodInfo *MI)
     }
 }
 
-static void readMethodInfo(MethodInfo *MI, MethodInfo *MIRdy)
+static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
 {
     if (checkItem("(")) {
         bool first = true;
@@ -296,6 +296,7 @@ static void readMethodInfo(MethodInfo *MI, MethodInfo *MIRdy)
                 ParseCheck(checkItem(","), "generate ',' missing");
                 std::string body = bufp;
                 MI->generateFor.push_back(GenerateForItem{cond, var->value, init, term, incr, body.substr(0, body.length()-5)});
+                IR->genvarCount = 1;
             }
             else
                 ParseCheck(false, "unknown method item");
@@ -341,8 +342,10 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 bool        isOutput = checkItem("/output");
                 bool        isInout = checkItem("/inout");
                 bool        isParameter = checkItem("/parameter");
-                if (checkItem("/Count"))
+                if (checkItem("/Count")) {
                     vecCount = atoi(getToken().c_str());
+                    IR->genvarCount = 1;
+                }
                 std::string type = getToken();
                 std::string fldName = getToken();
                 IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter, false});
@@ -376,7 +379,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                     MIRdy->rule = MI->rule;
                     MIRdy->type = "INTEGER_1";
                 }
-                readMethodInfo(MI, MIRdy);
+                readMethodInfo(IR, MI, MIRdy);
             }
             else
                 ParseCheck(false, "unknown module item");

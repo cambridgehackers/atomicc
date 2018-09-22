@@ -183,7 +183,10 @@ if (trace_expr)
 printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
 item = base;
 }
-        assert(refList[item].pin);
+        if(!refList[item].pin) {
+            printf("[%s:%d] pin not found '%s'\n", __FUNCTION__, __LINE__, item.c_str());
+            //exit(-1);
+        }
         refList[item].count++;
         ACCExpr *temp = assignList[item].value;
         if (temp && refList[item].count == 1)
