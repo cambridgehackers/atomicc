@@ -15,12 +15,10 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 #include <stdio.h>
-//#include <string.h>
-//#include <assert.h>
 #include "AtomiccIR.h"
 #include "common.h"
 
-static void generateModuleHeader(std::list<ModData> &modLine, FILE *OStr)
+void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
 {
     std::string sep;
     bool handleCLK = false;
@@ -79,9 +77,8 @@ static void generateModuleHeader(std::list<ModData> &modLine, FILE *OStr)
     fprintf(OStr, ");\n");
 }
 
-void generateVerilogOutput(FILE *OStr, std::list<ModData> &modLineTop)
+void generateVerilogOutput(FILE *OStr)
 {
-    generateModuleHeader(modLineTop, OStr);
     std::list<std::string> resetList;
     // generate local state element declarations and wires
     for (auto item: refList) {
@@ -231,5 +228,8 @@ next:;
         }
         fprintf(OStr, "    end // always @ (posedge CLK)\n");
     }
-    fprintf(OStr, "endmodule \n\n");
+}
+
+void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
+{
 }

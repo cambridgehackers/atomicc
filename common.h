@@ -144,7 +144,9 @@ std::string genericModuleParam(std::string name);
 void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);
 
 // filegen.cpp
-void generateVerilogOutput(FILE *OStr, std::list<ModData> &modLineTop);
+void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine);
+void generateVerilogOutput(FILE *OStr);
+void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR);
 
 extern int trace_assign;
 extern int trace_expand;
