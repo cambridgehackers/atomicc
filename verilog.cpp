@@ -21,7 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-int trace_assign;//= 1;
+int trace_assign= 1;
 int trace_connect;//= 1;
 int trace_expand;//= 1;
 int trace_skipped;//= 1;
@@ -153,26 +153,33 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
  * Generate verilog module header for class definition or reference
  */
 static void generateModuleSignature(ModuleIR *IR, std::string instance, std::list<ModData> &modParam, std::string params,
-bool dontDeclare = false, int vecCount = -1)
+bool dontDeclare = false, int vecCount = -1, int dimIndex = 0)
 {
+    std::string minst;
+    if (instance != "")
+        minst = instance.substr(0, instance.length()-1);
     auto checkWire = [&](std::string name, std::string type, int dir, bool inout, bool isparam, bool isLocal) -> void {
         int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
-        if ((!isLocal || instance == "" || dontDeclare) && vecCount == -1)
-        refList[instance + name] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare};
+        std::string instName = instance + name;
+        if (vecCount != -1) {
+            if (dontDeclare && dimIndex != -1)
+                instName = minst + "[" + autostr(dimIndex) + "]." + name;
+            else
+                instName = name;
+        }
+        if (!isLocal || instance == "" || dontDeclare)
+        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare};
         if (!isLocal && !dontDeclare)
-        modParam.push_back(ModData{name, instance + name, type, false, false, dir, inout, isparam, vecCount});
-        if (trace_connect)
-            printf("[%s:%d] instance %s name %s\n", __FUNCTION__, __LINE__, instance.c_str(), name.c_str());
+        modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
+        //if (trace_connect)
+            printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar %d isLoc %d dDecl %d vec %d dim %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam, isLocal, dontDeclare, vecCount, dimIndex);
         if (!isparam)
-        expandStruct(IR, instance + name, type, dir, inout, false, PIN_WIRE);
+        expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     pinPorts.clear();
     pinMethods.clear();
     paramPorts.clear();
-    std::string minst;
-    if (instance != "")
-        minst = instance.substr(0, instance.length()-1);
     collectInterfacePins(IR, instance != "", "", "", false);
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
@@ -617,19 +624,17 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             if (startswith(itemIR->name, "l_struct_OC_"))
                 expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
             else
-                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount);
+                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount, -1);
             }
         }
         do {
             std::string fldName = item.fldName;
-            if (vecCount != -1)
-                fldName += autostr(dimIndex++);
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
             if (startswith(itemIR->name, "l_struct_OC_"))
                 expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
             else
-                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != -1);
+                generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != -1, vecCount, dimIndex++);
             }
             else// if (convertType(item.type) != 0)
                 refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false, false};

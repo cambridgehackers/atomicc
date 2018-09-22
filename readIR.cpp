@@ -236,6 +236,7 @@ static void readMethodInfo(MethodInfo *MI, MethodInfo *MIRdy)
     }
     if (checkItem("="))
         MI->guard = getExpression();
+    if (MIRdy) {
     if (foundIf || (!foundOpenBrace && checkItem("if"))) {
         MIRdy->guard = getExpression();
         std::string v = MIRdy->guard->value;
@@ -244,6 +245,7 @@ static void readMethodInfo(MethodInfo *MI, MethodInfo *MIRdy)
     }
     else
         MIRdy->guard = allocExpr("1");
+    }
     if (foundOpenBrace || checkItem("{")) {
         while (readLine() && !checkItem("}")) {
             if (checkItem("ALLOCA")) {
@@ -362,14 +364,15 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 if (checkItem("/Rule"))
                     rule = true;
                 std::string methodName = getToken();
-                MethodInfo *MI = allocMethod(methodName);
+                MethodInfo *MI = allocMethod(methodName), *MIRdy = nullptr;
                 MI->rule = rule;
-                addMethod(IR, MI);
-                std::string rdyName = getRdyName(methodName, true);
-                MethodInfo *MIRdy = allocMethod(rdyName);
-                addMethod(IR, MIRdy);
-                MIRdy->rule = MI->rule;
-                MIRdy->type = "INTEGER_1";
+                if (addMethod(IR, MI)) {
+                    std::string rdyName = getRdyName(methodName, true);
+                    MIRdy = allocMethod(rdyName);
+                    addMethod(IR, MIRdy);
+                    MIRdy->rule = MI->rule;
+                    MIRdy->type = "INTEGER_1";
+                }
                 readMethodInfo(MI, MIRdy);
             }
             else

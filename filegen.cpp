@@ -126,8 +126,8 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             isGenerate = mitem.vecCount != -1;
             std::string instName = mitem.argName;
             if (isGenerate) {
-                fprintf(OStr, "    genvar __inst$Genvar;\n");
-                fprintf(OStr, "    generateFor(__inst$Genvar = 0; __inst$Genvar < %d; __inst$Genvar = __inst$Genvar + 1) begin %s:\n", mitem.vecCount, mitem.argName.c_str());
+                fprintf(OStr, "    genvar __inst$Genvar1;\n");
+                fprintf(OStr, "    for(__inst$Genvar1 = 0; __inst$Genvar1 < %d; __inst$Genvar1 = __inst$Genvar1 + 1) begin %s:\n", mitem.vecCount, mitem.argName.c_str());
                 instName = "data";
             }
             tempOutput.push_back("    " + mitem.value + " " + instName + " (");

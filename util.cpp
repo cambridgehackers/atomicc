@@ -291,15 +291,17 @@ MethodInfo *allocMethod(std::string name)
     return MI;
 }
 
-void addMethod(ModuleIR *IR, MethodInfo *MI)
+bool addMethod(ModuleIR *IR, MethodInfo *MI)
 {
     std::string methodName = MI->name;
     if (endswith(methodName, "__ENA"))
         methodName = methodName.substr(0, methodName.length()-5);
-    if (startswith(methodName, "FOR$"))
-        IR->generateBody[methodName] = MI;
-    else
+    bool ret = !startswith(methodName, "FOR$");
+    if (ret)
         IR->method[methodName] = MI;
+    else
+        IR->generateBody[methodName] = MI;
+    return ret;
 }
 
 void dumpMethod(std::string name, MethodInfo *MI)
