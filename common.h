@@ -25,6 +25,7 @@
 #define SUBSCRIPT_CLOSE "@]"
 #define PARAMETER_CLOSE "@}"
 #define ASSIGN_SIZE_LIMIT 6
+#define GENVAR_NAME "__inst$Genvar"
 
 #define GENERIC_INT_TEMPLATE_FLAG         999999
 #define GENERIC_INT_TEMPLATE_FLAG_STRING "999999"

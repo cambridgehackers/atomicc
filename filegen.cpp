@@ -122,9 +122,10 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             flushOut();
             isGenerate = mitem.vecCount != -1;
             std::string instName = mitem.argName;
+            std::string vecCountStr = mitem.vecCount == GENERIC_INT_TEMPLATE_FLAG ? "iovecWidth" : autostr(mitem.vecCount);
             if (isGenerate) {
                 fprintf(OStr, "    genvar __inst$Genvar1;\n");
-                fprintf(OStr, "    for(__inst$Genvar1 = 0; __inst$Genvar1 < %d; __inst$Genvar1 = __inst$Genvar1 + 1) begin %s:\n", mitem.vecCount, mitem.argName.c_str());
+                fprintf(OStr, "    for(__inst$Genvar1 = 0; __inst$Genvar1 < %s; __inst$Genvar1 = __inst$Genvar1 + 1) begin %s:\n", vecCountStr.c_str(), mitem.argName.c_str());
                 instName = "data";
             }
             tempOutput.push_back("    " + mitem.value + " " + instName + " (");
@@ -232,4 +233,26 @@ next:;
 
 void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
 {
+    // HACK HACK HACK
+    for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
+        MethodInfo *MI = FI.second;
+        std::string methodName = MI->name;
+        if (MI->generateFor.size())
+            fprintf(OStr, "// start %s\n", methodName.c_str());
+        for (auto item: MI->generateFor) {
+            //cond
+            fprintf(OStr, "    for (%s = %s; %s; %s) begin\n", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), tree2str(item.incr).c_str());
+            MethodInfo *MIb = IR->generateBody[item.body];
+            assert(MIb && "body item");
+            for (auto info: MIb->letList) {
+                ACCExpr *cond = cleanupExpr(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
+                ACCExpr *value = cleanupExprBit(info->value);
+                ACCExpr *dest = cleanupExprBit(info->dest);
+                fprintf(OStr, "        assign %s = %s;\n", tree2str(dest).c_str(), tree2str(value).c_str());
+            }
+            fprintf(OStr, "    end;\n");
+        }
+        if (MI->generateFor.size())
+            fprintf(OStr, "// end %s\n", methodName.c_str());
+    }
 }

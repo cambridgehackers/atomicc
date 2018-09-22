@@ -147,7 +147,7 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
                       printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
                   if (ind != -1 && fldName == fieldName)
                       return lookupIR(item.type);
-              } while(--vecCount > 0);
+              } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
               return nullptr; });
         if (!nextIR)
             break;
@@ -185,7 +185,7 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
                     printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
                 if (fieldName != "" && fldName == fieldName)
                     return lookupIR(item.type);
-            } while(--vecCount > 0);
+            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
             return nullptr; });
         if (!nextIR)
             break;
@@ -210,7 +210,7 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
                     printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
                 if (fieldName != "" && fldName == fieldName)
                     return lookupIR(item.type);
-            } while(--vecCount > 0);
+            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
             return nullptr; });
         if (!nextIR)
             break;
@@ -259,7 +259,7 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
                     getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
                     offset += convertType(item.type);
                 }
-            } while(--vecCount > 0);
+            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
             return nullptr; });
     }
     else if (force) {

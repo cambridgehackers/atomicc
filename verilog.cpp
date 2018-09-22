@@ -21,7 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-int trace_assign= 1;
+int trace_assign;//= 1;
 int trace_connect;//= 1;
 int trace_expand;//= 1;
 int trace_skipped;//= 1;
@@ -171,7 +171,7 @@ bool dontDeclare = false, int vecCount = -1, int dimIndex = 0)
         refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare};
         if (!isLocal && !dontDeclare)
         modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
-        //if (trace_connect)
+        if (trace_connect)
             printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar %d isLoc %d dDecl %d vec %d dim %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam, isLocal, dontDeclare, vecCount, dimIndex);
         if (!isparam)
         expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE);
@@ -638,7 +638,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             }
             else// if (convertType(item.type) != 0)
                 refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false, false};
-        } while(--vecCount > 0);
+        } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
         return nullptr; });
     for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
         MethodInfo *MI = FI.second;

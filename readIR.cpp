@@ -286,13 +286,16 @@ static void readMethodInfo(MethodInfo *MI, MethodInfo *MIRdy)
             else if (checkItem("GENERATE")) {
                 ACCExpr *cond = getExpression();
                 ParseCheck(checkItem(":"), "':' missing");
+                ACCExpr *var = getExpression();
+                ParseCheck(checkItem(","), "generate ',' missing");
                 ACCExpr *init = getExpression();
                 ParseCheck(checkItem(","), "generate ',' missing");
                 ACCExpr *term = getExpression();
                 ParseCheck(checkItem(","), "generate ',' missing");
                 ACCExpr *incr = getExpression();
                 ParseCheck(checkItem(","), "generate ',' missing");
-                MI->generateFor.push_back(GenerateForItem{cond, init, term, incr, bufp});
+                std::string body = bufp;
+                MI->generateFor.push_back(GenerateForItem{cond, var->value, init, term, incr, body.substr(0, body.length()-5)});
             }
             else
                 ParseCheck(false, "unknown method item");

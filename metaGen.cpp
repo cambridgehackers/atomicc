@@ -43,7 +43,7 @@ static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
             else if (!startswith(lookupIR(item.type)->name, "l_struct_OC_")
                  && !startswith(lookupIR(item.type)->name, "l_ainterface"))
                 metaList.push_back("//METAINTERNAL; " + fldName + "; " + lookupIR(item.type)->name + ";");
-        } while(--vecCount > 0);
+        } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
     }
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
