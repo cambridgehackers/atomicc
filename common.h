@@ -116,6 +116,7 @@ ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
 std::string treePost(const ACCExpr *arg);
 bool checkOperand(std::string s);
 ACCExpr *invertExpr(ACCExpr *expr);
+int exprWidth(ACCExpr *expr);
 void updateWidth(ACCExpr *item, int len);
 ACCExpr *getRHS(ACCExpr *expr, int match = 1);
 void walkRef (ACCExpr *expr);

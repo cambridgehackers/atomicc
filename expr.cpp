@@ -65,9 +65,13 @@ std::string treePost(const ACCExpr *arg)
     return "";
 }
 
+static bool bitOp(std::string s)
+{
+    return s == "^" || s == "&" || s == "|";
+}
 static bool booleanBinop(std::string s)
 {
-    return s == "^" || s == "&" || s == "|" || s == "&&" || s == "||";
+    return bitOp(s) || s == "&&" || s == "||";
 }
 static bool shiftOp(std::string s)
 {
@@ -75,12 +79,12 @@ static bool shiftOp(std::string s)
 }
 static bool arithOp(std::string s)
 {
-    return s == "+" || s == "-" || s == "*" || s == "%" || s == "?" || s == ":";
+    return bitOp(s) || s == "+" || s == "-" || s == "*" || s == "%" || s == "?" || s == ":";
 }
 
 static bool relationalOp(std::string s)
 {
-    return s == "==" || s == "!=" || s == "<" || s == ">";
+    return s == "==" || s == "!=" || s == "<" || s == ">" || s == "<=" || s == ">=";
 }
 
 static bool checkOperator(std::string s)
@@ -429,11 +433,13 @@ void updateWidth(ACCExpr *expr, int len)
             expr->operands.push_back(allocExpr("[", subexpr));
         }
     }
-    else if (expr->value == "?") {
-        updateWidth(getRHS(expr, 0), len);
+    else if (expr->value == ":") // for __phi
         updateWidth(getRHS(expr), len);
+    else if (expr->value == "?") {
+        updateWidth(getRHS(expr), len);
+        updateWidth(getRHS(expr, 2), len);
     }
-    else if (arithOp(expr->value))
+    else if (arithOp(expr->value) || expr->value == "(")
         for (auto item: expr->operands)
             updateWidth(item, len);
 }
@@ -506,6 +512,7 @@ void walkReplaceBuiltin(ACCExpr *expr)
             for (auto item: list->operands) {
                 item->value = "?"; // Change from ':' -> '?'
                 item->operands.push_back(allocExpr("0"));
+                updateWidth(item, exprWidth(getRHS(item)));
                 newe->operands.push_back(item);
             }
         }
@@ -706,9 +713,9 @@ static int level;
          }
     }
     factorExpr(ret);
-    if (ret->value == "?" && checkInteger(ret->operands.front(), "1"))
+    if (ret->value == "?" && checkInteger(getRHS(ret, 0), "1"))
         ret = getRHS(ret);
-    if (ret->value == "?" && checkInteger(getRHS(ret, 2), "0")) {
+    if (ret->value == "?" && checkInteger(getRHS(ret, 2), "0") && exprWidth(getRHS(ret, 2)) <= 1) {
         ACCExpr *rhs = getRHS(ret,1);
         int len = exprWidth(rhs);
         if (checkInteger(rhs, "1"))

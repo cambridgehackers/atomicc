@@ -45,6 +45,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         exit(-1);
     }
+    updateWidth(value, convertType(type));
     if (isIdChar(value->value[0])) {
         bool sDir = refList[value->value].out;
         if (trace_assign)
@@ -771,8 +772,10 @@ dumpExpr("READCALL", value);
         }
     }
     // combine mux'ed assignments into a single 'assign' statement
-    for (auto item: muxValueList)
+    for (auto item: muxValueList) {
+        updateWidth(item.second, convertType(refList[item.first].type));
         setAssign(item.first, cleanupExprBit(allocExpr("__phi", item.second)), refList[item.first].type);
+    }
     connectInterfaces(IR);
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
         setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "INTEGER_1");
