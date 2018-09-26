@@ -85,22 +85,15 @@ void generateVerilogOutput(FILE *OStr)
     for (auto item: refList) {
         if (trace_assign)
             printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str());
-        isGenerate = item.second.vecCount != -1;
         if (item.second.pin == PIN_REG) {
             // HACK HACK HACK HACK
-            std::string vecCountStr = item.second.vecCount == GENERIC_INT_TEMPLATE_FLAG ? "iovecWidth" : autostr(item.second.vecCount);
-            if (isGenerate) {
-                std::string g = GENVAR_NAME + autostr(1);
-                fprintf(OStr, "    for(%s = 0; %s < %s; %s = %s + 1) begin : %s\n",
-                    g.c_str(), g.c_str(), vecCountStr.c_str(), g.c_str(), g.c_str(), item.first.c_str());
-                fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + "data").c_str());
-                fprintf(OStr, "    end;\n");
-                //resetList.push_back(item.first);
-            }
-            else {
-                fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
+            std::string vecCountStr = " [" + (item.second.vecCount == GENERIC_INT_TEMPLATE_FLAG ? "iovecWidth" : autostr(item.second.vecCount)) + ":0]";
+            if (item.second.vecCount == -1) {
+        
+                vecCountStr = "";
                 resetList.push_back(item.first);
             }
+            fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());
         }
     }
     for (auto item: refList) {
