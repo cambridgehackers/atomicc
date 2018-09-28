@@ -736,14 +736,7 @@ dumpExpr("READCALL", value);
             walkRead(MI, value, cond);
             if (!info->isAction)
                 continue;
-            ACCExpr *tempCond = allocExpr(methodName);
-            if (cond) {
-                ACCExpr *temp = cond;
-                if (temp->value != "&")
-                    temp = allocExpr("&", temp);
-                temp->operands.push_back(tempCond);
-                tempCond = temp;
-            }
+            ACCExpr *tempCond = cleanupExpr(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
             std::string calledName = value->value;
 //printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
 //dumpExpr("CALLCOND", tempCond);
