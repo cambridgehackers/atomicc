@@ -163,9 +163,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                     if (ACCExpr *val = alitem.second.value)
                     if (isIdChar(val->value[0]) && val->value == item.first)
                         goto next;
-            if (refList[temp].done)
-                continue;
-            if (refList[temp].count) {
+            if (!refList[temp].done && refList[temp].count) {
                 if (assignList[item.first].value)
                     fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
                 else

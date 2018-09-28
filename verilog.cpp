@@ -844,10 +844,8 @@ printf("[%s:%d] replaceParam '%s' count %d done %d\n", __FUNCTION__, __LINE__, m
                     val = "0";
                 else
                     val = "";
-                refList[mitem.value].done = true;  // 'assign' line not needed; value is assigned by object inst
             }
-            else {
-            if (refList[mitem.value].count <= 1) {
+            else if (refList[mitem.value].count <= 1) {
             val = mapPort[mitem.value];
             if (val != "") {
 if (trace_assign)
@@ -857,7 +855,6 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, mitem.value.c_st
             }
             else
                 val = tree2str(replaceAssign(allocExpr(mitem.value)));
-            }
             }
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, false, mitem.vecCount});

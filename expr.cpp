@@ -155,7 +155,7 @@ std::string tree2str(ACCExpr *expr)
 void decRef(std::string name)
 {
 //return;
-    if (refList[name].count > 0)
+    if (refList[name].count > 0 && refList[name].pin != PIN_MODULE)
         refList[name].count--;
 }
 
