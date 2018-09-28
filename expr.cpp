@@ -632,6 +632,14 @@ skiplabel2:;
                     changed = true;
                     goto skipitem1;
                 }
+            if ((*item)->value == "|")
+                for (auto oitem: (*item)->operands)
+                for (auto jitem: expr->operands)
+                    if (matchExpr(oitem, jitem)) {
+                        item = expr->operands.erase(item);
+                        changed = true;
+                        goto skipitem1;
+                    }
             if (checkInteger(*item, "0")) {
                 replaceValue(expr, "0");
                 goto nextlab;
