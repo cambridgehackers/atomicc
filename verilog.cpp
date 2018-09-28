@@ -410,15 +410,15 @@ static void collectCSE(void)
 //printf("[%s:%d] END\n", __FUNCTION__, __LINE__);
 }
 
-int exprSize(ACCExpr *expr)
-{
-    return 16;
-}
-
 static int printfNumber = 1;
 #define PRINTF_PORT 0x7fff
+//////////////////HACKHACK /////////////////
+#define IfcNames_EchoIndicationH2S 5
+#define PORTALNUM IfcNames_EchoIndicationH2S
+//////////////////HACKHACK /////////////////
 static ACCExpr *printfArgs(ACCExpr *listp)
 {
+    int pipeArgSize = 128;
     ACCExpr *fitem = listp->operands.front();
     listp->operands.pop_front();
     std::string format = fitem->value;
@@ -443,20 +443,22 @@ static ACCExpr *printfArgs(ACCExpr *listp)
                 continue;
             }
         }
-        int size = exprSize(item);
+        int size = exprWidth(item);
         total_length += size;
         width.push_back(size);
         next->operands.push_back(item);
     }
     next->operands.push_back(allocExpr("16'd" + autostr(printfNumber++)));
     next->operands.push_back(allocExpr("16'd" + autostr(PRINTF_PORT)));
-    std::string lenstr = "16'd" + autostr((total_length + sizeof(int) * 8 - 1)/(sizeof(int) * 8) + 2);
-    next->operands.push_back(allocExpr(lenstr));
+    next->operands.push_back(allocExpr("16'd" + autostr(PORTALNUM)));
+    total_length += 3 * 16;
     listp->operands.clear();
     listp->operands = next->operands;
-    ACCExpr *ret = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next, allocExpr(lenstr)));
+    if (pipeArgSize > total_length)
+        next->operands.push_front(allocExpr(autostr(pipeArgSize - total_length) + "'d0"));
     printfFormat.push_back(PrintfInfo{format, width});
-dumpExpr("PRINTFLL", ret);
+    ACCExpr *ret = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next,
+        allocExpr("16'd" + autostr((total_length + 31)/32))));
     return ret;
 }
 
