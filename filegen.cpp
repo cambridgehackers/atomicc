@@ -249,7 +249,7 @@ void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
             fprintf(OStr, "// start %s\n", methodName.c_str());
         for (auto item: MI->generateFor) {
             //cond
-            fprintf(OStr, "    for (%s = %s; %s; %s) begin\n", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), tree2str(item.incr).c_str());
+            fprintf(OStr, "    for (%s = %s; %s; %s = %s) begin\n", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
             MethodInfo *MIb = IR->generateBody[item.body];
             assert(MIb && "body item");
             for (auto info: MIb->letList) {
