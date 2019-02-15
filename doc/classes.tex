@@ -5,8 +5,8 @@
 
 \rSec1[atomicc.module]{Module declaration and definition}
 
-A module is defined using the keyword "__module", resulting in generation of 
-a corresponding output verilog module.
+A module, defined using the keyword "__module", results in the generation of 
+a corresponding verilog module in the compilation output file.
 It includes local state elements, interfaces exported, interfaces imported
 and rules for clustering operations into atomic transactions.
 
@@ -19,8 +19,8 @@ schedule consistency between modules to be verified by the linker.
 \begin{example}
 \begin{codeblock}
      __module Echo {
-         EchoRequest      request;               // exported interface
-         EchoIndication   *indication;           // imported interface
+         EchoRequest      request;               // exported interface (defined by this module)
+         EchoIndication   *indication;           // imported interface (defined by the instantiator of this module)
          bool busy;
          __int(32) itemSay;
          ...
@@ -36,8 +36,8 @@ schedule consistency between modules to be verified by the linker.
 \end{codeblock}
 \end{example}
 
-To reference a separately compiled module, use "__emodule".  These external
-module definitions only need to include the exported/imported interfaces.
+To reference a module from a separate compilation unit, use "__emodule".  External
+module definitions need only specify the exported/imported interfaces.
 
 \begin{example}
 \begin{codeblock}
@@ -52,9 +52,10 @@ module definitions only need to include the exported/imported interfaces.
 An AtomicC interface is essentially an abstract class similar to a
 Java interface. All the methods are virtual and no default
 implementations are provided. AtomicC style uses composition of
-interfaces rather than inheritance.
+interfaces (using __connect) rather than inheritance.
 
-The __interface keyword defines a list of methods that are exposed from an object.
+The __interface keyword defines a list of methods that are exposed from an object that
+can be composed as a unit.
 Instead of using object inheritance to define reusable interfaces,
 they are defined/exported explicitly by objects, allowing fine-grained
 specification of interface method visibility.
@@ -96,7 +97,7 @@ Method definitions in __module declarations have the form:
 
 \begin{bnf}
 \nontermdef{atomicc-function-body}\br
-    \opt{ctor-initializer} \opt{if-guard} compound-statement
+    \opt{if-guard} compound-statement
 
 \nontermdef{if-guard}\br
     \terminal{if (} condition \terminal{)}
@@ -124,6 +125,8 @@ with imported interface references between objects within a module declaration.
 \end{bnf}
 
 \begin{example}
+\begin{multicols}{2}
+AtomicC example
 \begin{codeblock}
      __interface ExampleRequest {
          void say(__int(32) v);
@@ -143,12 +146,22 @@ with imported interface references between objects within a module declaration.
          __connect producer.callOut = consumer.callIn;
      };
 \end{codeblock}
+\columnbreak
+BSV example
+\begin{codeblock}
+    BSV example
+    BSV example
+    BSV example
+    BSV example
+    BSV example
+\end{codeblock}
+\end{multicols}
 \end{example}
 
 Comparision with BSV:
 \begin{itemize}
 \item The declaration for 'A' is just like BSV.
-In BSV, the declaration for B requires the interface be passed in as
+In BSV, the declaration for B requires the interface instance for 'callOut' be passed in as
 an interface parameter (forcing a textual ordering to the source code
 declaration sequence).
 \item In AtomicC, the interfaces are stitched together outside in any

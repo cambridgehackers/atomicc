@@ -3,7 +3,7 @@
 
 %%--------------------------------------------------
 %% basics
-\documentclass[a4paper,10pt,oneside,openany,final]{memoir}
+\documentclass[a4paper,12pt,oneside,openany,final]{memoir}
 
 \usepackage[american]
            {babel}        % needed for iso dates
@@ -102,25 +102,25 @@
 \include{atomicc}
 \include{classes}
 \include{statements}
-\include{declarations}
-\include{expressions}
+%% \include{declarations}
+%% \include{expressions}
 \include{modules}
-\include{usage}
+%% \include{usage}
 
 \FlushAndPrintGrammar
 %%--------------------------------------------------
 %% appendices
-\appendix
-\include{grammar}
-\include{schedule}
-\include{cpp-grammar}
+%% \appendix
+%% \include{grammar}
+%% \include{schedule}
+%% \include{cpp-grammar}
 
 \bibliographystyle{IEEEtran}
 \bibliography{references,bs-related-papers}
 
 %%--------------------------------------------------
 %% back matter
-\backmatter
+%% \backmatter
 
 %%--------------------------------------------------
 %% End of document
