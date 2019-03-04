@@ -4,18 +4,28 @@
 \rSec1[atomicc.intro]{Introduction(alt)}
 
 AtomicC is a structural hardware description language, permitting
-the high level specification of algorithms which will be instantiated
+the high level specification of algorithms to be instantiated
 directly in hardware.
+Separate compilation of modules promotes the safe use of pre-compiled, validated
+libraries, improving productivity on large projects.
+Automated synthesis of scheduling signals in the modular design
+decreases the analytic burden on the engineer; compile-time analysis
+detects all errors where serializable execution of transactions cannot be guaranteed.
 
-In software languages such as C++, execution occurs as a single, sequential thread.
-Since pointers and call-by-reference are widely used,
-the compiler cannot statically
-determine which specific state elements are referenced by program
-statements, prohibiting automated detection of concurrent access conflicts.
-Implementation of parallel execution coordination falls completely
-on the user correctly analyzing and using runtime libraries for features such as
-threading, signalling instances, mutex operations and atomic primitives.
+%In software languages such as C++, execution occurs as a single, sequential thread.
+%In data structure design, heavy use is made of inheritance and subclassing
+%in creating both data structure declarations and in defining methods usable
+%to perform operations on the class.
+%Since pointers and call-by-reference are widely used,
+%the compiler cannot statically
+%determine which specific state elements are referenced by program
+%statements, prohibiting automated detection of concurrent access conflicts.
+%Implementation of parallel execution coordination falls completely
+%on the user correctly analyzing and using runtime libraries for features such as
+%threading, signalling instances, mutex operations and atomic primitives.
 
+The syntax of AtomicC is derived from C++, but
+the semantic interpretation differs significantly.
 In AtomicC, all enabled statements in all modules execute on every clock cycle.
 With such a high degree of parallelism, automated detection of concurrency
 conflicts can prevent large drops in productivity.
@@ -23,16 +33,41 @@ Since there are no pointers, the compiler can statically determine the 'read' an
 footprint for every statement, allowing automated verification and
 synthesis of logic to prevent concurrency conflicts.
 
-AtomicC module definitions consist to 3 parts: 1) the module's interface to other
-modules (in Verilog, 'ports'), 2) instantiation
-of state elements used internally by the module and 3) 'rules', which group
-assignment statements into atomic transactions.
+AtomicC follows in the tradition of the Go language \cite{Pike2012},
+promoting the use of interfaces when performing composition and
+coupling rather than inheritance.  Using building blocks to assemble (compose) a solution
+to your problem is both easier to write and easier to maintain.
+A 'method invocation' style syntax indicates when data ports to module
+are valid and when commit transactions on interfaces should be performed.
+Implicit ready signalling from the called module allows it to prevent
+scheduling of the calling transaction until all necessary elements are
+available.
+
 The AtomicC compiler generates a separate Verilog module definition
 for each source AtomicC module definition.
 This verilog source defines the state elements
 used in the design as well as their connections (netlist).
-The syntax of AtomicC is derived from C++, but, as we will see below,
-the semantic interpretation differs significantly.
+
+AtomicC module definitions consist to 3 parts: 1) the module's interface to other
+modules (in Verilog, 'ports'), 2) instantiation
+of state elements used internally by the module and 3) 'rules', which group
+assignment statements into atomic transactions.
+
+\rSec2[atomicc.interface]{Interfaces}
+
+In AtomicC, 'interface's are a mechanism for expressing an abstract data type\cite{Liskov74programmingwith}.
+An interface
+is a list of method signatures, but no method bodies.
+A module can declare named interface elements and then provide implementations of
+the methods of each of these interfaces.  A module definition can also declare
+elements that are 'interface reference's, allowing the module to invoke methods
+in an external module.
+
+Named interfaces elements can be: 1)referenced by the instantiator of the module,
+2) forwarded transparently as an interface for the instantiating module or 3) 'connected'
+to an 'interface reference' of another module in the instantiating scope.
+
+\cite{MitchPlt}
 
 \rSec2[atomicc.interface]{Interactions between modules}
 
@@ -52,6 +87,7 @@ Rules execute as atomic transactions: internal states in the rule
 execution are not visible to other rules.  In addition, although all enabled
 rules execute every cycle, their execution must be 
 "equivalent" to some legal sequential computation.
+\cite{Lamport:1979:MMC:1311099.1311750}
 If two rules are not serializable (they have a 'read' or a 'write' conflict),
 static compile analysis must be able prove that their execution is disjoint
 or the source text of the program must specify the priority order of execution
