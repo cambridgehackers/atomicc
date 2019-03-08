@@ -6,71 +6,52 @@
 AtomicC is a structural hardware description language, permitting
 the high level specification of algorithms to be instantiated
 directly in hardware.
+AtomicC is a timed HDL and all state elements in the hardware
+netlist are explicit in the source code of the design.
 Separate compilation of modules promotes the safe use of pre-compiled, validated
 libraries, improving productivity on large projects.
 
-AtomicC is a structural hardware description language that extends C++
+AtomicC extends C++
 with Bluespec-style\cite{Bluespec:www,Hoe:Thesis,HoeArvind:TRS_Synthesis2}
 modules, rules, interfaces, and methods.
-
-AtomicC is structural in that all state elements in the hardware
-netlist are explicit in the source code of the design. AtomicC is a
-timed HDL, using SystemC terminology. 
-Atomic actions (rules and method invocations) execute in a single clock cycle.
-AtomicC does not attempt to replicate the behavior of all C++ constructs in hardware.
-Instead, it uses the C++ text to specify the desired single static assignment(SSA) computations
-and performs these computations under an atomic rule-based execution model.
+AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware.
+Instead, it uses the C++ source text to specify the desired
+single static assignment(SSA) computations,
+performing these computations under an atomic rule-based execution model.
 In addition, an interface definition scheme is used to explicitly and flexibly
 manage the visibility of interface methods to a module.
 
-Unlike C++'s serialized execution model, AtomicC permits all enabled rules to be atomically executable on
-every clock cycle.  The AtomicC compiler verifies that it is valid to consider
-all rules executed during a given clock cycle
-as if they were serialized into a linear, atomic ordering ("sequentially consistent"(SC)).
-Even though all concurrent rules are executed during the same clock cycle, SC allows us to compute the
-outcome of each rule independantly of any other rules that could be executing at the same time.
-
 Like Connectal, AtomicC designs may include both hardware and
 software, using interfaces to specify hardware/software communication
-in a type safe way. The AtomicC compiler generates the code to pass
+in a type safe way. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
 
 \rSec3[atomicc.mod]{Modules}
-Compose modules
-
-Each interface is an ADT for the module.  Named allows specific connections (in and out).
-
-In AtomicC, 'interface's are a mechanism for expressing an abstract data type\cite{Liskov74programmingwith}.
-An interface
-is a list of method signatures, but no method bodies.
-A module can declare named interface elements and then provide implementations of
-the methods of each of these interfaces.  A module definition can also declare
-elements that are 'interface reference's, allowing the module to invoke methods
-in an external module.
-
-Named interfaces elements can be: 1)referenced by the instantiator of the module,
-2) forwarded transparently as an interface for the instantiating module or 3) 'connected'
-to an 'interface reference' of another module in the instantiating scope.
-
-Method sets -> interfaces
-
-Modules interfaced methods
+The basic building block of AtomicC is the module declaration.
+AtomicC module definitions consist of 3 parts:
+1) instantiation of modules for state elements used internally by the module,
+2) the module's interface for interacting with other modules.
+and 3) 'rules', which group conditional assignment statements and method invocations into atomic transactions.
 
 Instatiated modules are interacted with through their interface methods.  The parameters
 to these methods are used to conditionally pass data to the instantiated module.
-The 'invocation' of the method is used to communicate to the module that the associated
-data parameters are valid.  The 'invoked' method is able to hold off execution by the
-caller.
-
-In Verilog, instantiated modules are interacted with through their interface pins
-(or 'ports' in Verilog terminology).  To associate 'ready' ('able to be invoked')
+The 'invocation' of the method communicates to the module that the associated
+data parameters are valid and to execute the text of the method.
+The 'invoked' method is able to hold off invocation by the caller.
+To associate 'ready' ('able to be invoked')
 and 'valid' ('invoke on next cycle'), AtomicC uses module 'method' to connect data
 and control signals.
 
+An interface is a list of method signatures, but no method bodies, defining
+a abstract data type(ADT)\cite{Liskov74programmingwith} for the module.
+Named interface declarations allows multiple ADTs to be defined for
+the module and an explicit denotation of which ADTs are connected to other
+state elements in the program text.
 AtomicC follows in the tradition of the Go language \cite{Pike2012},
 promoting the use of interfaces when performing composition and
-coupling rather than inheritance.  Using building blocks to assemble (compose) a solution
-to your problem is both easier to write and easier to maintain.
+coupling rather than using inheritance.  Assembling (composing) a solution
+to your problem using structural composition of building blocks
+is both easy to write and maintain.
 
 A 'method invocation' style syntax indicates when data ports to module
 are valid and when commit transactions on interfaces should be performed.
@@ -80,9 +61,16 @@ available.
 
 2 types of methods: 1) "Action".  Return void. Have parameters, ready, valid; 2) "Value". Return value, have ready.
 
+A module can declare named interface elements and then provide implementations of
+the methods of each of these interfaces.  A module definition can also declare
+elements that are 'interface reference's, allowing the module to invoke methods
+in an external module.
+Named interfaces elements can be: 1)referenced by the instantiator of the module,
+2) forwarded transparently as an interface for the instantiating module or 3) 'connected'
+to an 'interface reference' of another module in the instantiating scope.
+
 \rSec3[atomicc.modrule]{Rules}
-The syntax of AtomicC is derived from C++, but
-the semantic interpretation differs significantly.
+Atomic actions (rules and method invocations) execute in a single clock cycle.
 In AtomicC, all enabled statements in all modules execute on every clock cycle.
 
 Rules execute as atomic transactions: internal states in the rule
@@ -90,20 +78,22 @@ execution are not visible to other rules.  In addition, although all enabled
 rules execute every cycle, their execution must be 
 "equivalent" to some legal sequential computation.
 \cite{Lamport:1979:MMC:1311099.1311750}
-If two rules are not serializable (they have a 'read' or a 'write' conflict),
-static compile analysis must be able prove that their execution is disjoint
-or the source text of the program must specify the priority order of execution
-when both rules are valid.
-Note that there is no 'fair' scheduling: the higher priority valid rule will
-be executed on each cycle.
+The AtomicC compiler verifies that it is valid to consider
+all rules executed during a given clock cycle
+as if they were serialized into a linear, atomic ordering ("sequentially consistent"(SC)).
+Even though all concurrent rules are executed during the same clock cycle, SC allows us to compute the
+outcome of each rule independantly of any other rules that could be executing at the same time.
 
-With such a high degree of parallelism, automated detection of concurrency
-conflicts can prevent large drops in productivity.
+If static compile analysis cannot prove that their execution is disjoint
+or the source text of the program must specify the priority order of execution
+when both rules are valid,
+then two rules are not serializable (they have a 'read' or a 'write' conflict).
+Note that there is no 'fair' scheduling: on each cycle, the higher priority valid rule will
+always be executed.
+
 Since there are no pointers, the compiler can statically determine the 'read' and 'write'
 footprint for every statement, allowing automated verification and
 synthesis of logic to prevent concurrency conflicts.
-
-Rules are transactions in a module, executed every cycle.
 
 Automated synthesis of scheduling signals in the modular design
 decreases the analytic burden on the engineer; compile-time analysis
@@ -147,14 +137,6 @@ synthesis. Alternate translations are possible: to native code via
 LLVM, to System C, to Gallina for formal verification with the Coq
 Proof Assistant, etc.
 
-\rSec2[atomicc.outline2]{Outline2}
-
-AtomicC module definitions consist to 3 parts: 1) the module's interface to other
-modules (in Verilog, 'ports'), 2) instantiation
-of state elements used internally by the module and 3) 'rules', which group
-assignment statements into atomic transactions.
-
-%%\cite{MitchPlt}
 \rSec1[atomicc.prev]{Previous work}
 
 AtomicC derives heavily from and is based upon the language Bluespec Verilog (BSV)
