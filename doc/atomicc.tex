@@ -1,12 +1,12 @@
 %!TEX root = std.tex
 \rSec0[atomicc.basic]{Basic}
 
-\rSec1[atomicc.intro]{Introduction(alt)}
+\rSec1[atomicc.intro]{Introduction}
 
-AtomicC is a structural hardware description language, permitting
+AtomicC is a timed, structural hardware description language, permitting
 the high level specification of algorithms to be instantiated
 directly in hardware.
-AtomicC is a timed HDL and all state elements in the hardware
+AtomicC is structural in that all state elements in the hardware
 netlist are explicit in the source code of the design.
 Separate compilation of modules promotes the safe use of pre-compiled, validated
 libraries, improving productivity on large projects.
@@ -18,48 +18,32 @@ AtomicC does not attempt to emulate the behavior of all C++ constructs in hardwa
 Instead, it uses the C++ source text to specify the desired
 single static assignment(SSA) computations,
 performing these computations under an atomic rule-based execution model.
-In addition, an interface definition scheme is used to explicitly and flexibly
-manage the visibility of interface methods to a module.
+
+AtomicC follows in the tradition of the Go language \cite{Pike2012},
+promoting the use of interfaces when performing composition and
+coupling rather than using inheritance.  Assembling (composing) a solution
+to your problem using structural composition of building blocks
+is easy to write and maintain.
 
 Like Connectal, AtomicC designs may include both hardware and
 software, using interfaces to specify hardware/software communication
 in a type safe way. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
 
-\rSec3[atomicc.mod]{Modules}
 The basic building block of AtomicC is the module declaration.
-AtomicC module definitions consist of 3 parts:
-1) instantiation of modules for state elements used internally by the module,
-2) the module's interface for interacting with other modules.
-and 3) 'rules', which group conditional assignment statements and method invocations into atomic transactions.
+AtomicC modules consist of 3 parts:
+\begin{itemize}
+\item instantiation of state elements used internally by the module,
+\item the module's interface for interacting with other modules.
+\item 'rules', which group conditional assignment statements and method invocations into atomic transactions.
+\end{itemize}
 
-Instatiated modules are interacted with through their interface methods.  The parameters
-to these methods are used to conditionally pass data to the instantiated module.
-The 'invocation' of the method communicates to the module that the associated
-data parameters are valid and to execute the text of the method.
-The 'invoked' method is able to hold off invocation by the caller.
-To associate 'ready' ('able to be invoked')
-and 'valid' ('invoke on next cycle'), AtomicC uses module 'method' to connect data
-and control signals.
-
+\rSec1[atomicc.interface]{Interfaces}
 An interface is a list of method signatures, but no method bodies, defining
 a abstract data type(ADT)\cite{Liskov74programmingwith} for the module.
 Named interface declarations allows multiple ADTs to be defined for
-the module and an explicit denotation of which ADTs are connected to other
+the module and an explicit denotation of which ADTs are accessable from other
 state elements in the program text.
-AtomicC follows in the tradition of the Go language \cite{Pike2012},
-promoting the use of interfaces when performing composition and
-coupling rather than using inheritance.  Assembling (composing) a solution
-to your problem using structural composition of building blocks
-is both easy to write and maintain.
-
-A 'method invocation' style syntax indicates when data ports to module
-are valid and when commit transactions on interfaces should be performed.
-Implicit ready signalling from the called module allows it to prevent
-scheduling of the calling transaction until all necessary elements are
-available.
-
-2 types of methods: 1) "Action".  Return void. Have parameters, ready, valid; 2) "Value". Return value, have ready.
 
 A module can declare named interface elements and then provide implementations of
 the methods of each of these interfaces.  A module definition can also declare
@@ -69,45 +53,44 @@ Named interfaces elements can be: 1)referenced by the instantiator of the module
 2) forwarded transparently as an interface for the instantiating module or 3) 'connected'
 to an 'interface reference' of another module in the instantiating scope.
 
-\rSec3[atomicc.modrule]{Rules}
-Atomic actions (rules and method invocations) execute in a single clock cycle.
-In AtomicC, all enabled statements in all modules execute on every clock cycle.
+Instatiated modules are interacted with through their interface methods.  The parameters
+to these methods are used to pass data to the instantiated module.
+AtomicC uses a \textbf{VALID/READY} handshake process\cite{Fletcher2009, AXISpec} to invoke methods,
+giving both the invoker(master) and invokee(slave) the ability to control the progress of execution.
+The master uses the \textbf{VALID} signal
+of the method to show when data is available; the slave uses the associated
+\textbf{READY} signal to show when the data can be accepted.
+The method invocation transaction succeeds only when
+both \textbf{VALID} and \textbf{READY} are HIGH.
+Implicit ready signalling from the called module allows it to prevent
+scheduling of the calling transaction until all necessary elements are
+available.
 
-Rules execute as atomic transactions: internal states in the rule
-execution are not visible to other rules.  In addition, although all enabled
-rules execute every cycle, their execution must be 
-"equivalent" to some legal sequential computation.
-\cite{Lamport:1979:MMC:1311099.1311750}
+2 types of methods: 1) "Action".  Return void. Have parameters, ready, valid; 2) "Value". Return value, have ready.
+
+\rSec1[atomicc.modrule]{Rules}
+In AtomicC, all enabled statements in all modules execute on every clock cycle
+as atomic transactions: internal states in the rule
+execution are not visible to other rules.
+The compiler synthesizes control signals that allow rules to fire
+only when their dependant elements are ready and checks that enabled
+rules in a cycle are
+"equivalent" to some legal sequential computation \cite{Lamport:1979:MMC:1311099.1311750}.
+
+The compiler statically determines the 'read' and 'write'
+footprint for every rule.
+If static compile analysis cannot prove that their execution is disjoint
+or the source text of the program must specify the priority order of execution
+when both rules are valid,
+then two rules are not serializable (they have a 'read' or a 'write' conflict).
+
 The AtomicC compiler verifies that it is valid to consider
 all rules executed during a given clock cycle
 as if they were serialized into a linear, atomic ordering ("sequentially consistent"(SC)).
 Even though all concurrent rules are executed during the same clock cycle, SC allows us to compute the
 outcome of each rule independantly of any other rules that could be executing at the same time.
 
-If static compile analysis cannot prove that their execution is disjoint
-or the source text of the program must specify the priority order of execution
-when both rules are valid,
-then two rules are not serializable (they have a 'read' or a 'write' conflict).
-Note that there is no 'fair' scheduling: on each cycle, the higher priority valid rule will
-always be executed.
-
-Since there are no pointers, the compiler can statically determine the 'read' and 'write'
-footprint for every statement, allowing automated verification and
-synthesis of logic to prevent concurrency conflicts.
-
-Automated synthesis of scheduling signals in the modular design
-decreases the analytic burden on the engineer; compile-time analysis
-detects all errors where serializable execution of transactions cannot be guaranteed.
-
-The compiler automatically synthesizes control signals that allow rules to fire
-only when their dependant elements are ready and when there are no conflicts with
-other rules executing in the same cycle.  The removal of this analytic burden on
-the engineer increases productivity as well as improves reliability of the
-resulting design.
-
-"Scheduling" ensures SC guarantee.
-
-\rSec3[atomicc.modcomp]{Compilation}
+\rSec1[atomicc.modcomp]{Compilation}
 
 The AtomicC compiler generates a separate Verilog module definition
 for each source AtomicC module definition.
@@ -136,25 +119,6 @@ an intermediate representation and then to Verilog for simulation or
 synthesis. Alternate translations are possible: to native code via
 LLVM, to System C, to Gallina for formal verification with the Coq
 Proof Assistant, etc.
-
-\rSec1[atomicc.prev]{Previous work}
-
-AtomicC derives heavily from and is based upon the language Bluespec Verilog (BSV)
-and the experiences of the BSV community.  Although the responsibility for all
-errors in AtomicC lie solely with the current authors, the underlying analysis and
-concepts come from 20 years of accumulated research in this area that community.
-
-In the Esposito Scheduler\cite{Esposito:Patent},
-the Bluespec compiler creates a linear schedule, adding
-one rule at a time.  When a rule violates constraints from the previously scheduled
-rules, an error is issued and an automatic guard is synthesised to prevent the
-rule from executing on cycles where conflicting rules are executing.
-
-Since the rules are added to the schedule approximately in the order they are
-found in the source program text, the resulting schedule (and which rules are
-inhibited) can be affected by source ordering and edits.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \rSec1[atomicc.schedule]{Scheduling}
 
@@ -187,23 +151,23 @@ the source text with "priority" statements to resolve conflicts.
 \item sensitivity set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
 \item schedule set: all rules that could possibly conflict (rules that share elements in sensitivity set)
 \end{itemize}
-
+\pagebreak
 \rSec2[atomicc.schedalg]{Algorithm}
 
 \begin{lstlisting}[mathescape=true]
 // Partition rules into disjoint "schedule sets"
-U = { $R_{i}, M_{i}$ forall i }   // Construct set of unscheduled rules and methods for this module
-While $U \neq \emptyset$           // While there are unscheduled rules/methods
-    Extract a rule, T, from U
-    $P_{i} = \{ T \}$          // Create next schedule set
-    forall E in U
-        if $S(E) \cap S(P_{i}) \neq \emptyset$
-            Move E from U to $P_{i}$
+WorkSet = { $R_{i}, M_{i}$ forall i }   // Construct set of unscheduled rules and methods for this module
+While $WorkSet \neq \emptyset$           // While there are unscheduled rules/methods
+    Extract a rule, T, from WorkSet
+    $ScheduleSet = \{ T \}$          // Create next schedule set
+    forall E in WorkSet
+        if $S(E) \cap S(ScheduleSet) \neq \emptyset$
+            Move E from WorkSet to $ScheduleSet$
     // Create 'read-before-write' graph
-    Initialize graph G to have nodes for all elements in $P_{i}$
-    forall T in $P_{i}$
+    Initialize graph G to have nodes for all elements in $ScheduleSet$
+    forall T in $ScheduleSet$
         forall W in T.write
-            forall J in $P_{i}$
+            forall J in $ScheduleSet$
                 forall R in J.read
                     if W.name == R.name
                         add arc [$T \Rightarrow J$; guard: $(W.cond\ \&\&\ R.cond\ \&\&\ \pi(T)\ \&\&\ \pi(J))$]
@@ -221,3 +185,20 @@ While $U \neq \emptyset$           // While there are unscheduled rules/methods
               loop still exists, report error
 \end{lstlisting}
 
+
+\rSec1[atomicc.prev]{Previous work}
+
+AtomicC derives heavily from and is based upon the language Bluespec Verilog (BSV)
+and the experiences of the BSV community.  Although the responsibility for all
+errors in AtomicC lie solely with the current authors, the underlying analysis and
+concepts come from 20 years of accumulated research in this area that community.
+
+In the Esposito Scheduler\cite{Esposito:Patent},
+the Bluespec compiler creates a linear schedule, adding
+one rule at a time.  When a rule violates constraints from the previously scheduled
+rules, an error is issued and an automatic guard is synthesised to prevent the
+rule from executing on cycles where conflicting rules are executing.
+
+Since the rules are added to the schedule approximately in the order they are
+found in the source program text, the resulting schedule (and which rules are
+inhibited) can be affected by source ordering and edits.
