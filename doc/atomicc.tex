@@ -149,38 +149,35 @@ the source text with "priority" statements to resolve conflicts.
 \item read set: $R_{i}.read$
 \item write set: $R_{i}.write$
 \item sensitivity set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
-\item schedule set: all rules that could possibly conflict (rules that share elements in sensitivity set)
 \end{itemize}
-\pagebreak
 \rSec2[atomicc.schedalg]{Algorithm}
 
 \begin{lstlisting}[mathescape=true]
-// Partition rules into disjoint "schedule sets"
-WorkSet = { $R_{i}, M_{i}$ forall i }   // Construct set of unscheduled rules and methods for this module
-While $WorkSet \neq \emptyset$           // While there are unscheduled rules/methods
-    Extract a rule, T, from WorkSet
-    $ScheduleSet = \{ T \}$          // Create next schedule set
-    forall E in WorkSet
-        if $S(E) \cap S(ScheduleSet) \neq \emptyset$
-            Move E from WorkSet to $ScheduleSet$
-    // Create 'read-before-write' graph
-    Initialize graph G to have nodes for all elements in $ScheduleSet$
-    forall T in $ScheduleSet$
-        forall W in T.write
-            forall J in $ScheduleSet$
-                forall R in J.read
-                    if W.name == R.name
-                        add arc [$T \Rightarrow J$; guard: $(W.cond\ \&\&\ R.cond\ \&\&\ \pi(T)\ \&\&\ \pi(J))$]
+$WorkSet = { R_{i}, M_{i} forall i }$   // Construct set of unscheduled rules and methods
+While $WorkSet \neq \varnothing$           // While there are unscheduled rules/methods
+    // Group all rules/methods that have some overlap in read/write sets
+    $ScheduleSet$ = Extract a rule/method, T, from $WorkSet$
+    $ScheduleSet = \{ E \vert S(E) \cap S(ScheduleSet) \neq \varnothing  \}$  // Create next schedule set
+    $WorkSet = WorkSet \setminus ScheduleSet$
+    // Create 'read-before-write' digraph
+    $G = (V, E)$
+    where: 
+       $V$ is a set of vertices $== ScheduleSet$
+       $E$ is a set of edges $== \{ uv \vert u.Write \cap v.Read \neq \varnothing \}$
     // Check/repair 'read-before-write' graph to be SC
     forall loops L in G
-       loopcondition = true
-       forall arcs A in L 
-          loopcondition = loopcondition & A.guard
-       if loopcondition is not identically false
+       loopCondition = true
+       forall arcs uv in L 
+          arcCondition = false
+          forall element in u.Write
+             if element in v.Read
+                 arcCondition |= $(u.Write(element).cond\ \&\ v.Read(element).cond\ \&\ \pi(u)\ \&\ \pi(v))$
+          loopCondition &= arcCondition
+       if loopCondition is not identically false
           if loop has some method $M_{i}$ and some rule $R_{j}$
-              $ready(R_{j}) = ready(R_{j})\ \&\&\ \neg \pi(M_{i})$
+              $ready(R_{j})$ &= $\neg \pi(M_{i})$
           else if source code has "priority $R_{i} > R_{j}$" & $R_{i}$ in L & $R_{j}$ in L
-              $ready(R_{j}) = ready(R_{j})\ \&\&\ \neg \pi(R_{i})$
+              $ready(R_{j})$ &= $\neg \pi(R_{i})$
           else
               loop still exists, report error
 \end{lstlisting}
