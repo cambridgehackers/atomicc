@@ -166,13 +166,8 @@ While $WorkSet \neq \varnothing$           // While there are unscheduled rules/
        $E$ is a set of edges $== \{ uv \vert u.Write \cap v.Read \neq \varnothing \}$
     // Check/repair 'read-before-write' graph to be SC
     forall loops L in G
-       loopCondition = true
-       forall arcs uv in L 
-          arcCondition = false
-          forall element in u.Write
-             if element in v.Read
-                 arcCondition |= $(u.Write(element).cond\ \&\ v.Read(element).cond\ \&\ \pi(u)\ \&\ \pi(v))$
-          loopCondition &= arcCondition
+       loopCondition = fold (&, { $\forall uv \in L \colon$
+          fold (|, { $\forall E \in u.Write, E \in v.Read \colon (u.Write(E).cond\ \&\ v.Read(E).cond) $}) })
        if loopCondition is not identically false
           if loop has some method $M_{i}$ and some rule $R_{j}$
               $ready(R_{j})$ &= $\neg \pi(M_{i})$
