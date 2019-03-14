@@ -8,6 +8,9 @@ the high level specification of algorithms to be instantiated
 directly in hardware.
 AtomicC is structural in that all state elements in the hardware
 netlist are explicit in the source code of the design.
+AtomicC follows in the tradition of the Go language,
+promoting the use of interfaces when performing composition and
+coupling rather than using inheritance \cite{Pike2012}.
 Separate compilation of modules promotes the safe use of pre-compiled, validated
 libraries, improving productivity on large projects.
 
@@ -15,58 +18,67 @@ AtomicC extends C++
 with Bluespec-style\cite{Bluespec:www,Hoe:Thesis,HoeArvind:TRS_Synthesis2}
 modules, rules, interfaces, and methods.
 AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware.
-Instead, it uses the C++ source text to specify the desired
-single static assignment(SSA) computations,
-performing these computations under an atomic rule-based execution model.
-
-AtomicC follows in the tradition of the Go language \cite{Pike2012},
-promoting the use of interfaces when performing composition and
-coupling rather than using inheritance.  Assembling (composing) a solution
-to your problem using structural composition of building blocks
-is easy to write and maintain.
+Instead, it uses a subset of the C++ language to specify desired
+conditional assignments to state elements,
+performing these operations under an atomic rule-based execution model.
+Transactions are "write" or "commit" actions.
 
 Like Connectal, AtomicC designs may include both hardware and
-software, using interfaces to specify hardware/software communication
+software components, using interfaces to specify hardware/software communication
 in a type safe way. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
 
-The basic building block of AtomicC is the module declaration.
-AtomicC modules consist of 3 parts:
+The basic building block of AtomicC is the module declaration,
+consisting of 3 parts:
 \begin{itemize}
 \item instantiation of state elements used internally by the module,
-\item the module's interface for interacting with other modules.
+\item the module's interface for interacting with other modules,
 \item 'rules', which group conditional assignment statements and method invocations into atomic transactions.
 \end{itemize}
 
 \rSec1[atomicc.interface]{Interfaces}
 An interface is a list of method signatures, but no method bodies, defining
-a abstract data type(ADT)\cite{Liskov74programmingwith} for the module.
-Named interface declarations allows multiple ADTs to be defined for
-the module and an explicit denotation of which ADTs are accessable from other
-state elements in the program text.
+an abstract data type(ADT) \cite{Liskov74programmingwith} for the module.
+Named interface declarations allow a module to expose
+multiple, independent, heterogeneous ADTs for system construction.
+This allows explicit denotation in the program text
+of which ADTs are connected to and accessable from other state elements.
 
-A module can declare named interface elements and then provide implementations of
-the methods of each of these interfaces.  A module definition can also declare
-elements that are 'interface reference's, allowing the module to invoke methods
+A module can export named interface elements, providing implementations of
+the methods of each of these interfaces.  A module definition can also import
+interface references, allowing the module to invoke methods defined
 in an external module.
-Named interfaces elements can be: 1)referenced by the instantiator of the module,
-2) forwarded transparently as an interface for the instantiating module or 3) 'connected'
-to an 'interface reference' of another module in the instantiating scope.
+
+Named interfaces elements can be:
+\begin{itemize}
+\item referenced by the instantiator of the module,
+\item forwarded transparently as an interface for the instantiating module,
+\item 'connected' to an 'interface reference' of another module in the instantiating scope.
+\end{itemize}
+
+There are 2 types of methods:
+\begin{itemize}
+\item \textbf{Action method procedures} perform persistent operations on state elements
+and do not have a return value.  A compiler generated \textbf{ready} signal
+indicates when the callee is available to perform the method invocation.  A compiler generated
+\textbf{valid} signal indicates that the caller wishes to perform the method invocation (which
+takes place only when both \textbf{ready} and \textbf{valid} are high during the same clock cycle).
+\item \textbf{Value method functions} provide transient access to module state element values along
+with a compiler generated \textbf{ready} signal to indicate when that value is valid.
+\end{itemize}
 
 Instatiated modules are interacted with through their interface methods.  The parameters
 to these methods are used to pass data to the instantiated module.
-AtomicC uses a \textbf{VALID/READY} handshake process\cite{Fletcher2009, AXISpec} to invoke methods,
+AtomicC uses a \textbf{valid/ready} handshake process\cite{Fletcher2009, AXISpec} to invoke methods,
 giving both the invoker(master) and invokee(slave) the ability to control the progress of execution.
-The master uses the \textbf{VALID} signal
+The master uses the \textbf{valid} signal
 of the method to show when data is available; the slave uses the associated
-\textbf{READY} signal to show when the data can be accepted.
+\textbf{ready} signal to show when the data can be accepted.
 The method invocation transaction succeeds only when
-both \textbf{VALID} and \textbf{READY} are HIGH.
-Implicit ready signalling from the called module allows it to prevent
+both \textbf{valid} and \textbf{ready} are HIGH.
+\textbf{Ready} signalling from the called module allows it to prevent
 scheduling of the calling transaction until all necessary elements are
 available.
-
-2 types of methods: 1) "Action".  Return void. Have parameters, ready, valid; 2) "Value". Return value, have ready.
 
 \rSec1[atomicc.modrule]{Rules}
 In AtomicC, all enabled statements in all modules execute on every clock cycle
@@ -90,36 +102,6 @@ as if they were serialized into a linear, atomic ordering ("sequentially consist
 Even though all concurrent rules are executed during the same clock cycle, SC allows us to compute the
 outcome of each rule independantly of any other rules that could be executing at the same time.
 
-\rSec1[atomicc.modcomp]{Compilation}
-
-The AtomicC compiler generates a separate Verilog module definition
-for each source AtomicC module definition.
-This verilog source defines the state elements
-used in the design as well as their connections (netlist).
-
-Modules independently compiled.  Combined with "linking", which validates schedule using header files.
-
-Physical partitioning is used to separate design into separately synthesized pieces, connected using
-"long distance" signalling.  Parallel synthesis; bitstreams combined.
-
-AtomicC execution consists of 3 phases:
-\begin{itemize}
-\item netlist generation, 
-\item netlist compilation or implementation
-\item and runtime.
-\end{itemize}
-
-During netlist
-generation, modules are instantiated by executing their
-constructors. During this phase, any C++ constructs may be used, but
-the resulting netlist must only contain synthesizeable components.
-
-During netlist compilation, the netlist is analyzed and translated to
-an intermediate representation and then to Verilog for simulation or
-synthesis. Alternate translations are possible: to native code via
-LLVM, to System C, to Gallina for formal verification with the Coq
-Proof Assistant, etc.
-
 \rSec1[atomicc.schedule]{Scheduling}
 
 Each rule has a set of state elements that it reads and another set of element that it writes.
@@ -133,7 +115,7 @@ than any rules that read the same state element.
 \item Non-conflicting: A given state element cannot be written by more than one concurrently executable rule.
 \end{itemize}
 
-The compiler and linker do not break SC violations automatically. Error require the user to annotate
+The compiler and linker do not break SC violations automatically. Errors require the user to annotate
 the source text with "priority" statements to resolve conflicts.
 
 \rSec2[atomicc.scheddefs]{Definitions}
@@ -149,48 +131,83 @@ the source text with "priority" statements to resolve conflicts.
 \item read set: $R_{i}.read$
 \item write set: $R_{i}.write$
 \item sensitivity set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
+\item arc condition: $arcCond(uv) \equiv
+\newline
+      fold (|, \{ \forall E \in u.Write, E \in v.Read \colon (u.Write(E).cond\ \&\ v.Read(E).cond) \})$
 \end{itemize}
 \rSec2[atomicc.schedalg]{Algorithm}
 
 \begin{lstlisting}[mathescape=true]
-$WorkSet = { R_{i}, M_{i} forall i }$   // Construct set of unscheduled rules and methods
-While $WorkSet \neq \varnothing$           // While there are unscheduled rules/methods
-    // Group all rules/methods that have some overlap in read/write sets
-    $ScheduleSet$ = Extract a rule/method, T, from $WorkSet$
-    $ScheduleSet = \{ E \vert S(E) \cap S(ScheduleSet) \neq \varnothing  \}$  // Create next schedule set
-    $WorkSet = WorkSet \setminus ScheduleSet$
+$WorkSet$ = { all rules and methods for module }
+for $r \in WorkSet$ do
+    // Greedily group all rules/methods that have some overlap in read/write sets
+    $V = \{ r \}$
+    $V = \{ E \vert S(E) \cap S(V) \neq \varnothing  \}$  // Create next schedule set
+    $WorkSet = WorkSet \setminus V$
+
     // Create 'read-before-write' digraph
     $G = (V, E)$
     where: 
-       $V$ is a set of vertices $== ScheduleSet$
-       $E$ is a set of edges $== \{ uv \vert u.Write \cap v.Read \neq \varnothing \}$
-    // Check/repair 'read-before-write' graph to be SC
-    forall loops L in G
-       loopCondition = fold (&, { $\forall uv \in L \colon$
-          fold (|, { $\forall E \in u.Write, E \in v.Read \colon (u.Write(E).cond\ \&\ v.Read(E).cond) $}) })
-       if loopCondition is not identically false
-          if loop has some method $M_{i}$ and some rule $R_{j}$
-              $ready(R_{j})$ &= $\neg \pi(M_{i})$
-          else if source code has "priority $R_{i} > R_{j}$" & $R_{i}$ in L & $R_{j}$ in L
-              $ready(R_{j})$ &= $\neg \pi(R_{i})$
+       $V$ is a set of vertices
+       $E$ is a set of arcs $==$ { uv $\vert$ arcCond(uv) is not identically false }
+
+    // Find loops
+    $L$ = loops in $G$
+
+    for $L \in G$ do
+       if fold (&, { $\forall uv \in L \colon$ arcCond(uv)}) is not identically false
+          // 'break' loop L
+          if loop has some method $M$ & some rule $R$
+              $ready(R)$ &= $\neg \pi(M)$
+          else if source code has "priority $R1 > R2$" & $R1 \in L$ & $R2 \in L$
+              $ready(R2)$ &= $\neg \pi(R1)$
           else
               loop still exists, report error
 \end{lstlisting}
 
+\rSec2[atomicc.schedfuture]{Future directions in scheduling}
 
-\rSec1[atomicc.prev]{Previous work}
+It is possible to create new rules that 'read' the 'commit value' for a state element.
+This would be done by synthesising a new 'combined rule' and scheduling it \cite{Rosenband:Thesis}.
 
-AtomicC derives heavily from and is based upon the language Bluespec Verilog (BSV)
-and the experiences of the BSV community.  Although the responsibility for all
-errors in AtomicC lie solely with the current authors, the underlying analysis and
-concepts come from 20 years of accumulated research in this area that community.
+\rSec2[atomicc.schedprev]{Previous scheduling work}
 
 In the Esposito Scheduler\cite{Esposito:Patent},
-the Bluespec compiler creates a linear schedule, adding
+the Bluespec compiler creates a specific, linear schedule, adding
 one rule at a time.  When a rule violates constraints from the previously scheduled
 rules, an error is issued and an automatic guard is synthesised to prevent the
-rule from executing on cycles where conflicting rules are executing.
+rule from executing on cycles when conflicting rules are executed.
 
 Since the rules are added to the schedule approximately in the order they are
 found in the source program text, the resulting schedule (and which rules are
 inhibited) can be affected by source ordering and edits.
+
+\rSec1[atomicc.modcomp]{Compilation}
+
+The AtomicC compiler generates a separate Verilog module definition
+for each source AtomicC module definition.
+This verilog source defines the state elements
+used in the design as well as their connections (netlist).
+
+Modules independently compiled.  Combined with "linking", which validates schedule using header files.
+
+Physical partitioning is used to separate design into separately synthesized pieces, connected using
+"long distance" signalling.  Parallel synthesis; bitstreams combined.
+
+AtomicC execution consists of 3 phases:
+\begin{itemize}
+\item static elaboration: netlist generation, 
+\item netlist compilation or implementation
+\item and runtime.
+\end{itemize}
+
+During netlist
+generation, modules are instantiated by executing their
+constructors. During this phase, any C++ constructs may be used, but
+the resulting netlist must only contain synthesizeable components.
+
+During netlist compilation, the netlist is analyzed and translated to
+an intermediate representation and then to Verilog for simulation or
+synthesis. Alternate translations are possible: to native code via
+LLVM, to System C, to Gallina for formal verification with the Coq
+Proof Assistant, etc.
