@@ -20,8 +20,9 @@ modules, rules, interfaces, and methods.
 AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware.
 Instead, it uses a subset of the C++ language to specify desired
 conditional assignments to state elements,
-performing these operations under an atomic rule-based execution model.
-Transactions are "write" or "commit" actions.
+performing these operations under an atomic transaction rule-based execution model.
+In AtomicC, all module data is private; an instantiator of a module can only 
+interact with it via method invocations.
 
 Like Connectal, AtomicC designs may include both hardware and
 software components, using interfaces to specify hardware/software communication
@@ -31,83 +32,74 @@ arguments between hardware and software.
 The basic building block of AtomicC is the module declaration,
 consisting of 3 parts:
 \begin{itemize}
-\item instantiation of state elements used internally by the module,
-\item the module's interface for interacting with other modules,
-\item 'rules', which group conditional assignment statements and method invocations into atomic transactions.
+\item Instantiation of state elements used by the module,
+\item Interface declarations for interacting from other modules,
+\item Rules, which group assignment statements and method invocations into atomic transactions.
 \end{itemize}
 
 \rSec1[atomicc.interface]{Interfaces}
-An interface is a list of method signatures, but no method bodies, defining
-an abstract data type(ADT) \cite{Liskov74programmingwith} for the module.
-Named interface declarations allow a module to expose
-multiple, independent, heterogeneous ADTs for system construction.
-This allows explicit denotation in the program text
+Instantiated modules are interacted with using one or more interfaces exported by the module.
+An interface definition is a list of method signatures, but no method bodies, defining
+an abstract data type(ADT) \cite{Liskov74programmingwith}.
+Module interfaces are named, 
+allowing explicit denotation in the program text
 of which ADTs are connected to and accessable from other state elements.
-
-A module can export named interface elements, providing implementations of
-the methods of each of these interfaces.  A module definition can also import
-interface references, allowing the module to invoke methods defined
-in an external module.
-
-Named interfaces elements can be:
-\begin{itemize}
-\item referenced by the instantiator of the module,
-\item forwarded transparently as an interface for the instantiating module,
-\item 'connected' to an 'interface reference' of another module in the instantiating scope.
-\end{itemize}
+In addition to defining and exporting interfaces,
+a module definition can also import
+interface references, exported from an
+externally defined module.
 
 There are 2 types of methods:
 \begin{itemize}
-\item \textbf{Action method procedures} perform persistent operations on state elements
-and do not have a return value.  A compiler generated \textbf{ready} signal
-indicates when the callee is available to perform the method invocation.  A compiler generated
-\textbf{valid} signal indicates that the caller wishes to perform the method invocation (which
-takes place only when both \textbf{ready} and \textbf{valid} are high during the same clock cycle).
-\item \textbf{Value method functions} provide transient access to module state element values along
-with a compiler generated \textbf{ready} signal to indicate when that value is valid.
+\item \textbf{Value method functions} provide read-only access to module state elements.
+\item \textbf{Action method procedures} perform transactions on state elements
+and do not have a return value.
+Parameters are used to pass transaction data to the instantiated module.
+A compiler generated
+\textbf{valid} signal indicates that the caller wishes to perform the method invocation.
 \end{itemize}
 
-Instatiated modules are interacted with through their interface methods.  The parameters
-to these methods are used to pass data to the instantiated module.
-AtomicC uses a \textbf{valid/ready} handshake process\cite{Fletcher2009, AXISpec} to invoke methods,
-giving both the invoker(master) and invokee(slave) the ability to control the progress of execution.
-The master uses the \textbf{valid} signal
-of the method to show when data is available; the slave uses the associated
-\textbf{ready} signal to show when the data can be accepted.
-The method invocation transaction succeeds only when
-both \textbf{valid} and \textbf{ready} are HIGH.
-\textbf{Ready} signalling from the called module allows it to prevent
-scheduling of the calling transaction until all necessary elements are
+Both types of methods use a compiler generated \textbf{ready} signal
+to indicate when the callee is available and
+to prevent scheduling of the calling transaction until all necessary elements are
 available.
 
+AtomicC uses a \textbf{valid/ready} handshake process\cite{Fletcher2009, AXISpec} to invoke action methods,
+giving both the invoker(master) and invokee(slave) the ability to control the progress of execution.
+The master uses the \textbf{valid} signal
+of the method to show when parameter data is available and the transaction should be performed
+The method invocation transaction succeeds only when
+both \textbf{valid} and \textbf{ready} are HIGH ($\pi(M_{i}) \equiv ready(M_{i})\ \&\&\ valid(M_{i})$).
+
+Exported interfaces can be used in several ways:
+\begin{itemize}
+\item invoked directly by the instantiator of the module,
+\item forwarded transparently, becoming another exported interface of the instantiating module,
+\item 'connected' to an 'interface reference' of another module in the instantiating scope.
+\end{itemize}
+
 \rSec1[atomicc.modrule]{Rules}
-In AtomicC, all enabled statements in all modules execute on every clock cycle
-as atomic transactions: internal states in the rule
+In AtomicC, all enabled statements in all modules execute on every clock cycle.
+These executions are atomic transactions: internal states in the rule
 execution are not visible to other rules.
 The compiler synthesizes control signals that allow rules to fire
-only when their dependant elements are ready and checks that enabled
-rules in a cycle are
-"equivalent" to some legal sequential computation \cite{Lamport:1979:MMC:1311099.1311750}.
-
-The compiler statically determines the 'read' and 'write'
-footprint for every rule.
-If static compile analysis cannot prove that their execution is disjoint
-or the source text of the program must specify the priority order of execution
-when both rules are valid,
-then two rules are not serializable (they have a 'read' or a 'write' conflict).
-
-The AtomicC compiler verifies that it is valid to consider
-all rules executed during a given clock cycle
-as if they were serialized into a linear, atomic ordering ("sequentially consistent"(SC)).
+only when their dependant elements are ready and validates that all enabled
+rules in any cycle are
+"equivalent" to some legal sequentially consistent (SC)
+computation \cite{Lamport:1979:MMC:1311099.1311750}.
 Even though all concurrent rules are executed during the same clock cycle, SC allows us to compute the
 outcome of each rule independantly of any other rules that could be executing at the same time.
 
 \rSec1[atomicc.schedule]{Scheduling}
 
+The AtomicC compiler verifies that it is valid to consider
+all rules executed during a given clock cycle
+as if they were serialized into a linear, atomic ordering ("sequentially consistent"(SC)).
+
 Each rule has a set of state elements that it reads and another set of element that it writes.
+Value method invocations are treated as reads; action method invocations are treated as writes.
 For the execution of a group of rules to be considered to be SC, the following must
 be true:
-
 \begin{itemize}
 \item Atomic: All read and write operations for a given rule occur at the same time point in the sequence.
 \item Read-before-write:  A rule that writes a state element must occur later in the sequence
@@ -115,27 +107,26 @@ than any rules that read the same state element.
 \item Non-conflicting: A given state element cannot be written by more than one concurrently executable rule.
 \end{itemize}
 
-The compiler and linker do not break SC violations automatically. Errors require the user to annotate
-the source text with "priority" statements to resolve conflicts.
-
-\rSec2[atomicc.scheddefs]{Definitions}
+The compiler statically determines the 'read' and 'write'
+footprint for every rule and method.
 \begin{itemize}
-\item Rules: $R_{i}$
-\item Methods: $M_{i}$
-\item Control signals:
-\begin {itemize}
-\item Exported signal(generated by callee):  $ready(M_{i})$
-\item Imported signal(generated by caller):  $valid(M_{i})$
-\end{itemize}
-\item Rule firing condition: $\pi(M_{i}) \equiv ready(M_{i})\ \&\&\ valid(M_{i})$
 \item read set: $R_{i}.read$
 \item write set: $R_{i}.write$
 \item sensitivity set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
+\end{itemize}
+
+The compiler and linker do not break SC violations automatically.
+If static compile analysis cannot prove that their execution conditions(guards) or
+effects(sensitivity sets) are always disjoint,
+then the source text of the program must specify the priority order of scheduling
+to resolve conflicts.
+
+\rSec2[atomicc.schedalg]{Algorithm}
+\begin{itemize}
 \item arc condition: $arcCond(uv) \equiv
 \newline
       fold (|, \{ \forall E \in u.Write, E \in v.Read \colon (u.Write(E).cond\ \&\ v.Read(E).cond) \})$
 \end{itemize}
-\rSec2[atomicc.schedalg]{Algorithm}
 
 \begin{lstlisting}[mathescape=true]
 $WorkSet$ = { all rules and methods for module }
@@ -158,12 +149,27 @@ for $r \in WorkSet$ do
        if fold (&, { $\forall uv \in L \colon$ arcCond(uv)}) is not identically false
           // 'break' loop L
           if loop has some method $M$ & some rule $R$
-              $ready(R)$ &= $\neg \pi(M)$
+              $valid(R)$ &= $\neg valid(M)$
           else if source code has "priority $R1 > R2$" & $R1 \in L$ & $R2 \in L$
-              $ready(R2)$ &= $\neg \pi(R1)$
+              $valid(R2)$ &= $\neg valid(R1)$
           else
               loop still exists, report error
 \end{lstlisting}
+
+\rSec2[atomicc.schedlink]{Linking}
+
+Without knowledge of the internals of a method, it must be assumed that all "action method"
+calls to a state element conflict.  In addition, it must be assumed that all "value method" calls
+must preceed all "action method" calls in any clock cycle.
+
+Since method/method conflicts in a module cannot be validated in the absence of
+information about their usage, this processing is delayed until the "module group binding"
+stage of linking.
+(It is not possible to resolve these conflicts standalone in the instantiated module.)
+
+The linker cannot break any loops, but can only report on errors that are non-DAG.
+
+Memoize checked results.
 
 \rSec2[atomicc.schedfuture]{Future directions in scheduling}
 
