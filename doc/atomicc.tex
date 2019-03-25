@@ -13,6 +13,10 @@ promoting the use of interfaces when performing composition and
 coupling rather than using inheritance \cite{Pike2012}.
 Separate compilation of modules promotes the safe use of pre-compiled, validated
 libraries, improving productivity on large projects.
+The AtomicC compiler 
+generates a single Verilog module for each AtomicC module declared.
+Standard Verilog backend tools are then used to create the netlist and synthesize
+the resulting ASIC or FPGA.
 
 AtomicC extends C++
 with Bluespec-style\cite{Bluespec:www,Hoe:Thesis,HoeArvind:TRS_Synthesis2}
@@ -29,8 +33,8 @@ software components, using interfaces to specify hardware/software communication
 in a type safe way. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
 
-The basic building block of AtomicC is the module declaration,
-consisting of 3 parts:
+The basic building block of AtomicC is the module declaration.
+Modules consist of 3 parts:
 \begin{itemize}
 \item Instantiation of state elements used by the module,
 \item Interface declarations for interacting from other modules,
