@@ -32,11 +32,26 @@ Sequential logic = combinational logic + memory elements
 
 Synchronous logic = sequential logic + clock
 
-\begin{importgraphic}
-{Simple ordering example}
-{fig:sync}
-{figsync.pdf}
-\end{importgraphic}
+%%\begin{importgraphic}
+%%{Simple ordering example}
+%%{fig:sync}
+%%{figsync.pdf}
+%%\end{importgraphic}
+\tikzset{  
+block/.style    = {draw, thick, rectangle, minimum height = 3em, minimum width = 3em},}
+\begin{tikzpicture}[auto, thick, >=triangle 45,fill=blue!20]
+\node at (0,0)[circle,draw,inner sep=0pt,minimum width=3mm,name=n1,label={225:$-$},fill=blue!20] {};
+\node[block,right of= n1,node distance=2cm,fill=blue!20] (con) {Controller};
+%%\node[block,right of= con,node distance=3cm,fill=blue!20] (sys) {System};
+\node[block,below of=con,xshift=.1cm,node distance=2cm,fill=blue!20] (mea) {Memory};
+\draw[<-] (n1.west) to node[midway,above] {$r$} (-1,0);
+\draw[->] (n1.east) to node[midway,above] {$e$} (con.west);
+%%\draw[->] (con.east) to node[midway,above] {$u$} (sys.west);
+\draw[->] (con.east) to node[midway,above] (y) {$y$} ++(3,0);
+\draw[->] (y.south) |- node[midway,above] {} (mea.east);
+\draw[->] (mea.west) -| node[near end] {$y_m$} (n1.south);
+\draw[<-] (mea.south) to ++(0,-1) node[below] {$Clock$};
+\end{tikzpicture}
 
 From Hoe\cite{Hoe:Thesis}, the Term Rewriting System representation of this is:
 
