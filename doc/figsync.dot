@@ -1,11 +1,25 @@
 digraph figsync
 {
-  rankdir=RL;
-  ruleA [label="RuleA\nread = {E1, E2}"];
-  ruleB [label="RuleB\nread = {E3}\nwrite = {E2}"];
-  ruleC [label="RuleC\nwrite={E1,E3}"];
+  nodesep = 1;
+  sep=1;
 
-  ruleC -> ruleB [label="{E3}"];
-  ruleC -> ruleA [label="{E1}"];
-  ruleB -> ruleA [label="{E2}"];
+  nodeinp [label = "Input", shape = plaintext];
+  nodeoutp [label = "Output", shape = plaintext];
+  nodemem [shape=record, label = "Memory", width = 2, height=.5];
+/*
+  /*node [shape=record,width=3,height=1];*
+  nodecl [label = "{ CL | <f1> | <f2>}" ];
+*/
+  nodecl [shape=plaintext, label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="20" CELLPADDING="0">
+      <TR><TD PORT="f1">CL</TD></TR>
+      <TR><TD PORT="f2" COLSPAN="20"></TD></TR>
+    </TABLE>>];
+
+  {rank=same nodeinp nodecl nodeoutp};
+  nodeinp:e->nodecl:w;
+  nodecl:e->nodeoutp:w;
+  nodecl:f2:e -> nodemem:e;
+  nodemem:w -> nodecl:f2:w;
 }
+
