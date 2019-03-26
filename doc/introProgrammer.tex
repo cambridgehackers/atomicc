@@ -1,0 +1,49 @@
+\infannex{introProg}{Introduction for Programmers}
+
+\pnum
+\rSec1[introProg.sw]{Software}
+
+In software, the core model is the time-multiplexed execution
+of software threads by one or more central processing units (CPUs).
+Extensive use of address arithmetic (pointers
+and indexing) improves code density, both at the source level and at
+runtime.
+
+The programmer
+must decorate the code with library calls to dynamically enforce
+mutual exclusion (mutex) regions, preventing the interleaved execution of
+multiple threads accessing a single storage element.
+In languages like Java, the programmer is able to decorate the
+storage element declarations to automate calling of these mutex operations.
+
+In all cases, since the compiler cannot statically determine which specific
+storage elements are subject to contentious access, the programmer is responsible
+for correct manual decoration of the source code.
+
+\rSec1[introProg.hw]{Hardware}
+
+In hardware, the core model is clock-based updates to state elements from
+a combinational logic net.
+
+Combinational logic = boolean circuits
+
+Sequential logic = combinational logic + memory elements
+
+Synchronous logic = sequential logic + clock
+
+\begin{importgraphic}
+{Simple ordering example}
+{fig:sync}
+{figsync.pdf}
+\end{importgraphic}
+
+From Hoe\cite{Hoe:Thesis}, the Term Rewriting System representation of this is:
+
+$\textbf{s'}$ = if $\pi(\textbf{s})$ then $\delta(\textbf{s})$ else $\textbf{s}$
+
+Since all hardware elements are independent, all valid source lines in the
+program text are executed on every cycle.
+Access to state elements supports neither pointers nor indexing, allowing the
+compiler to statically determine parallel access transaction conflict sets,
+allowing the flagging of all combinations where correct operation cannot
+be guaranteed.
