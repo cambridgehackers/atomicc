@@ -1,7 +1,5 @@
 \infannex{introProg}{Introduction for Programmers}
 
-\tikzset{  
-block/.style    = {draw, thick, rectangle, minimum height = 3em, minimum width = 3em},}
 
 \pnum
 \rSec1[introProg.sw]{Software}
@@ -26,26 +24,23 @@ for correct manual decoration of the source code.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     \begin{tikzpicture}
         [title/.style={font=\fontsize{18}{18}\color{black!45}},
-        server/.style={rectangle, draw, fill=blue!23, rounded corners, minimum height=9em},
-        client/.style={rectangle, draw, fill=green!23, rounded corners, minimum height=2em},
+        server/.style={rectangle, draw, fill=blue!23},
+        client/.style={rectangle, draw, fill=green!23},
         dot/.style={circle, fill=black, minimum size=2pt, inner sep=0pt, outer sep=2pt},
         link/.style={latex-latex}]
         % Place nodes
-        \node [server, outer sep=8pt, align=center] (s1) at (5,8.3) {S1};
-        \node [server, outer sep=8pt, align=center] (s2) at (7.65,8.3) {S2};
-        \node [server, outer sep=8pt] (s3) at (10.3,8.3) {S3};
-        \node [draw=black!50, fit={(s1) (s2) (s3)}] (back) {};
-        \node [client] (c1) at (0,9.5) {C1};
-        \node [client] (c2) at ($(c1) + (270:1.15)$) {C2};
-        \node [client] (c3) at ($(c2) + (270:1.15)$) {C3};
+        \node [server, outer sep=8pt, align=center, minimum height=9em] (sched) at (5,8.3) {Scheduler};
+        \node [server, outer sep=8pt, align=center] (cpu1) at (7.65,8.3) {CPU};
+        \node [server, outer sep=8pt, align=center] (cpu2) at (7.65,9.3) {CPU};
+        \node [draw=black!50, fit={(sched) (cpu1) (cpu2)}] (back) {};
+        \node [client] (c1) at (0,9.5) {Software thread};
+        \node [client] (c2) at ($(c1) + (270:1.15)$) {Software thread};
+        \node [client] (c3) at ($(c2) + (270:1.15)$) {Software thread};
         \node [dot] (c4) at ($(c3) + (270:1)$) {};
         \node [dot] (c5) at ($(c4) + (270:0.5)$) {};
         \node [dot] (c6) at ($(c5) + (270:0.5)$) {};
-        \node [draw=red!50, fit={($(c1.north)+(0, 8pt)$) (c2) (c3) (c4) (c5) ($(c6.south)+(0, -7pt)$)}, inner sep=5.75pt] (front) {};
-        \draw (c1) -- (c1-|back.west)
-            (c2) -- (c2-|back.west)
-            (c3) -- (c3-|back.west);
-        % Place edges
+        \draw (c1) -- (c1-|sched.west) (c2) -- (c2-|sched.west) (c3) -- (c3-|sched.west);
+        \draw (sched) -- (sched-|cpu1.west) (sched) -- (sched-|cpu2.west);
     \end{tikzpicture}
 
 
@@ -69,11 +64,11 @@ test2
 \end{tikzpicture}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\begin{tikzpicture}[auto]
 \tikzstyle{b} = [rectangle, draw, fill=blue!20, node distance=1cm, text width=6em, text centered, rounded corners, minimum height=2em, thick]
 \tikzstyle{c} = [rectangle, draw, inner sep=0.1cm, dashed]
 \tikzstyle{l} = [draw, -latex',thick]
 
-\begin{tikzpicture}[auto]
     \node [b] (planning) {Planning};
     \node [b, below=of planning] (resources) {Resources};
     \node [b, below=of resources] (sensors) {Sensors};
@@ -96,26 +91,6 @@ test2
     \draw [l] (lowerright |- container.east) -- (container.east -| resources.south east);
 \end{tikzpicture}
 
-\begin{tikzpicture}
-    \tikzset{block/.style={rectangle, fill=cyan!10, text width=3cm, text centered, rounded corners, minimum height=1.5cm}};
-    \node[block] {root} [level distance=3cm, sibling distance=4cm, edge from parent/.style={<-,draw}]
-        child{ node[block] {child1} }
-        child{ node[block] {child2} }
-        child{ node[block] {child3} };
-\end{tikzpicture}
-
-\begin{tikzpicture}[auto, thick, >=triangle 45,fill=blue!20]
-\node at (0,0)[block,draw,fill=blue!20] (clogic) {Scheduler};
-\node[block,below of=clogic,node distance=2cm,fill=blue!20] (memory) {CPU};
-\draw[<-] ([yshift=2ex]clogic.west) to node[midway,above] {$Input$} ++(-3,0);
-\draw[->] ([yshift=2ex]clogic.east) to node[midway,above] {$Output$} ++(3,0);
-\draw[->] ([yshift=-2ex]clogic.east) -| node[midway,right] {$Next State$} ([xshift=60]memory.east)
-                                    |- (memory.east);
-\draw[->] (memory.west) -| ([xshift=-60]memory.west)
-                       |- node[midway,left] {$Current State$} ([yshift=-2ex]clogic.west);
-\draw[<-] (memory.south) to ++(0,-1) node[below] {$Clock$};
-\end{tikzpicture}
-
 \rSec1[introProg.hw]{Hardware}
 
 In hardware, the core model is clock-based updates to state elements from
@@ -129,6 +104,8 @@ Sequential logic = combinational logic + memory elements
 Synchronous logic = sequential logic + clock
 
 \begin{tikzpicture}[auto, thick, >=triangle 45,fill=blue!20]
+\tikzset{  
+block/.style    = {draw, thick, rectangle, minimum height = 3em, minimum width = 3em},}
 \node at (0,0)[block,draw,fill=blue!20] (clogic) {Combinational Logic};
 \node[block,below of=clogic,node distance=2cm,fill=blue!20] (memory) {Memory};
 \draw[<-] ([yshift=2ex]clogic.west) to node[midway,above] {$Input$} ++(-3,0);
