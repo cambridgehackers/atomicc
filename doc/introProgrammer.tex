@@ -23,15 +23,15 @@ for correct manual decoration of the source code.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     \begin{tikzpicture}
-        [title/.style={font=\fontsize{18}{18}\color{black!45}},
+        [auto,title/.style={font=\fontsize{18}{18}\color{black!45}},
         server/.style={rectangle, draw, fill=blue!23},
         client/.style={rectangle, draw, fill=green!23},
         dot/.style={circle, fill=black, minimum size=2pt, inner sep=0pt, outer sep=2pt},
         link/.style={latex-latex}]
         % Place nodes
-        \node [server, outer sep=8pt, align=center, minimum height=9em] (sched) at (5,8.3) {Scheduler};
-        \node [server, outer sep=8pt, align=center] (cpu1) at (7.65,8.3) {CPU};
-        \node [server, outer sep=8pt, align=center] (cpu2) at (7.65,9.3) {CPU};
+        \node [server, rotate=90, outer sep=8pt, align=center] (sched) at (5,8.3) {Scheduler};
+        \node [server] (cpu1) at (7.65,8.3) {CPU};
+        \node [server] (cpu2) at ($(cpu1) + (270:1)$){CPU};
         \node [draw=black!50, fit={(sched) (cpu1) (cpu2)}] (back) {};
         \node [client] (c1) at (0,9.5) {Software thread};
         \node [client] (c2) at ($(c1) + (270:1.15)$) {Software thread};
@@ -39,29 +39,14 @@ for correct manual decoration of the source code.
         \node [dot] (c4) at ($(c3) + (270:1)$) {};
         \node [dot] (c5) at ($(c4) + (270:0.5)$) {};
         \node [dot] (c6) at ($(c5) + (270:0.5)$) {};
-        \draw (c1) -- (c1-|sched.west) (c2) -- (c2-|sched.west) (c3) -- (c3-|sched.west);
-        \draw (sched) -- (sched-|cpu1.west) (sched) -- (sched-|cpu2.west);
+        \draw[->] (c1) -- (c1-|sched.north);
+        \draw[->] (c2) -- (c2-|sched.north);
+        \draw[->] (c3) -- (c3-|sched.north);
+        \draw[->] (sched.south) -- (sched.south-|cpu1.west);
+        \draw[->] (sched.south) -- (sched.south-|cpu2.west);
     \end{tikzpicture}
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-test2
-
-\begin{tikzpicture}[
-	decoration={ markings, mark=at position 1cm with {\arrow[black]{stealth}}, },
-	path/.style={ ->, >=stealth, postaction=decorate },
-	every node/.style={font=\sffamily}
-]
-\node [ draw, yshift=2cm, minimum width=4cm, ] (control) {Control System};
-\node [ draw, minimum width=5cm, minimum height=1cm, ] (process) {Process/Equipment};
-\node [ draw, yshift=-2cm, minimum width=4cm, ] (safety) {Safety System}; 
-
-\draw[path] (control.east) -- ++(1,0) |- ([yshift=-0.25cm] process.north east);
-\draw[path] ([yshift=-0.25cm] process.north west) -- ++(-1,0) |- (control.west);
-\draw[path] ([yshift=0.25cm] process.south west) -- ++(-1,0) |- (safety.west);
-\draw[path] (safety.east) -- ++(1,0) |- ([yshift=0.25cm] process.south east);
-
-\end{tikzpicture}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{tikzpicture}[auto]
@@ -110,9 +95,9 @@ block/.style    = {draw, thick, rectangle, minimum height = 3em, minimum width =
 \node[block,below of=clogic,node distance=2cm,fill=blue!20] (memory) {Memory};
 \draw[<-] ([yshift=2ex]clogic.west) to node[midway,above] {$Input$} ++(-3,0);
 \draw[->] ([yshift=2ex]clogic.east) to node[midway,above] {$Output$} ++(3,0);
-\draw[->] ([yshift=-2ex]clogic.east) -| node[midway,right] {$Next State$} ([xshift=60]memory.east)
+\draw[->] ([yshift=-2ex]clogic.east) -| node[midway,right] {$Next State$} ++(1,0)
                                     |- (memory.east);
-\draw[->] (memory.west) -| ([xshift=-60]memory.west)
+\draw[->] (memory.west) -| ++(-2.5,0)
                        |- node[midway,left] {$Current State$} ([yshift=-2ex]clogic.west);
 \draw[<-] (memory.south) to ++(0,-1) node[below] {$Clock$};
 \end{tikzpicture}
