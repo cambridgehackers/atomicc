@@ -21,60 +21,32 @@ In all cases, since the compiler cannot statically determine which specific
 storage elements are subject to contentious access, the programmer is responsible
 for correct manual decoration of the source code.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    \begin{tikzpicture}
-        [auto,title/.style={font=\fontsize{18}{18}\color{black!45}},
-        server/.style={rectangle, draw, fill=blue!23},
-        client/.style={rectangle, draw, fill=green!23},
-        dot/.style={circle, fill=black, minimum size=2pt, inner sep=0pt, outer sep=2pt},
-        link/.style={latex-latex}]
-        % Place nodes
-        \node [server, rotate=90, outer sep=8pt, align=center] (sched) at (5,8.3) {Scheduler};
-        \node [server] (cpu1) at (7.65,8.3) {CPU};
-        \node [server] (cpu2) at ($(cpu1) + (270:1)$){CPU};
-        \node [draw=black!50, fit={(sched) (cpu1) (cpu2)}] (back) {};
-        \node [client] (c1) at (0,9.5) {Software thread};
-        \node [client] (c2) at ($(c1) + (270:1.15)$) {Software thread};
-        \node [client] (c3) at ($(c2) + (270:1.15)$) {Software thread};
-        \node [dot] (c4) at ($(c3) + (270:1)$) {};
-        \node [dot] (c5) at ($(c4) + (270:0.5)$) {};
-        \node [dot] (c6) at ($(c5) + (270:0.5)$) {};
-        \draw[->] (c1) -- (c1-|sched.north);
-        \draw[->] (c2) -- (c2-|sched.north);
-        \draw[->] (c3) -- (c3-|sched.north);
-        \draw[->] (sched.south) -- (sched.south-|cpu1.west);
-        \draw[->] (sched.south) -- (sched.south-|cpu2.west);
-    \end{tikzpicture}
+\begin{tikzpicture}
+    [title/.style={font=\fontsize{18}{18}\color{black!45}},
+    server/.style={rectangle, draw, fill=blue!23},
+    client/.style={rectangle, draw, fill=green!23},
+    dot/.style={circle, fill=black, minimum size=2pt, inner sep=0pt, outer sep=2pt},
+    link/.style={latex-latex},
+    >=latex]
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{tikzpicture}[auto]
-\tikzstyle{b} = [rectangle, draw, fill=blue!20, node distance=1cm, text width=6em, text centered, rounded corners, minimum height=2em, thick]
-\tikzstyle{c} = [rectangle, draw, inner sep=0.1cm, dashed]
-\tikzstyle{l} = [draw, -latex',thick]
-
-    \node [b] (planning) {Planning};
-    \node [b, below=of planning] (resources) {Resources};
-    \node [b, below=of resources] (sensors) {Sensors};
-    \coordinate (RSmid) at ($(resources.south west)!0.5!(sensors.north west)$);
-    \node [b, left=of RSmid, node distance=4cm] (information) {Information system};
-    \node [b, below=of sensors] (processing) {Processing};
-
-    \node [c,fit=(resources) (sensors)] (container) {};
-
-    \path [l] (planning) -- (resources);
-    \path [l] (resources) -- (sensors);
-    \path [l] (sensors) -- (processing);
-
-    \path [l] (information) |- (planning);
-    \path [l] (information) |- (processing);
-
-    \node at (container.north west) [above right] {Desc};
-
-    \draw [l] (processing.east) -- ++(2,0) node(lowerright){} |- (planning.east);
-    \draw [l] (lowerright |- container.east) -- (container.east -| resources.south east);
+    \node [server, rotate=90, outer sep=8pt, align=center] (sched) at (5,8.3) {Scheduler};
+    \node [server, fill = red!23] (cpu1) at (7.65,8.3) {CPU};
+    \node [server, fill = red!23] (cpu2) at ($(cpu1) + (270:1)$){CPU};
+    \node [draw=black!50, fit={(sched) (cpu1) (cpu2)}] (back) {};
+    \node [anchor=north east] at (back.north east) {Computer/OS};
+    \node [client] (c1) at (0,9.5) {Software thread};
+    \node [client] (c2) at ($(c1) + (270:1.15)$) {Software thread};
+    \node [client] (c3) at ($(c2) + (270:1.15)$) {Software thread};
+    \node [dot] (c4) at ($(c3) + (270:1)$) {};
+    \node [dot] (c5) at ($(c4) + (270:0.5)$) {};
+    \node [dot] (c6) at ($(c5) + (270:0.5)$) {};
+    \draw[->] (c1.east) to ([yshift=2ex]sched.north);
+    \draw[->] (c2.east) to (sched.north);
+    \draw[->] (c3.east) to ([yshift=-2ex]sched.north);
+    \draw[->] (sched.south) to (cpu1.west);
+    \draw[->] ([yshift=-2ex]sched.south) to (cpu2.west);
 \end{tikzpicture}
+
 
 \rSec1[introProg.hw]{Hardware}
 
