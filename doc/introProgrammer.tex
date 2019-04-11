@@ -6,20 +6,18 @@
 
 In software, the core model is the time-multiplexed execution
 of software threads by one or more central processing units (CPUs).
-Extensive use of address arithmetic (pointers
-and indexing) improves code density, both at the source level and at
-runtime.
+Address arithmetic (pointers and indexing) prevents
+the compiler from statically determining read/write
+storage elements sets for a transaction.
+The programmer is responsible
+preventing the interleaved execution of
+multiple threads accessing a single storage element by
+decoration of the code with library calls to dynamically enforce
+mutual exclusion (mutex) regions.
 
-The programmer
-must decorate the code with library calls to dynamically enforce
-mutual exclusion (mutex) regions, preventing the interleaved execution of
-multiple threads accessing a single storage element.
 In languages like Java, the programmer is able to decorate the
 storage element declarations to automate calling of these mutex operations.
 
-In all cases, since the compiler cannot statically determine which specific
-storage elements are subject to contentious access, the programmer is responsible
-for correct manual decoration of the source code.
 
 \begin{tikzpicture}
     [title/.style={font=\fontsize{18}{18}\color{black!45}},

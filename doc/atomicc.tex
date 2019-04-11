@@ -83,6 +83,30 @@ Exported interfaces can be used in several ways:
 \end{itemize}
 
 \rSec1[atomicc.modrule]{Rules}
+
+To facilitate program analysis, all operations on state elements are grouped into transactions.
+Transactions are a group of operations that transform state elements from one consistent state to another.
+Transactions follow ACID semantics.  Scheduling of rules guarantees 'Isolation'.
+The term 'isolation' is also called 'consistency' (the static property), 'concurrency control'
+(the problem), 'serializability' (the theory), or 'locking' (the technique).
+Pragmatic issues concern scheduling of lock requests that are waiting.  (GrayReuter, Sec 7.1)
+Taxonomy of concurrency control algorithms (OV, Fig 11.4, pg 368)
+
+Transactions permit packing a set of logical actions into a unit so that users
+do not need to work about conflicts and the system knows how to execute multiple
+units concurrently.  (6.830, lec 12)
+
+System state is said to be 'consistent' if it satisfies program invariants.
+To cope with temporary inconsistencies, sequences of actions are grouped to form
+transactions that preserve the consistency constraints.
+Transactions are units of consistency.
+Isolation allows design of applications without having to worry about inconsistent inputs
+caused by concurrent execution.
+
+$O[i] \cap (I[j] \cup O[j]) = \varnothing, \forall i \neq j $
+(GrayReuter, Sec 7.3)
+
+
 In AtomicC, all enabled statements in all modules execute on every clock cycle.
 These executions are atomic transactions: internal states in the rule
 execution are not visible to other rules.
@@ -94,7 +118,19 @@ computation \cite{Lamport:1979:MMC:1311099.1311750}.
 Even though all concurrent rules are executed during the same clock cycle, SC allows us to compute the
 outcome of each rule independantly of any other rules that could be executing at the same time.
 
+An SC computation can also be thought as one that is serializable (GibbonsKorach, Sec 2.4).
+We only deal with 'conflict serializability'.
+
+From p113-condon.pdf, there is a graph-based definition of SC: define a constraint graph with node for each load/store.  protocol is SC iff all traces have acyclic constraint graphs
+
+To compare terminology with Verilog designs, the 'datapath' is comprised of assignments in rule statements, parameters to method invocations and return values from methods.  The 'control plane' consists of rule guards, which include automatically promoted guard expressions for invoked methods.
+
 \rSec1[atomicc.schedule]{Scheduling}
+
+A schedule is conflict serializable iff its precedence graph is acyclic. (ch15-2.pdf,
+Silberschatz/Korth/Sudarahan)
+(franklin97concurrency.pdf, sec 2.1.3)
+(DBSysConcepts, p.644)
 
 The AtomicC compiler verifies that it is valid to consider
 all rules executed during a given clock cycle
@@ -112,16 +148,19 @@ than any rules that read the same state element.
 \end{itemize}
 
 The compiler statically determines the 'read' and 'write'
-footprint for every rule and method.
+footprint for every rule and method \cite{OV11}, Section 10.1.2, \cite{doi:10.1137/0213032}.
 \begin{itemize}
 \item read set: $R_{i}.read$
 \item write set: $R_{i}.write$
-\item sensitivity set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
+\item base set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
 \end{itemize}
+(OzsuValduriez, Sec 10.1.2)
+(OV, Sec 11.1.  2 operations on same state element (x) are in conflict if
+one of them is a write. -> partial order)
 
 The compiler and linker do not break SC violations automatically.
 If static compile analysis cannot prove that their execution conditions(guards) or
-effects(sensitivity sets) are always disjoint,
+effects(base sets) are always disjoint,
 then the source text of the program must specify the priority order of scheduling
 to resolve conflicts.
 
@@ -221,3 +260,20 @@ an intermediate representation and then to Verilog for simulation or
 synthesis. Alternate translations are possible: to native code via
 LLVM, to System C, to Gallina for formal verification with the Coq
 Proof Assistant, etc.
+
+\rSec1[atomicc.modfuture]{Future work}
+
+Need to describe multi-cycle rules and pipelining.
+
+Need to have a way to support sequencing of operations
+
+Need to have a way to support model checking (say 'module B is a behavioral description of module A')
+Show example with diff eqn solver from Sharp thesis.
+
+C block semantics do not correctly process the 2 statements: a = b; b = a;.
+(binding of read values should occur at beginning of block, so that it is clear the
+2nd assign refers to the 'previous' value).
+Thinking again: if we retain C semantics, we have: temp = a; a = b; b = temp;, which
+gives the correct value mapping.
+
+Multiple clock domains
