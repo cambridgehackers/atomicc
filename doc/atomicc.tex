@@ -10,7 +10,7 @@ AtomicC is structural in that all state elements in the hardware
 netlist are explicit in the source code of the design.
 AtomicC follows in the tradition of the Go language\cite{Pike2012},
 promoting the use of \textbf{interfaces} for composition and
-coupling rather than using inheritance.
+coupling rather than inheritance.
 Grouping operations into transactions (\textbf{rules}) and
 using a standardized flow control for
 interface \textbf{method} invocation
@@ -32,7 +32,7 @@ Instead, it uses a subset of the C++ language to specify desired
 conditional assignments to state elements,
 performing these operations under an atomic transaction rule-based execution model.
 In AtomicC, all module data is private; an instantiator of a module can only 
-interact with it via method invocations.
+interact with it via interface method invocations.
 
 Like Connectal, AtomicC designs may include both hardware and
 software components, using interfaces to specify hardware/software communication
@@ -50,15 +50,23 @@ Modules consist of 3 parts:
 \rSec1[atomicc.interface]{Interfaces}
 Instantiated modules are interacted with using one or more interfaces exported by the module.
 An interface definition is a list of method signatures, but no method bodies, defining
-an abstract data type(ADT) \cite{Liskov74programmingwith}.
+an abstract data type(ADT) \cite{Liskov74programmingwith} view exported by the module.
 Module interfaces are named, 
 allowing explicit denotation in the program text
-of which ADTs are connected to and accessable from other state elements.
+of which module ADTs are connected to and accessable from other state elements.
 In addition to defining and exporting interfaces,
 a module definition can also import
 interface references, exported from an
-externally defined module.
+externally defined module, providing flexibility in algorithmic description.
 
+Exported interfaces can be used in several ways:
+\begin{itemize}
+\item invoked directly by the instantiator of the module,
+\item forwarded transparently, becoming another exported interface of the instantiating module,
+\item 'connected' to an 'interface reference' of another module in the instantiating scope.
+\end{itemize}
+
+\rSec1[atomicc.method]{Interface Methods}
 There are 2 types of methods:
 \begin{itemize}
 \item \textbf{Value method functions} provide read-only access to module state elements.
@@ -75,18 +83,11 @@ to prevent scheduling of the calling transaction until all necessary elements ar
 available.
 
 AtomicC uses a \textbf{valid/ready} handshake process\cite{Fletcher2009, AXISpec} to invoke action methods,
-giving both the invoker(master) and invokee(slave) the ability to control the progress of execution.
+giving both the invoker(master) and invokee(slave) the ability to control execution timing.
 The master uses the \textbf{valid} signal
 of the method to show when parameter data is available and the transaction should be performed
 The method invocation transaction succeeds only when
 both \textbf{valid} and \textbf{ready} are HIGH ($\pi(M_{i}) \equiv ready(M_{i})\ \&\&\ valid(M_{i})$).
-
-Exported interfaces can be used in several ways:
-\begin{itemize}
-\item invoked directly by the instantiator of the module,
-\item forwarded transparently, becoming another exported interface of the instantiating module,
-\item 'connected' to an 'interface reference' of another module in the instantiating scope.
-\end{itemize}
 
 \rSec1[atomicc.modrule]{Rules}
 
@@ -100,15 +101,15 @@ Scheduling of rules guarantees 'Isolation',
 also called 'consistency' (the static property), 'concurrency control'
 (the problem), 'serializability' (the theory), or 'locking' (the technique). (\cite{GrayR93}, Sec 7.1)
 
-In contrast to software, which uses \textit{dynamic allocation} and locking to guarantee isolation(
-\cite{GrayR93}, p.377),
+In contrast to software, which uses \textit{dynamic allocation} and locking to guarantee isolation
+\cite[p.~377]{GrayR93},
 state elements accessed by an AtomicC transaction are known at compile time as well as the
 conditions when the transaction is performed.  This allows \textit{static allocation}
-(\cite{GrayR93}, sec 7.3.1) of schedules.
+\cite[Sec.~7.3.1]{GrayR93} of schedules.
 
 The AtomicC compiler
 validates that all rules executed during a given clock cycle are "equivalent"
-to linear, atomic ordering ("sequentially consistent"(SC))
+to some linear, atomic ordering ("sequentially consistent"(SC))
 \cite{Lamport:1979:MMC:1311099.1311750}.
 Even though all concurrent rules are executed during the same clock cycle,
 SC allows us to compute the
@@ -119,7 +120,7 @@ protocol is SC iff all traces have acyclic constraint (also called precedence) d
 \cite{Cain2003}.
 
 $O[i] \cap (I[j] \cup O[j]) = \varnothing, \forall i \neq j $
-(\cite{GrayR93}, Sec 7.3)
+\cite[Sec.~7.3]{GrayR93}
 
 \rSec1[atomicc.schedule]{Scheduling}
 
@@ -135,14 +136,14 @@ than any rules that read the same state element.
 \end{itemize}
 
 The compiler statically determines the 'read' and 'write'
-footprint for every rule and method \cite{OV11}, Section 10.1.2, \cite{doi:10.1137/0213032}.
+footprint for every rule and method \cite[Sec.~10.1.2]{OV11} \cite{doi:10.1137/0213032}.
 \begin{itemize}
 \item read set: $R_{i}.read$
 \item write set: $R_{i}.write$
 \item base set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
 \end{itemize}
-(OzsuValduriez, Sec 10.1.2)
-(OV, Sec 11.1.  2 operations on same state element (x) are in conflict if
+\cite[Sec.~10.1.2]{OV11}
+\cite[Sec.~11.1]{OV11}  2 operations on same state element (x) are in conflict if
 one of them is a write. -> partial order)
 
 The compiler and linker do not resolve SC conflicts automatically.
