@@ -8,18 +8,20 @@ the high level specification of algorithms to be instantiated
 directly in hardware.
 AtomicC is structural in that all state elements in the hardware
 netlist are explicit in the source code of the design.
-AtomicC follows in the tradition of the Go language,
-promoting the use of \textit{interfaces} for composition and
-coupling rather than using inheritance \cite{Pike2012}.
-Standardized use of symmetric flow control signals (ready/valid) for
-interface method invocation
-supports the automated promotion of interface flow control to transaction invocation.
-Separate compilation of modules 
-supports the safe use of pre-compiled, validated
+AtomicC follows in the tradition of the Go language\cite{Pike2012},
+promoting the use of \textbf{interfaces} for composition and
+coupling rather than using inheritance.
+Grouping operations into transactions (\textbf{rules}) and
+using a standardized flow control for
+interface \textbf{method} invocation
+support the automated promotion of control logic and validation
+of parallel execution.
+Separate compilation of \textbf{modules}
+supports the efficient reuse of pre-compiled, validated
 libraries.
 The AtomicC compiler 
 generates a single Verilog module for each AtomicC module declared.
-Standard Verilog backend tools are then used to create the netlist and synthesize
+Standard Verilog backend tools are then used to synthesize
 the resulting ASIC or FPGA.
 
 AtomicC extends C++
@@ -34,7 +36,7 @@ interact with it via method invocations.
 
 Like Connectal, AtomicC designs may include both hardware and
 software components, using interfaces to specify hardware/software communication
-in a type safe way. The AtomicC compiler generates the code and transactors to pass
+in a type safe manner. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
 
 The basic building block of AtomicC is the module declaration.
@@ -88,52 +90,38 @@ Exported interfaces can be used in several ways:
 
 \rSec1[atomicc.modrule]{Rules}
 
-To automate checking of conflicts caused by concurrent execution,
-operations on state elements are grouped into transactions, called \textbf{rules}.
-Transactions are units of consistency and follow ACID semantics.
-System state is said to be 'consistent' if it satisfies program invariants.
-To cope with temporary inconsistencies, sequences of actions are grouped to form
-transactions that preserve the consistency constraints.
-Isolation allows design of applications without having to worry about inconsistent inputs
-caused by concurrent execution.
-
+Operations on state elements are grouped into transactions, called \textbf{rules}.
+Transactions are units of consistency (preserving program invariants), following ACID semantics.
 In AtomicC, all enabled statements in all modules execute on every clock cycle.
-The compiler synthesizes control signals that allow rules to fire
-only when their dependant elements are ready.
+The compiler synthesizes control signals, allowing rules to fire
+only when their dependent elements and referenced method invocations are ready.
 
-To compare terminology with Verilog designs, the 'datapath' is comprised of assignments in rule statements, parameters to method invocations and return values from methods.  The 'control plane' consists of rule guards, which include automatically promoted guard expressions for invoked methods.
+Scheduling of rules guarantees 'Isolation',
+also called 'consistency' (the static property), 'concurrency control'
+(the problem), 'serializability' (the theory), or 'locking' (the technique). (\cite{GrayR93}, Sec 7.1)
 
-\rSec1[atomicc.schedule]{Scheduling}
+In contrast to software, which uses \textit{dynamic allocation} and locking to guarantee isolation(
+\cite{GrayR93}, p.377),
+state elements accessed by an AtomicC transaction are known at compile time as well as the
+conditions when the transaction is performed.  This allows \textit{static allocation}
+(\cite{GrayR93}, sec 7.3.1) of schedules.
 
-Scheduling of rules guarantees 'Isolation'.
-The term 'isolation' is also called 'consistency' (the static property), 'concurrency control'
-(the problem), 'serializability' (the theory), or 'locking' (the technique).
-Pragmatic issues concern scheduling of lock requests that are waiting.  (GrayReuter, Sec 7.1)
-Taxonomy of concurrency control algorithms (OV, Fig 11.4, pg 368)
-
-$O[i] \cap (I[j] \cup O[j]) = \varnothing, \forall i \neq j $
-(GrayReuter, Sec 7.3)
-
-The compiler validates that all enabled rules in any cycle are
-"equivalent" to some legal sequentially consistent (SC)
-computation \cite{Lamport:1979:MMC:1311099.1311750}.
+The AtomicC compiler
+validates that all rules executed during a given clock cycle are "equivalent"
+to linear, atomic ordering ("sequentially consistent"(SC))
+\cite{Lamport:1979:MMC:1311099.1311750}.
 Even though all concurrent rules are executed during the same clock cycle,
 SC allows us to compute the
-outcome of each rule independantly of any other rules that could be executing at the same time.
+outcome of each rule independently of any other rules that could be executing at the same time.
 
-An SC computation can also be thought as one that is serializable (GibbonsKorach, Sec 2.4).
-We only deal with 'conflict serializability'.
+There is a graph-based definition of SC: define a constraint graph with node for each load/store.
+protocol is SC iff all traces have acyclic constraint (also called precedence) directed graphs
+\cite{Cain2003}.
 
-From p113-condon.pdf, there is a graph-based definition of SC: define a constraint graph with node for each load/store.  protocol is SC iff all traces have acyclic constraint graphs
+$O[i] \cap (I[j] \cup O[j]) = \varnothing, \forall i \neq j $
+(\cite{GrayR93}, Sec 7.3)
 
-A schedule is conflict serializable iff its precedence graph is acyclic. (ch15-2.pdf,
-Silberschatz/Korth/Sudarahan)
-(franklin97concurrency.pdf, sec 2.1.3)
-(DBSysConcepts, p.644)
-
-The AtomicC compiler verifies that it is valid to consider
-all rules executed during a given clock cycle
-as if they were serialized into a linear, atomic ordering ("sequentially consistent"(SC)).
+\rSec1[atomicc.schedule]{Scheduling}
 
 Each rule has a set of state elements that it reads and another set of element that it writes.
 Value method invocations are treated as reads; action method invocations are treated as writes.
@@ -157,7 +145,7 @@ footprint for every rule and method \cite{OV11}, Section 10.1.2, \cite{doi:10.11
 (OV, Sec 11.1.  2 operations on same state element (x) are in conflict if
 one of them is a write. -> partial order)
 
-The compiler and linker do not break SC violations automatically.
+The compiler and linker do not resolve SC conflicts automatically.
 If static compile analysis cannot prove that their execution conditions(guards) or
 effects(base sets) are always disjoint,
 then the source text of the program must specify the priority order of scheduling
@@ -178,7 +166,7 @@ for $r \in WorkSet$ do
     $V = \{ E \vert S(E) \cap S(V) \neq \varnothing  \}$  // Create next schedule set
     $WorkSet = WorkSet \setminus V$
 
-    // Create 'read-before-write' precedence digraph
+    // Create 'read-before-write' constraint digraph
     $G = (V, E)$
     where: 
        $V$ is a set of vertices
@@ -195,7 +183,7 @@ for $r \in WorkSet$ do
           else if source code has "priority $R1 > R2$" & $R1 \in L$ & $R2 \in L$
               $valid(R2)$ &= $\neg valid(R1)$
           else
-              precedence digraph not acyclic, report error
+              constraint digraph not acyclic, report error
 \end{lstlisting}
 
 \rSec2[atomicc.schedlink]{Linking}
