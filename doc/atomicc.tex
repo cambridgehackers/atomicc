@@ -8,17 +8,62 @@ the high level specification of algorithms to be instantiated
 directly in hardware.
 AtomicC is structural in that all state elements in the hardware
 netlist are explicit in the source code of the design.
+
+\rSec2[atomicc.imethod]{Latency Insensitive Methods}
+Automate the handling of the transitive effect of stalls.
+
+Latency-Insensitive Design assumes that modules are stallable.
+In future designs, a signal will need more than 10 clock cycles
+to traverse the entire chip area.  Partition long wires into
+subsections, connected with relay stations.
+Can be implemented using \textit{hand-shaking signalling} techniques.
+(Carloni, McMillan, SangiovanniVincentelli)
+
+A patient system is one whose components are \textit{stallable}.
+Two signals are latency equiv if they present the same sequence of
+informative events.
+Patient process: 1) intersection of 2 patient processes is a patient
+process, 2) give 2 pairs of latency equiv patient processes,
+their pairwise intersections are also latency equiv.
+
+\rSec2[atomicc.itrans]{Transactions}
+
+Grouping operations into transactions (\textbf{rules})
+enable compile time formal verification of the correctness of
+composite parallel execution of transactions
+in the synthesized logic.
+
+Use of transactions supports compositions of modules that 
+retain atomic properties.  (usually atomic ops are non-modular, non-compositional
+HarrisMarlowJonesHerlihy, Nikhil)
+Transactions are compositional: small transactions can be glued together to form 
+larger transactions(HarrisMarlowJonesHerlihy).
+Lock-based programs do not compose: correct fragments may fail when composed.
+
+Transactional Datapath Specification.  (Nurvitadhi)
+To support overlapped execution of multiple operations,
+hazard detection and stall logic is introduced to maintain
+the correctness of operations in the overlapped executions.
+The single-cycle version serves as a function specification of the pipelined
+design, used in model checking.
+T-spec blocks use an established set of handshaking signals: ready, start, done.
+Each async block can be executed at most once by each transaction.
+
+Time is defined relative to state transition and not the other way around.
+(FoxHarman)
+
+\rSec2[atomicc.iinterface]{Interface}
 AtomicC follows in the tradition of the Go language\cite{Pike2012},
 promoting the use of \textbf{interfaces} for composition and
-coupling rather than inheritance.
-Grouping operations into transactions (\textbf{rules}) and
-using a standardized flow control for
-interface \textbf{method} invocation
-support the automated promotion of control logic and validation
-of parallel execution.
+coupling rather than (possibly multiple) inheritance.
+An ADT is "a way to interact with a module" rather than "a description
+of the module type itself".
+
+\rSec2[atomicc.imodule]{Module}
 Separate compilation of \textbf{modules}
 supports the efficient reuse of pre-compiled, validated
 libraries.
+
 The AtomicC compiler 
 generates a single Verilog module for each AtomicC module declared.
 Standard Verilog backend tools are then used to synthesize
@@ -102,7 +147,7 @@ also called 'consistency' (the static property), 'concurrency control'
 (the problem), 'serializability' (the theory), or 'locking' (the technique). (\cite{GrayR93}, Sec 7.1)
 
 In contrast to software, which uses \textit{dynamic allocation} and locking to guarantee isolation
-\cite[p.~377]{GrayR93},
+\cite[p.~377]{GrayR93} \cite[Sec.~11.2]{OV11},
 state elements accessed by an AtomicC transaction are known at compile time as well as the
 conditions when the transaction is performed.  This allows \textit{static allocation}
 \cite[Sec.~7.3.1]{GrayR93} of schedules.
@@ -118,6 +163,12 @@ outcome of each rule independently of any other rules that could be executing at
 There is a graph-based definition of SC: define a constraint graph with node for each load/store.
 protocol is SC iff all traces have acyclic constraint (also called precedence) directed graphs
 \cite{Cain2003}.
+The transitive closure of these orders on the constrain graph nodes dictate
+the sequence in which each operation must \textit{appear} to execute in order to
+be considered correct.
+Dependency constraints(RAW, WAR, WAW) vs consistency constraints (defined by memory consistency model.  for example, if model is SC, then directed cycle cannot be placed in total order).
+WAR/WAW edges can be removed using register renaming.  RAW edges
+can be removed using value prediction.
 
 $O[i] \cap (I[j] \cup O[j]) = \varnothing, \forall i \neq j $
 \cite[Sec.~7.3]{GrayR93}
