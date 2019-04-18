@@ -6,8 +6,26 @@
 AtomicC is a timed, structural hardware description language, permitting
 the high level specification of algorithms to be instantiated
 directly in hardware.
-AtomicC is structural in that all state elements in the hardware
-netlist are explicit in the source code of the design.
+
+The language is designed for
+the construction of \textbf{modules} that are \textit{composable}:
+validated smaller modules can be aggregated to form
+a larger validated module with no impact on the correct
+operation of the component modules.
+\begin{itemize}
+\item Modules interactions are performed with Latency Insensitive (LI) \textbf{method} calls, allowing automated handling of the transitive effect of stalls.
+\item Module behaviorial statements are encapsulated in transactions (\textbf{rules}), allowing static validation of correct operation in the presence of concurrent execution.
+\item Modules can export multiple, explicitly named Abstract Data Type (ADT) \textbf{interfaces},
+promoting flexibility and clarity in module coupling.
+\item All state elements in the hardware
+netlist are explicit in the source code of the design, removing a source of common errors.
+\item Parametric polymorphic data types allow flexible reuse of parameterized
+\textbf{modules} (C++ templates).
+\item Integration with existing backend Verilog infrastructure including reuse of existing Verilog
+components.
+\end{itemize}
+This supports the efficient, incremental reuse of pre-compiled, validated
+libraries, improving productivity on large designs.
 
 \rSec2[atomicc.imethod]{Latency Insensitive Methods}
 Automate the handling of the transitive effect of stalls.
@@ -60,9 +78,6 @@ An ADT is "a way to interact with a module" rather than "a description
 of the module type itself".
 
 \rSec2[atomicc.imodule]{Module}
-Separate compilation of \textbf{modules}
-supports the efficient reuse of pre-compiled, validated
-libraries.
 
 The AtomicC compiler 
 generates a single Verilog module for each AtomicC module declared.
