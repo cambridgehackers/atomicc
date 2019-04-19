@@ -73,12 +73,16 @@ Exported interfaces can be used in several ways:
 \item 'connected' to an 'interface reference' of another module in the instantiating scope.
 \end{itemize}
 
+Module interface methods invocations are \textit{stallable}, refered to as \textit{patient system}
+\cite{carloni2001theory}.
+This allows the called method to enforce invocation pre-conditions on the caller
+so that interface usage requirements are guaranteed and stalling is transitive.
+
 There are 2 types of methods:
 \begin{itemize}
 \item \textbf{Value method functions} provide read-only access to module state elements.
-\item \textbf{Action method procedures} perform transactions on state elements
-and do not have a return value.
-Parameters are used to pass transaction data to the instantiated module.
+\item \textbf{Action method procedures} perform write operations on state elements,
+can take parameters and do not have a return value.
 A compiler generated
 \textbf{valid} signal indicates that the caller wishes to perform the method invocation.
 \end{itemize}
@@ -88,33 +92,19 @@ to indicate when the callee is available and
 to prevent scheduling of the calling transaction until all necessary elements are
 available.
 
-Latency-Insensitive Design assumes that modules are stallable.
-In future designs, a signal will need more than 10 clock cycles
-to traverse the entire chip area.  Partition long wires into
-subsections, connected with relay stations.
-Can be implemented using \textit{hand-shaking signalling} techniques.
-
-A patient system is one whose components are \textit{stallable}.
-Two signals are latency equiv if they present the same sequence of
-informative events.
-Patient process: 1) intersection of 2 patient processes is a patient
-process, 2) give 2 pairs of latency equiv patient processes,
-their pairwise intersections are also latency equiv.
-
 AtomicC uses a \textbf{valid/ready} \textit{hand-shaking signalling}
 \cite{Fletcher2009, AXISpec} to invoke action methods,
-giving both the invoker(master) and invokee(slave) the ability to control execution timing.
+giving both the invoker(master) and invokee(slave) the ability to control transaction
+execution timing.
 The master uses the \textbf{valid} signal
-of the method to show when parameter data is available and the transaction should be performed
+of the method to show when parameter data is available and the transaction should be performed.
 The method invocation transaction succeeds only when
-both \textbf{valid} and \textbf{ready} are HIGH ($\pi(M_{i}) \equiv ready(M_{i})\ \&\&\ valid(M_{i})$).
+both \textbf{valid} and \textbf{ready} are HIGH:
+
+ ($\pi(M_{i}) \equiv ready(M_{i})\ \&\&\ valid(M_{i})$).
 
 \rSec1[atomicc.modrule]{Rules}
 
-Grouping operations on state elements into transactions (\textbf{rules})
-enables compile time formal verification of the correctness of
-composite parallel execution of transactions
-in the synthesized logic.
 Transactions are units of consistency (preserving program invariants), following ACID semantics.
 In AtomicC, all enabled statements in all modules execute on every clock cycle.
 The compiler synthesizes control signals, allowing rules to fire
@@ -124,44 +114,58 @@ Scheduling of rules guarantees 'Isolation',
 (also called 'consistency', 'concurrency control', 'serializability', or 'locking')
 \cite[Sec.~7.1]{GrayR93}.
 
-The AtomicC compiler
-validates that all rules executed during a given clock cycle are "equivalent"
-to some linear, atomic ordering ("sequentially consistent"(SC))
-\cite{Lamport:1979:MMC:1311099.1311750}.
-Even though all concurrent rules are executed during the same clock cycle,
-SC allows us to analyze the
-outcome of each rule independently of any other rules that could be executing at the same time.
-
-In contrast to software, which uses \textit{dynamic allocation} and locking to guarantee isolation
-\cite[p.~377]{GrayR93} \cite[Sec.~11.2]{OV11},
-state elements accessed by an AtomicC transaction are known at compile time as well as the
-conditions when the transaction is performed.  This allows \textit{static allocation}
-\cite[Sec.~7.3.1]{GrayR93} of schedules.
-
-Transactions are compositional: small transactions can be glued together to form 
-Lock-based programs do not compose: correct fragments may fail when composed.
-
-Transactional Datapath Specification.  \cite{nurvitadhi2011automatic}
-To support overlapped execution of multiple operations,
-hazard detection and stall logic is introduced to maintain
-the correctness of operations in the overlapped executions.
-The single-cycle version serves as a function specification of the pipelined
-design, used in model checking.
-T-spec blocks use an established set of handshaking signals: ready, start, done.
-Each async block can be executed at most once by each transaction.
-
-Time is defined relative to state transition and not the other way around.
+Grouping operations on state elements into transactions (\textbf{rules})
+enables compile time formal verification of the correctness of
+parallel execution of transactions
+in the synthesized logic.
+\cite{nurvitadhi2011automatic}
 \cite{fox2003algebraic}
 
-There is a graph-based definition of SC: define a dependency graph with node for each load/store.
-protocol is SC iff all traces have acyclic dependency directed graphs
-\cite{Cain2003}.
+The AtomicC compiler
+validates that all rules executed during a given clock cycle are
+"sequentially consistent"(SC) \cite{Lamport:1979:MMC:1311099.1311750},
+allowing analysis of
+outcome of each rule independently of any other rules that could be executing at the same time.
+
+In contrast to software, which uses \textit{dynamic allocation}\cite[p.~377]{GrayR93}
+and locking\cite[Sec.~11.2]{OV11} to guarantee isolation,
+the set of state elements accessed by an AtomicC transaction are known at compile time.
+In addition, the boolean condition when the transaction is performed
+is also known, allowing \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of schedules.
+Unlike lock-based scheduling,
+rule are compositional: small transactions can be glued together to form larger transactions.
+
+To check that a set of rules is SC, first
+define a dependency digraph with node for each transactions and
+dependency arcs from loads to stores.
 The transitive closure of these orders on the dependency graph nodes dictate
 the sequence in which each operation must \textit{appear} to execute in order to
 be considered correct.
-Dependency constraints(RAW, WAR, WAW) vs consistency constraints (defined by memory consistency model.  for example, if model is SC, then directed cycle cannot be placed in total order).
-WAR/WAW edges can be removed using register renaming.  RAW edges
-can be removed using value prediction.
+
+A \textit{constraint graph} is a partially-ordered digraph that models
+execution of a set of rules.
+\cite[Sec.~3]{Cain2003}.
+Nodes in a constraint graph represent atomic rule execution instances.  Edges
+represent the ordering relations between these instances, and are transitive in nature.
+The transitive closure of these orders on the constraint graph nodes
+dictate the sequence in which each operation must \textit{appear} to execute in
+order to be considered correct.
+Dependency constraints are:
+\begin{itemize}
+\item \textbf{Read-after-write (RAW)}: two nodes are connected by RAW dependence
+edges if one transaction creates a value that is used by the other, ensuring
+that values are created before they are read.
+\item \textbf{Write-after-read (WAR)}: the transaction node that writes a state
+element is preceded by a node that reads that element.
+\item \textbf{Write-after-write (WAW)}: the transaction node that writes a state
+element is preceeded by another node that has previously written that element.
+\end{itemize}
+Currently in AtomicC, only WAR edges are permitted, since all reads
+of state elements occur at the beginning of a clock period (preventing RAW)
+and all writes occur at the end (preventing WAW).
+In the future, it is possible that RAW edges can be removed using value prediction.
+
+A set is SC if and only if the dependency digraph is acyclic.
 
 $O[i] \cap (I[j] \cup O[j]) = \varnothing, \forall i \neq j $
 \cite[Sec.~7.3]{GrayR93}
