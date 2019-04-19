@@ -135,12 +135,13 @@ is also known, allowing \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of 
 Unlike lock-based scheduling,
 rule are compositional: small transactions can be glued together to form larger transactions.
 
-To check that a set of rules is SC, first
-define a dependency digraph with node for each transactions and
-dependency arcs from loads to stores.
-The transitive closure of these orders on the dependency graph nodes dictate
-the sequence in which each operation must \textit{appear} to execute in order to
-be considered correct.
+In preparation for scheduling, the compiler statically determines the 'read' and 'write'
+footprint for every rule and method \cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis}.
+\begin{itemize}
+\item read set: $R_{i}.read$
+\item write set: $R_{i}.write$
+\item base set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
+\end{itemize}
 
 A \textit{constraint graph} is a partially-ordered digraph that models
 execution of a set of rules.
@@ -165,42 +166,18 @@ of state elements occur at the beginning of a clock period (preventing RAW)
 and all writes occur at the end (preventing WAW).
 In the future, it is possible that RAW edges can be removed using value prediction.
 
-A set is SC if and only if the dependency digraph is acyclic.
+To check that a set of rules is SC, 
+first greedily partition the rules into 'schedule sets': rules that have
+overlapping base sets.
 
-$O[i] \cap (I[j] \cup O[j]) = \varnothing, \forall i \neq j $
-\cite[Sec.~7.3]{GrayR93}
+To check that a 'schedule set' is SC, first
+define a dependency digraph with node for each transactions and
+dependency arcs from loads to stores.
+The transitive closure of these orders on the dependency graph nodes dictate
+the sequence in which each operation must \textit{appear} to execute in order to
+be considered correct.
+\cite[Sec.~11.1]{OV11}
 
-\rSec1[atomicc.schedule]{Scheduling}
-
-Each rule has a set of state elements that it reads and another set of element that it writes.
-Value method invocations are treated as reads; action method invocations are treated as writes.
-For the execution of a group of rules to be considered to be SC, the following must
-be true:
-\begin{itemize}
-\item Atomic: All read and write operations for a given rule occur at the same time point in the sequence.
-\item Read-before-write:  A rule that writes a state element must occur later in the sequence
-than any rules that read the same state element.
-\item Non-conflicting: A given state element cannot be written by more than one concurrently executable rule.
-\end{itemize}
-
-The compiler statically determines the 'read' and 'write'
-footprint for every rule and method \cite[Sec.~10.1.2]{OV11} \cite{doi:10.1137/0213032}.
-\begin{itemize}
-\item read set: $R_{i}.read$
-\item write set: $R_{i}.write$
-\item base set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
-\end{itemize}
-\cite[Sec.~10.1.2]{OV11}
-\cite[Sec.~11.1]{OV11}  2 operations on same state element (x) are in conflict if
-one of them is a write. -> partial order)
-
-The compiler and linker do not resolve SC conflicts automatically.
-If static compile analysis cannot prove that their execution conditions(guards) or
-effects(base sets) are always disjoint,
-then the source text of the program must specify the priority order of scheduling
-to resolve conflicts.
-
-\rSec2[atomicc.schedalg]{Algorithm}
 \begin{itemize}
 \item arc condition: $arcCond(uv) \equiv
 \newline
@@ -208,23 +185,6 @@ to resolve conflicts.
 \end{itemize}
 
 \begin{lstlisting}[mathescape=true]
-$WorkSet$ = { all rules and methods for module }
-for $r \in WorkSet$ do
-    // Greedily group all rules/methods that have some overlap in read/write sets
-    $V = \{ r \}$
-    $V = \{ E \vert S(E) \cap S(V) \neq \varnothing  \}$  // Create next schedule set
-    $WorkSet = WorkSet \setminus V$
-
-    // Create 'read-before-write' dependency digraph
-    $G = (V, E)$
-    where: 
-       $V$ is a set of vertices
-       $E$ is a set of arcs $==$ { uv $\vert$ arcCond(uv) is not identically false }
-
-    // Find loops
-    $L$ = loops in $G$
-
-    for $L \in G$ do
        if fold (&, { $\forall uv \in L \colon$ arcCond(uv)}) is not identically false
           // 'break' loop L
           if loop has some method $M$ & some rule $R$
@@ -234,6 +194,14 @@ for $r \in WorkSet$ do
           else
               dependency digraph not acyclic, report error
 \end{lstlisting}
+
+A set is SC if and only if the dependency digraph is acyclic.
+
+The compiler and linker do not resolve SC conflicts automatically.
+If static compile analysis cannot prove that their execution conditions(guards) or
+effects(base sets) are always disjoint,
+then the source text of the program must specify the priority order of scheduling
+to resolve conflicts.
 
 \rSec2[atomicc.schedlink]{Linking}
 
