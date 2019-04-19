@@ -3,94 +3,37 @@
 
 \rSec1[atomicc.intro]{Introduction}
 
-AtomicC is a timed, structural hardware description language, permitting
+AtomicC is a timed, structural hardware description language for
 the high level specification of algorithms to be instantiated
 directly in hardware.
-
-The language is designed for
-the construction of \textbf{modules} that are \textit{composable}:
-validated smaller modules can be aggregated to form
-a larger validated module with no impact on the correct
-operation of the component modules.
-\begin{itemize}
-\item Modules interactions are performed with Latency Insensitive (LI) \textbf{method} calls, allowing automated handling of the transitive effect of stalls.
-\item Module behaviorial statements are encapsulated in transactions (\textbf{rules}), allowing static validation of correct operation in the presence of concurrent execution.
-\item Modules can export multiple, explicitly named Abstract Data Type (ADT) \textbf{interfaces},
-promoting flexibility and clarity in module coupling.
-\item All state elements in the hardware
-netlist are explicit in the source code of the design, removing a source of common errors.
-\item Parametric polymorphic data types allow flexible reuse of parameterized
-\textbf{modules} (C++ templates).
-\item Integration with existing backend Verilog infrastructure including reuse of existing Verilog
-components.
-\end{itemize}
-This supports the efficient, incremental reuse of pre-compiled, validated
-libraries, improving productivity on large designs.
-
-\rSec2[atomicc.imethod]{Latency Insensitive Methods}
-Automate the handling of the transitive effect of stalls.
-
-Latency-Insensitive Design assumes that modules are stallable.
-In future designs, a signal will need more than 10 clock cycles
-to traverse the entire chip area.  Partition long wires into
-subsections, connected with relay stations.
-Can be implemented using \textit{hand-shaking signalling} techniques.
-(Carloni, McMillan, SangiovanniVincentelli)
-
-A patient system is one whose components are \textit{stallable}.
-Two signals are latency equiv if they present the same sequence of
-informative events.
-Patient process: 1) intersection of 2 patient processes is a patient
-process, 2) give 2 pairs of latency equiv patient processes,
-their pairwise intersections are also latency equiv.
-
-\rSec2[atomicc.itrans]{Transactions}
-
-Grouping operations into transactions (\textbf{rules})
-enable compile time formal verification of the correctness of
-composite parallel execution of transactions
-in the synthesized logic.
-
-Use of transactions supports compositions of modules that 
-retain atomic properties.  (usually atomic ops are non-modular, non-compositional
-HarrisMarlowJonesHerlihy, Nikhil)
-Transactions are compositional: small transactions can be glued together to form 
-larger transactions(HarrisMarlowJonesHerlihy).
-Lock-based programs do not compose: correct fragments may fail when composed.
-
-Transactional Datapath Specification.  (Nurvitadhi)
-To support overlapped execution of multiple operations,
-hazard detection and stall logic is introduced to maintain
-the correctness of operations in the overlapped executions.
-The single-cycle version serves as a function specification of the pipelined
-design, used in model checking.
-T-spec blocks use an established set of handshaking signals: ready, start, done.
-Each async block can be executed at most once by each transaction.
-
-Time is defined relative to state transition and not the other way around.
-(FoxHarman)
-
-\rSec2[atomicc.iinterface]{Interface}
-AtomicC follows in the tradition of the Go language\cite{Pike2012},
-promoting the use of \textbf{interfaces} for composition and
-coupling rather than (possibly multiple) inheritance.
-An ADT is "a way to interact with a module" rather than "a description
-of the module type itself".
-
-\rSec2[atomicc.imodule]{Module}
-
-The AtomicC compiler 
-generates a single Verilog module for each AtomicC module declared.
-Standard Verilog backend tools are then used to synthesize
-the resulting ASIC or FPGA.
-
 AtomicC extends C++
 with Bluespec-style\cite{Bluespec:www,Hoe:Thesis,HoeArvind:TRS_Synthesis2}
 modules, rules, interfaces, and methods.
-AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware.
-Instead, it uses a subset of the C++ language to specify desired
-conditional assignments to state elements,
-performing these operations under an atomic transaction rule-based execution model.
+
+The language is designed for
+the construction of \textbf{modules} that are correct-by-construction \textit{composable}:
+validated smaller modules can be aggregated to form
+a larger validated module with no impact on the correct
+operation of the component modules:
+\begin{itemize}
+\item Modules interactions are performed with Latency Insensitive (LI) \textbf{method} calls, automating the transitive effect of stalls.
+\item Module behaviorial statements are encapsulated into single cycle transactions (\textbf{rules}),
+replacing unreliable manual analysis of parallel operation
+with compile time hazard detection and runtime stall logic.
+\item Modules can export multiple, named Abstract Data Type (ADT) \textbf{interfaces},
+promoting flexibility in module coupling.  Program clarity and expressiveness is
+also improved through the explicit textual addition of interface name to references, rather
+than relying on multiple inheritance and usage casting as is traditional in C++.
+\item All state elements in the hardware
+netlist are explicit in the source code of the design.
+\end{itemize}
+These features support the efficient reuse of pre-compiled, incrementally validated
+libraries, improving productivity on large designs.
+
+AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware,
+instead uses a subset of the C++ language to specify behavioral
+assignments to state elements.
+Standard C++ templates allow parametric polymorphic reuse of \textbf{modules}.
 In AtomicC, all module data is private; an instantiator of a module can only 
 interact with it via interface method invocations.
 
@@ -98,6 +41,13 @@ Like Connectal, AtomicC designs may include both hardware and
 software components, using interfaces to specify hardware/software communication
 in a type safe manner. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
+
+The AtomicC compiler 
+generates a single Verilog module for each AtomicC module declared.
+Standard Verilog backend tools are then used to synthesize
+the resulting ASIC or FPGA.
+Integration with existing backend Verilog infrastructure including reuse of existing Verilog
+components.
 
 The basic building block of AtomicC is the module declaration.
 Modules consist of 3 parts:
@@ -108,9 +58,12 @@ Modules consist of 3 parts:
 \end{itemize}
 
 \rSec1[atomicc.interface]{Interfaces}
-Instantiated modules are interacted with using one or more interfaces exported by the module.
+
 An interface definition is a list of method signatures, but no method bodies, defining
 an abstract data type(ADT) \cite{Liskov74programmingwith} view exported by the module.
+AtomicC follows in the tradition of the Go language\cite{Pike2012},
+promoting the explicit declaration of \textbf{interfaces} for composition and
+coupling rather than using multiple inheritance to support heterogenous exported interface types.
 Module interfaces are named, 
 allowing explicit denotation in the program text
 of which module ADTs are connected to and accessable from other state elements.
@@ -127,6 +80,7 @@ Exported interfaces can be used in several ways:
 \end{itemize}
 
 \rSec1[atomicc.method]{Interface Methods}
+
 There are 2 types of methods:
 \begin{itemize}
 \item \textbf{Value method functions} provide read-only access to module state elements.
@@ -142,6 +96,22 @@ to indicate when the callee is available and
 to prevent scheduling of the calling transaction until all necessary elements are
 available.
 
+Automate the handling of the transitive effect of stalls.
+
+Latency-Insensitive Design assumes that modules are stallable.
+In future designs, a signal will need more than 10 clock cycles
+to traverse the entire chip area.  Partition long wires into
+subsections, connected with relay stations.
+Can be implemented using \textit{hand-shaking signalling} techniques.
+\cite{carloni2001theory}
+
+A patient system is one whose components are \textit{stallable}.
+Two signals are latency equiv if they present the same sequence of
+informative events.
+Patient process: 1) intersection of 2 patient processes is a patient
+process, 2) give 2 pairs of latency equiv patient processes,
+their pairwise intersections are also latency equiv.
+
 AtomicC uses a \textbf{valid/ready} handshake process\cite{Fletcher2009, AXISpec} to invoke action methods,
 giving both the invoker(master) and invokee(slave) the ability to control execution timing.
 The master uses the \textbf{valid} signal
@@ -151,21 +121,18 @@ both \textbf{valid} and \textbf{ready} are HIGH ($\pi(M_{i}) \equiv ready(M_{i})
 
 \rSec1[atomicc.modrule]{Rules}
 
-Operations on state elements are grouped into transactions, called \textbf{rules}.
+Grouping operations on state elements into transactions (\textbf{rules})
+enables compile time formal verification of the correctness of
+composite parallel execution of transactions
+in the synthesized logic.
 Transactions are units of consistency (preserving program invariants), following ACID semantics.
 In AtomicC, all enabled statements in all modules execute on every clock cycle.
 The compiler synthesizes control signals, allowing rules to fire
 only when their dependent elements and referenced method invocations are ready.
 
 Scheduling of rules guarantees 'Isolation',
-also called 'consistency' (the static property), 'concurrency control'
-(the problem), 'serializability' (the theory), or 'locking' (the technique). (\cite{GrayR93}, Sec 7.1)
-
-In contrast to software, which uses \textit{dynamic allocation} and locking to guarantee isolation
-\cite[p.~377]{GrayR93} \cite[Sec.~11.2]{OV11},
-state elements accessed by an AtomicC transaction are known at compile time as well as the
-conditions when the transaction is performed.  This allows \textit{static allocation}
-\cite[Sec.~7.3.1]{GrayR93} of schedules.
+(also called 'consistency', 'concurrency control', 'serializability', or 'locking')
+\cite[Sec.~7.1]{GrayR93}.
 
 The AtomicC compiler
 validates that all rules executed during a given clock cycle are "equivalent"
@@ -175,10 +142,36 @@ Even though all concurrent rules are executed during the same clock cycle,
 SC allows us to compute the
 outcome of each rule independently of any other rules that could be executing at the same time.
 
-There is a graph-based definition of SC: define a constraint graph with node for each load/store.
-protocol is SC iff all traces have acyclic constraint (also called precedence) directed graphs
+In contrast to software, which uses \textit{dynamic allocation} and locking to guarantee isolation
+\cite[p.~377]{GrayR93} \cite[Sec.~11.2]{OV11},
+state elements accessed by an AtomicC transaction are known at compile time as well as the
+conditions when the transaction is performed.  This allows \textit{static allocation}
+\cite[Sec.~7.3.1]{GrayR93} of schedules.
+
+Use of transactions supports compositions of modules that 
+retain atomic properties.  (usually atomic ops are non-modular, non-compositional
+\cite{harris2005composable}
+\cite{NikhilSemantics})
+Transactions are compositional: small transactions can be glued together to form 
+larger transactions\cite{harris2005composable}.
+Lock-based programs do not compose: correct fragments may fail when composed.
+
+Transactional Datapath Specification.  \cite{nurvitadhi2011automatic}
+To support overlapped execution of multiple operations,
+hazard detection and stall logic is introduced to maintain
+the correctness of operations in the overlapped executions.
+The single-cycle version serves as a function specification of the pipelined
+design, used in model checking.
+T-spec blocks use an established set of handshaking signals: ready, start, done.
+Each async block can be executed at most once by each transaction.
+
+Time is defined relative to state transition and not the other way around.
+\cite{fox2003algebraic}
+
+There is a graph-based definition of SC: define a dependency graph with node for each load/store.
+protocol is SC iff all traces have acyclic dependency directed graphs
 \cite{Cain2003}.
-The transitive closure of these orders on the constrain graph nodes dictate
+The transitive closure of these orders on the dependency graph nodes dictate
 the sequence in which each operation must \textit{appear} to execute in order to
 be considered correct.
 Dependency constraints(RAW, WAR, WAW) vs consistency constraints (defined by memory consistency model.  for example, if model is SC, then directed cycle cannot be placed in total order).
@@ -233,7 +226,7 @@ for $r \in WorkSet$ do
     $V = \{ E \vert S(E) \cap S(V) \neq \varnothing  \}$  // Create next schedule set
     $WorkSet = WorkSet \setminus V$
 
-    // Create 'read-before-write' constraint digraph
+    // Create 'read-before-write' dependency digraph
     $G = (V, E)$
     where: 
        $V$ is a set of vertices
@@ -250,7 +243,7 @@ for $r \in WorkSet$ do
           else if source code has "priority $R1 > R2$" & $R1 \in L$ & $R2 \in L$
               $valid(R2)$ &= $\neg valid(R1)$
           else
-              constraint digraph not acyclic, report error
+              dependency digraph not acyclic, report error
 \end{lstlisting}
 
 \rSec2[atomicc.schedlink]{Linking}
