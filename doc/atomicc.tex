@@ -16,14 +16,21 @@ validated smaller modules can be aggregated to form
 a larger validated module with no impact on the correct
 operation of the component modules:
 \begin{itemize}
-\item Modules interactions are performed with Latency Insensitive (LI) \textbf{method} calls, automating the transitive effect of stalls.
+\item Modules interactions are performed with Latency Insensitive (LI)
+\cite{carloni2001theory}
+\textbf{method} calls, automating the transitive effect of stalls.
 \item Module behaviorial statements are encapsulated into single cycle transactions (\textbf{rules}),
 replacing unreliable manual analysis of parallel operation
 with compile time hazard detection and runtime stall logic.
-\item Modules can export multiple, named Abstract Data Type (ADT) \textbf{interfaces},
-promoting flexibility in module coupling.  Program clarity and expressiveness is
-also improved through the explicit textual addition of interface name to references, rather
-than relying on multiple inheritance and usage casting as is traditional in C++.
+\cite{NikhilSemantics}
+\cite{harris2005composable}.
+\item Like the Go language\cite{Pike2012},
+an \textbf{interface} is a named collection of method signatures, defining
+the behavior of an abstract data type(ADT) \cite{Liskov74programmingwith}.
+Modules can export multiple, named \textbf{interfaces},
+promoting easy composition and coupling with other modules.
+AtomicC supports both export and import of interfaces, giving flexibility in
+algorithm expression.
 \item All state elements in the hardware
 netlist are explicit in the source code of the design.
 \end{itemize}
@@ -59,27 +66,12 @@ Modules consist of 3 parts:
 
 \rSec1[atomicc.interface]{Interfaces}
 
-An interface definition is a list of method signatures, but no method bodies, defining
-an abstract data type(ADT) \cite{Liskov74programmingwith} view exported by the module.
-AtomicC follows in the tradition of the Go language\cite{Pike2012},
-promoting the explicit declaration of \textbf{interfaces} for composition and
-coupling rather than using multiple inheritance to support heterogenous exported interface types.
-Module interfaces are named, 
-allowing explicit denotation in the program text
-of which module ADTs are connected to and accessable from other state elements.
-In addition to defining and exporting interfaces,
-a module definition can also import
-interface references, exported from an
-externally defined module, providing flexibility in algorithmic description.
-
 Exported interfaces can be used in several ways:
 \begin{itemize}
 \item invoked directly by the instantiator of the module,
 \item forwarded transparently, becoming another exported interface of the instantiating module,
 \item 'connected' to an 'interface reference' of another module in the instantiating scope.
 \end{itemize}
-
-\rSec1[atomicc.method]{Interface Methods}
 
 There are 2 types of methods:
 \begin{itemize}
@@ -96,14 +88,11 @@ to indicate when the callee is available and
 to prevent scheduling of the calling transaction until all necessary elements are
 available.
 
-Automate the handling of the transitive effect of stalls.
-
 Latency-Insensitive Design assumes that modules are stallable.
 In future designs, a signal will need more than 10 clock cycles
 to traverse the entire chip area.  Partition long wires into
 subsections, connected with relay stations.
 Can be implemented using \textit{hand-shaking signalling} techniques.
-\cite{carloni2001theory}
 
 A patient system is one whose components are \textit{stallable}.
 Two signals are latency equiv if they present the same sequence of
@@ -112,7 +101,8 @@ Patient process: 1) intersection of 2 patient processes is a patient
 process, 2) give 2 pairs of latency equiv patient processes,
 their pairwise intersections are also latency equiv.
 
-AtomicC uses a \textbf{valid/ready} handshake process\cite{Fletcher2009, AXISpec} to invoke action methods,
+AtomicC uses a \textbf{valid/ready} \textit{hand-shaking signalling}
+\cite{Fletcher2009, AXISpec} to invoke action methods,
 giving both the invoker(master) and invokee(slave) the ability to control execution timing.
 The master uses the \textbf{valid} signal
 of the method to show when parameter data is available and the transaction should be performed
@@ -139,7 +129,7 @@ validates that all rules executed during a given clock cycle are "equivalent"
 to some linear, atomic ordering ("sequentially consistent"(SC))
 \cite{Lamport:1979:MMC:1311099.1311750}.
 Even though all concurrent rules are executed during the same clock cycle,
-SC allows us to compute the
+SC allows us to analyze the
 outcome of each rule independently of any other rules that could be executing at the same time.
 
 In contrast to software, which uses \textit{dynamic allocation} and locking to guarantee isolation
@@ -148,12 +138,7 @@ state elements accessed by an AtomicC transaction are known at compile time as w
 conditions when the transaction is performed.  This allows \textit{static allocation}
 \cite[Sec.~7.3.1]{GrayR93} of schedules.
 
-Use of transactions supports compositions of modules that 
-retain atomic properties.  (usually atomic ops are non-modular, non-compositional
-\cite{harris2005composable}
-\cite{NikhilSemantics})
 Transactions are compositional: small transactions can be glued together to form 
-larger transactions\cite{harris2005composable}.
 Lock-based programs do not compose: correct fragments may fail when composed.
 
 Transactional Datapath Specification.  \cite{nurvitadhi2011automatic}
