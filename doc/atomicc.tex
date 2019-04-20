@@ -7,8 +7,12 @@ AtomicC is a timed, structural hardware description language for
 the high level specification of algorithms to be instantiated
 directly in hardware.
 AtomicC extends C++
-with Bluespec-style\cite{Bluespec:www,Hoe:Thesis,HoeArvind:TRS_Synthesis2}
+with support for Guarded Atomic Actions:
+Bluespec-style\cite{Bluespec:www,Hoe:Thesis,HoeArvind:TRS_Synthesis2}
 modules, rules, interfaces, and methods.
+AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware,
+instead uses a subset of the C++ language to specify behavioral
+assignments to state elements.
 
 The language is designed for
 the construction of \textbf{modules} that are correct-by-construction \textit{composable}:
@@ -18,31 +22,25 @@ operation of the component modules:
 \begin{itemize}
 \item Modules interactions are performed with Latency Insensitive (LI)
 \cite{carloni2001theory}
-\textbf{method} calls, automating the transitive effect of stalls.
-\item Module behaviorial statements are encapsulated into single cycle transactions (\textbf{rules}),
-replacing unreliable manual analysis of parallel operation
-with compile time hazard detection and runtime stall logic.
+\textbf{method} calls, allowing methods to enforce invocation pre-conditions
+and transitive support for stalling.
+\item Module behaviorial statements are encapsulated into transactions (\textbf{rules})
+with full compile time validation of concurrent execution.
 \cite{NikhilSemantics}
 \cite{harris2005composable}.
-\item Like the Go language\cite{Pike2012},
-an \textbf{interface} is a named collection of method signatures, defining
+\cite{nurvitadhi2011automatic}
+\cite{fox2003algebraic}
+\item An \textbf{interface} is a named collection of method signatures, defining
 the behavior of an abstract data type(ADT) \cite{Liskov74programmingwith}.
-Modules can export multiple, named \textbf{interfaces},
-promoting easy composition and coupling with other modules.
-AtomicC supports both export and import of interfaces, giving flexibility in
-algorithm expression.
+Modules can export and import
+multiple, named \textbf{interfaces},
+giving flexibility in algorithm expression and coupling with other modules.
 \item All state elements in the hardware
 netlist are explicit in the source code of the design.
+All module data is private to the module.
 \end{itemize}
-These features support the efficient reuse of pre-compiled, incrementally validated
+These features support the reliable reuse of pre-compiled, incrementally validated
 libraries, improving productivity on large designs.
-
-AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware,
-instead uses a subset of the C++ language to specify behavioral
-assignments to state elements.
-Standard C++ templates allow parametric polymorphic reuse of \textbf{modules}.
-In AtomicC, all module data is private; an instantiator of a module can only 
-interact with it via interface method invocations.
 
 Like Connectal, AtomicC designs may include both hardware and
 software components, using interfaces to specify hardware/software communication
@@ -51,10 +49,10 @@ arguments between hardware and software.
 
 The AtomicC compiler 
 generates a single Verilog module for each AtomicC module declared.
-Standard Verilog backend tools are then used to synthesize
+Existing Verilog modules can be called from and can call AtomicC
+generated modules.
+Standard Verilog backend tools are used to synthesize
 the resulting ASIC or FPGA.
-Integration with existing backend Verilog infrastructure including reuse of existing Verilog
-components.
 
 The basic building block of AtomicC is the module declaration.
 Modules consist of 3 parts:
@@ -73,16 +71,11 @@ Exported interfaces can be used in several ways:
 \item 'connected' to an 'interface reference' of another module in the instantiating scope.
 \end{itemize}
 
-Module interface methods invocations are \textit{stallable}, refered to as \textit{patient system}
-\cite{carloni2001theory}.
-This allows the called method to enforce invocation pre-conditions on the caller
-so that interface usage requirements are guaranteed and stalling is transitive.
-
 There are 2 types of methods:
 \begin{itemize}
 \item \textbf{Value method functions} provide read-only access to module state elements.
 \item \textbf{Action method procedures} perform write operations on state elements,
-can take parameters and do not have a return value.
+can take parameters and do not have return values.
 A compiler generated
 \textbf{valid} signal indicates that the caller wishes to perform the method invocation.
 \end{itemize}
@@ -106,50 +99,43 @@ both \textbf{valid} and \textbf{ready} are HIGH:
 \rSec1[atomicc.modrule]{Rules}
 
 Transactions are units of consistency (preserving program invariants), following ACID semantics.
-In AtomicC, all enabled statements in all modules execute on every clock cycle.
+In AtomicC, all enabled rules in all modules execute on every clock cycle.
 The compiler synthesizes control signals, allowing rules to fire
 only when their dependent elements and referenced method invocations are ready.
-
-Scheduling of rules guarantees 'Isolation',
-(also called 'consistency', 'concurrency control', 'serializability', or 'locking')
-\cite[Sec.~7.1]{GrayR93}.
-
-Grouping operations on state elements into transactions (\textbf{rules})
-enables compile time formal verification of the correctness of
-parallel execution of transactions
-in the synthesized logic.
-\cite{nurvitadhi2011automatic}
-\cite{fox2003algebraic}
 
 The AtomicC compiler
 validates that all rules executed during a given clock cycle are
 "sequentially consistent"(SC) \cite{Lamport:1979:MMC:1311099.1311750},
-allowing analysis of
-outcome of each rule independently of any other rules that could be executing at the same time.
+guaranteeing \textit{isolation}\cite[Sec.~7.1]{GrayR93}: each rule executes
+independently of any other rules executing at the same time.
+
+Of course, since all rules execute in a single cycle, "schedule" does not
+refer to an actual time sequenced evolution, but merely to an abstract sub-cycle
+virtual ordering.
 
 In contrast to software, which uses \textit{dynamic allocation}\cite[p.~377]{GrayR93}
 and locking\cite[Sec.~11.2]{OV11} to guarantee isolation,
-the set of state elements accessed by an AtomicC transaction are known at compile time.
-In addition, the boolean condition when the transaction is performed
-is also known, allowing \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of schedules.
-Unlike lock-based scheduling,
-rule are compositional: small transactions can be glued together to form larger transactions.
+the set of state elements accessed by an AtomicC transaction
+and the boolean condition when the transaction is performed
+are known at compile time.
+This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of schedules.
 
-In preparation for scheduling, the compiler statically determines the 'read' and 'write'
-footprint for every rule and method \cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis}.
-\begin{itemize}
-\item read set: $R_{i}.read$
-\item write set: $R_{i}.write$
-\item base set: $S(R_{i}) \equiv R_{i}.read \cup R_{i}.write$
-\end{itemize}
+In preparation for scheduling, the compiler statically determines the
+\textit{read set} and \textit{write set}
+for every rule and method \cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis}.
+The \textit{base set} is defined to be
+the union of the \textit{read set} and \textit{write set}.
 
 A \textit{constraint graph} is a partially-ordered digraph that models
-execution of a set of rules.
+the conditional dependencies within a set of rules.
 \cite[Sec.~3]{Cain2003}.
+The condition on each edge is the boolean expression for when the
+edge (the dependency) exists, based on the conditions that each rule
+and each local operation within that rule exists.
 Nodes in a constraint graph represent atomic rule execution instances.  Edges
 represent the ordering relations between these instances, and are transitive in nature.
 The transitive closure of these orders on the constraint graph nodes
-dictate the sequence in which each operation must \textit{appear} to execute in
+dictate the sequence in which each rule must \textit{appear} to execute in
 order to be considered correct.
 Dependency constraints are:
 \begin{itemize}
@@ -161,41 +147,50 @@ element is preceded by a node that reads that element.
 \item \textbf{Write-after-write (WAW)}: the transaction node that writes a state
 element is preceeded by another node that has previously written that element.
 \end{itemize}
-Currently in AtomicC, only WAR edges are permitted, since all reads
-of state elements occur at the beginning of a clock period (preventing RAW)
-and all writes occur at the end (preventing WAW).
-In the future, it is possible that RAW edges can be removed using value prediction.
+Currently in AtomicC,
+since all reads of state elements occur at the beginning of a clock period
+and all writes occur at the end,
+only WAR edges are permitted in the constraint graph.
+In the future, it is possible that RAW edges can be removed using value prediction
+and WAW or RAW edges could be removed with register renaming, allowing more
+flexible aggregation of multiple transactions into a single cycle.
 
 To check that a set of rules is SC, 
-first greedily partition the rules into 'schedule sets': rules that have
-overlapping base sets.
+first greedily partition the rules into \textit{schedule sets}: rules that have
+overlapping \textit{base sets}.
 
 To check that a 'schedule set' is SC, first
 define a dependency digraph with node for each transactions and
-dependency arcs from loads to stores.
+edges from loads to stores, including the conditional execution conditions.
 The transitive closure of these orders on the dependency graph nodes dictate
 the sequence in which each operation must \textit{appear} to execute in order to
 be considered correct.
 \cite[Sec.~11.1]{OV11}
 
+Each edge has an \textit{unit edge condition}, which is the disjunction of the following:
+the execution condition of the source rule,
+the execution condition of the destination rule,
+the execution condition of the source read/write of the dependant state element,
+the execution condition of the destination read/write of the dependant state element.
+
+For each pair of nodes in the dependency digraph, we define the \textit{edge condition}
+between 2 nodes as the 'fold' of the \textit{unit edge conditions} of each WAR edge
+using the 'or' operator.
+For a cycle in the digraph, we define the \textit{path condition}
+as the 'fold' of the \textit{edge conditions} for all edges in the cycle using the 'and' operator.
+
+If a loop has a \textit{path condition} that is not identically false,
+the compiler can break the loop under the following conditions:
 \begin{itemize}
-\item arc condition: $arcCond(uv) \equiv
-\newline
-      fold (|, \{ \forall E \in u.Write, E \in v.Read \colon (u.Write(E).cond\ \&\ v.Read(E).cond) \})$
+\item if loop has some method $M$ \& some rule $R$
+
+              $valid(R)$ \&= $\neg valid(M)$
+\item if source code has "priority $R1 > R2$" \& $R1 \in L$ \& $R2 \in L$
+
+              $valid(R2)$ \&= $\neg valid(R1)$
 \end{itemize}
-
-\begin{lstlisting}[mathescape=true]
-       if fold (&, { $\forall uv \in L \colon$ arcCond(uv)}) is not identically false
-          // 'break' loop L
-          if loop has some method $M$ & some rule $R$
-              $valid(R)$ &= $\neg valid(M)$
-          else if source code has "priority $R1 > R2$" & $R1 \in L$ & $R2 \in L$
-              $valid(R2)$ &= $\neg valid(R1)$
-          else
-              dependency digraph not acyclic, report error
-\end{lstlisting}
-
-A set is SC if and only if the dependency digraph is acyclic.
+A \textit{schedule set} is not SC if the dependency digraph has a cycle
+with a cycle \textit{path condition} that is not identically false.
 
 The compiler and linker do not resolve SC conflicts automatically.
 If static compile analysis cannot prove that their execution conditions(guards) or
