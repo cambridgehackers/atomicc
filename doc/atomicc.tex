@@ -17,24 +17,34 @@ assignments to state elements.
 The language is designed for
 the construction of \textbf{modules} that are correct-by-construction \textit{composable}:
 validated smaller modules can be aggregated to form
-a larger validated module with no impact on the correct
-operation of the component modules:
+a larger validated module with
+no degradation of the component modules:
 \begin{itemize}
 \item Modules interactions are performed with Latency Insensitive (LI)
 \cite{carloni2001theory}
 \textbf{method} calls, allowing methods to enforce invocation pre-conditions
 and transitive support for stalling.
 \item Module behaviorial statements are encapsulated into transactions (\textbf{rules})
-with full compile time validation of concurrent execution.
+following ACID semantics
 \cite{NikhilSemantics}
-\cite{harris2005composable}.
+\cite{harris2005composable}
 \cite{nurvitadhi2011automatic}
-\cite{fox2003algebraic}
+\cite{fox2003algebraic}.
+The compiler synthesizes control signals, allowing rules to fire
+only when their referenced method invocations are ready.
+
+In AtomicC, all enabled rules in all modules execute on every clock cycle.
+The compiler
+validates that rules executed during a given clock cycle are
+"sequentially consistent"(SC) \cite{Lamport:1979:MMC:1311099.1311750},
+guaranteeing each rule executes
+independently of any other rules executing at the same time
+(\textit{isolation}\cite[Sec.~7.1]{GrayR93}).
 \item An \textbf{interface} is a named collection of method signatures, defining
 the behavior of an abstract data type(ADT) \cite{Liskov74programmingwith}.
 Modules can export and import
 multiple, named \textbf{interfaces},
-giving flexibility in algorithm expression and coupling with other modules.
+giving flexibility in coupling with other modules and in algorithm expression.
 \item All state elements in the hardware
 netlist are explicit in the source code of the design.
 All module data is private to the module.
@@ -96,127 +106,67 @@ both \textbf{valid} and \textbf{ready} are HIGH:
 
  ($\pi(M_{i}) \equiv ready(M_{i})\ \&\&\ valid(M_{i})$).
 
-\rSec1[atomicc.modrule]{Rules}
-
-Transactions are units of consistency (preserving program invariants), following ACID semantics.
-In AtomicC, all enabled rules in all modules execute on every clock cycle.
-The compiler synthesizes control signals, allowing rules to fire
-only when their dependent elements and referenced method invocations are ready.
-
-The AtomicC compiler
-validates that all rules executed during a given clock cycle are
-"sequentially consistent"(SC) \cite{Lamport:1979:MMC:1311099.1311750},
-guaranteeing \textit{isolation}\cite[Sec.~7.1]{GrayR93}: each rule executes
-independently of any other rules executing at the same time.
-
-Of course, since all rules execute in a single cycle, "schedule" does not
-refer to an actual time sequenced evolution, but merely to an abstract sub-cycle
-virtual ordering.
+\rSec2[atomicc.schedule]{Scheduling}
 
 In contrast to software, which uses \textit{dynamic allocation}\cite[p.~377]{GrayR93}
 and locking\cite[Sec.~11.2]{OV11} to guarantee isolation,
 the set of state elements accessed by an AtomicC transaction
 and the boolean condition when the transaction is performed
-are known at compile time.
-This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of schedules.
+are all known at compile time.
+This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of schedules
+and compile time validation of SC.
 
-In preparation for scheduling, the compiler statically determines the
-\textit{read set} and \textit{write set}
-for every rule and method \cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis}.
-The \textit{base set} is defined to be
-the union of the \textit{read set} and \textit{write set}.
-
+When scheduling, rules with overlap in usage of state elements
+(\textit{read set} and \textit{write set}\cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis})
+are greedily gathered into \textit{schedule sets}, each of which is
+validated with a \textit{constraint graph}.
 A \textit{constraint graph} is a partially-ordered digraph that models
-the conditional dependencies within a set of rules.
-\cite[Sec.~3]{Cain2003}.
-The condition on each edge is the boolean expression for when the
-edge (the dependency) exists, based on the conditions that each rule
-and each local operation within that rule exists.
-Nodes in a constraint graph represent atomic rule execution instances.  Edges
-represent the ordering relations between these instances, and are transitive in nature.
+the dependencies within a \textit{schedule set}:
+nodes in a constraint graph represent atomic rule instances, edges
+represent the ordering relations between these instances\cite[Sec.~3]{Cain2003}.
+Since all reads of state elements occur at the beginning of a clock period,
+all edges in the graph are \textbf{Write-after-read (WAR)}.
+Each edge has a symbolic boolean \textit{edge condition} for when the
+the ordering dependency actually exists: the boolean
+condition when one rule actually reads a given state element
+and another rule actually writes it.
+
 The transitive closure of these orders on the constraint graph nodes
-dictate the sequence in which each rule must \textit{appear} to execute in
-order to be considered correct.
-Dependency constraints are:
-\begin{itemize}
-\item \textbf{Read-after-write (RAW)}: two nodes are connected by RAW dependence
-edges if one transaction creates a value that is used by the other, ensuring
-that values are created before they are read.
-\item \textbf{Write-after-read (WAR)}: the transaction node that writes a state
-element is preceded by a node that reads that element.
-\item \textbf{Write-after-write (WAW)}: the transaction node that writes a state
-element is preceeded by another node that has previously written that element.
-\end{itemize}
-Currently in AtomicC,
-since all reads of state elements occur at the beginning of a clock period
-and all writes occur at the end,
-only WAR edges are permitted in the constraint graph.
-In the future, it is possible that RAW edges can be removed using value prediction
-and WAW or RAW edges could be removed with register renaming, allowing more
-flexible aggregation of multiple transactions into a single cycle.
+dictate the sequence (\textbf{schedule}) in which each rule must \textit{appear} to execute in
+order to be considered correct
+\cite[Sec.~11.1]{OV11}.
+Of course, since all rules execute in a single cycle, "schedule" does not
+refer to an actual time sequenced evolution of state,
+but to a conceptual "sub-cycle" ordering.
 
-To check that a set of rules is SC, 
-first greedily partition the rules into \textit{schedule sets}: rules that have
-overlapping \textit{base sets}.
-
-To check that a 'schedule set' is SC, first
-define a dependency digraph with node for each transactions and
-edges from loads to stores, including the conditional execution conditions.
-The transitive closure of these orders on the dependency graph nodes dictate
-the sequence in which each operation must \textit{appear} to execute in order to
-be considered correct.
-\cite[Sec.~11.1]{OV11}
-
-Each edge has an \textit{unit edge condition}, which is the disjunction of the following:
-the execution condition of the source rule,
-the execution condition of the destination rule,
-the execution condition of the source read/write of the dependant state element,
-the execution condition of the destination read/write of the dependant state element.
-
-For each pair of nodes in the dependency digraph, we define the \textit{edge condition}
-between 2 nodes as the 'fold' of the \textit{unit edge conditions} of each WAR edge
+For each pair of nodes in the constraint digraph, we define the \textit{node condition}
+between 2 nodes as the 'fold' of the \textit{edge conditions} of each WAR edge
 using the 'or' operator.
-For a cycle in the digraph, we define the \textit{path condition}
-as the 'fold' of the \textit{edge conditions} for all edges in the cycle using the 'and' operator.
+For each cycle in the digraph, we define the \textit{path condition}
+as the 'fold' of the \textit{node conditions} for all sequential pairs of nodes
+in the cycle using the 'and' operator.
 
-If a loop has a \textit{path condition} that is not identically false,
-the compiler can break the loop under the following conditions:
+If a cycle has a \textit{path condition} that is not identically false,
+then, when the \textit{path condition} is true, a total ordering of
+the digraph is not possible and the \textit{schedule set} is not SC.
+The compiler can break the cycle under the following conditions:
 \begin{itemize}
-\item if loop has some method $M$ \& some rule $R$
+\item if cycle has some method $M$ \& some rule $R$
 
               $valid(R)$ \&= $\neg valid(M)$
 \item if source code has "priority $R1 > R2$" \& $R1 \in L$ \& $R2 \in L$
 
               $valid(R2)$ \&= $\neg valid(R1)$
 \end{itemize}
-A \textit{schedule set} is not SC if the dependency digraph has a cycle
-with a cycle \textit{path condition} that is not identically false.
+If neither of these methods is applicable, the compiler or linker
+reports a error, requiring manual resolution in the source program.
 
-The compiler and linker do not resolve SC conflicts automatically.
-If static compile analysis cannot prove that their execution conditions(guards) or
-effects(base sets) are always disjoint,
-then the source text of the program must specify the priority order of scheduling
-to resolve conflicts.
-
-\rSec2[atomicc.schedlink]{Linking}
-
-Without knowledge of the internals of a method, it must be assumed that all "action method"
-calls to a state element conflict.  In addition, it must be assumed that all "value method" calls
-must preceed all "action method" calls in any clock cycle.
-
-Since method/method conflicts in a module cannot be validated in the absence of
-information about their usage, this processing is delayed until the "module group binding"
-stage of linking.
-(It is not possible to resolve these conflicts standalone in the instantiated module.)
-
-The linker cannot break any loops, but can only report on errors that are non-DAG.
-
-Memoize checked results.
-
-\rSec2[atomicc.schedfuture]{Future directions in scheduling}
-
-It is possible to create new rules that 'read' the 'commit value' for a state element.
-This would be done by synthesising a new 'combined rule' and scheduling it \cite{Rosenband:Thesis}.
+Since method/method conflicts in a rule cannot be validated in the absence of
+concrete information about their constraints,
+this processing is delayed until the "module group binding"
+stage of linking, where separately compiled AtomicC output is combined and
+verified
+for SC scheduling.
 
 \rSec2[atomicc.schedprev]{Previous scheduling work}
 
@@ -231,11 +181,6 @@ found in the source program text, the resulting schedule (and which rules are
 inhibited) can be affected by source ordering and edits.
 
 \rSec1[atomicc.modcomp]{Compilation}
-
-The AtomicC compiler generates a separate Verilog module definition
-for each source AtomicC module definition.
-This verilog source defines the state elements
-used in the design as well as their connections (netlist).
 
 Modules independently compiled.  Combined with "linking", which validates schedule using header files.
 
