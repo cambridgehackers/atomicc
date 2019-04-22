@@ -113,14 +113,14 @@ and locking\cite[Sec.~11.2]{OV11} to guarantee isolation,
 the set of state elements accessed by an AtomicC transaction
 and the boolean condition when the transaction is performed
 are all known at compile time.
-This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of schedules
+This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of \textbf{schedules}
 and compile time validation of SC.
-
-When scheduling, rules with overlap in usage of state elements
+The scheduling algorithm is:
+\begin{itemize}
+\item Rules that overlap usage of state elements
 (\textit{read set} and \textit{write set}\cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis})
-are greedily gathered into \textit{schedule sets}, each of which is
-validated with a \textit{constraint graph}.
-A \textit{constraint graph} is a partially-ordered digraph that models
+are greedily gathered into \textit{schedule sets}.
+\item A \textit{constraint graph} is a partially-ordered digraph modeling
 the dependencies within a \textit{schedule set}:
 nodes in a constraint graph represent atomic rule instances, edges
 represent the ordering relations between these instances\cite[Sec.~3]{Cain2003}.
@@ -131,24 +131,28 @@ the ordering dependency actually exists: the boolean
 condition when one rule actually reads a given state element
 and another rule actually writes it.
 
-The transitive closure of these orders on the constraint graph nodes
+\item The transitive closure of these orders on the constraint graph nodes
 dictate the sequence (\textbf{schedule}) in which each rule must \textit{appear} to execute in
-order to be considered correct
+order to be considered SC
 \cite[Sec.~11.1]{OV11}.
 Of course, since all rules execute in a single cycle, "schedule" does not
 refer to an actual time sequenced evolution of state,
 but to a conceptual "sub-cycle" ordering.
 
-For each pair of nodes in the constraint digraph, we define the \textit{node condition}
+\item For each pair of nodes in the constraint digraph, we define the \textit{node condition}
 between 2 nodes as the 'fold' of the \textit{edge conditions} of each WAR edge
 using the 'or' operator.
 For each cycle in the digraph, we define the \textit{path condition}
 as the 'fold' of the \textit{node conditions} for all sequential pairs of nodes
 in the cycle using the 'and' operator.
 
-If a cycle has a \textit{path condition} that is not identically false,
-then, when the \textit{path condition} is true, a total ordering of
+\item When the \textit{path condition} is true, a total ordering of
 the digraph is not possible and the \textit{schedule set} is not SC.
+For any cycles where the path condition is not identically false,
+the compiler or linker reports an error,
+requiring manual source program resolution.
+\end{itemize}
+
 The compiler can break the cycle under the following conditions:
 \begin{itemize}
 \item if cycle has some method $M$ \& some rule $R$
@@ -158,8 +162,6 @@ The compiler can break the cycle under the following conditions:
 
               $valid(R2)$ \&= $\neg valid(R1)$
 \end{itemize}
-If neither of these methods is applicable, the compiler or linker
-reports a error, requiring manual resolution in the source program.
 
 Since method/method conflicts in a rule cannot be validated in the absence of
 concrete information about their constraints,
