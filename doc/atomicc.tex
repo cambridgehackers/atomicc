@@ -7,8 +7,9 @@ AtomicC is a timed, structural hardware description language for
 the high level specification of algorithms to be instantiated
 directly in hardware.
 AtomicC extends C++
-with support for Guarded Atomic Actions:
-Bluespec-style\cite{Bluespec:www,Hoe:Thesis,HoeArvind:TRS_Synthesis2}
+with support for Guarded Atomic Actions
+\cite{Hoe:Thesis,HoeArvind:TRS_Synthesis2}:
+Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
 AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware,
 instead uses a subset of the C++ language to specify behavioral
@@ -26,10 +27,8 @@ no degradation of the component modules:
 and transitive support for stalling.
 \item Module behaviorial statements are encapsulated into transactions (\textbf{rules})
 following ACID semantics
-\cite{NikhilSemantics}
-\cite{harris2005composable}
-\cite{nurvitadhi2011automatic}
-\cite{fox2003algebraic}.
+\cite{NikhilSemantics,GrayR93}.
+%% harris2005composable, nurvitadhi2011automatic,fox2003algebraic
 The compiler synthesizes control signals, allowing rules to fire
 only when their referenced method invocations are ready.
 
@@ -47,7 +46,7 @@ multiple, named \textbf{interfaces},
 giving flexibility in coupling with other modules and in algorithm expression.
 \item All state elements in the hardware
 netlist are explicit in the source code of the design.
-All module data is private to the module.
+All module data is private to the module, accessable externally only by method invocation.
 \end{itemize}
 These features support the reliable reuse of pre-compiled, incrementally validated
 libraries, improving productivity on large designs.
@@ -64,22 +63,14 @@ generated modules.
 Standard Verilog backend tools are used to synthesize
 the resulting ASIC or FPGA.
 
-The basic building block of AtomicC is the module declaration.
-Modules consist of 3 parts:
+The basic building block of AtomicC is the module declaration, made of 3 parts:
 \begin{itemize}
 \item Instantiation of state elements used by the module,
 \item Interface declarations for interacting from other modules,
 \item Rules, which group assignment statements and method invocations into atomic transactions.
 \end{itemize}
 
-\rSec1[atomicc.interface]{Interfaces}
-
-Exported interfaces can be used in several ways:
-\begin{itemize}
-\item invoked directly by the instantiator of the module,
-\item forwarded transparently, becoming another exported interface of the instantiating module,
-\item 'connected' to an 'interface reference' of another module in the instantiating scope.
-\end{itemize}
+\rSec1[atomicc.interface]{Interface Methods}
 
 There are 2 types of methods:
 \begin{itemize}
@@ -90,9 +81,9 @@ A compiler generated
 \textbf{valid} signal indicates that the caller wishes to perform the method invocation.
 \end{itemize}
 
-Both types of methods use a compiler generated \textbf{ready} signal
+Both value and action methods use a compiler generated \textbf{ready} signal
 to indicate when the callee is available and
-to prevent scheduling of the calling transaction until all necessary elements are
+prevent scheduling of the calling transaction until all necessary elements are
 available.
 
 AtomicC uses a \textbf{valid/ready} \textit{hand-shaking signalling}
@@ -100,71 +91,72 @@ AtomicC uses a \textbf{valid/ready} \textit{hand-shaking signalling}
 giving both the invoker(master) and invokee(slave) the ability to control transaction
 execution timing.
 The master uses the \textbf{valid} signal
-of the method to show when parameter data is available and the transaction should be performed.
+of an action method to show when parameter data is available
+and the operation should be performed.
 The method invocation transaction succeeds only when
 both \textbf{valid} and \textbf{ready} are HIGH:
 
- ($\pi(M_{i}) \equiv ready(M_{i})\ \&\&\ valid(M_{i})$).
+ ($\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$).
 
 \rSec2[atomicc.schedule]{Scheduling}
 
-In contrast to software, which uses \textit{dynamic allocation}\cite[p.~377]{GrayR93}
-and locking\cite[Sec.~11.2]{OV11} to guarantee isolation,
-the set of state elements accessed by an AtomicC transaction
+To guarantee transaction isolation in software, \textit{dynamic allocation}\cite[p.~377]{GrayR93}
+and locking\cite[Sec.~11.2]{OV11} are used.
+In contrast in AtomicC, the set of state elements accessed by an AtomicC transaction,
+the operations on these state elements
 and the boolean condition when the transaction is performed
 are all known at compile time.
 This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of \textbf{schedules}
+(valid sequences of transaction execution)
 and compile time validation of SC.
 The scheduling algorithm is:
 \begin{itemize}
-\item Rules that overlap usage of state elements
+\item Rules and methods that overlap usage of state elements
 (\textit{read set} and \textit{write set}\cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis})
-are greedily gathered into \textit{schedule sets}.
+are greedily gathered into \textit{schedule sets} and will be independently scheduled (since
+there can be no interactions between sets).
 \item A \textit{constraint graph} is a partially-ordered digraph modeling
 the dependencies within a \textit{schedule set}:
-nodes in a constraint graph represent atomic rule instances, edges
-represent the ordering relations between these instances\cite[Sec.~3]{Cain2003}.
-Since all reads of state elements occur at the beginning of a clock period,
-all edges in the graph are \textbf{Write-after-read (WAR)}.
+nodes in a constraint graph represent atomic rule and method instances, edges
+represent \textbf{write-after-read (WAR)} ordering dependency
+(for a specific storage element)
+between instances\cite[Sec.~3]{Cain2003}.
 Each edge has a symbolic boolean \textit{edge condition} for when the
 the ordering dependency actually exists: the boolean
 condition when one rule actually reads a given state element
 and another rule actually writes it.
 
 \item The transitive closure of these orders on the constraint graph nodes
-dictate the sequence (\textbf{schedule}) in which each rule must \textit{appear} to execute in
+dictate the \textbf{schedule} in which each rule must \textit{appear} to execute in
 order to be considered SC
 \cite[Sec.~11.1]{OV11}.
 Of course, since all rules execute in a single cycle, "schedule" does not
 refer to an actual time sequenced evolution of state,
-but to a conceptual "sub-cycle" ordering.
+but to a \textit{conceptual} "sub-cycle" ordering.
 
 \item For each pair of nodes in the constraint digraph, we define the \textit{node condition}
-between 2 nodes as the 'fold' of the \textit{edge conditions} of each WAR edge
-using the 'or' operator.
+between 2 nodes as the conjunction of the \textit{edge conditions} of all the edges between
+them (i.e., the condition that \textit{any} of the edges causes a dependency).
 For each cycle in the digraph, we define the \textit{path condition}
-as the 'fold' of the \textit{node conditions} for all sequential pairs of nodes
-in the cycle using the 'and' operator.
+as the disjunction of the \textit{node conditions} for all sequential pairs of nodes
+in the cycle (i.e., the condition that \textit{all} the edges, hence the cycle exists).
 
-\item When the \textit{path condition} is true, a total ordering of
-the digraph is not possible and the \textit{schedule set} is not SC.
-For any cycles where the path condition is not identically false,
-the compiler or linker reports an error,
-requiring manual source program resolution.
+\item When the \textit{path condition} is not identically false, a total ordering of
+the digraph can not be guaranteed and the \textit{schedule set} is not SC.
+In this case, the compiler or linker reports an error,
+requiring resolution by the user.
 \end{itemize}
 
 The compiler can break the cycle under the following conditions:
 \begin{itemize}
-\item if cycle has some method $M$ \& some rule $R$
-
-              $valid(R)$ \&= $\neg valid(M)$
-\item if source code has "priority $R1 > R2$" \& $R1 \in L$ \& $R2 \in L$
-
-              $valid(R2)$ \&= $\neg valid(R1)$
+\item if cycle has some method $M$ \& some rule $R$, then
+rewrite the term $valid(R)$ to add a disjunction with the term $\neg valid(M)$
+\item if source code has "priority $R1 > R2$" and $R1$, $R2$ are in the cycle, then
+rewrite the term $valid(R2)$ to add a disjunction with the term $\neg valid(R1)$
 \end{itemize}
 
-Since method/method conflicts in a rule cannot be validated in the absence of
-concrete information about their constraints,
+Since method invocation conflicts in rules cannot be validated in the absence of
+concrete information about the constraints within the methods,
 this processing is delayed until the "module group binding"
 stage of linking, where separately compiled AtomicC output is combined and
 verified

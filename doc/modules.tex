@@ -10,6 +10,13 @@ Referencing modules do not depend on the internal implementation of referenced m
 even if they textually exist in the same compilation unit.
 Scheduling of rules in a module is performed "inside out", with the resulting schedule dependancies written to a metadata file during compilation.
 
+Exported interfaces can be used in several ways:
+\begin{itemize}
+\item invoked directly by the instantiator of the module,
+\item forwarded transparently, becoming another exported interface of the instantiating module,
+\item 'connected' to an 'interface reference' of another module in the instantiating scope.
+\end{itemize}
+
 \rSec1[atomicc.econtrol]{Execution control}
 
 There are 2 common styles for communication of execution control information for a method:
