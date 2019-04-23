@@ -1,72 +1,52 @@
 \begin{codeblock}
-typedef struct {
-    int a;
-    int b;
-} ValuePair;
-
-__interface LpmIndication {
-    void heard(int meth, int v);
-};
+typedef int LookupItem;
 
 __interface LpmRequest {
-    void say(int meth, int v);
+    void       enter(LookupItem v);
 };
 
 __interface LpmMem {
-    void req(ValuePair v);
-    void resAccept(void);
-    ValuePair resValue(void);
+    void       req(LookupItem v);
+    void       resAccept(void);
+    LookupItem res(void);
+};
+
+__emodule LpmMemory {
+    LpmMem     ifc;
 };
 
 __module Lpm {
-    Fifo1<ValuePair> inQ;
-    Fifo1<ValuePair> fifo;
-    Fifo1<ValuePair> outQ;
-    LpmMemory        mem;
-    int doneCount;
-    void request.say(int meth, int v) {
-        ValuePair temp;
-        temp.a = meth;
-        temp.b = v;
-        inQ.in.enq(temp);
-    }
-    bool done() {
-        doneCount++;
-        return !(doneCount % 5);
-    }
-    LpmIndication *ind;
-    LpmRequest request;
-public:
+    LpmRequest          request;
+    Fifo1<LookupItem>   inQ;
+    Fifo1<LookupItem>   fifo;
+    PipeIn<LookupItem> *outQ;
+    LpmMemory           mem;
     Lpm() {
-            __rule recirc {
-                ValuePair temp = fifo.out.first();
-                ValuePair mtemp = mem.ifc.resValue();
-                mem.ifc.resAccept();
-	        fifo.out.deq();
-	        fifo.in.enq(mtemp);
-	        mem.ifc.req(temp);
-                };
-            __rule exit_rule {
-                ValuePair temp = fifo.out.first();
-                ValuePair mtemp = mem.ifc.resValue();
-                mem.ifc.resAccept();
-	        fifo.out.deq();
-	        outQ.in.enq(temp);
-                };
-            __rule enter {
-                ValuePair temp = inQ.out.first();
-	        inQ.out.deq();
-	        fifo.in.enq(temp);
-	        mem.ifc.req(temp);
-                };
-            __rule respond {
-                ValuePair temp = outQ.out.first();
-	        outQ.out.deq();
-	        ind->heard(temp.a, temp.b);
-                };
-            atomiccSchedulePriority("recirc", "enter;exit", 0);
+        __rule recirc {
+            auto x = mem.ifc.res();
+            auto y = fifo.out.first();
+            mem.ifc.resAccept();
+	    mem.ifc.req(y);
+	    fifo.out.deq();
+	    fifo.in.enq(f2(x,y));
+        };
+        __rule exitr {
+            auto x = mem.ifc.res();
+            auto y = fifo.out.first();
+            mem.ifc.resAccept();
+	    fifo.out.deq();
+	    outQ->enq(f1(x,y));
+        };
+        __rule enter {
+            auto x = inQ.out.first;
+            inQ.out.deq();
+	    fifo.in.enq(x);
+	    mem.ifc.req(addr(x));
+        };
+        atomiccSchedulePriority("recirc", "exitr;enter", 0);
     };
+    void request.enter(LookupItem x) {
+	inQ.in.enq(x);
+    }
 };
-
-Lpm lpmbase;
 \end{codeblock}

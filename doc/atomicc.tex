@@ -8,7 +8,7 @@ the high level specification of algorithms to be instantiated
 directly in hardware.
 AtomicC extends C++
 with support for Guarded Atomic Actions
-\cite{Hoe:Thesis,HoeArvind:TRS_Synthesis2}:
+\cite{Hoe:Thesis,HoeArvind:TRS_Synthesis2,Dave2007}:
 Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
 AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware,
@@ -21,24 +21,26 @@ validated smaller modules can be aggregated to form
 a larger validated module with
 no degradation of the component modules:
 \begin{itemize}
-\item Modules interactions are performed with Latency Insensitive (LI)
-\cite{carloni2001theory}
+\item Modules interactions are performed with
+Latency Insensitive\cite{Ng2010,AbbasB18}
 \textbf{method} calls, allowing methods to enforce invocation pre-conditions
 and transitive support for stalling.
 \item Module behaviorial statements are encapsulated into transactions (\textbf{rules})
 following ACID semantics
-\cite{NikhilSemantics,GrayR93}.
+\cite{NikhilSemantics,GrayR93}:
 %% harris2005composable, nurvitadhi2011automatic,fox2003algebraic
-The compiler synthesizes control signals, allowing rules to fire
+\begin{itemize}
+\item \textit{Atomic}: all enabled rules in all modules execute on every clock cycle.
+\item \textit{Consistent}: The compiler synthesizes control signals, allowing rules to fire
 only when their referenced method invocations are ready.
-
-In AtomicC, all enabled rules in all modules execute on every clock cycle.
-The compiler
-validates that rules executed during a given clock cycle are
+\item \textit{Isolated}: all rules executed during a given clock cycle are
 "sequentially consistent"(SC) \cite{Lamport:1979:MMC:1311099.1311750},
 guaranteeing each rule executes
 independently of any other rules executing at the same time
-(\textit{isolation}\cite[Sec.~7.1]{GrayR93}).
+\cite[Sec.~7.1]{GrayR93}.
+\item \textit{Durable}: all transactions read from and write to state elements in the design
+\end{itemize}
+
 \item An \textbf{interface} is a named collection of method signatures, defining
 the behavior of an abstract data type(ADT) \cite{Liskov74programmingwith}.
 Modules can export and import
@@ -51,7 +53,7 @@ All module data is private to the module, accessable externally only by method i
 These features support the reliable reuse of pre-compiled, incrementally validated
 libraries, improving productivity on large designs.
 
-Like Connectal, AtomicC designs may include both hardware and
+Like Connectal\cite{king2015software}, AtomicC designs may include both hardware and
 software components, using interfaces to specify hardware/software communication
 in a type safe manner. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
@@ -83,48 +85,53 @@ A compiler generated
 
 Both value and action methods use a compiler generated \textbf{ready} signal
 to indicate when the callee is available and
-prevent scheduling of the calling transaction until all necessary elements are
+stall scheduling of the calling transaction until all necessary elements are
 available.
 
-AtomicC uses a \textbf{valid/ready} \textit{hand-shaking signalling}
+AtomicC uses \textbf{valid/ready} \textit{hand-shaking signalling}
 \cite{Fletcher2009, AXISpec} to invoke action methods,
-giving both the invoker(master) and invokee(slave) the ability to control transaction
+giving both the invoker(master) and invokee(slave) the ability to control invocation
 execution timing.
 The master uses the \textbf{valid} signal
 of an action method to show when parameter data is available
 and the operation should be performed.
-The method invocation transaction succeeds only when
+The method invocation succeeds only when
 both \textbf{valid} and \textbf{ready} are HIGH:
 
  ($\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$).
 
 \rSec2[atomicc.schedule]{Scheduling}
 
-To guarantee transaction isolation in software, \textit{dynamic allocation}\cite[p.~377]{GrayR93}
+In software systems, to guarantee \textit{isolation} in the presence of
+parallelism, \textit{dynamic allocation}\cite[p.~377]{GrayR93} of schedules
 and locking\cite[Sec.~11.2]{OV11} are used.
-In contrast in AtomicC, the set of state elements accessed by an AtomicC transaction,
+In hardware design with AtomicC,
+the set of state elements accessed by a transaction,
 the operations on these state elements
 and the boolean condition when the transaction is performed
 are all known at compile time.
 This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of \textbf{schedules}
-(valid sequences of transaction execution)
+(sequences of transaction execution)
 and compile time validation of SC.
 The scheduling algorithm is:
 \begin{itemize}
 \item Rules and methods that overlap usage of state elements
 (\textit{read set} and \textit{write set}\cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis})
-are greedily gathered into \textit{schedule sets} and will be independently scheduled (since
+are greedily gathered into \textit{schedule sets}.
+Each set will be independently scheduled (since
 there can be no interactions between sets).
 \item A \textit{constraint graph} is a partially-ordered digraph modeling
 the dependencies within a \textit{schedule set}:
-nodes in a constraint graph represent atomic rule and method instances, edges
-represent \textbf{write-after-read (WAR)} ordering dependency
-(for a specific storage element)
-between instances\cite[Sec.~3]{Cain2003}.
-Each edge has a symbolic boolean \textit{edge condition} for when the
-the ordering dependency actually exists: the boolean
-condition when one rule actually reads a given state element
-and another rule actually writes it.
+\begin{itemize}
+\item \textit{nodes} in a constraint graph represent atomic rule and method instances,
+\item \textit{edges} represent \textbf{write-after-read (WAR)} ordering dependency
+for a specific storage element\cite[Sec.~3]{Cain2003}.
+
+In addition, each edge has a symbolic boolean \textit{edge condition} for when the
+the ordering dependency exists: the boolean
+condition when one rule/method actually reads a given state element
+and the other actually writes it.
+\end{itemize}
 
 \item The transitive closure of these orders on the constraint graph nodes
 dictate the \textbf{schedule} in which each rule must \textit{appear} to execute in
@@ -147,7 +154,7 @@ In this case, the compiler or linker reports an error,
 requiring resolution by the user.
 \end{itemize}
 
-The compiler can break the cycle under the following conditions:
+The compiler can break a cycle under the following conditions:
 \begin{itemize}
 \item if cycle has some method $M$ \& some rule $R$, then
 rewrite the term $valid(R)$ to add a disjunction with the term $\neg valid(M)$
@@ -164,15 +171,15 @@ for SC scheduling.
 
 \rSec2[atomicc.schedprev]{Previous scheduling work}
 
-In the Esposito Scheduler\cite{Esposito:Patent},
-the Bluespec compiler creates a specific, linear schedule, adding
-one rule at a time.  When a rule violates constraints from the previously scheduled
-rules, an error is issued and an automatic guard is synthesised to prevent the
-rule from executing on cycles when conflicting rules are executed.
+In Dave\cite{Dave2007}, there is a quite complete discussion and analysis 
+of the current state and future directions of Bluespec scheduling.
 
-Since the rules are added to the schedule approximately in the order they are
-found in the source program text, the resulting schedule (and which rules are
-inhibited) can be affected by source ordering and edits.
+The Esposito Scheduler\cite{Esposito:Patent,Dave2007},
+is the standard scheduler generation algorithm in the Bluespec Compiler.
+It uses a heuristic designed to produce a concrete total ordering of rules.
+
+The Performance Guarantees scheduler\cite{Rosenband:PerformanceGuarantees}
+was proposed to address issues with intra-cycle data passing.
 
 \rSec1[atomicc.modcomp]{Compilation}
 
