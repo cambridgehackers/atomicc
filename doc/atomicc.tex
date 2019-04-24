@@ -19,10 +19,10 @@ The language is designed for
 the construction of \textbf{modules} that are correct-by-construction \textit{composable}:
 validated smaller modules can be aggregated to form
 a larger validated module with
-no degradation of the component modules:
+no loss of correctness of the component modules:
 \begin{itemize}
 \item Modules interactions are performed with
-Latency Insensitive\cite{Ng2010,AbbasB18}
+latency insensitive\cite{Ng2010,AbbasB18}
 \textbf{method} calls, allowing methods to enforce invocation pre-conditions
 and transitive support for stalling.
 \item Module behaviorial statements are encapsulated into transactions (\textbf{rules})
@@ -34,7 +34,7 @@ following ACID semantics
 \item \textit{Consistent}: The compiler synthesizes control signals, allowing rules to fire
 only when their referenced method invocations are ready.
 \item \textit{Isolated}: all rules executed during a given clock cycle are
-"sequentially consistent"(SC) \cite{Lamport:1979:MMC:1311099.1311750},
+\textit{sequentially consistent} (SC) \cite{Lamport:1979:MMC:1311099.1311750},
 guaranteeing each rule executes
 independently of any other rules executing at the same time
 \cite[Sec.~7.1]{GrayR93}.
@@ -44,7 +44,7 @@ independently of any other rules executing at the same time
 \item An \textbf{interface} is a named collection of method signatures, defining
 the behavior of an abstract data type(ADT) \cite{Liskov74programmingwith}.
 Modules can export and import
-multiple, named \textbf{interfaces},
+multiple \textbf{interfaces} and each interface is declared with a name,
 giving flexibility in coupling with other modules and in algorithm expression.
 \item All state elements in the hardware
 netlist are explicit in the source code of the design.
@@ -59,7 +59,7 @@ in a type safe manner. The AtomicC compiler generates the code and transactors t
 arguments between hardware and software.
 
 The AtomicC compiler 
-generates a single Verilog module for each AtomicC module declared.
+generates a single Verilog module for each defined AtomicC module.
 Existing Verilog modules can be called from and can call AtomicC
 generated modules.
 Standard Verilog backend tools are used to synthesize
@@ -68,7 +68,7 @@ the resulting ASIC or FPGA.
 The basic building block of AtomicC is the module declaration, made of 3 parts:
 \begin{itemize}
 \item Instantiation of state elements used by the module,
-\item Interface declarations for interacting from other modules,
+\item Interface declarations for interacting with other modules,
 \item Rules, which group assignment statements and method invocations into atomic transactions.
 \end{itemize}
 
@@ -85,8 +85,8 @@ A compiler generated
 
 Both value and action methods use a compiler generated \textbf{ready} signal
 to indicate when the callee is available and
-stall scheduling of the calling transaction until all necessary elements are
-available.
+stall scheduling of the calling transaction until
+execution pre-conditions are statisfied.
 
 AtomicC uses \textbf{valid/ready} \textit{hand-shaking signalling}
 \cite{Fletcher2009, AXISpec} to invoke action methods,
@@ -96,9 +96,8 @@ The master uses the \textbf{valid} signal
 of an action method to show when parameter data is available
 and the operation should be performed.
 The method invocation succeeds only when
-both \textbf{valid} and \textbf{ready} are HIGH:
-
- ($\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$).
+both \textbf{valid} and \textbf{ready} are HIGH in the same clock cycle;
+in TRS notation\cite[p.~22]{Hoe:Thesis}, $\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$.
 
 \rSec2[atomicc.schedule]{Scheduling}
 
@@ -115,7 +114,7 @@ This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of \textbf{sche
 and compile time validation of SC.
 The scheduling algorithm is:
 \begin{itemize}
-\item Rules and methods that overlap usage of state elements
+\item For each module, rules and methods that overlap usage of state elements
 (\textit{read set} and \textit{write set}\cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis})
 are greedily gathered into \textit{schedule sets}.
 Each set will be independently scheduled (since
@@ -162,17 +161,23 @@ rewrite the term $valid(R)$ to add a disjunction with the term $\neg valid(M)$
 rewrite the term $valid(R2)$ to add a disjunction with the term $\neg valid(R1)$
 \end{itemize}
 
-Since method invocation conflicts in rules cannot be validated in the absence of
-concrete information about the constraints within the methods,
-this processing is delayed until the "module group binding"
+Since AtomicC performs scheduling analysis independantly for each
+declared module, method invocation conflicts in rules cannot be validated.
+Schedule processing for rule method calls is delayed until the "module group binding"
 stage of linking, where separately compiled AtomicC output is combined and
 verified
-for SC scheduling.
+for SC scheduling.  Errors and conflicts detected at this stage must be repaired
+in the module source text and recompiled before proceeding.
 
 \rSec2[atomicc.schedprev]{Previous scheduling work}
 
-In Dave\cite{Dave2007}, there is a quite complete discussion and analysis 
-of the current state and future directions of Bluespec scheduling.
+In Rule Composition\cite{Dave2007}, scheduling
+is reformulated in terms of rule composition, leading to a succinct discussion
+of issues involved, including a concise description of the Esposito and
+Performance Guarantees schedulers.
+In contrast to AtomicC, the Bluespec kernel language they use
+for analysis has a sequential composition operator, creating rules
+that execute for multiple clock cycles.
 
 The Esposito Scheduler\cite{Esposito:Patent,Dave2007},
 is the standard scheduler generation algorithm in the Bluespec Compiler.
@@ -188,11 +193,12 @@ Modules independently compiled.  Combined with "linking", which validates schedu
 Physical partitioning is used to separate design into separately synthesized pieces, connected using
 "long distance" signalling.  Parallel synthesis; bitstreams combined.
 
-AtomicC execution consists of 3 phases:
+AtomicC execution consists of 4 phases:
 \begin{itemize}
-\item static elaboration: netlist generation, 
-\item netlist compilation or implementation
-\item and runtime.
+\item \textit{compilation}: static elaboration followed by Verilog netlist generation, 
+\item \textit{linking}: binding of multiple modules and verification of inter-module schedule conflicts,
+\item \textit{netlist synthesis},
+\item \textit{hardware execution}.
 \end{itemize}
 
 During netlist
