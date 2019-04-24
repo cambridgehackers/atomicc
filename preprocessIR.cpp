@@ -186,7 +186,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
         genericIR->fields.push_back(FieldElement{item.fldName,
             item.vecCount, updateType(item.type, pname), item.isPtr,
             item.isInput, item.isOutput, item.isInout,
-            item.isParameter, item.isLocalInterface});
+            item.isParameter, item.isShared, item.isLocalInterface});
     for (auto FI : IR->generateBody)
         copyGenericMethod(genericIR, FI.second, pname);
     for (auto FI : IR->method)
@@ -197,7 +197,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
         genericIR->interfaces.push_back(FieldElement{item.fldName,
              item.vecCount, iname, item.isPtr, item.isInput,
              item.isOutput, item.isInout,
-             item.isParameter, item.isLocalInterface});
+             item.isParameter, item.isShared, item.isLocalInterface});
     }
     return genericIR;
 }
@@ -359,8 +359,8 @@ skipLab:;
             irSeq.push_back(genericIR);
             genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM");
-            genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false});
-            paramIR->fields.push_back(FieldElement{pname, -1, "INTEGER_32", false, false, false, false, true, false});
+            genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false, false});
+            paramIR->fields.push_back(FieldElement{pname, -1, "INTEGER_32", false, false, false, false, true, false, false});
             //dumpModule("GENERIC", genericIR);
         }
     }

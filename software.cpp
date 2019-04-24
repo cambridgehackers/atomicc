@@ -116,7 +116,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         std::string muxName = "mux";
         std::string muxTypeName = "MuxPipe";
         std::string pipeName = "l_ainterface_OC_PipeIn";
-        IR->fields.push_back(FieldElement{localName, -1, dutType, false, false, false, false, false, false});
+        IR->fields.push_back(FieldElement{localName, -1, dutType, false, false, false, false, false, false, false});
         if (hasPrintf) {
 #if 0
             ModuleIR *muxDef = lookupIR(muxTypeName);
@@ -126,9 +126,9 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
             else {
                 muxDef = allocIR(muxTypeName);
                 irSeq.push_back(muxDef);
-                muxDef->interfaces.push_back(FieldElement{"in", -1, pipeName, false, false, false, false, false, false});
-                muxDef->interfaces.push_back(FieldElement{"forward", -1, pipeName, false, false, false, false, false, false});
-                muxDef->interfaces.push_back(FieldElement{"out", -1, pipeName, true, false, false, false, false, false});
+                muxDef->interfaces.push_back(FieldElement{"in", -1, pipeName, false, false, false, false, false, false, false});
+                muxDef->interfaces.push_back(FieldElement{"forward", -1, pipeName, false, false, false, false, false, false, false});
+                muxDef->interfaces.push_back(FieldElement{"out", -1, pipeName, true, false, false, false, false, false, false});
                 auto makeEnq = [&](std::string methodName) -> void {
                     MethodInfo *MI = allocMethod(methodName);
                     addMethod(muxDef, MI);
@@ -149,7 +149,7 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
 dumpModule("MUX", muxDef);
             }
 #endif
-            IR->fields.push_back(FieldElement{muxName, -1, muxTypeName, false, false, false, false, false, false});
+            IR->fields.push_back(FieldElement{muxName, -1, muxTypeName, false, false, false, false, false, false, false});
         }
         localName += MODULE_SEPARATOR;
         muxName += MODULE_SEPARATOR;
@@ -161,10 +161,10 @@ dumpModule("MUX", muxDef);
             std::string pName = pipeName + (outcall ? "H" : "");
             std::string fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             ModuleIR *ifcIR = allocIR(fieldName);
-            ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall, false, false, false, false, false});
-            ifcIR->interfaces.push_back(FieldElement{"pipe", -1, pName, outcall, false, false, false, false, false});
-            IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false, false, false, false, false, false});
-            IR->interfaces.push_back(FieldElement{userInterface, -1, pName, outcall, false, false, false, false, false});
+            ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall, false, false, false, false, false, false});
+            ifcIR->interfaces.push_back(FieldElement{"pipe", -1, pName, outcall, false, false, false, false, false, false});
+            IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false, false, false, false, false, false, false});
+            IR->interfaces.push_back(FieldElement{userInterface, -1, pName, outcall, false, false, false, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 localName + userInterface,
                 fieldName + MODULE_SEPARATOR + "method", userTypeName, true});
