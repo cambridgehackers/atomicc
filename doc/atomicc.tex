@@ -32,7 +32,8 @@ following ACID semantics
 \begin{itemize}
 \item \textit{Atomic}: all enabled rules in all modules execute on every clock cycle.
 \item \textit{Consistent}: The compiler synthesizes control signals, allowing rules to fire
-only when their referenced method invocations are ready.
+only when their referenced method invocations (\textit{implicit conditions})
+are ready.
 \item \textit{Isolated}: all rules executed during a given clock cycle are
 \textit{sequentially consistent} (SC) \cite{Lamport:1979:MMC:1311099.1311750},
 guaranteeing each rule executes
