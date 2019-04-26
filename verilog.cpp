@@ -625,7 +625,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
             if (startswith(itemIR->name, "l_struct_OC_"))
-                expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG, true, vecCount);
+                expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount);
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount, -1);
             }
@@ -636,13 +636,13 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             if (itemIR && !item.isPtr) {
             if (startswith(itemIR->name, "l_struct_OC_")) {
                 if (vecCount == -1)
-                    expandStruct(IR, fldName, item.type, 1, false, true, PIN_REG);
+                    expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG);
             }
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != -1, vecCount, dimIndex++);
             }
             else// if (convertType(item.type) != 0)
-                refList[fldName] = RefItem{0, item.type, false, false, PIN_REG, false, false, -1};
+                refList[fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, -1};
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
         return nullptr; });
     for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
@@ -779,8 +779,13 @@ dumpExpr("READCALL", value);
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
-        for (auto info: MI->storeList)
-            appendLine(methodName, info->cond, info->dest, info->value);
+        for (auto info: MI->storeList) {
+            std::string item = info->dest->value;
+            if (isIdChar(item[0]) && !info->dest->operands.size() && refList[item].pin == PIN_WIRE)
+                setAssign(item, info->value, refList[item].type);
+            else
+                appendLine(methodName, info->cond, info->dest, info->value);
+        }
         if (!hasPrintf)
             for (auto info: MI->printfList)
                 appendLine(methodName, info->cond, nullptr, info->value);
