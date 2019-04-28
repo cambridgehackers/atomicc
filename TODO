@@ -1,0 +1,12 @@
+
+make sure that __shared values are written on the same cycle they are used
+
+mux __shared value assignment; check for conflicts.
+
+change name __shared -> __common
+
+add __valid(ruleName) expressions
+
+linker (hoist state element names to check for conflicts)
+
+check for linker conflicts within compilation unit
