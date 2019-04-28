@@ -21,7 +21,7 @@ validated smaller modules can be aggregated to form
 a larger validated module with
 no loss of correctness of the component modules:
 \begin{itemize}
-\item Modules interactions are performed with
+\item Module interactions are performed with
 latency insensitive\cite{Ng2010,AbbasB18}
 \textbf{method} calls, allowing methods to enforce invocation pre-conditions
 and transitive support for stalling.
@@ -44,9 +44,12 @@ independently of any other rules executing at the same time
 
 \item An \textbf{interface} is a named collection of method signatures, defining
 the behavior of an abstract data type(ADT) \cite{Liskov74programmingwith}.
-Modules can export and import
-multiple \textbf{interfaces} and each interface is declared with a name,
-giving flexibility in coupling with other modules and in algorithm expression.
+Modules can declare
+multiple \textbf{interfaces}, giving each interface an explicit name,
+giving flexibility in coupling with other modules.
+Interfaces can be exported (defined in the module) or imported (used in
+the module, but defined externally), giving flexibility in algorithm
+representation \cite[Sec.~4.1]{Dave:ROB}.
 \item All state elements in the hardware
 netlist are explicit in the source code of the design.
 All module data is private to the module, accessable externally only by method invocation.
@@ -158,8 +161,6 @@ The compiler can break a cycle under the following conditions:
 \begin{itemize}
 \item if cycle has some method $M$ \& some rule $R$, then
 rewrite the term $valid(R)$ to add a disjunction with the term $\neg valid(M)$
-\item if source code has "priority $R1 > R2$" and $R1$, $R2$ are in the cycle, then
-rewrite the term $valid(R2)$ to add a disjunction with the term $\neg valid(R1)$
 \end{itemize}
 
 Since AtomicC performs scheduling analysis independantly for each
@@ -175,7 +176,8 @@ in the module source text and recompiled before proceeding.
 In Rule Composition\cite{Dave2007}, scheduling
 is reformulated in terms of rule composition, leading to a succinct discussion
 of issues involved, including a concise description of the Esposito and
-Performance Guarantees schedulers.
+Performance Guarantees schedulers.  The resulting schedules are quite close
+to the user-specified scheduling in AtomicC.
 In contrast to AtomicC, the Bluespec kernel language they use
 for analysis has a sequential composition operator, creating rules
 that execute for multiple clock cycles.
