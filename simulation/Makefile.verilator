@@ -1,7 +1,7 @@
 
 THISDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CONNECTALDIR = $(THISDIR)/../../connectal
-VERILOG_PATH = $(THISDIR)/verilog $(DTOP)/generated $(DTOP)/../../lib/generated
+VERILOG_PATH = $(THISDIR)/verilog $(DTOP)/generated $(VERILOG_LIB)
 VERILATOR_ARGS= -O3 -CFLAGS "-I$(CONNECTALDIR)/cpp -I$(DTOP)/jni -I$(DTOP)/verilator -O " -LDFLAGS "-O " \
     -Wno-fatal -exe --profile-cfuncs --output-split 20000 $(VERILOG_PATH:%=-y %) \
     -DDerivedClockPeriod=4 -DMainClockPeriod=4
@@ -20,6 +20,7 @@ SIM_CXXFLAGS= -g -fPIC -I $(CONNECTALDIR)/cpp -I $(CONNECTALDIR) -I$(DTOP)/jni -
 $(foreach src, $(SIM_CXX_COMMON), $(eval $(call SIM_CXX_RULE, $(DTOP)/verilator/lib, $(SIM_CXXFLAGS), $(src))))
 
 run:
+	echo DDD $(DTOP)
 	$(DTOP)/verilator/bin/ubuntu.exe
 
 prepare_dir:
@@ -32,7 +33,7 @@ $(DTOP)/verilator/bin/libconnectal-sim.so: $(SIM_OBJECTS)
 $(DTOP)/verilator/obj_dir/vlsim.mk: $(DTOP)/verilator/bin/libconnectal-sim.so
 	rm -fr $(DTOP)/verilator/obj_dir
 	cd $(DTOP)/verilator; verilator -o $(DTOP)/verilator/bin/vlsim --prefix vlsim $(VERILATOR_ARGS) -cc \
-	    --top-module VsimTop $(DTOP)/../../lib/generated/VsimTop.v \
+	    --top-module VsimTop $(VERILOG_LIB)/VsimTop.v \
 	    $(THISDIR)/cpp/verilatortop.cpp -LDFLAGS -L$(DTOP)/verilator/bin
 
 $(DTOP)/verilator/bin/vlsim: $(DTOP)/verilator/obj_dir/vlsim.mk
