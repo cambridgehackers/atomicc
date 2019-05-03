@@ -12,7 +12,7 @@ with support for Guarded Atomic Actions
 Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
 AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware,
-instead uses a subset of the C++ language to specify behavioral
+instead using a subset of the C++ language to specify behavioral
 assignments to state elements.
 
 The language is designed for
@@ -101,7 +101,7 @@ of an action method to show when parameter data is available
 and the operation should be performed.
 The method invocation succeeds only when
 both \textbf{valid} and \textbf{ready} are HIGH in the same clock cycle;
-in TRS notation\cite[p.~22]{Hoe:Thesis}, $\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$.
+in TRS notation\cite[p.~22]{Hoe:Thesis}: $\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$.
 
 \rSec2[atomicc.schedule]{Scheduling}
 
@@ -110,7 +110,7 @@ parallelism, \textit{dynamic allocation}\cite[p.~377]{GrayR93} of schedules
 and locking\cite[Sec.~11.2]{OV11} are used.
 In hardware design with AtomicC,
 the set of state elements accessed by a transaction,
-the operations on these state elements
+the operations on these state elements (read-only or write)
 and the boolean condition when the transaction is performed
 are all known at compile time.
 This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of \textbf{schedules}
@@ -179,7 +179,7 @@ of issues involved, including a concise description of the Esposito and
 Performance Guarantees schedulers.  The resulting schedules are quite close
 to the user-specified scheduling in AtomicC.
 In contrast to AtomicC, the Bluespec kernel language they use
-for analysis has a sequential composition operator, creating rules
+for analysis also has a sequential composition operator, creating rules
 that execute for multiple clock cycles.
 
 The Esposito Scheduler\cite{Esposito:Patent,Dave2007},

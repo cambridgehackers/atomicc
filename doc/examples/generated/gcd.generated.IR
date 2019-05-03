@@ -1,0 +1,32 @@
+EMODULE l_ainterface_OC_UserIndication {
+    METHOD gcd__ENA ( INTEGER_32 v )
+}
+EMODULE l_ainterface_OC_UserRequest {
+    METHOD say__ENA ( INTEGER_32 va , INTEGER_32 vb )
+}
+MODULE Gcd {
+    INTERFACE l_ainterface_OC_UserRequest request
+    INTERFACE/Ptr l_ainterface_OC_UserIndication indication
+    FIELD INTEGER_1 busy
+    FIELD INTEGER_2 busy_delay
+    FIELD INTEGER_32 a
+    FIELD INTEGER_32 b
+    METHOD/Rule RULE$flip_rule__ENA if (((a) < (b))) {
+        ALLOCA INTEGER_32 RULE$flip_rule__ENA$tmp
+        LET INTEGER_32 :RULE$flip_rule__ENA$tmp = b
+        STORE :b = a
+        STORE :a = RULE$flip_rule__ENA$tmp
+    }
+    METHOD/Rule RULE$mod_rule__ENA if ((((a) >= (b)) & ((b) != (0)))) {
+        STORE :a = (a) - (b)
+    }
+    METHOD/Rule RULE$respond_rule__ENA if (((b) == (0))) {
+        STORE :busy = 0
+        CALL/Action :indication$gcd__ENA{a}
+    }
+    METHOD request$say__ENA ( INTEGER_32 va , INTEGER_32 vb ) if ((((busy) != (0)) ^ (1))) {
+        STORE :a = request$say$va
+        STORE :b = request$say$vb
+        STORE :busy = 1
+    }
+}
