@@ -10,4 +10,5 @@ all:
 	$(CPP) -c $(CPPFLAGS) -S $(LLVMFLAGS) -o generated/example1.ll example1.cpp
 	$(CPP) -c $(CPPFLAGS) -S $(LLVMFLAGS) -o generated/gcd.ll gcd.cpp
 	$(CPP) -c $(CPPFLAGS) -S $(LLVMFLAGS) -o generated/gcd2.ll gcd2.cpp
+	$(CPP) -c $(CPPFLAGS) -S $(LLVMFLAGS) -o generated/order.ll order.cpp
 

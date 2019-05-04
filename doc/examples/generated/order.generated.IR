@@ -1,0 +1,27 @@
+EMODULE l_ainterface_OC_UserRequest {
+    METHOD say__ENA ( INTEGER_32 va )
+}
+MODULE Order {
+    INTERFACE l_ainterface_OC_UserRequest request
+    FIELD INTEGER_1 running
+    FIELD INTEGER_32 a
+    FIELD INTEGER_32 outA
+    FIELD INTEGER_32 outB
+    FIELD INTEGER_32 offset
+    METHOD/Rule RULE$A__ENA if ((((request$say__ENA) != (0)) ^ (1))) {
+        STORE :outA = (a) + (offset)
+        STORE ((running) != (0)):a = (a) + (1)
+    }
+    METHOD/Rule RULE$B__ENA if ((((request$say__ENA) != (0)) ^ (1))) {
+        STORE :outB = (a) + (offset)
+        STORE (((running) != (0)) ^ 1):a = 1
+    }
+    METHOD/Rule RULE$C__ENA if ((((request$say__ENA) != (0)) ^ (1))) {
+        STORE :offset = (offset) + (1)
+    }
+    METHOD request$say__ENA ( INTEGER_32 va ) if ((((running) != (0)) ^ (1))) {
+        STORE :a = request$say$va
+        STORE :offset = 1
+        STORE :running = 1
+    }
+}
