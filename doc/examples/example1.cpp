@@ -36,7 +36,7 @@ __module Example1 {
         v_temp = v;
         busy = 1;
     }
-    __rule delay_rule if(busy & (busy_delay == 0)) {
+    __rule delay_rule if(busy && busy_delay == 0) {
         busy_delay = 1;
         v_delay = v_temp;
     };

@@ -4,24 +4,24 @@ EMODULE l_ainterface_OC_UserIndication {
 EMODULE l_ainterface_OC_UserRequest {
     METHOD say__ENA ( INTEGER_32 va , INTEGER_32 vb )
 }
-MODULE Gcd {
+MODULE Gcd2 {
     INTERFACE l_ainterface_OC_UserRequest request
     INTERFACE/Ptr l_ainterface_OC_UserIndication indication
     FIELD INTEGER_1 running
     FIELD INTEGER_32 a
     FIELD INTEGER_32 b
-    METHOD/Rule RULE$flip_rule__ENA if ((((running) != (0)) && ((a) < (b)))) {
+    METHOD/Rule RULE$flip_rule__ENA {
         ALLOCA INTEGER_32 RULE$flip_rule__ENA$tmp
-        LET INTEGER_32 :RULE$flip_rule__ENA$tmp = b
-        STORE :b = a
-        STORE :a = RULE$flip_rule__ENA$tmp
+        LET INTEGER_32 (((a) < (b)) & ((running) != (0))):RULE$flip_rule__ENA$tmp = b
+        STORE (((a) < (b)) & ((running) != (0))):b = a
+        STORE (((a) < (b)) & ((running) != (0))):a = RULE$flip_rule__ENA$tmp
     }
-    METHOD/Rule RULE$mod_rule__ENA if (((((a) >= (b)) & ((running) != (0))) | (((((a) >= (b)) ^ 1) & ((running) != (0))) | (((running) != (0)) ^ 1))) ? (((running) != (0)) && ((a) >= (b)) && ((b) != (0)))) {
-        STORE :a = (a) - (b)
+    METHOD/Rule RULE$mod_rule__ENA {
+        STORE (((b) != (0)) & (((a) >= (b)) & ((running) != (0)))):a = (a) - (b)
     }
-    METHOD/Rule RULE$respond_rule__ENA if ((((running) != (0)) && ((b) == (0)))) {
-        STORE :running = 0
-        CALL/Action :indication$gcd__ENA{a}
+    METHOD/Rule RULE$respond_rule__ENA {
+        STORE (((b) == (0)) & ((running) != (0))):running = 0
+        CALL/Action (((b) == (0)) & ((running) != (0))):indication$gcd__ENA{a}
     }
     METHOD request$say__ENA ( INTEGER_32 va , INTEGER_32 vb ) if ((((running) != (0)) ^ (1))) {
         STORE :a = request$say$va

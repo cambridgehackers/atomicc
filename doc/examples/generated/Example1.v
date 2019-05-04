@@ -12,9 +12,14 @@ module Example1 (input wire CLK, input wire nRST,
     reg [1:0]busy_delay;
     reg [31:0]v_delay;
     reg [31:0]v_temp;
+    wire RULE$delay_rule__ENA;
+    wire RULE$delay_rule__RDY;
     assign indication$heard$v = v_delay;
     assign indication$heard__ENA = busy_delay == 2'd2;
     assign request$say__RDY = !busy;
+    // Extra assigments, not to output wires
+    assign RULE$delay_rule__ENA = ( busy && ( busy_delay == 2'd0 ) ) != 0;
+    assign RULE$delay_rule__RDY = ( busy && ( busy_delay == 2'd0 ) ) != 0;
 
     always @( posedge CLK) begin
       if (!nRST) begin
@@ -29,7 +34,7 @@ module Example1 (input wire CLK, input wire nRST,
             if (v_delay == 1)
             busy <= 0;
         end; // End of RULE$delay2_rule__ENA
-        if (busy & ( busy_delay == 2'd0 )) begin // RULE$delay_rule__ENA
+        if (RULE$delay_rule__ENA & RULE$delay_rule__RDY) begin // RULE$delay_rule__ENA
             busy_delay <= 1;
             v_delay <= v_temp;
         end; // End of RULE$delay_rule__ENA

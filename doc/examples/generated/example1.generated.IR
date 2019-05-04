@@ -15,7 +15,7 @@ MODULE Example1 {
         STORE ((v_delay) == (1)):busy = 0
         STORE :busy_delay = 2
     }
-    METHOD/Rule RULE$delay_rule__ENA if (((busy) & ((busy_delay) == (0)))) {
+    METHOD/Rule RULE$delay_rule__ENA if ((((busy) != (0)) && ((busy_delay) == (0)))) {
         STORE :busy_delay = 1
         STORE :v_delay = v_temp
     }

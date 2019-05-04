@@ -26,7 +26,7 @@ __interface UserIndication {
     void gcd(__uint(32) v);
 };
 
-__module Gcd {
+__module Gcd2 {
     UserRequest                     request;
     UserIndication                 *indication;
     __uint(1) running;
@@ -36,16 +36,21 @@ __module Gcd {
         b = vb;
         running = 1;
     }
-    __rule mod_rule if(running && a >= b && b != 0) {
-        a -= b;
+    __rule mod_rule {
+        if(running && a >= b && b != 0)
+            a -= b;
     };
-    __rule flip_rule if(running && a < b) {
+    __rule flip_rule {
+        if(running && a < b) {
         __uint(32) tmp = b;
         b = a;
         a = tmp;
+        }
     };
-    __rule respond_rule if(running && b == 0) {
+    __rule respond_rule {
+        if(running && b == 0) {
         running = 0;
         indication->gcd(a);
+        }
    };
 };
