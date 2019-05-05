@@ -4,35 +4,24 @@
 
 \rSec1[orderExample.sw]{Source program}
 
-User program source code:
 \input{examples/order.cpp.tex}
+
+\rSec1[orderExample.conflict]{Constraint graph}
+
+\begin{importgraphic}
+{Simple ordering example}
+{fig:orderschedule}
+{orderschedule.pdf}
+\end{importgraphic}
+
+Sequentially consistent schedules are:
+\begin{itemize}
+\item when 'running == 1': A -> B -> C
+\item when 'running == 0': B -> A -> C
+\end{itemize}
 
 \rSec1[orderExample.verilog]{Verilog output}
 
 This is the generated verilog:
 
 \lstinputlisting[language=Verilog,basicstyle=\tiny\ttfamily]{examples/Order.v.tex}
-
-\rSec1[orderExample.conflict]{Conflict graph}
-
-%% In the following examples, there are 3 rules: RuleA, RuleB and RuleC.
-%% There are 3 state elements: E1, E2 and E3.
-%% 
-\begin{importgraphic}
-{Simple ordering example}
-{fig:orderschedule}
-{orderschedule.pdf}
-\end{importgraphic}
-%% 
-%% A simple SC example is shown in Figure~\ref{fig:schedule1}.  
-%% The schedule sequence is {A, B, C}.
-%% 
-%% \begin{importgraphic}
-%% {non-SC ordering example}
-%% {fig:schedule2}
-%% {figschedule2.pdf}
-%% \end{importgraphic}
-%% 
-%% A non-SC example is shown in Figure~\ref{fig:schedule2}.
-%% There is no linear sequence of the rules that preserves read-before-write for all
-%% state elements.

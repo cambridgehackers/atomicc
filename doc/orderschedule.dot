@@ -2,22 +2,22 @@ digraph figorderschedule
 {
   size = "600,600";
   nodesep = "2";
-  pad = "0.5";
+  //pad = "0.5";
   { rank=same;
-  ruleNameA [fontsize=30, shape=plaintext, label="ruleA"];
-  ruleNameB [fontsize=30, shape=plaintext, label="ruleB"];
+  ruleNameA [fontsize=35, shape=plaintext, label="rule A"];
+  ruleNameB [fontsize=35, shape=plaintext, label="rule B"];
   }
   { rank=same;
-  ruleB [label="read = {a, offset}\nwrite = {a, outB}"];
-  ruleA [label="read = {a, offset}\nwrite = {a, outA}"];
+  ruleB [fontsize=27, label="read = {a, offset}\nwrite = {a, outB}"];
+  ruleA [fontsize=27, label="read = {a, offset}\nwrite = {a, outA}"];
   }
-  ruleNameC [fontsize=30, shape=plaintext, label="ruleC"];
-  ruleC [label="write = {offset}"];
+  ruleNameC [fontsize=35, shape=plaintext, label="rule C"];
+  ruleC [fontsize=27, label="write = {offset}"];
 
-  ruleA -> ruleB [label="WAR[a] if (running)"];
-  ruleB -> ruleA [label="WAR[a] if (!running)"];
-  ruleA -> ruleC [label="WAR[offset]"];
-  ruleC -> ruleB [dir="back", label="WAR[offset]"];
+  ruleA -> ruleB [fontsize=25, label="WAR[a] if (running)"];
+  ruleB -> ruleA [fontsize=25, label="WAR[a] if (!running)"];
+  ruleA -> ruleC [fontsize=25, label="WAR[offset]"];
+  ruleC -> ruleB [dir="back", fontsize=25, label="WAR[offset]"];
   ruleNameA -> ruleA [style = invis];
   ruleNameB -> ruleB [style = invis];
   ruleA -> ruleNameC [style = invis];
