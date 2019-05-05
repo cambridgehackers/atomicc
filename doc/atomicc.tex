@@ -11,9 +11,16 @@ with support for Guarded Atomic Actions
 \cite{Hoe:Thesis,HoeArvind:TRS_Synthesis2,Dave2007}:
 Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
-AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware,
-instead using a subset of the C++ language to specify behavioral
-assignments to state elements.
+
+AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware.
+It instead uses a subset of the C++ language to specify
+code blocks that have the property that there is at most
+one assignment to each state element.
+This form is called \textit{static single assignment} form,
+or SSA form\cite{Alpern:1988}.
+In the eventual runtime execution, these assignments are
+all made in a single clock cycle, when the rule or method
+is enabled.
 
 The language is designed for
 the construction of \textbf{modules} that are \textit{correct-by-construction composable}:
@@ -80,8 +87,9 @@ The basic building block of AtomicC is the module declaration, made of 3 parts:
 
 There are 2 types of methods:
 \begin{itemize}
-\item \textbf{Value method functions} provide read-only access to module state elements.
-\item \textbf{Action method procedures} perform write operations on state elements,
+\item \textbf{Value method functions} allow \textit{inspection} of module state elements.
+\item \textbf{Action method procedures} allow \textit{modification}
+(including inspection) of state elements,
 can take parameters and do not have return values.
 A compiler generated
 \textbf{valid} signal indicates that the caller wishes to perform the method invocation.
