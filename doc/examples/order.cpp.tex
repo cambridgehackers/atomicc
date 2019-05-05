@@ -1,0 +1,29 @@
+\begin{codeblock}
+__interface UserRequest {
+    void say(__uint(32) va);
+};
+
+__module Order {
+    UserRequest                     request;
+    __uint(1) running;
+    __uint(32) a, outA, outB, offset;
+    void request.say(__uint(32) va) if (!running) {
+        a = va;
+        offset = 1;
+        running = 1;
+    }
+    __rule A if (!__valid(request.say)) {
+        outA = a + offset;
+        if (running)
+            a = a + 1;
+    };
+    __rule B if (!__valid(request.say)) {
+        outB = a + offset;
+        if (!running)
+            a = 1;
+    };
+    __rule C if (!__valid(request.say)) {
+        offset = offset + 1;
+    };
+};
+\end{codeblock}

@@ -32,7 +32,6 @@ __module Order {
         offset = 1;
         running = 1;
     }
-    Order() {
     __rule A if (!__valid(request.say)) {
         outA = a + offset;
         if (running)
@@ -46,7 +45,4 @@ __module Order {
     __rule C if (!__valid(request.say)) {
         offset = offset + 1;
     };
-    }
 };
-
-Order test;

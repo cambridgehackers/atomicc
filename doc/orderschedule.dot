@@ -1,0 +1,26 @@
+digraph figorderschedule
+{
+  size = "600,600";
+  nodesep = "2";
+  pad = "0.5";
+  { rank=same;
+  ruleNameA [fontsize=30, shape=plaintext, label="ruleA"];
+  ruleNameB [fontsize=30, shape=plaintext, label="ruleB"];
+  }
+  { rank=same;
+  ruleB [label="read = {a, offset}\nwrite = {a, outB}"];
+  ruleA [label="read = {a, offset}\nwrite = {a, outA}"];
+  }
+  ruleNameC [fontsize=30, shape=plaintext, label="ruleC"];
+  ruleC [label="write = {offset}"];
+
+  ruleA -> ruleB [label="WAR[a] if (running)"];
+  ruleB -> ruleA [label="WAR[a] if (!running)"];
+  ruleA -> ruleC [label="WAR[offset]"];
+  ruleC -> ruleB [dir="back", label="WAR[offset]"];
+  ruleNameA -> ruleA [style = invis];
+  ruleNameB -> ruleB [style = invis];
+  ruleA -> ruleNameC [style = invis];
+  ruleNameC -> ruleB [dir=back, style=invis];
+  ruleNameC -> ruleC [style = invis];
+}
