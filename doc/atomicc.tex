@@ -100,8 +100,12 @@ The master uses the \textbf{valid} signal
 of an action method to show when parameter data is available
 and the operation should be performed.
 The method invocation succeeds only when
-both \textbf{valid} and \textbf{ready} are HIGH in the same clock cycle;
-in TRS notation\cite[p.~22]{Hoe:Thesis}: $\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$.
+both \textbf{valid} and \textbf{ready} are HIGH in the same clock cycle.
+\newline
+In TRS notation\cite[p.~22]{Hoe:Thesis}:
+\begin{itemize}[label= ]
+\item $\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$.
+\end{itemize}
 
 \rSec2[atomicc.schedule]{Scheduling}
 
@@ -116,6 +120,7 @@ are all known at compile time.
 This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of \textbf{schedules}
 (sequences of transaction execution)
 and compile time validation of SC.
+\newline
 The scheduling algorithm is:
 \begin{itemize}
 \item For each module, rules and methods that overlap usage of state elements
@@ -151,17 +156,19 @@ For each cycle in the digraph, we define the \textit{path condition}
 as the disjunction of the \textit{node conditions} for all sequential pairs of nodes
 in the cycle (i.e., the condition that \textit{all} the edges, hence the cycle exists).
 
+\item Since potential conflicts between methods (called from rules outside the module)
+and module rules are quite common,
+if cycle has some method $M$ \& some rule $R$, then the compiler can
+rewrite the term $valid(R)$ to add a disjunction with the term $\neg valid(M)$, breaking
+the cycle.
+
 \item When the \textit{path condition} is not identically false, a total ordering of
 the digraph can not be guaranteed and the \textit{schedule set} is not SC.
 In this case, the compiler or linker reports an error,
 requiring resolution by the user.
 \end{itemize}
 
-The compiler can break a cycle under the following conditions:
-\begin{itemize}
-\item if cycle has some method $M$ \& some rule $R$, then
-rewrite the term $valid(R)$ to add a disjunction with the term $\neg valid(M)$
-\end{itemize}
+A simple example of a constraint graph is given in \ref{scheduleExample}, at the end of this document.
 
 Since AtomicC performs scheduling analysis independantly for each
 declared module, method invocation conflicts in rules cannot be validated.
@@ -189,6 +196,7 @@ It uses a heuristic designed to produce a concrete total ordering of rules.
 The Performance Guarantees scheduler\cite{Rosenband:PerformanceGuarantees}
 was proposed to address issues with intra-cycle data passing.
 
+\newpage
 \rSec1[atomicc.modcomp]{Compilation}
 
 Modules independently compiled.  Combined with "linking", which validates schedule using header files.

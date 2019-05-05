@@ -1,6 +1,5 @@
-\infannex{scheduleExample}{Scheduling example}
-
-\pnum
+\Annex{scheduleExample}{Scheduling example}{}
+%%\infannex{scheduleExample}{Scheduling example}
 
 \rSec1[orderExample.sw]{Source program}
 
@@ -15,7 +14,8 @@
 \end{importgraphic}
 
 Sequentially consistent schedules are:
-\begin{itemize}
+%%\setlist{nolistsep}
+\begin{itemize}[noitemsep,topsep=0pt]
 \item when 'running == 1': A -> B -> C
 \item when 'running == 0': B -> A -> C
 \end{itemize}
