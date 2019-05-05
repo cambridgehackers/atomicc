@@ -16,7 +16,7 @@ instead using a subset of the C++ language to specify behavioral
 assignments to state elements.
 
 The language is designed for
-the construction of \textbf{modules} that are correct-by-construction \textit{composable}:
+the construction of \textbf{modules} that are \textit{correct-by-construction composable}:
 validated smaller modules can be aggregated to form
 a larger validated module with
 no loss of correctness of the component modules:
@@ -126,10 +126,10 @@ The scheduling algorithm is:
 \item For each module, rules and methods that overlap usage of state elements
 (\textit{read set} and \textit{write set}\cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis})
 are greedily gathered into \textit{schedule sets}.
-Each set will be independently scheduled (since
-there can be no interactions between sets).
+Since there can be no execution interactions between sets,
+each set will be independently scheduled.
 \item A \textit{constraint graph} is a partially-ordered digraph modeling
-the dependencies within a \textit{schedule set}:
+the schedule sequencing dependencies within a \textit{schedule set}:
 \begin{itemize}
 \item \textit{nodes} in a constraint graph represent atomic rule and method instances,
 \item \textit{edges} represent \textbf{write-after-read (WAR)} ordering dependency
