@@ -93,15 +93,23 @@ software components, using interfaces to specify hardware/software communication
 in a type safe manner. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
 
-In summary, AtomicC is a way of constructing highly parallel hardware artifacts
-without being burdened with the mechanics of handling concurrent consistency.
-All parallel operations are checked for safety by the compiler and errors
-robustly flagged.
+In summary, although AtomicC is a way of constructing highly parallel hardware artifacts,
+the user model is quite simple:
+\begin{itemize}
+\item Methods/rules are written as though they were serially executed,
+\item Updates to state elements only occur atomiccally, as transactions.
+Intermediate state evolution is not visible to other transactions,
+\item Consistent concurrent execution of transactions is guaranteed by the
+compiler framework,
+\item Consistent concurrent implementation of the code for methods/rules
+is guaranteed by the compiler's
+translation of the SSA source text into combinatoric (only) logic.
+\end{itemize}
 Of course, if the underlying algorithm is not designed to allow parallel
 execution of incremental computations, it will perform poorly and there
-is nothing the compiler can do to help.  With that in mind, the automation
-of the tedious checking for concurrent execution conflicts allows
-the user to focus solely on the algorithm to be implemented.
+is nothing the compiler can do to help.  With that in mind,
+no being burdened with the mechanics of handling concurrent consistency,
+the user can efficiently focus solely on the algorithm development itself.
 
 \rSec1[atomicc.module]{Modules}
 
