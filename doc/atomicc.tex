@@ -12,16 +12,6 @@ with support for Guarded Atomic Actions
 Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
 
-AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware.
-It instead uses a subset of the C++ language to specify
-code blocks that have the property that there is at most
-one assignment to each state element.
-This form is called \textit{static single assignment} form,
-or SSA form\cite{Alpern:1988}.
-In the eventual runtime execution, these assignments are
-all made in a single clock cycle, when the rule or method
-is enabled.
-
 The language is designed for
 the construction of \textbf{modules} that are \textit{correct-by-construction composable}:
 validated smaller modules can be aggregated to form
@@ -64,10 +54,15 @@ All module data is private to the module, accessable externally only by method i
 These features support the reliable reuse of pre-compiled, incrementally validated
 libraries, improving productivity on large designs.
 
-Like Connectal\cite{king2015software}, AtomicC designs may include both hardware and
-software components, using interfaces to specify hardware/software communication
-in a type safe manner. The AtomicC compiler generates the code and transactors to pass
-arguments between hardware and software.
+AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware.
+It instead uses a subset of the C++ language to specify
+code blocks that have the property that there is at most
+one assignment to each state element.
+This form is called \textit{static single assignment} form,
+or SSA form\cite{Alpern:1988}.
+In the eventual runtime execution, these assignments are
+all made in a single clock cycle, when the rule or method
+is enabled.
 
 The AtomicC compiler 
 generates a single Verilog module for each defined AtomicC module.
@@ -75,6 +70,11 @@ Existing Verilog modules can be called from and can call AtomicC
 generated modules.
 Standard Verilog backend tools are used to synthesize
 the resulting ASIC or FPGA.
+
+Like Connectal\cite{king2015software}, AtomicC designs may include both hardware and
+software components, using interfaces to specify hardware/software communication
+in a type safe manner. The AtomicC compiler generates the code and transactors to pass
+arguments between hardware and software.
 
 The basic building block of AtomicC is the module declaration, made of 3 parts:
 \begin{itemize}
