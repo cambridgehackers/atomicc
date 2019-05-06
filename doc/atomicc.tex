@@ -63,6 +63,21 @@ or SSA form\cite{Alpern:1988}.
 In the eventual runtime execution, these assignments are
 all made in a single clock cycle, when the rule or method
 is enabled.
+To preserve the standard interpretation of C++ assigment,
+can use the following mental model of operations:
+\begin{enumerate}
+\item Wrap each rule/method with prelude code and postprocessing code
+\item Prelude code:
+For each state element \textbf{A} in module, add the declaration of a shadow item:
+\begin{codeblock}
+decltype(this->A) A = this->A;    // create shadow of state element
+\end{codeblock}
+\item Postprocessing code:
+For each state element actually written during execution of the code block:
+\begin{codeblock}
+this->A = A;                // update state elements only at end of code block
+\end{codeblock}
+\end{enumerate}
 
 The AtomicC compiler 
 generates a single Verilog module for each defined AtomicC module.
