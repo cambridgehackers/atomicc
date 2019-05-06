@@ -78,6 +78,8 @@ For each state element actually written during execution of the code block:
 this->A = A;                // update state elements only at end of code block
 \end{codeblock}
 \end{enumerate}
+This processing style is described in more detail as \textbf{modification in-private}
+in Prinz\cite[Sec.~3.2]{Prinz03operationalsemantics}.
 
 The AtomicC compiler 
 generates a single Verilog module for each defined AtomicC module.
