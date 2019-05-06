@@ -63,8 +63,11 @@ or SSA form\cite{Alpern:1988}.
 In the eventual runtime execution, these assignments are
 all made in a single clock cycle, when the rule or method
 is enabled.
-To preserve the standard interpretation of C++ assigment,
-can use the following mental model of operations:
+
+To preserve the standard interpretation of C++ source code
+in methods and rules,
+a \textbf{modification in-private} \cite[Sec.~3.2]{Prinz03operationalsemantics}
+execution model is used:
 \begin{enumerate}
 \item Wrap each rule/method with prelude code and postprocessing code
 \item Prelude code:
@@ -77,9 +80,8 @@ For each state element actually written during execution of the code block:
 \begin{codeblock}
 this->A = A;                // update state elements only at end of code block
 \end{codeblock}
+All assignments in the postprocessing section occur on a single clock cycle.
 \end{enumerate}
-This processing style is described in more detail as \textbf{modification in-private}
-in Prinz\cite[Sec.~3.2]{Prinz03operationalsemantics}.
 
 The AtomicC compiler 
 generates a single Verilog module for each defined AtomicC module.
@@ -93,23 +95,23 @@ software components, using interfaces to specify hardware/software communication
 in a type safe manner. The AtomicC compiler generates the code and transactors to pass
 arguments between hardware and software.
 
-In summary, although AtomicC is a way of constructing highly parallel hardware artifacts,
-the user model is quite simple:
+In summary, although AtomicC is a way of constructing highly parallel hardware,
+the usage model is quite simple:
 \begin{itemize}
-\item Methods/rules are written as though they were serially executed,
+\item Methods/rules are written as though they were locally serially executed,
 \item Updates to state elements only occur atomiccally, as transactions.
 Intermediate state evolution is not visible to other transactions,
-\item Consistent concurrent execution of transactions is guaranteed by the
-compiler framework,
-\item Consistent concurrent implementation of the code for methods/rules
+\item Concurrent execution of transactions is guaranteed to be SC by the compiler framework,
+\item Correct concurrent implementation of the code for each individual method/rule
 is guaranteed by the compiler's
-translation of the SSA source text into combinatoric (only) logic.
+translation of the SSA source text into logic.
 \end{itemize}
 Of course, if the underlying algorithm is not designed to allow parallel
 execution of incremental computations, it will perform poorly and there
-is nothing the compiler can do to help.  With that in mind,
-no being burdened with the mechanics of handling concurrent consistency,
-the user can efficiently focus solely on the algorithm development itself.
+is nothing the compiler can do to help.  AtomicC allows
+the user to focus solely on the algorithm itself,
+without the burden of the bare mechanics of orchestrating concurrent consistency,
+increasing quality and productivity.
 
 \rSec1[atomicc.module]{Modules}
 
