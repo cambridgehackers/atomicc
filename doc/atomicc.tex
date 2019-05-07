@@ -255,29 +255,44 @@ was proposed to address issues with intra-cycle data passing.
 \newpage
 \rSec1[atomicc.modcomp]{Compilation}
 
-Modules independently compiled.  Combined with "linking", which validates schedule using header files.
+In traditional software, program startup at runtime allocates
+and populates data structures used during execution.  Although dynamic
+creation of state elements is not possible for hardware,
+we need the ability to create them programmatically, improving
+efficiency of the design creation process.
+The compilation of an AtomicC program is similar to that of C++, but adds
+an \textit{elaboration} phase \cite[Sec.~1]{Milner:1990}\cite{Gillenwater:2008,Memarian:2016,Pfenning},
+translating the source parse tree into a high-level
+intermediate \textit{abstract syntax}.
 
-Physical partitioning is used to separate design into separately synthesized pieces, connected using
-"long distance" signalling.  Parallel synthesis; bitstreams combined.
-
-AtomicC execution consists of 4 phases:
-\begin{itemize}
-\item \textit{compilation}: static elaboration followed by Verilog netlist generation, 
-\item \textit{linking}: binding of multiple modules and verification of inter-module schedule conflicts,
-\item \textit{netlist synthesis},
-\item \textit{hardware execution}.
-\end{itemize}
-
-During netlist
-generation, modules are instantiated by executing their
-constructors. During this phase, any C++ constructs may be used, but
+During \textit{static elaboration},
+constructors are executed for statically declared data elements,
+allowing allocation of new instances of modules and parameterized rule creation.
+Any C++ constructs may be used, but
 the resulting netlist must only contain synthesizeable components.
 
-During netlist compilation, the netlist is analyzed and translated to
-an intermediate representation and then to Verilog for simulation or
-synthesis. Alternate translations are possible: to native code via
-LLVM, to System C, to Gallina for formal verification with the Coq
-Proof Assistant, etc.
+AtomicC execution consists of the following phases:
+\begin{itemize}
+\item \textit{compilation}
+\begin{itemize}
+\item {Parsing,semantic checks},
+\item {Static elaboration},
+\item {Translation to an intermediate representation (IR)},
+\item {Verilog netlist generation from the IR},
+\end{itemize}
+\item \textit{Linking}: Modules across the project are incrementally compiled
+and unit tested.  As modules are reused in varying contexts, it is necessary
+to validate if restrictions need to be added for concurrent calls to conflicting
+methods in the module interface.
+This checking is done by a \textit{linker},  ensuring that rule/method access
+across a set of Verilog output is free of inter-module schedule conflicts,
+\item \textit{Logic synthesis, physical backend processing}.  This is performed
+with existing backend tool flows
+\item \textit{Formal verification} using the Coq Proof Assistant, etc.
+\item \textit{Verification}: performed using existing backend tooling,
+\item \textit{Hardware execution}.
+\end{itemize}
+
 
 \rSec1[atomicc.modfuture]{Future work}
 
@@ -300,3 +315,8 @@ Need reference definition for 'static elaboration'.
 from Newton: 
 Static elaboration does not change the semantics (types, evaluation rules) of the
 Regiment language, it merely opportunistically pushes evaluation forward into compile time
+
+Coding FSMs as 'case' statements in Verilog (to integrate with verification tools).
+
+Physical partitioning is used to separate design into separately synthesized pieces, connected using
+"long distance" signalling.  Parallel synthesis; bitstreams combined.
