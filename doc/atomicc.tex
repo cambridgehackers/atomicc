@@ -89,6 +89,15 @@ Existing Verilog modules can be called from and can call AtomicC
 generated modules.
 Standard Verilog backend tools are used to synthesize
 the resulting ASIC or FPGA.
+Particular emphasis is put on making the Verilog output both readable
+and stable to incremental change.  Synthesized names in the verilog
+output depend only on the named structual context, not on aspects
+like 'source line number' that will change globally, even when there is no
+local module definition source change.
+Incremental source code changes produce locally incremental generated
+code changes, easing the management of ECOs and version control
+on successive releases (for example, management of Verilog output
+files using git repositories).
 
 Like Connectal\cite{king2015software}, AtomicC designs may include both hardware and
 software components, using interfaces to specify hardware/software communication
@@ -286,3 +295,8 @@ Thinking again: if we retain C semantics, we have: temp = a; a = b; b = temp;, w
 gives the correct value mapping.
 
 Multiple clock domains
+
+Need reference definition for 'static elaboration'.
+from Newton: 
+Static elaboration does not change the semantics (types, evaluation rules) of the
+Regiment language, it merely opportunistically pushes evaluation forward into compile time
