@@ -1,0 +1,107 @@
+\Annex{intermediateRepresentation}{Intermediate Representation}{}
+
+\gramSec[irgram.module]{Module Definitions}
+
+\begin{bnf}
+\nontermdef{atomicc-module-definition}\br
+    module-type module-name \terminal{\{} \opt{module-body-list} \terminal{\}}
+
+\nontermdef{module-type} \br
+    \terminal{MODULE} \br
+    \terminal{EMODULE}
+
+\nontermdef{module-body}\br
+    module-body-definition\br
+    module-body-definition module-body
+
+\nontermdef{module-body-definition}\br
+    field-definition\br
+    param-definition\br
+    method-definition\br
+    interface-definition\br
+    interface-connect-definition
+
+\nontermdef{field-definition}\br
+    \terminal{FIELD} \opt{field-option-list} field-type field-name
+
+\nontermdef{param-definition}\br
+    \terminal{PARAMS} field-name \terminal{<} param-value \terminal{>}
+
+\nontermdef{field-option-list}\br
+    field-option\br
+    field-option field-option-list
+
+\nontermdef{field-option}\br
+    \terminal{/Ptr}\br
+    \terminal{/shared}\br
+    \terminal{/Count} numeric-constant\br
+    verilog-field-options
+
+\nontermdef{verilog-field-options}\br
+    \terminal{/parameter}\br
+    \terminal{/input}\br
+    \terminal{/output}\br
+    \terminal{/inout}
+
+\nontermdef{interface-definition}\br
+    \terminal{INTERFACE} \opt{interface-option-list} interface-type interface-name
+
+\nontermdef{interface-connect-definition}\br
+    \terminal{INTERFACECONNECT} \opt{connect-option-list} interface-name-l interface-name-r interface-type
+
+\nontermdef{connect-option-list}\br
+    connect-option\br
+    connect-option connect-option-list
+
+\nontermdef{connect-option-list}\br
+    \terminal{/Forward}
+\end{bnf}
+
+\gramSec[irgram.method]{Method Definitions}
+
+\begin{bnf}
+\nontermdef{method-definition}\br
+    \terminal{METHOD} method-name method-options \terminal{\{} method-contents-list \terminal{\}}
+
+\nontermdef{method-options}\br
+    \opt{method-param-list} \opt{method-return} \opt{method-guard}
+
+\nontermdef{param-list}\br
+    param-definition\br
+    param-definition \terminal{,} param-list
+
+\nontermdef{param-definition}\br
+    param-type param-name
+
+\nontermdef{method-return}\br
+    return-type \terminal{=} expression
+
+\nontermdef{method-guard}\br
+    \terminal{if} boolean-expression
+
+\nontermdef{method-contents-list}\br
+    method-contents\br
+    method-contents method-contents-list
+
+\nontermdef{method-contents}\br
+    alloca-definition\br
+    let-definition\br
+    store-definition\br
+    call-definition
+
+\nontermdef{alloca-definition}\br
+    \terminal{ALLOCA} alloca-type alloca-name
+
+\nontermdef{let-definition}\br
+    \terminal{LET} let-type \opt{action-guard} \terminal{:} let-target-name \terminal{=} source-expression
+
+\nontermdef{store-definition}\br
+    \terminal{STORE} \opt{action-guard} \terminal{:} store-target-name \terminal{=} source-expression
+
+\nontermdef{call-definition}\br
+    \terminal{CALL} \opt{call-option} \opt{action-guard} \terminal{:} call-target-name \opt{call-param-list}
+
+\nontermdef{action-guard}\br
+    \terminal{(} boolean-expression \terminal{)}
+
+\end{bnf}

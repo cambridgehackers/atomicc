@@ -47,6 +47,9 @@ giving flexibility in coupling with other modules.
 Interfaces can be exported (defined in the module) or imported (used in
 the module, but defined externally), giving flexibility in algorithm
 representation \cite[Sec.~4.1]{Dave:ROB}.
+By using interfaces to describe behavior of a module instead of relying
+on inheritance, the user is able to specify clearly that no implementation
+information is inherited.
 \item All state elements in the hardware
 netlist are explicit in the source code of the design.
 All module data is private to the module, accessable externally only by method invocation.
@@ -98,6 +101,9 @@ Incremental source code changes produce locally incremental generated
 code changes, easing the management of ECOs and version control
 on successive releases (for example, management of Verilog output
 files using git repositories).
+Since project development often involves many people over an
+extended interval of time, predictable reuse and evolution
+of modules is considered key to improving productivity.
 
 Like Connectal\cite{king2015software}, AtomicC designs may include both hardware and
 software components, using interfaces to specify hardware/software communication
