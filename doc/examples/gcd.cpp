@@ -29,23 +29,21 @@ __interface UserIndication {
 __module Gcd {
     UserRequest                     request;
     UserIndication                 *indication;
-    __uint(1) running;
     __uint(32) a, b;
-    void request.say(__uint(32) va, __uint(32) vb) if (!running) {
+    void request.say(__uint(32) va, __uint(32) vb) if (a == 0 && b == 0) {
         a = va;
         b = vb;
-        running = 1;
     }
-    __rule mod_rule if(running && a >= b && b != 0) {
+    __rule mod_rule if(a >= b && b != 0) {
         a -= b;
     };
-    __rule flip_rule if(running && a < b) {
+    __rule flip_rule if(a < b) {
         __uint(32) tmp = b;
         b = a;
         a = tmp;
     };
-    __rule respond_rule if(running && b == 0) {
-        running = 0;
+    __rule respond_rule if(a != 0 && b == 0) {
         indication->gcd(a);
+        a = 0;
    };
 };
