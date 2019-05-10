@@ -156,6 +156,7 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::string p
     newMI->type = updateType(MI->type, pname);
     newMI->guard = MI->guard;
     newMI->rule = MI->rule;
+    newMI->action = MI->action;
     newMI->storeList = MI->storeList;
     newMI->letList = MI->letList;
     newMI->callList = MI->callList;

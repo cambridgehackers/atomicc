@@ -64,7 +64,15 @@
     \terminal{METHOD} method-name method-options \terminal{\{} method-contents-list \terminal{\}}
 
 \nontermdef{method-options}\br
-    \opt{method-param-list} \opt{method-return} \opt{method-guard}
+    \opt{method-flag-list} \opt{method-param-list} \opt{method-return} \opt{method-guard}
+
+\nontermdef{method-flag-list}\br
+    method-flag\br
+    method-flag method-flag-list
+
+\nontermdef{method-flag}\br
+    \terminal(/Rule)\br
+    \terminal(/Action)
 
 \nontermdef{param-list}\br
     param-definition\br

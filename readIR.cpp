@@ -367,12 +367,15 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                 IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, false, false, false});
             }
             else if (checkItem("METHOD")) {
-                bool rule = false;
+                bool rule = false, action = false;
                 if (checkItem("/Rule"))
                     rule = true;
+                if (checkItem("/Action"))
+                    action = true;
                 std::string methodName = getToken();
                 MethodInfo *MI = allocMethod(methodName), *MIRdy = nullptr;
                 MI->rule = rule;
+                MI->action = action;
                 if (addMethod(IR, MI)) {
                     std::string rdyName = getRdyName(methodName, true);
                     MIRdy = allocMethod(rdyName);

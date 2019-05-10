@@ -120,7 +120,7 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
-        if (MI->rule && endswith(methodName, "__ENA"))
+        if (MI->rule && MI->action)
             ruleNames += "; " + methodName.substr(0, methodName.length()-5);
     }
     if (ruleNames != "")
