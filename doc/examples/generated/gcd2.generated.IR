@@ -1,8 +1,8 @@
 EMODULE l_ainterface_OC_UserIndication {
-    METHOD gcd__ENA ( INTEGER_32 v )
+    METHOD/Action gcd__ENA ( INTEGER_32 v )
 }
 EMODULE l_ainterface_OC_UserRequest {
-    METHOD say__ENA ( INTEGER_32 va , INTEGER_32 vb )
+    METHOD/Action say__ENA ( INTEGER_32 va , INTEGER_32 vb )
 }
 MODULE Gcd2 {
     INTERFACE l_ainterface_OC_UserRequest request
@@ -10,20 +10,20 @@ MODULE Gcd2 {
     FIELD INTEGER_1 running
     FIELD INTEGER_32 a
     FIELD INTEGER_32 b
-    METHOD/Rule RULE$flip_rule__ENA {
+    METHOD/Rule/Action RULE$flip_rule__ENA {
         ALLOCA INTEGER_32 RULE$flip_rule__ENA$tmp
         LET INTEGER_32 (((a) < (b)) & ((running) != (0))):RULE$flip_rule__ENA$tmp = b
         STORE (((a) < (b)) & ((running) != (0))):b = a
         STORE (((a) < (b)) & ((running) != (0))):a = RULE$flip_rule__ENA$tmp
     }
-    METHOD/Rule RULE$mod_rule__ENA {
+    METHOD/Rule/Action RULE$mod_rule__ENA {
         STORE (((b) != (0)) & (((a) >= (b)) & ((running) != (0)))):a = (a) - (b)
     }
-    METHOD/Rule RULE$respond_rule__ENA {
+    METHOD/Rule/Action RULE$respond_rule__ENA {
         STORE (((b) == (0)) & ((running) != (0))):running = 0
         CALL/Action (((b) == (0)) & ((running) != (0))):indication$gcd__ENA{a}
     }
-    METHOD request$say__ENA ( INTEGER_32 va , INTEGER_32 vb ) if ((((running) != (0)) ^ (1))) {
+    METHOD/Action request$say__ENA ( INTEGER_32 va , INTEGER_32 vb ) if ((((running) != (0)) ^ (1))) {
         STORE :a = request$say$va
         STORE :b = request$say$vb
         STORE :running = 1

@@ -1,8 +1,8 @@
 EMODULE l_ainterface_OC_UserIndication {
-    METHOD heard__ENA ( INTEGER_32 v )
+    METHOD/Action heard__ENA ( INTEGER_32 v )
 }
 EMODULE l_ainterface_OC_UserRequest {
-    METHOD say__ENA ( INTEGER_32 v )
+    METHOD/Action say__ENA ( INTEGER_32 v )
 }
 MODULE Example1 {
     INTERFACE l_ainterface_OC_UserRequest request
@@ -11,20 +11,20 @@ MODULE Example1 {
     FIELD INTEGER_2 busy_delay
     FIELD INTEGER_32 v_temp
     FIELD INTEGER_32 v_delay
-    METHOD/Rule RULE$delay2_rule__ENA if (((busy_delay) == (1))) {
+    METHOD/Rule/Action RULE$delay2_rule__ENA if (((busy_delay) == (1))) {
         STORE ((v_delay) == (1)):busy = 0
         STORE :busy_delay = 2
     }
-    METHOD/Rule RULE$delay_rule__ENA if ((((busy) != (0)) && ((busy_delay) == (0)))) {
+    METHOD/Rule/Action RULE$delay_rule__ENA if ((((busy) != (0)) && ((busy_delay) == (0)))) {
         STORE :busy_delay = 1
         STORE :v_delay = v_temp
     }
-    METHOD/Rule RULE$respond_rule__ENA if (((busy_delay) == (2))) {
+    METHOD/Rule/Action RULE$respond_rule__ENA if (((busy_delay) == (2))) {
         STORE ((v_delay) != (1)):busy = 0
         STORE :busy_delay = 0
         CALL/Action :indication$heard__ENA{v_delay}
     }
-    METHOD request$say__ENA ( INTEGER_32 v ) if ((((busy) != (0)) ^ (1))) {
+    METHOD/Action request$say__ENA ( INTEGER_32 v ) if ((((busy) != (0)) ^ (1))) {
         STORE :v_temp = request$say$v
         STORE :busy = 1
     }
