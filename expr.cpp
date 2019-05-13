@@ -721,6 +721,7 @@ static int level;
          }
     }
     factorExpr(ret);
+#if 0
     if (ret->value == "?" && checkInteger(getRHS(ret, 0), "1"))
         ret = getRHS(ret);
     if (ret->value == "?" && checkInteger(getRHS(ret, 2), "0") && exprWidth(getRHS(ret, 2)) <= 1) {
@@ -753,6 +754,7 @@ static int level;
         ret = nret;
         } while (restartFlag);
     }
+#endif
     if (ret->value == "!=") {
         if (isdigit(ret->operands.front()->value[0])) { // move constants to RHS
             ACCExpr *lhs = ret->operands.front();
@@ -829,6 +831,7 @@ static int level;
         if (found)
             ret = cleanupExpr(ret);
     }
+#if 0
     if (ret->value == "&" && ret->operands.size() > 1) {
         auto aitem = ret->operands.begin(), aend = ret->operands.end();
         ACCExpr *lhs = *aitem++;
@@ -874,6 +877,7 @@ static int level;
         if (found)
             ret = cleanupExpr(ret);
     }
+#endif
     if (TRACE_CLEANUP_EXPR)
         dumpExpr("cleanupExprEND" + autostr(level), ret);
     level--;
@@ -891,7 +895,8 @@ ACCExpr *cleanupBool(ACCExpr *expr)
     if (!expr)
         return expr;
     walkReplaceBuiltin(expr);
-    return cleanupExpr(expr);
+    ACCExpr *ret = cleanupExpr(expr);
+    return ret;
 }
 
 static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCurrentToken, bool preserveParen)
