@@ -251,9 +251,9 @@ void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
             MethodInfo *MIb = IR->generateBody[item.body];
             assert(MIb && "body item");
             for (auto info: MIb->letList) {
-                ACCExpr *cond = cleanupExpr(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
-                ACCExpr *value = cleanupExprBit(info->value);
-                ACCExpr *dest = cleanupExprBit(info->dest);
+                ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
+                ACCExpr *value = cleanupExprBuiltin(info->value);
+                ACCExpr *dest = cleanupExprBuiltin(info->dest);
                 fprintf(OStr, "        assign %s = %s;\n", tree2str(dest).c_str(), tree2str(value).c_str());
             }
             fprintf(OStr, "    end;\n");

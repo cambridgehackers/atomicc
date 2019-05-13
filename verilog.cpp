@@ -511,7 +511,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
             CI->second.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[methodName].guard = cleanupExpr(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName))));
+    condLines[methodName].guard = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName))));
     condLines[methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
@@ -670,7 +670,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
             if (item->cond)
                 tempCond = allocExpr("|", invertExpr(walkRemoveParam(item->cond)), tempCond);
-            MIRdy->guard = cleanupExpr(allocExpr("&", MIRdy->guard, tempCond));
+            MIRdy->guard = cleanupBool(allocExpr("&", MIRdy->guard, tempCond));
         }
     }
 
@@ -679,7 +679,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
-        MI->guard = cleanupExpr(MI->guard);
+        MI->guard = cleanupBool(MI->guard);
         if (!endswith(methodName, "__RDY")) {
             walkRead(MI, MI->guard, nullptr);
             if (MI->rule)
@@ -691,7 +691,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             walkRead(MI, info->value, info->cond);
         }
         for (auto info: MI->letList) {
-            ACCExpr *cond = cleanupExpr(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
+            ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
             ACCExpr *value = info->value;
             updateWidth(value, convertType(info->type));
             walkRead(MI, cond, nullptr);
@@ -738,7 +738,7 @@ dumpExpr("READCALL", value);
             walkRead(MI, value, cond);
             if (!info->isAction)
                 continue;
-            ACCExpr *tempCond = cleanupExpr(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
+            ACCExpr *tempCond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
             std::string calledName = value->value;
 //printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
 //dumpExpr("CALLCOND", tempCond);
@@ -769,7 +769,7 @@ dumpExpr("READCALL", value);
     // combine mux'ed assignments into a single 'assign' statement
     for (auto item: muxValueList) {
         updateWidth(item.second, convertType(refList[item.first].type));
-        setAssign(item.first, cleanupExprBit(allocExpr("__phi", item.second)), refList[item.first].type);
+        setAssign(item.first, cleanupExprBuiltin(allocExpr("__phi", item.second)), refList[item.first].type);
     }
     connectInterfaces(IR);
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY

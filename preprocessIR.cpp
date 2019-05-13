@@ -258,34 +258,34 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
         expandTree(4, &item->cond, item->value, item->isAction);
 
     // now replace __bitconcat, __bitsubstr, __phi
-    MI->guard = cleanupExprBit(MI->guard);
+    MI->guard = cleanupBool(MI->guard);
     for (auto info: MI->storeList) {
         walkSubst(IR, info->dest);
         walkSubst(IR, info->cond);
         walkSubst(IR, info->value);
-        info->dest = cleanupExprBit(info->dest);
-        info->cond = cleanupExprBit(info->cond);
-        info->value = cleanupExprBit(info->value);
+        info->dest = cleanupExprBuiltin(info->dest);
+        info->cond = cleanupBool(info->cond);
+        info->value = cleanupExprBuiltin(info->value);
     }
     for (auto info: MI->printfList) {
         walkSubst(IR, info->cond);
         walkSubst(IR, info->value);
-        info->cond = cleanupExprBit(info->cond);
-        info->value = cleanupExprBit(info->value);
+        info->cond = cleanupBool(info->cond);
+        info->value = cleanupExprBuiltin(info->value);
     }
     for (auto info: MI->callList) {
         walkSubst(IR, info->cond);
         walkSubst(IR, info->value);
-        info->cond = cleanupExprBit(info->cond);
-        info->value = cleanupExprBit(info->value);
+        info->cond = cleanupBool(info->cond);
+        info->value = cleanupExprBuiltin(info->value);
     }
     for (auto info: MI->letList) {
         walkSubst(IR, info->dest);
         walkSubst(IR, info->cond);
         walkSubst(IR, info->value);
-        info->dest = cleanupExprBit(info->dest);
-        info->cond = cleanupExprBit(info->cond);
-        info->value = cleanupExprBit(info->value);
+        info->dest = cleanupExprBuiltin(info->dest);
+        info->cond = cleanupBool(info->cond);
+        info->value = cleanupExprBuiltin(info->value);
     }
 }
 

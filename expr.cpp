@@ -879,7 +879,14 @@ static int level;
     level--;
     return ret;
 }
-ACCExpr *cleanupExprBit(ACCExpr *expr)
+ACCExpr *cleanupExprBuiltin(ACCExpr *expr)
+{
+    if (!expr)
+        return expr;
+    walkReplaceBuiltin(expr);
+    return cleanupExpr(expr);
+}
+ACCExpr *cleanupBool(ACCExpr *expr)
 {
     if (!expr)
         return expr;
