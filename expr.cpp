@@ -18,6 +18,11 @@
 #include <stdlib.h> // atol
 #include <string.h>
 #include <assert.h>
+//#define USE_CUDD
+#ifdef USE_CUDD
+#include "cudd.h"   // BDD library
+#include "cuddInt.h"// BDD library
+#endif
 #include "AtomiccIR.h"
 #include "common.h"
 #define MAX_EXPR_DEPTH 20
@@ -32,6 +37,7 @@ static bool lexAllowRange;
 static ACCExpr *repeatGet1Token;
 std::map<std::string, int> replaceBlock;
 int flagErrorsCleanup;
+static int inBool;  // allow for recursive invocation!
 
 bool isIdChar(char ch)
 {
@@ -531,6 +537,8 @@ bool factorExpr(ACCExpr *expr)
     bool changed = false;
     if (!expr)
         return false;
+    if (!inBool)
+        return false;
 static int level = 999;
     level++;
 if (level == 1)
@@ -704,8 +712,12 @@ static int level;
     if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
         expr = allocExpr("0");
     ACCExpr *ret = allocExpr(expr->value);
+    bool booleanCond = expr->value == "?";
     for (auto item: expr->operands) {
+         if (booleanCond)
+             item = cleanupBool(item);
          ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]));
+         booleanCond = false;
          if (TRACE_CLEANUP_EXPR)
              printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
          if (titem->value != ret->value || ret->value == "?" || isParen(ret->value)
@@ -809,6 +821,7 @@ static int level;
                 leftLen = len;
         }
     }
+#if 0
     if (ret->value == "&" && ret->operands.size() >= 2) {
         auto aitem = ret->operands.begin(), aend = ret->operands.end();
         ACCExpr *first = *aitem++;
@@ -831,7 +844,6 @@ static int level;
         if (found)
             ret = cleanupExpr(ret);
     }
-#if 0
     if (ret->value == "&" && ret->operands.size() > 1) {
         auto aitem = ret->operands.begin(), aend = ret->operands.end();
         ACCExpr *lhs = *aitem++;
@@ -890,12 +902,94 @@ ACCExpr *cleanupExprBuiltin(ACCExpr *expr)
     walkReplaceBuiltin(expr);
     return cleanupExpr(expr);
 }
+
+#ifdef USE_CUDD
+typedef struct {
+    int index;
+    DdNode *node;
+} MapItem;
+
+static int varIndex;
+static std::map<std::string, MapItem *> varMap;
+static DdManager * mgr;
+#define MAX_NAME_COUNT 100
+char const *inames[MAX_NAME_COUNT];
+
+DdNode *getVar(std::string name)
+{
+  if (!varMap[name]) {
+    varMap[name] = new MapItem;
+    varMap[name]->index = varIndex;
+    varMap[name]->node = Cudd_bddIthVar(mgr, varIndex);
+    inames[varIndex] = strdup(name.c_str());
+    varIndex++;
+  }
+  return varMap[name]->node;
+}
+static DdNode *tree2BDD(ACCExpr *expr)
+{
+    std::string op = expr->value;
+    DdNode *ret = nullptr;
+    if (op == "&&")
+        op = "&";
+    else if (op == "||")
+        op = "|";
+    if (op == "1" || op == "1d1")
+        ret = DD_ONE(mgr);
+    else if (op == "0" || op == "1d0")
+        ret = DD_ZERO(mgr);
+    else if (op == "!")
+        ret = Cudd_Not(tree2BDD(expr->operands.front()));
+    else if (op != "&" && op != "|" && op != "^")
+        ret = getVar(tree2str(expr));
+    if (ret) {
+        Cudd_Ref(ret);
+        return ret;
+    }
+    for (auto item: expr->operands) {
+         DdNode *operand = tree2BDD(item), *next;
+printf("[%s:%d] tree '%s' operand %p\n", __FUNCTION__, __LINE__, tree2str(item).c_str(), operand);
+         Cudd_Ref(operand);
+         if (!ret)
+             ret = operand;
+         else {
+printf("[%s:%d] op %s ret %p operand %p\n", __FUNCTION__, __LINE__, op.c_str(), ret, operand);
+             if (op == "&")
+                 next = Cudd_bddAnd(mgr, ret, operand);
+             else if (op == "|")
+                 next = Cudd_bddOr(mgr, ret, operand);
+             else if (op == "^")
+                 next = Cudd_bddXor(mgr, ret, operand);
+             else {
+printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+                 exit(-1);
+             }
+             Cudd_Ref(next);
+             ret = next;
+printf("[%s:%d] next %p\n", __FUNCTION__, __LINE__, ret);
+         }
+    }
+    return ret;
+}
+#endif
+
 ACCExpr *cleanupBool(ACCExpr *expr)
 {
     if (!expr)
         return expr;
+    inBool++; // can be invoked recursively!
     walkReplaceBuiltin(expr);
     ACCExpr *ret = cleanupExpr(expr);
+    inBool--;
+#ifdef USE_CUDD
+    if (!mgr)
+        mgr = Cudd_Init(MAX_NAME_COUNT,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0);
+    DdNode *bdd = tree2BDD(expr);
+    char * fform = Cudd_FactoredFormString(mgr, bdd, inames);
+    printf("%s\n", fform);
+    //ret = str2tree(fform);
+    free(fform);
+#endif
     return ret;
 }
 

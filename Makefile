@@ -18,6 +18,8 @@
 SOURCES = main.cpp verilog.cpp util.cpp interfaces.cpp \
     expr.cpp filegen.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp
 LLVMDIR = ../llvm/lib/Target/Atomicc
+#CUDDINC = -I../cudd/cudd -I../cudd -I../cudd/st -I../cudd/mtr -I../cudd/epd
+#CUDDLIB = ../cudd/cudd/.libs/libcudd.a
 
 all: veriloggen atomiccImport
 
@@ -31,7 +33,7 @@ veriloggen: $(SOURCES) $(LLVMDIR)/*.h *.h
             -Wwrite-strings -Wcovered-switch-default -Wcast-qual \
             -Wmissing-field-initializers -Wstring-conversion    \
             -Wnon-virtual-dtor -Wdelete-non-virtual-dtor \
-            -I. -I$(LLVMDIR) $(SOURCES) -lBlocksRuntime
+            -I. -I$(LLVMDIR) $(CUDDINC) $(SOURCES) -lBlocksRuntime $(CUDDLIB)
 
 atomiccImport: atomiccImport.cpp
 	clang++ -g -std=c++11 -o atomiccImport atomiccImport.cpp

@@ -39,6 +39,8 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     bool tDir = refList[target].out;
     if (!value)
         return;
+    if (type == "INTEGER_1")
+        value = cleanupBool(value);
     if (trace_assign)
         printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin) {
@@ -336,7 +338,7 @@ static void setAssignRefCount(ModuleIR *IR)
     for (auto tcond = condLines.begin(), tend = condLines.end(); tcond != tend; tcond++) {
         std::string methodName = tcond->first;
         walkRef(tcond->second.guard);
-        tcond->second.guard = replaceAssign(tcond->second.guard);
+        tcond->second.guard = cleanupBool(replaceAssign(tcond->second.guard));
         if (trace_assign)
             printf("[%s:%d] %s: guard %s\n", __FUNCTION__, __LINE__, methodName.c_str(), tree2str(tcond->second.guard).c_str());
         for (auto item: tcond->second.info) {
@@ -375,7 +377,7 @@ static void setAssignRefCount(ModuleIR *IR)
         if (ind != -1)
             temp = temp.substr(0,ind);
         if (aitem.second.value)
-            printf("[%s:%d] ASSIGN %s = %s size %d count %d[%d] pin %d\n", __FUNCTION__, __LINE__, aitem.first.c_str(), tree2str(aitem.second.value).c_str(), walkCount(aitem.second.value), refList[aitem.first].count, refList[temp].count, refList[temp].pin);
+            printf("[%s:%d] ASSIGN %s = %s size %d count %d[%d] pin %d type %s\n", __FUNCTION__, __LINE__, aitem.first.c_str(), tree2str(aitem.second.value).c_str(), walkCount(aitem.second.value), refList[aitem.first].count, refList[temp].count, refList[temp].pin, refList[temp].type.c_str());
     }
     for (auto item: refList)
         if (item.second.count) {
@@ -775,7 +777,10 @@ dumpExpr("READCALL", value);
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
         setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "INTEGER_1");
     for (auto item: assignList)
-        assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
+        if (item.second.type == "INTEGER_1")
+            assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
+        else
+            assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
     for (auto FI : IR->method) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
