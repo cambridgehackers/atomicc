@@ -572,17 +572,9 @@ skiplabel1:;
                  changed = true;
                  continue;
             }
-            ACCExpr *invertItem = invertExpr(*itemo);
-            for (auto jtemo = expr->operands.begin(); jtemo != itemo; jtemo++)
-                 if (matchExpr(*jtemo, invertItem)) {
-                     replaceValue(expr, "0");
-                     changed = true;
-                     goto skiplabel2;
-                 }
             itemo++;
         }
     }
-skiplabel2:;
     if (expr->value == "|") {
         ACCExpr *matchItem = nullptr;
         for (auto itemo : expr->operands) {
@@ -735,40 +727,6 @@ static int level;
          }
     }
     factorExpr(ret);
-#if 0
-    if (ret->value == "?" && checkInteger(getRHS(ret, 0), "1"))
-        ret = getRHS(ret);
-    if (ret->value == "?" && checkInteger(getRHS(ret, 2), "0") && exprWidth(getRHS(ret, 2)) <= 1) {
-        ACCExpr *rhs = getRHS(ret,1);
-        int len = exprWidth(rhs);
-        if (checkInteger(rhs, "1"))
-            ret = ret->operands.front();
-        else if (len == 1)
-            ret = allocExpr("&", ret->operands.front(), rhs);
-    }
-    if (ret->value == "&") {
-        bool restartFlag = false;
-        do {
-        restartFlag = false;
-        ACCExpr *nret = allocExpr(ret->value);
-        std::string checkName;
-        for (auto item: ret->operands) {
-             if (item->value == "==")
-                 checkName = item->operands.front()->value;
-             else if (item->value == "&") {
-                 for (auto pitem: item->operands)
-                     nret->operands.push_back(pitem);
-                 restartFlag = true;
-                 continue;
-             }
-             else if (item->value == "!=" && checkName == item->operands.front()->value)
-                 continue;
-             nret->operands.push_back(item);
-        }
-        ret = nret;
-        } while (restartFlag);
-    }
-#endif
     if (ret->value == "!=") {
         if (isdigit(ret->operands.front()->value[0])) { // move constants to RHS
             ACCExpr *lhs = ret->operands.front();
@@ -823,75 +781,6 @@ static int level;
                 leftLen = len;
         }
     }
-#if 0
-    if (ret->value == "&" && ret->operands.size() >= 2) {
-        auto aitem = ret->operands.begin(), aend = ret->operands.end();
-        ACCExpr *first = *aitem++;
-        ACCExpr *invertFirst = invertExpr(first);
-        bool found = false;
-        for (;aitem != aend; aitem++) {
-            if ((*aitem)->value == "|") {
-                for (auto oitem: (*aitem)->operands) {
-                    if (matchExpr(oitem, invertFirst)) {
-                        replaceValue(oitem, "0");
-                        found = true;
-                    }
-                    else if (matchExpr(oitem, first)) {
-                        replaceValue(oitem, "1");
-                        found = true;
-                    }
-                }
-            }
-        }
-        if (found)
-            ret = cleanupExpr(ret);
-    }
-    if (ret->value == "&" && ret->operands.size() > 1) {
-        auto aitem = ret->operands.begin(), aend = ret->operands.end();
-        ACCExpr *lhs = *aitem++;
-        if (lhs->value == "==") {
-        ACCExpr *invertLhs = invertExpr(lhs);
-        ACCExpr *matchItem = getRHS(lhs, 0);
-        bool found = false;
-        for (; aitem != aend; aitem++) {
-            if ((*aitem)->value == "|")
-                for (auto oitem: (*aitem)->operands) {
-                     if (matchExpr(lhs, oitem)) {
-                         replaceValue(oitem, "1");
-                         found = true;
-                     }
-                     else if (matchExpr(invertLhs, oitem)) {
-                         replaceValue(oitem, "0");
-                         found = true;
-                     }
-                     else if (oitem->value == "!=" && matchExpr(matchItem, getRHS(oitem,0))) {
-                         replaceValue(oitem, "0");
-                         found = true;
-                     }
-                }
-        }
-        if (found)
-            ret = cleanupExpr(ret);
-        }
-    }
-    if (ret->value == "|" && ret->operands.size() > 1) {
-        auto aitem = ret->operands.begin(), aend = ret->operands.end();
-        ACCExpr *lhs = *aitem++;
-        ACCExpr *invertLhs = invertExpr(lhs);
-        bool found = false;
-        for (; aitem != aend; aitem++) {
-            if ((*aitem)->value == "&")
-                for (auto pitem: (*aitem)->operands) {
-                     if (matchExpr(invertLhs, pitem)) {
-                         replaceValue(pitem, "1");
-                         found = true;
-                     }
-                }
-        }
-        if (found)
-            ret = cleanupExpr(ret);
-    }
-#endif
     if (TRACE_CLEANUP_EXPR)
         dumpExpr("cleanupExprEND" + autostr(level), ret);
     level--;
