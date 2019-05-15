@@ -516,6 +516,8 @@ void walkReplaceBuiltin(ACCExpr *expr)
             //dumpExpr("PHI", list);
             newe = allocExpr("|");
             for (auto item: list->operands) {
+                if (checkInteger(getRHS(item), "0"))
+                    continue;    // default value is already '0'
                 item->value = "?"; // Change from ':' -> '?'
                 item->operands.push_back(allocExpr("0"));
                 updateWidth(item, exprWidth(getRHS(item)));
