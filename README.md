@@ -15,6 +15,7 @@ To build
 1) get sources
     git clone git://github.com/cambridgehackers/atomicc
     git clone git://github.com/cambridgehackers/atomicc-examples
+    git clone git://github.com/cambridgehackers/cudd
     git clone git://github.com/cambridgehackers/llvm
     git clone git://github.com/cambridgehackers/clang
     git clone git://github.com/cambridgehackers/verilator
@@ -29,7 +30,9 @@ To build
     cd build
     bash ../configure_atomicc
     make -j10
-    cd ../../atomicc
+    cd ../../cudd
+    make
+    cd ../atomicc
     make
 
 3) cd atomicc-examples/examples/rulec

@@ -18,7 +18,7 @@
 #include <stdlib.h> // atol
 #include <string.h>
 #include <assert.h>
-//#define USE_CUDD
+#define USE_CUDD
 #ifdef USE_CUDD
 #include "cudd.h"   // BDD library
 #include "cuddInt.h"// BDD library
@@ -95,7 +95,7 @@ static bool relationalOp(std::string s)
 
 static bool checkOperator(std::string s)
 {
-    return booleanBinop(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == "," || s == "!";
+    return booleanBinop(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == "," || s == "!" || s == ".";
 }
 
 bool checkOperand(std::string s)
@@ -297,7 +297,7 @@ static ACCExpr *get1Token(void)
         do {
             getNext();
         } while (lexChar == '=' || lexChar == '<' || lexChar == '>');
-    else if (isParen(lexChar) || lexChar == '/' || lexChar == '%'
+    else if (isParen(lexChar) || lexChar == '/' || lexChar == '%' || lexChar == '.'
         || lexChar == ']' || lexChar == '}' || lexChar == ')' || lexChar == '^'
         || lexChar == ',' || lexChar == '?' || lexChar == ':' || lexChar == ';')
         getNext();
@@ -429,6 +429,10 @@ nextand:;
 void updateWidth(ACCExpr *expr, int len)
 {
     int ilen = exprWidth(expr);
+    if (ilen < 0 || len < 0) {
+        printf("[%s:%d] len %d ilen %d tree %s\n", __FUNCTION__, __LINE__, len, ilen, tree2str(expr).c_str());
+        exit(-1);
+    }
     if (isdigit(expr->value[0]) && len > 0 && expr->value.find("'") == std::string::npos)
         expr->value = autostr(len) + "'d" + expr->value;
     else if (isIdChar(expr->value[0])) {
@@ -754,7 +758,8 @@ static int level;
                     ret = allocExpr("!", ret->operands.front());
                     break;
                 }
-                updateWidth(item, leftLen);
+                if (leftLen != -1)
+                    updateWidth(item, leftLen);
             }
             else if (int len = exprWidth(item))
                 leftLen = len;
@@ -775,7 +780,8 @@ static int level;
                     ret = ret->operands.front();
                     break;
                 }
-                updateWidth(item, leftLen);
+                if (leftLen != -1)
+                    updateWidth(item, leftLen);
             }
             else if (int len = exprWidth(item))
                 leftLen = len;
@@ -799,25 +805,20 @@ typedef struct {
     int index;
     DdNode *node;
 } MapItem;
+typedef std::map<std::string, MapItem *> VarMap;
 
-static int varIndex;
-static std::map<std::string, MapItem *> varMap;
-static DdManager * mgr;
-#define MAX_NAME_COUNT 100
-char const *inames[MAX_NAME_COUNT];
+#define MAX_NAME_COUNT 1000
 
-DdNode *getVar(std::string name)
+DdNode *getVar(DdManager *mgr, std::string name, VarMap &varMap)
 {
   if (!varMap[name]) {
     varMap[name] = new MapItem;
-    varMap[name]->index = varIndex;
-    varMap[name]->node = Cudd_bddIthVar(mgr, varIndex);
-    inames[varIndex] = strdup(name.c_str());
-    varIndex++;
+    varMap[name]->index = varMap.size();
+    varMap[name]->node = Cudd_bddIthVar(mgr, varMap[name]->index);
   }
   return varMap[name]->node;
 }
-static DdNode *tree2BDD(ACCExpr *expr)
+static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
 {
     std::string op = expr->value;
     DdNode *ret = nullptr;
@@ -825,26 +826,23 @@ static DdNode *tree2BDD(ACCExpr *expr)
         op = "&";
     else if (op == "||")
         op = "|";
-    if (op == "1" || op == "1d1")
-        ret = DD_ONE(mgr);
-    else if (op == "0" || op == "1d0")
-        ret = DD_ZERO(mgr);
+    if (checkInteger(expr, "1"))
+        ret = Cudd_ReadOne(mgr);
+    else if (checkInteger(expr, "0"))
+        ret = Cudd_ReadLogicZero(mgr);
     else if (op == "!")
-        ret = Cudd_Not(tree2BDD(expr->operands.front()));
+        return Cudd_Not(tree2BDD(mgr, expr->operands.front(), varMap)); // Not passes through ref count
     else if (op != "&" && op != "|" && op != "^")
-        ret = getVar(tree2str(expr));
+        ret = getVar(mgr, "( " + tree2str(expr) + " )", varMap);
     if (ret) {
         Cudd_Ref(ret);
         return ret;
     }
     for (auto item: expr->operands) {
-         DdNode *operand = tree2BDD(item), *next;
-printf("[%s:%d] tree '%s' operand %p\n", __FUNCTION__, __LINE__, tree2str(item).c_str(), operand);
-         Cudd_Ref(operand);
+         DdNode *operand = tree2BDD(mgr, item, varMap), *next;
          if (!ret)
              ret = operand;
          else {
-printf("[%s:%d] op %s ret %p operand %p\n", __FUNCTION__, __LINE__, op.c_str(), ret, operand);
              if (op == "&")
                  next = Cudd_bddAnd(mgr, ret, operand);
              else if (op == "|")
@@ -852,12 +850,13 @@ printf("[%s:%d] op %s ret %p operand %p\n", __FUNCTION__, __LINE__, op.c_str(), 
              else if (op == "^")
                  next = Cudd_bddXor(mgr, ret, operand);
              else {
-printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+                 printf("[%s:%d] unknown operator\n", __FUNCTION__, __LINE__);
                  exit(-1);
              }
              Cudd_Ref(next);
+             Cudd_RecursiveDeref(mgr, operand);
+             Cudd_RecursiveDeref(mgr, ret);
              ret = next;
-printf("[%s:%d] next %p\n", __FUNCTION__, __LINE__, ret);
          }
     }
     return ret;
@@ -873,13 +872,23 @@ ACCExpr *cleanupBool(ACCExpr *expr)
     ACCExpr *ret = cleanupExpr(expr);
     inBool--;
 #ifdef USE_CUDD
-    if (!mgr)
-        mgr = Cudd_Init(MAX_NAME_COUNT,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0);
-    DdNode *bdd = tree2BDD(expr);
+    int varIndex = 0;
+    VarMap varMap;
+    DdManager * mgr = Cudd_Init(MAX_NAME_COUNT,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0);
+    varIndex = 0;
+    varMap.clear();
+    DdNode *bdd = tree2BDD(mgr, expr, varMap);
+    char const *inames[MAX_NAME_COUNT];
+    for (auto item: varMap)
+        inames[item.second->index] = strdup(item.first.c_str());
     char * fform = Cudd_FactoredFormString(mgr, bdd, inames);
-    printf("%s\n", fform);
-    //ret = str2tree(fform);
+    Cudd_RecursiveDeref(mgr, bdd);
+    int err = Cudd_CheckZeroRef(mgr);
+    printf("err %x: expr '%s' val = %s\n", err, tree2str(expr).c_str(), fform);
+    assert(err == 0 && "Reference counting");
+    ret = str2tree(fform);
     free(fform);
+    Cudd_Quit(mgr);
 #endif
     return ret;
 }
