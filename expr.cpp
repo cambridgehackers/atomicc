@@ -449,9 +449,18 @@ void updateWidth(ACCExpr *expr, int len)
         updateWidth(getRHS(expr), len);
         updateWidth(getRHS(expr, 2), len);
     }
-    else if (arithOp(expr->value) || expr->value == "(")
+    else if (arithOp(expr->value) || expr->value == "(") {
+        if (expr->value == "-" && expr->operands.size() == 1
+            && isdigit(expr->operands.front()->value[0]) && len == 1) {
+            /* hack to update width on "~foo", which translates to "foo ^ -1" in the IR */
+            expr->value = expr->operands.front()->value;
+            expr->operands.clear();
+            updateWidth(expr, len);
+        }
+        else
         for (auto item: expr->operands)
             updateWidth(item, len);
+    }
 }
 
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
