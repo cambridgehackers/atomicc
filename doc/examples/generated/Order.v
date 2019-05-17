@@ -34,7 +34,7 @@ module Order (input wire CLK, input wire nRST,
         if (request$say__ENA == 0) begin // RULE$C__ENA
             offset <= offset + 1;
         end; // End of RULE$C__ENA
-        if (request$say__ENA & ( !running )) begin // request$say__ENA
+        if (!( running | ( !request$say__ENA ) )) begin // request$say__ENA
             a <= request$say$va;
             offset <= 1;
             running <= 1;

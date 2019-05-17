@@ -43,7 +43,7 @@ module Example1 (input wire CLK, input wire nRST,
             if (v_delay != 1)
             busy <= 0;
         end; // End of RULE$respond_rule__ENA
-        if (request$say__ENA & ( !busy )) begin // request$say__ENA
+        if (!( busy | ( !request$say__ENA ) )) begin // request$say__ENA
             v_temp <= request$say$v;
             busy <= 1;
         end; // End of request$say__ENA
