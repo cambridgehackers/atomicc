@@ -31,6 +31,7 @@ To build
     bash ../configure_atomicc
     make -j10
     cd ../../cudd
+    ./configure
     make
     cd ../atomicc
     make
