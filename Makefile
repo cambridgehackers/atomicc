@@ -18,7 +18,7 @@
 SOURCES = main.cpp verilog.cpp util.cpp interfaces.cpp \
     expr.cpp filegen.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp
 LLVMDIR = ../llvm/lib/Target/Atomicc
-CUDDINC = -I../cudd/cudd -I../cudd -I../cudd/st -I../cudd/mtr -I../cudd/epd
+CUDDINC = -I../cudd/cudd -DUSE_CUDD
 CUDDLIB = ../cudd/cudd/.libs/libcudd.a
 
 all: veriloggen atomiccImport

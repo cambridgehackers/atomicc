@@ -18,10 +18,8 @@
 #include <stdlib.h> // atol
 #include <string.h>
 #include <assert.h>
-#define USE_CUDD
 #ifdef USE_CUDD
 #include "cudd.h"   // BDD library
-#include "cuddInt.h"// BDD library
 #endif
 #include "AtomiccIR.h"
 #include "common.h"
@@ -841,8 +839,15 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
         ret = Cudd_ReadLogicZero(mgr);
     else if (op == "!")
         return Cudd_Not(tree2BDD(mgr, expr->operands.front(), varMap)); // Not passes through ref count
-    else if (op != "&" && op != "|" && op != "^")
+    else if (op != "&" && op != "|" && op != "^") {
+        if (op == "!=")    // normalize comparison strings
+            expr->value = "==";
         ret = getVar(mgr, "( " + tree2str(expr) + " )", varMap);
+        if (op == "!=") {   // normalize comparison strings
+            expr->value = op; // restore
+            ret = Cudd_Not(ret);
+        }
+    }
     if (ret) {
         Cudd_Ref(ret);
         return ret;
@@ -878,7 +883,10 @@ ACCExpr *cleanupBool(ACCExpr *expr)
         return expr;
     inBool++; // can be invoked recursively!
     walkReplaceBuiltin(expr);
-    ACCExpr *ret = cleanupExpr(expr);
+    ACCExpr *ret;
+#ifndef USE_CUDD
+    ret = cleanupExpr(expr);
+#endif
     inBool--;
 #ifdef USE_CUDD
     int varIndex = 0;
