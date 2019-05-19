@@ -18,17 +18,13 @@
 #include <stdlib.h> // atol
 #include <string.h>
 #include <assert.h>
-#ifdef USE_CUDD
 #include "cudd.h"   // BDD library
-#endif
 #include "AtomiccIR.h"
 #include "common.h"
 #define MAX_EXPR_DEPTH 20
 
 static int trace_expr;//=1;
 static int trace_bool;//=1;
-static int cleanupTraceLevel;//=1; //-1;
-#define TRACE_CLEANUP_EXPR (cleanupTraceLevel && (cleanupTraceLevel == -1 || (level <= cleanupTraceLevel)))
 static std::string lexString;
 static unsigned lexIndex;
 static char lexChar;
@@ -483,12 +479,6 @@ bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
     return true;
 }
 
-static void replaceValue(ACCExpr *expr, std::string value)
-{
-    expr->value = value;
-    expr->operands.clear();
-}
-
 ACCExpr *dupExpr(ACCExpr *expr)
 {
     auto ext = allocExpr(expr->value);
@@ -555,177 +545,16 @@ void walkReplaceBuiltin(ACCExpr *expr)
         walkReplaceBuiltin(item);
 }
 
-bool factorExpr(ACCExpr *expr)
-{
-    bool changed = false;
-    if (!expr)
-        return false;
-    if (!inBool)
-        return false;
-static int level = 999;
-    level++;
-if (level == 1)
-dumpExpr("FACT" + autostr(level), expr);
-    while(1) {
-        bool found = false;
-    if (expr->value == "|") {
-        for (auto itemo = expr->operands.begin(), iend = expr->operands.end(); itemo != iend;) {
-            if (checkInteger(*itemo, "0")) {
-                 itemo = expr->operands.erase(itemo);
-                 changed = true;
-                 continue;
-            }
-            ACCExpr *invertItem = invertExpr(*itemo);
-            for (auto jtemo = expr->operands.begin(); jtemo != itemo; jtemo++)
-                 if (matchExpr(*jtemo, invertItem)) {
-                     replaceValue(expr, "1");
-                     changed = true;
-                     goto skiplabel1;
-                 }
-            itemo++;
-        }
-    }
-skiplabel1:;
-    if (expr->value == "&") {
-        for (auto itemo = expr->operands.begin(), iend = expr->operands.end(); itemo != iend;) {
-            if (checkInteger(*itemo, "1")) {
-                 itemo = expr->operands.erase(itemo);
-                 changed = true;
-                 continue;
-            }
-            itemo++;
-        }
-    }
-    if (expr->value == "|") {
-        ACCExpr *matchItem = nullptr;
-        for (auto itemo : expr->operands) {
-            if (itemo->value == "&" && itemo->operands.size()) {
-                ACCExpr *thisLast = getRHS(itemo, -1); // get last item
-                if (matchExpr(matchItem, thisLast))
-                    found = true;
-                else if (!found)
-                    matchItem = thisLast;
-            }
-        }
-        if (found) {
-            ACCExpr *factorp = allocExpr("|");
-            for (auto itemo = expr->operands.begin(), iend = expr->operands.end(); itemo != iend;) {
-                ACCExpr *thisLast = getRHS(*itemo, -1); // get last item
-                if ((*itemo)->value == "&" && matchExpr(matchItem, thisLast)) {
-                    ACCExpr *andp = allocExpr("&");
-                    for (auto itema : (*itemo)->operands)
-                        if (!matchExpr(matchItem, itema))
-                            andp->operands.push_back(itema);
-                    if (andp->operands.size())
-                        factorp->operands.push_back(andp);
-                    itemo = expr->operands.erase(itemo);
-                    changed = true;
-                }
-                else
-                    itemo++;
-            }
-            changed |= factorExpr(factorp);
-            expr->operands.push_back(allocExpr("&", factorp, matchItem));
-            continue;
-        }
-    }
-    ACCExpr *lhs = getRHS(expr, 0);
-    if (expr->value == "|" && expr->operands.size() >= 2 && lhs->value == "&" && lhs->operands.size()) {
-        auto itemo = expr->operands.begin(), iend = expr->operands.end();
-        ACCExpr *andp = *itemo++, *used = allocExpr("");
-        for (; itemo != iend; itemo++) {
-            ACCExpr *itemoInvert = invertExpr(*itemo);
-            auto itema = andp->operands.begin(), aend = andp->operands.end();
-            for (; itema != aend;) {
-                if (matchExpr(*itema, itemoInvert)) {
-                    used->operands.push_back(*itema);
-                    itema = andp->operands.erase(itema);
-                    found |= true;
-                }
-                else
-                    itema++;
-            }
-        }
-    }
-    if (expr->value == "&")
-        for (auto item = expr->operands.begin(), iend = expr->operands.end(); item != iend;) {
-            for (auto jitem = expr->operands.begin(); jitem != item; jitem++)
-                if (matchExpr(*item, *jitem)) {
-                    item = expr->operands.erase(item);
-                    changed = true;
-                    goto skipitem1;
-                }
-            if ((*item)->value == "|")
-                for (auto oitem: (*item)->operands)
-                for (auto jitem: expr->operands)
-                    if (matchExpr(oitem, jitem)) {
-                        item = expr->operands.erase(item);
-                        changed = true;
-                        goto skipitem1;
-                    }
-            if (checkInteger(*item, "0")) {
-                replaceValue(expr, "0");
-                goto nextlab;
-            }
-            item++;
-skipitem1:;
-        }
-    if (expr->value == "|")
-        for (auto item = expr->operands.begin(), iend = expr->operands.end(); item != iend;) {
-            for (auto jitem = expr->operands.begin(); jitem != item; jitem++)
-                if (matchExpr(*item, *jitem)) {
-                    item = expr->operands.erase(item);
-                    changed = true;
-                    goto skipitem2;
-                }
-            if (checkInteger(*item, "1")) {
-                replaceValue(expr, "1");
-                goto nextlab;
-            }
-            item++;
-skipitem2:;
-        }
-    for (auto item: expr->operands)
-        found |= factorExpr(item);
-    if (found)
-        goto nextlab;
-    if (expr->operands.size() == 1 && booleanBinop(expr->value)) {
-        ACCExpr *lhs = getRHS(expr, 0);
-        expr->value = lhs->value;
-        expr->operands = lhs->operands;
-    }
-    else if (expr->value == "&" && !expr->operands.size())
-        replaceValue(expr, "1");
-    else if (expr->value == "|" && !expr->operands.size())
-        replaceValue(expr, "0");
-    else
-        break;  // all done, no more updates
-nextlab:;
-    changed = true;
-    }
-if (level == 1 && changed && expr->operands.size())
-dumpExpr("FOVER" + autostr(level), expr);
-    level--;
-    return changed;
-}
-
 ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
 {
     if (!expr)
         return expr;
 static int level;
     level++;
-    if (TRACE_CLEANUP_EXPR)
-        dumpExpr("cleanupExprSTART" + autostr(level), expr);
     if (expr->operands.size() == 1 && expr->operands.front()->value != "," && (!preserveParen && expr->value == "("))
         expr = expr->operands.front();
     if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
-    ACCExpr *lhs = expr->operands.front();
-    if (expr->value == "^" && checkInteger(getRHS(expr), "1"))
-        expr = invertExpr(cleanupExpr(lhs));
-    if (expr->value == "&" && expr->operands.size() == 2 && matchExpr(getRHS(expr, 0), invertExpr(getRHS(expr))))
-        expr = allocExpr("0");
     ACCExpr *ret = allocExpr(expr->value);
     bool booleanCond = expr->value == "?";
     for (auto item: expr->operands) {
@@ -733,79 +562,16 @@ static int level;
              item = cleanupBool(item);
          ACCExpr *titem = cleanupExpr(item, isIdChar(expr->value[0]));
          booleanCond = false;
-         if (TRACE_CLEANUP_EXPR)
-             printf("[%s:%d] item %p titem %p ret %p\n", __FUNCTION__, __LINE__, (void *)item, (void *)titem, (void *)ret);
          if (titem->value != ret->value || ret->value == "?" || isParen(ret->value)
             || (  titem->value != "&" && titem->value != "|"
                && titem->value != "&&" && titem->value != "||"
                && titem->value != "+" && titem->value != "*"))
              ret->operands.push_back(titem);
          else {
-             if (TRACE_CLEANUP_EXPR)
-                 printf("[%s:%d] combine tree expressions: op %s uppersize %d lowersize %d\n", __FUNCTION__, __LINE__, titem->value.c_str(), (int)ret->operands.size(), (int)titem->operands.size());
              for (auto oitem: titem->operands)
                  ret->operands.push_back(oitem);
          }
     }
-    factorExpr(ret);
-    if (ret->value == "!=") {
-        if (isdigit(ret->operands.front()->value[0])) { // move constants to RHS
-            ACCExpr *lhs = ret->operands.front();
-            ret->operands.pop_front();
-            ret->operands.push_back(lhs);
-        }
-        ACCExpr *rhs = getRHS(ret), *lhs = ret->operands.front();
-        if (checkInteger(rhs, "0") && lhs->value == "^" && checkInteger(getRHS(lhs), "1")) {
-            ret->value = "==";
-            ret->operands.clear();
-            ret->operands.push_back(lhs->operands.front());
-            ret->operands.push_back(rhs);
-        }
-    }
-    if (ret->value == "==") {
-        int leftLen = -1;
-        if (isdigit(ret->operands.front()->value[0])) { // move constants to RHS
-            ACCExpr *lhs = ret->operands.front();
-            ret->operands.pop_front();
-            ret->operands.push_back(lhs);
-        }
-        for (auto item: ret->operands) {
-            if (isdigit(item->value[0])) {
-                if (checkInteger(item, "0") && leftLen == 1) {
-                    ret = allocExpr("!", ret->operands.front());
-                    break;
-                }
-                if (leftLen != -1)
-                    updateWidth(item, leftLen);
-            }
-            else if (int len = exprWidth(item))
-                leftLen = len;
-        }
-        ACCExpr *rhs = getRHS(ret), *lhs = ret->operands.front();
-        if (checkInteger(rhs, "0")) {
-        if (lhs->value == "==") {
-            ret = lhs;
-            ret->value = "!=";
-        }
-        }
-    }
-    if (ret->value == "!=") {
-        int leftLen = -1;
-        for (auto item: ret->operands) {
-            if (isdigit(item->value[0])) {
-                if (checkInteger(item, "0") && leftLen == 1) {
-                    ret = ret->operands.front();
-                    break;
-                }
-                if (leftLen != -1)
-                    updateWidth(item, leftLen);
-            }
-            else if (int len = exprWidth(item))
-                leftLen = len;
-        }
-    }
-    if (TRACE_CLEANUP_EXPR)
-        dumpExpr("cleanupExprEND" + autostr(level), ret);
     level--;
     return ret;
 }
@@ -817,7 +583,6 @@ ACCExpr *cleanupExprBuiltin(ACCExpr *expr)
     return cleanupExpr(expr);
 }
 
-#ifdef USE_CUDD
 typedef struct {
     int index;
     DdNode *node;
@@ -901,7 +666,6 @@ next:;
     }
     return ret;
 }
-#endif
 
 ACCExpr *cleanupBool(ACCExpr *expr)
 {
@@ -909,12 +673,7 @@ ACCExpr *cleanupBool(ACCExpr *expr)
         return expr;
     inBool++; // can be invoked recursively!
     walkReplaceBuiltin(expr);
-    ACCExpr *ret;
-#ifndef USE_CUDD
-    ret = cleanupExpr(expr);
-#endif
     inBool--;
-#ifdef USE_CUDD
     int varIndex = 0;
     VarMap varMap;
     DdManager * mgr = Cudd_Init(MAX_NAME_COUNT,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0);
@@ -927,12 +686,11 @@ ACCExpr *cleanupBool(ACCExpr *expr)
     char * fform = Cudd_FactoredFormString(mgr, bdd, inames);
     Cudd_RecursiveDeref(mgr, bdd);
     int err = Cudd_CheckZeroRef(mgr);
-    printf("err %x: expr '%s' val = %s\n", err, tree2str(expr).c_str(), fform);
+    printf("%s: expr '%s' val = %s\n", __FUNCTION__, tree2str(expr).c_str(), fform);
     assert(err == 0 && "Reference counting");
-    ret = str2tree(fform);
+    ACCExpr *ret = str2tree(fform);
     free(fform);
     Cudd_Quit(mgr);
-#endif
     return ret;
 }
 
@@ -1031,7 +789,6 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                 head = TOP;
         }
     }
-    factorExpr(head);
     head = cleanupExpr(head, preserveParen);
     return head;
 }
