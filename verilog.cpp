@@ -22,6 +22,7 @@
 #include "common.h"
 
 int trace_assign;//= 1;
+int trace_declare;//= 1;
 int trace_connect;//= 1;
 int trace_expand;//= 1;
 int trace_skipped;//= 1;
@@ -86,13 +87,18 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d
         assert (!refList[fitem.name].pin);
         refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false, vecCount};
         refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false, false, vecCount};
+        if (trace_declare)
+            printf("[%s:%d]NEWREF %s %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fnew.c_str(), fitem.type.c_str());
         if (!fitem.alias && out)
             itemList->operands.push_front(allocExpr(fitem.name));
         else if (assign)
             setAssign(fitem.name, fexpr, fitem.type);
     }
-    if (force)
+    if (force) {
         refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false, vecCount};
+        if (trace_declare)
+            printf("[%s:%d]NEWREF2 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), type.c_str());
+    }
     if (itemList->operands.size() > 0 && assign)
         setAssign(fldName, itemList, type);
 }
@@ -643,8 +649,11 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != -1, vecCount, dimIndex++);
             }
-            else// if (convertType(item.type) != 0)
+            else { // if (convertType(item.type) != 0)
                 refList[fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, -1};
+                if (trace_declare)
+                    printf("[%s:%d]NEWFLD3 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.type.c_str());
+            }
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
         return nullptr; });
     for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
@@ -771,7 +780,8 @@ dumpExpr("READCALL", value);
     // combine mux'ed assignments into a single 'assign' statement
     for (auto item: muxValueList) {
         updateWidth(item.second, convertType(refList[item.first].type));
-        setAssign(item.first, cleanupExprBuiltin(allocExpr("__phi", item.second)), refList[item.first].type);
+        ACCExpr *phi = cleanupExprBuiltin(allocExpr("__phi", item.second));
+        setAssign(item.first, phi, refList[item.first].type);
     }
     connectInterfaces(IR);
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY

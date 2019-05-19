@@ -26,6 +26,7 @@
 #define MAX_EXPR_DEPTH 20
 
 static int trace_expr;//=1;
+static int trace_bool;//=1;
 static int cleanupTraceLevel;//=1; //-1;
 #define TRACE_CLEANUP_EXPR (cleanupTraceLevel && (cleanupTraceLevel == -1 || (level <= cleanupTraceLevel)))
 static std::string lexString;
@@ -377,18 +378,23 @@ ACCExpr *invertExpr(ACCExpr *expr)
     return allocExpr("^", expr, allocExpr("1"));
 }
 
-int exprWidth(ACCExpr *expr)
+int exprWidth(ACCExpr *expr, bool forceNumeric)
 {
     if (!expr)
         return 0;
-    if (relationalOp(expr->value))
+    std::string op = expr->value;
+    if (relationalOp(op))
         return 1;
-    int ind = expr->value.find("'");
-    if (isdigit(expr->value[0]) && ind > 0) {
-        std::string temp = expr->value.substr(0, ind);
-        return atoi(temp.c_str());
+    if (isdigit(op[0])) {
+        int ind = op.find("'");
+        if (ind > 0) {
+            std::string temp = op.substr(0, ind);
+            return atoi(temp.c_str());
+        }
+        else if (forceNumeric)
+            return 1;
     }
-    if (isIdChar(expr->value[0])) {
+    if (isIdChar(op[0])) {
         ACCExpr *lhs = getRHS(expr, 0);
         if (lhs && lhs->value == "[" && lhs->operands.size() > 0) {
             ACCExpr *first = getRHS(lhs, 0);
@@ -403,23 +409,23 @@ int exprWidth(ACCExpr *expr)
             else if (isdigit(first->value[0]))
                 return 1;
         }
-        return convertType(refList[expr->value].type);
+        return convertType(refList[op].type);
     }
-    if (expr->value == "?") {
-        if (int len = exprWidth(getRHS(expr, 1)))
+    if (op == "?") {
+        if (int len = exprWidth(getRHS(expr, 1), forceNumeric))
             return len;
-        if (int len = exprWidth(getRHS(expr, 2)))
+        if (int len = exprWidth(getRHS(expr, 2), forceNumeric))
             return len;
     }
-    if (expr->value == "&") {
+    if (op == "&" || op == "|" || op == "^") {
         for (auto item: expr->operands)
-            if (exprWidth(item) != 1)
+            if (exprWidth(item, forceNumeric) != 1)
                 goto nextand;
         return 1;
 nextand:;
     }
-    if (expr->value == "!") {
-        return exprWidth(expr->operands.front());
+    if (op == "!") {
+        return exprWidth(expr->operands.front(), forceNumeric);
     }
     return 0;
 }
@@ -434,7 +440,8 @@ void updateWidth(ACCExpr *expr, int len)
     if (isdigit(expr->value[0]) && len > 0 && expr->value.find("'") == std::string::npos)
         expr->value = autostr(len) + "'d" + expr->value;
     else if (isIdChar(expr->value[0])) {
-        if (ilen > len) {
+printf("[%s:%d] ID %s ilen %d len %d\n", __FUNCTION__, __LINE__, tree2str(expr).c_str(), ilen, len);
+        if (ilen > len && len > 0 && !expr->operands.size()) {
             ACCExpr *subexpr = allocExpr(":", allocExpr(autostr(len-1)));
             if (len > 1)
                 subexpr->operands.push_back(allocExpr("0"));
@@ -513,7 +520,7 @@ void walkReplaceBuiltin(ACCExpr *expr)
         expr->operands = bitem->operands;
     }
     else if (expr->value == "__phi") {
-        ACCExpr *list = expr->operands.front();
+        ACCExpr *list = expr->operands.front(); // get "(" list of [":", cond, value] items
         int size = list->operands.size();
         ACCExpr *firstInList = getRHS(list, 0), *secondInList = getRHS(list);
         ACCExpr *newe = nullptr;
@@ -527,12 +534,15 @@ void walkReplaceBuiltin(ACCExpr *expr)
             //dumpExpr("PHI", list);
             newe = allocExpr("|");
             for (auto item: list->operands) {
+                dumpExpr("PHIELEMENTBEF", item);
                 if (checkInteger(getRHS(item), "0"))
                     continue;    // default value is already '0'
                 item->value = "?"; // Change from ':' -> '?'
                 item->operands.push_back(allocExpr("0"));
                 updateWidth(item, exprWidth(getRHS(item)));
                 newe->operands.push_back(item);
+                if (trace_expr)
+                    dumpExpr("PHIELEMENT", item);
             }
         }
         expr->value = newe->value;
@@ -816,15 +826,11 @@ typedef std::map<std::string, MapItem *> VarMap;
 
 #define MAX_NAME_COUNT 1000
 
-DdNode *getVar(DdManager *mgr, std::string name, VarMap &varMap)
+static bool boolPossible(ACCExpr *expr)
 {
-  if (!varMap[name]) {
-    varMap[name] = new MapItem;
-    varMap[name]->index = varMap.size();
-    varMap[name]->node = Cudd_bddIthVar(mgr, varMap[name]->index);
-  }
-  return varMap[name]->node;
+    return expr && (isdigit(expr->value[0]) || exprWidth(expr, true) == 1);
 }
+
 static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
 {
     std::string op = expr->value;
@@ -840,9 +846,26 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
     else if (op == "!")
         return Cudd_Not(tree2BDD(mgr, expr->operands.front(), varMap)); // Not passes through ref count
     else if (op != "&" && op != "|" && op != "^") {
+        if ((op == "!=" || op == "==")) {
+            ACCExpr *lhs = getRHS(expr, 0);
+            if (boolPossible(lhs) && boolPossible(getRHS(expr,1)))
+                goto next; // we can analyze relops on booleans
+            if (trace_bool)
+                printf("[%s:%d] boolnot %d %d = %s\n", __FUNCTION__, __LINE__, boolPossible(getRHS(expr,0)), boolPossible(getRHS(expr,1)), tree2str(expr).c_str());
+            if (isIdChar(lhs->value[0])) {
+                if (trace_bool)
+                    printf("[%s:%d] name %s type %s\n", __FUNCTION__, __LINE__, lhs->value.c_str(), refList[lhs->value].type.c_str());
+            }
+        }
         if (op == "!=")    // normalize comparison strings
             expr->value = "==";
-        ret = getVar(mgr, "( " + tree2str(expr) + " )", varMap);
+        std::string name = "( " + tree2str(expr) + " )";
+        if (!varMap[name]) {
+            varMap[name] = new MapItem;
+            varMap[name]->index = varMap.size();
+            varMap[name]->node = Cudd_bddIthVar(mgr, varMap[name]->index);
+        }
+        ret = varMap[name]->node;
         if (op == "!=") {   // normalize comparison strings
             expr->value = op; // restore
             ret = Cudd_Not(ret);
@@ -852,6 +875,7 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
         Cudd_Ref(ret);
         return ret;
     }
+next:;
     for (auto item: expr->operands) {
          DdNode *operand = tree2BDD(mgr, item, varMap), *next;
          if (!ret)
@@ -861,8 +885,10 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
                  next = Cudd_bddAnd(mgr, ret, operand);
              else if (op == "|")
                  next = Cudd_bddOr(mgr, ret, operand);
-             else if (op == "^")
+             else if (op == "^" || op == "!=")
                  next = Cudd_bddXor(mgr, ret, operand);
+             else if (op == "==")
+                 next = Cudd_bddXnor(mgr, ret, operand);
              else {
                  printf("[%s:%d] unknown operator\n", __FUNCTION__, __LINE__);
                  exit(-1);
