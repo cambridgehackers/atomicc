@@ -13,7 +13,7 @@ Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
 
 The language is designed for
-the construction of \textbf{modules} that are \textit{correct-by-construction composable}:
+the construction of \textbf{modules}\cite{Parnas:1972} that are \textit{correct-by-construction composable}:
 validated smaller modules can be aggregated to form
 a larger validated module with
 no loss of correctness of the component modules:
@@ -62,7 +62,7 @@ It instead uses a subset of the C++ language to specify
 code blocks that have the property that there is at most
 one assignment to each state element.
 This form is called \textit{static single assignment} form,
-or SSA form\cite{Alpern:1988}.
+or SSA form\cite{Alpern:1988} and is a functional program\cite{Appel98ssais}.
 In the eventual runtime execution, these assignments are
 all made in a single clock cycle, when the rule or method
 is enabled.
@@ -270,6 +270,7 @@ The compilation of an AtomicC program is similar to that of C++, but adds
 an \textit{elaboration} phase \cite[Sec.~1]{Milner:1990}\cite{Gillenwater:2008,Memarian:2016,Pfenning},
 translating the source parse tree into a high-level
 intermediate \textit{abstract syntax}.
+This is quite similar to the approach suggested by Bluespec-2\cite{ArvindBS2}.
 
 During \textit{static elaboration},
 constructors are executed for statically declared data elements,
