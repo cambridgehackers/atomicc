@@ -11,6 +11,11 @@ To build
 0) prepare machine
     sudo apt-get install libffi-dev libblocksruntime-dev clang
     sudo apt-get install gcc-multilib g++-multilib
+0) On OSX:
+    git clone git://github.com/mackyle/blocksruntime.git
+    cd blocksruntime
+    make
+    make install
 
 1) get sources
     git clone git://github.com/cambridgehackers/atomicc
