@@ -14,8 +14,8 @@ To build
 0) On OSX:
     git clone git://github.com/mackyle/blocksruntime.git
     cd blocksruntime
-    make
-    make install
+    ./buildlib
+    sudo ./installlib
 
 1) get sources
     git clone git://github.com/cambridgehackers/atomicc
