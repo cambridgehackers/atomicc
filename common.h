@@ -143,6 +143,7 @@ void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string 
 void preprocessIR(std::list<ModuleIR *> &irSeq);
 std::string genericName(std::string name);
 std::string genericModuleParam(std::string name);
+void cleanupIR(std::list<ModuleIR *> &irSeq);
 
 // verilog.cpp
 void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);

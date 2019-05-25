@@ -84,6 +84,7 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
         myName = myName.substr(ind+1);
 
     readIR(irSeq, OutputDir);
+    cleanupIR(irSeq);
     flagErrorsCleanup = 1;
     if (int ret = generateSoftware(irSeq, argv[0], OutputDir))
         return ret;
