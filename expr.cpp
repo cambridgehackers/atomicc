@@ -436,7 +436,8 @@ void updateWidth(ACCExpr *expr, int len)
     if (isdigit(expr->value[0]) && len > 0 && expr->value.find("'") == std::string::npos)
         expr->value = autostr(len) + "'d" + expr->value;
     else if (isIdChar(expr->value[0])) {
-printf("[%s:%d] ID %s ilen %d len %d\n", __FUNCTION__, __LINE__, tree2str(expr).c_str(), ilen, len);
+        if (trace_expr)
+            printf("[%s:%d] ID %s ilen %d len %d\n", __FUNCTION__, __LINE__, tree2str(expr).c_str(), ilen, len);
         if (ilen > len && len > 0 && !expr->operands.size()) {
             ACCExpr *subexpr = allocExpr(":", allocExpr(autostr(len-1)));
             if (len > 1)
@@ -686,7 +687,8 @@ ACCExpr *cleanupBool(ACCExpr *expr)
     char * fform = Cudd_FactoredFormString(mgr, bdd, inames);
     Cudd_RecursiveDeref(mgr, bdd);
     int err = Cudd_CheckZeroRef(mgr);
-    printf("%s: expr '%s' val = %s\n", __FUNCTION__, tree2str(expr).c_str(), fform);
+    if (trace_bool)
+        printf("%s: expr '%s' val = %s\n", __FUNCTION__, tree2str(expr).c_str(), fform);
     assert(err == 0 && "Reference counting");
     ACCExpr *ret = str2tree(fform);
     free(fform);

@@ -501,7 +501,10 @@ static void postParseCleanup(MethodInfo *MI)
 
 void cleanupIR(std::list<ModuleIR *> &irSeq)
 {
-    for (auto IR: irSeq)
+    for (auto IR: irSeq) {
         for (auto item: IR->method)
             postParseCleanup(item.second);
+        for (auto item: IR->generateBody)
+            postParseCleanup(item.second);
+    }
 }
