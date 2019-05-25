@@ -309,11 +309,14 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
     while (readLine()) {
-        bool ext = checkItem("EMODULE");
-        ParseCheck(ext || checkItem("MODULE"), "Module header missing");
+        bool ext = checkItem("EMODULE"), interface = false;
+        if (!ext)
+            interface = checkItem("INTERFACE");
+        ParseCheck(ext || interface || checkItem("MODULE"), "Module header missing");
         std::string name = getToken();
         ModuleIR *IR = allocIR(name);
-        if (!ext)
+        IR->isInterface = interface;
+        if (!ext && !interface)
             irSeq.push_back(IR);
         ParseCheck(checkItem("{"), "Module '{' missing");
         while (readLine() && !checkItem("}")) {

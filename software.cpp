@@ -98,6 +98,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         int counter = 5;
         std::string enumList, sep;
         ModuleIR *IR = allocIR("l_top");
+        IR->isInterface = false;
         irSeq.push_back(IR);
         std::string dutType;
         bool hasPrintf = false;
@@ -125,6 +126,7 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
                 irSeq.push_back(muxDef); // HACK FOR NOW!!!!!!!!!!!!!!!!!!!!!!
             else {
                 muxDef = allocIR(muxTypeName);
+                muxDef->isInterface = false;
                 irSeq.push_back(muxDef);
                 muxDef->interfaces.push_back(FieldElement{"in", -1, pipeName, false, false, false, false, false, false, false});
                 muxDef->interfaces.push_back(FieldElement{"forward", -1, pipeName, false, false, false, false, false, false, false});
@@ -161,6 +163,7 @@ dumpModule("MUX", muxDef);
             std::string pName = pipeName + (outcall ? "H" : "");
             std::string fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             ModuleIR *ifcIR = allocIR(fieldName);
+            ifcIR->isInterface = false;
             ifcIR->interfaces.push_back(FieldElement{"method", -1, userTypeName, !outcall, false, false, false, false, false, false});
             ifcIR->interfaces.push_back(FieldElement{"pipe", -1, pName, outcall, false, false, false, false, false, false});
             IR->fields.push_back(FieldElement{fieldName, -1, ifcIR->name, false, false, false, false, false, false, false});

@@ -37,6 +37,7 @@ printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", false, false, false, false, false, false, false});
     IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_16", false, false, false, false, false, false, false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
+    unionIR->isInterface = false;
     IR->fields.push_back(FieldElement{"data", -1, unionIR->name, false, false, false, false, false, false, false});
     int counter = 0;  // start method number at 0
     uint64_t maxDataLength = 0;
@@ -52,6 +53,7 @@ exit(-1);
         }
         methodName = methodName.substr(0, methodName.length()-5);
         ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
+        variant->isInterface = false;
         unionIR->unionList.push_back(UnionItem{methodName, variant->name});
         uint64_t dataLength = 0;
         for (auto param: MI->params) {
@@ -85,6 +87,7 @@ static void processM2P(ModuleIR *IR)
             ModuleIR *II = lookupIR(type);
             if (!II) {
                 II = allocIR(type);
+                II->isInterface = false;
                 II->interfaces.push_back(FieldElement{"ifc", -1, inter.type, false, false, false, false, false, false, false});
             }
     if (trace_software)

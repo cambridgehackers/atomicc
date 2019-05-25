@@ -183,6 +183,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
     genericIR->params = IR->params;
     genericIR->unionList = IR->unionList;
     genericIR->interfaceConnect = IR->interfaceConnect;
+    genericIR->isInterface = false;
     for (auto item : IR->fields)
         genericIR->fields.push_back(FieldElement{item.fldName,
             item.vecCount, updateType(item.type, pname), item.isPtr,
@@ -360,6 +361,7 @@ skipLab:;
             irSeq.push_back(genericIR);
             genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM");
+            paramIR->isInterface = false;
             genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false, false});
             paramIR->fields.push_back(FieldElement{pname, -1, "INTEGER_32", false, false, false, false, true, false, false});
             //dumpModule("GENERIC", genericIR);
