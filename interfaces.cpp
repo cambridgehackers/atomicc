@@ -32,7 +32,7 @@ static void processSerialize(ModuleIR *IR)
     auto inter = IR->interfaces.front();
     if (trace_software)
 printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
-    ModuleIR *IIR = lookupIR(inter.type);
+    ModuleIR *IIR = lookupInterface(inter.type);
     IR->fields.clear();
     IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", false, false, false, false, false, false, false});
     IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_16", false, false, false, false, false, false, false});
@@ -76,10 +76,10 @@ static void processM2P(ModuleIR *IR)
         if (inter.isPtr) {
             target = inter.fldName;
             if (trace_software)
-                dumpModule("M2P/IIR :" + target, lookupIR(inter.type));
+                dumpModule("M2P/IIR :" + target, lookupInterface(inter.type));
         }
         else {
-            HIR = lookupIR(inter.type);
+            HIR = lookupInterface(inter.type);
             host = inter.fldName;
             std::string iname = inter.type.substr(16);
             IR->name = iname + "___M2P";
@@ -140,7 +140,7 @@ static void processP2M(ModuleIR *IR)
     std::string host, target;
     for (auto inter: IR->interfaces) {
         if (inter.isPtr) {
-            IIR = lookupIR(inter.type);
+            IIR = lookupInterface(inter.type);
             target = inter.fldName;
             std::string iname = inter.type.substr(16);
             IR->name = iname + "___P2M";
@@ -149,7 +149,7 @@ static void processP2M(ModuleIR *IR)
 dumpModule("P2M/IIR :" + target, IIR);
         }
         else {
-            HIR = lookupIR(inter.type);
+            HIR = lookupInterface(inter.type);
     if (trace_software)
 printf("[%s:%d] HIR type %s IR %p\n", __FUNCTION__, __LINE__, inter.type.c_str(), (void *)HIR);
             host = inter.fldName;

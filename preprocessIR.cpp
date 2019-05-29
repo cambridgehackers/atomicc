@@ -172,10 +172,10 @@ walkToGeneric(item.cond, pname), item.var, walkToGeneric(item.init, pname), walk
         newMI->params.push_back(ParamElement{item.name, updateType(item.type, pname)});
 }
 
-static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pname)
+static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pname, bool isInterface = false)
 {
 
-    ModuleIR *genericIR = allocIR(irName);
+    ModuleIR *genericIR = allocIR(irName, isInterface);
     genericIR->genvarCount = IR->genvarCount;
     genericIR->metaList = IR->metaList;
     genericIR->softwareName = IR->softwareName;
@@ -183,7 +183,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
     genericIR->params = IR->params;
     genericIR->unionList = IR->unionList;
     genericIR->interfaceConnect = IR->interfaceConnect;
-    genericIR->isInterface = false;
+    genericIR->isInterface = isInterface;
     for (auto item : IR->fields)
         genericIR->fields.push_back(FieldElement{item.fldName,
             item.vecCount, updateType(item.type, pname), item.isPtr,
@@ -195,7 +195,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
         copyGenericMethod(genericIR, FI.second, pname);
     for (auto item : IR->interfaces) {
         std::string iname = "l_ainterface_OC_" + irName + MODULE_SEPARATOR + item.fldName;
-        buildGeneric(lookupIR(item.type), iname, pname);
+        buildGeneric(lookupInterface(item.type), iname, pname, true);
         genericIR->interfaces.push_back(FieldElement{item.fldName,
              item.vecCount, iname, item.isPtr, item.isInput,
              item.isOutput, item.isInout,
@@ -360,8 +360,8 @@ skipLab:;
             ModuleIR *genericIR = buildGeneric(IR, irName, pname);
             irSeq.push_back(genericIR);
             genericModule[irName] = 1;
-            ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM");
-            paramIR->isInterface = false;
+            ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM", true);
+            paramIR->isInterface = true;
             genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false, false});
             paramIR->fields.push_back(FieldElement{pname, -1, "INTEGER_32", false, false, false, false, true, false, false});
             //dumpModule("GENERIC", genericIR);

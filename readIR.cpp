@@ -21,7 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-static int trace_readIR = 1;
+static int trace_readIR;//= 1;
 static char buf[MAX_READ_LINE];
 static char *bufp;
 static int lineNumber = 0;
@@ -222,7 +222,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
             interface = checkItem("INTERFACE");
         ParseCheck(ext || interface || checkItem("MODULE"), "Module header missing");
         std::string name = getToken();
-        ModuleIR *IR = allocIR(name);
+        ModuleIR *IR = allocIR(name, interface);
         IR->isInterface = interface;
         if (!ext && !interface)
             irSeq.push_back(IR);

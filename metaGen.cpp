@@ -29,7 +29,7 @@ static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
     metaList.push_front("//METASTART; " + IR->name);
     for (auto item: IR->interfaces)
         if (item.isPtr)
-        metaList.push_back("//METAEXTERNAL; " + item.fldName + "; " + lookupIR(item.type)->name + ";");
+        metaList.push_back("//METAEXTERNAL; " + item.fldName + "; " + lookupInterface(item.type)->name + ";");
     for (auto item: IR->fields) {
         int64_t vecCount = item.vecCount;
         int dimIndex = 0;
@@ -129,7 +129,7 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
         std::string tname = item.target;
         std::string sname = item.source;
 //printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
-        for (auto FI: lookupIR(item.type)->method) {
+        for (auto FI: lookupInterface(item.type)->method) {
             MethodInfo *MI = FI.second;
             std::string methodName = MI->name;
             metaList.push_back("//METACONNECT; " + tname + MODULE_SEPARATOR + MI->name

@@ -88,7 +88,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         for (auto interfaceName: IR->softwareName) {
             for (auto iitem: IR->interfaces) {
                 if (iitem.fldName == interfaceName) {
-                    ModuleIR *inter = lookupIR(iitem.type);
+                    ModuleIR *inter = lookupInterface(iitem.type);
                     softwareNameList[inter->name.substr(strlen("l_ainterface_OC_"))] = SoftwareItem{iitem, IR, inter};
                 }
             }

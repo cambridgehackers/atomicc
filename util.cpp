@@ -23,6 +23,7 @@
 
 int trace_expand;//= 1;
 std::map<std::string, ModuleIR *> mapIndex;
+static std::map<std::string, ModuleIR *> interfaceIndex;
 static int trace_iter;//=1;
 static int suppressHack_flag=1;
 
@@ -40,7 +41,18 @@ ModuleIR *lookupIR(std::string ind)
 {
     if (ind == "" || mapIndex.find(ind) == mapIndex.end())
         return nullptr;
+    if (mapIndex[ind]->isInterface)
+        printf("[%s:%d] was interface %s\n", __FUNCTION__, __LINE__, ind.c_str());
     return mapIndex[ind];
+}
+
+ModuleIR *lookupInterface(std::string ind)
+{
+    if (ind == "" || interfaceIndex.find(ind) == interfaceIndex.end())
+        return nullptr;
+    if (!interfaceIndex[ind]->isInterface)
+        printf("[%s:%d] not interface %s\n", __FUNCTION__, __LINE__, ind.c_str());
+    return interfaceIndex[ind];
 }
 
 uint64_t convertType(std::string arg)
@@ -165,11 +177,11 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
     //printf("[%s:%d]interface %s\n", __FUNCTION__, __LINE__, fieldName.c_str());
     for (auto item: searchIR->interfaces)
         if (item.fldName == fieldName)
-            return lookupMethod(lookupIR(item.type), searchStr);
+            return lookupMethod(lookupInterface(item.type), searchStr);
         else if (item.fldName == "")
             nullInterface = item.type;
     if (nullInterface != "")
-        return lookupMethod(lookupIR(nullInterface), searchStr);
+        return lookupMethod(lookupInterface(nullInterface), searchStr);
     return nullptr;
 }
 
@@ -218,7 +230,7 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
                 if (trace_iter)
                     printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
                 if (fieldName != "" && fldName == fieldName)
-                    return lookupIR(item.type);
+                    return lookupInterface(item.type);
             } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
             return nullptr; });
         if (!nextIR)
@@ -282,12 +294,19 @@ printf("%s: name %s base %s type %s %s offset %d\n", __FUNCTION__, fitem.name.c_
         }
 }
 
-ModuleIR *allocIR(std::string name)
+ModuleIR *allocIR(std::string name, bool isInterface)
 {
+    std::string iname = name;
     ModuleIR *IR = new ModuleIR;
     IR->name = name;
     IR->genvarCount = 0;
-    mapIndex[IR->name] = IR;
+    int i = iname.find("(");
+    if (i > 0)
+        iname = iname.substr(0,i);
+    if (isInterface)
+        interfaceIndex[iname] = IR;
+    else
+        mapIndex[iname] = IR;
     return IR;
 }
 
@@ -341,7 +360,7 @@ void dumpModule(std::string name, ModuleIR *IR)
     if (!IR)
         return;
     for (auto item: IR->interfaces)
-        dumpModule(name + "_INTERFACE_" + autostr(interfaceNumber++), lookupIR(item.type));
+        dumpModule(name + "_INTERFACE_" + autostr(interfaceNumber++), lookupInterface(item.type));
 printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
     for (auto item: IR->fields) {
         std::string ret = "    FIELD";

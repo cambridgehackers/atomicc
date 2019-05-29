@@ -129,7 +129,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
 {
     for (auto item : IR->interfaces) {
         std::string interfaceName = item.fldName;
-        ModuleIR *IIR = lookupIR(item.type);
+        ModuleIR *IIR = lookupInterface(item.type);
         if (!IIR) {
             printf("%s: in module '%s', interface lookup '%s' name '%s' failed\n", __FUNCTION__, IR->name.c_str(), item.type.c_str(), interfaceName.c_str());
             exit(-1);
@@ -561,7 +561,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
 static void connectInterfaces(ModuleIR *IR)
 {
     for (auto IC : IR->interfaceConnect) {
-        ModuleIR *IIR = lookupIR(IC.type);
+        ModuleIR *IIR = lookupInterface(IC.type);
         if (!IIR)
             dumpModule("MISSINGCONNECT", IR);
         assert(IIR && "interfaceConnect interface type");

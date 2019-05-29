@@ -252,6 +252,7 @@ void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
             assert(MIb && "body item");
             for (auto info: MIb->letList) {
                 ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
+                (void)(cond);
                 ACCExpr *value = cleanupExprBuiltin(info->value);
                 ACCExpr *dest = cleanupExprBuiltin(info->dest);
                 fprintf(OStr, "        assign %s = %s;\n", tree2str(dest).c_str(), tree2str(value).c_str());

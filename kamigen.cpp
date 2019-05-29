@@ -22,43 +22,21 @@
 
 static void generateKami(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
 {
-    std::string baseDir = OutputDir;
-    int ind = baseDir.rfind('/');
-    if (ind > 0)
-        baseDir = baseDir.substr(0, ind+1);
+    FILE *OStrV = fopen((OutputDir + ".kami").c_str(), "w");
+    if (!OStrV) {
+        printf("kamigen: unable to open '%s'\n", (OutputDir + ".kami").c_str());
+        exit(-1);
+    }
     for (auto IR : irSeq) {
-        static std::list<ModData> modLineTop;
-        modLineTop.clear();
-        generateModuleDef(IR, modLineTop);         // Collect/process kami info
+        //static std::list<ModData> modLineTop;
+        //modLineTop.clear();
+        //generateModuleDef(IR, modLineTop);         // Collect/process kami info
+printf("[%s:%d] module '%s'\n", __FUNCTION__, __LINE__, IR->name.c_str());
 
-        FILE *OStrV = fopen((baseDir + IR->name + ".v").c_str(), "w");
-        if (!OStrV) {
-            printf("kamigen: unable to open '%s'\n", (baseDir + IR->name + ".v").c_str());
-            exit(-1);
-        }
-        fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
-        fprintf(OStrV, "`default_nettype none\n");
-        generateModuleHeader(OStrV, modLineTop);
-        if (IR->genvarCount) {
-            std::string genstr;
-            for (int i = 1; i <= IR->genvarCount; i++)
-                genstr = ", " GENVAR_NAME + autostr(i);
-            fprintf(OStrV, "    genvar %s;\n", genstr.substr(1).c_str());
-        }
-        generateVerilogOutput(OStrV);
-        generateVerilogGenerateOutput(OStrV, IR);
-        fprintf(OStrV, "endmodule \n\n`default_nettype wire    // set back to default value\n");
+        //generateModuleHeader(OStrV, modLineTop);
+        //generateVerilogOutput(OStrV);
+        //generateVerilogGenerateOutput(OStrV, IR);
         fclose(OStrV);
-    }
-    if (printfFormat.size()) {
-    FILE *OStrP = fopen((OutputDir + ".printf").c_str(), "w");
-    for (auto item: printfFormat) {
-        fprintf(OStrP, "%s ", item.format.c_str());
-        for (auto witem: item.width)
-            fprintf(OStrP, "%d ", witem);
-        fprintf(OStrP, "\n");
-    }
-    fclose(OStrP);
     }
 }
 
@@ -82,7 +60,7 @@ printf("[%s:%d] AFTERREAD\n", __FUNCTION__, __LINE__);
     //cleanupIR(irSeq);
     flagErrorsCleanup = 1;
     //preprocessIR(irSeq);
-    //generateKami(irSeq, myName, OutputDir);
+    generateKami(irSeq, myName, OutputDir);
 printf("[%s:%d]DONE\n", __FUNCTION__, __LINE__);
     return 0;
 }
