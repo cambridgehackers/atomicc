@@ -65,7 +65,7 @@ Module module'mkGCD.
 
     Hint Unfold mkGCDModule : ModuleDefs.
 (* Module mkGCD type Module#(GCD(Bit(32))) return type GCD(Bit(32)) *)
-    Definition mkGCD := Build_ mkGCDModule.
+    Definition mkGCD := Build_GCD mkGCDModule (instancePrefix--"result") (instancePrefix--"set_m") (instancePrefix--"set_n").
     Hint Unfold mkGCD : ModuleDefs.
     Hint Unfold mkGCDModule : ModuleDefs.
 
@@ -103,8 +103,8 @@ Module module'mkMain.
     with Rule instancePrefix--"rl_start" :=
     (
         Assert(( #started_v ) == $$ (* intwidth *) (natToWord 32 0));
-               BKCall unused1 : Void (* actionBinding *) <- gcd . set_n( 100 )  ;
-               BKCall unused2 : Void (* actionBinding *) <- gcd . set_m( 20 )  ;
+               BKCall unused1 : Void (* actionBinding *) <- gcd'set_n( $$ (* intwidth *) (natToWord 32 100) )  ;
+               BKCall unused2 : Void (* actionBinding *) <- gcd'set_m( $$ (* intwidth *) (natToWord 32 20) )  ;
         Write (instancePrefix--"started") : BITT <- $$ (* intwidth *) (natToWord 32 1) ;
         Retv ) (* rule rl_start *)
 
@@ -112,7 +112,7 @@ Module module'mkMain.
 
     Hint Unfold mkMainModule : ModuleDefs.
 (* Module mkMain type Module#(Main) return type Main *)
-    Definition mkMain := Build_Empty mkMainModule.
+    Definition mkMain := Build_Main mkMainModule.
     Hint Unfold mkMain : ModuleDefs.
     Hint Unfold mkMainModule : ModuleDefs.
 
