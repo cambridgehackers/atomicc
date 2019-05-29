@@ -158,6 +158,7 @@ extern int trace_skipped;
 extern std::map<std::string, RefItem> refList;
 extern std::map<std::string, AssignItem> assignList;
 extern std::map<std::string, ModuleIR *> mapIndex;
+extern std::map<std::string, ModuleIR *> interfaceIndex;
 extern std::map<std::string, int> replaceBlock;
 extern std::list<ModData> modNew;
 extern std::map<std::string, CondGroup> condLines;

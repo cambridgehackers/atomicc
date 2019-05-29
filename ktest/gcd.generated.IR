@@ -6,7 +6,7 @@ INTERFACE GCD(a) {
 }
 
 MODULE GCD(Bit(32)) {
-        INTERFACE GCD(Bit(32)) _
+        INTERFACE GCD(Bit(32))
         FIELD Bit(32) n
         FIELD Bit(32) m
         METHOD/Rule/Action swap if (((n > m) && (m !=  0))) {
@@ -26,13 +26,13 @@ MODULE GCD(Bit(32)) {
 
         }
 }
-MODULE mkMain {
+MODULE Main {
         FIELD GCD(Bit(32)) gcd
         FIELD Bit(1) started
         FIELD Bit(32) dv
         METHOD/Rule/Action rl_start if ((started ==  0)) {
-               CALL : gcd.set_n(  100)
-               CALL : gcd.set_m(  20)
+               CALL/Action : gcd.set_n(  100)
+               CALL/Action : gcd.set_m(  20)
                STORE : started =  1 
         }
         METHOD/Rule/Action rl_display {

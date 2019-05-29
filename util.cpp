@@ -23,7 +23,7 @@
 
 int trace_expand;//= 1;
 std::map<std::string, ModuleIR *> mapIndex;
-static std::map<std::string, ModuleIR *> interfaceIndex;
+std::map<std::string, ModuleIR *> interfaceIndex;
 static int trace_iter;//=1;
 static int suppressHack_flag=1;
 
@@ -37,8 +37,12 @@ std::string getRdyName(std::string basename, bool suppressHack)
     return rdyName + "__RDY";
 }
 
-ModuleIR *lookupIR(std::string ind)
+ModuleIR *lookupIR(std::string name)
 {
+    std::string ind = name;
+    int i = ind.find("(");
+    if (i > 0)
+        ind = ind.substr(0,i);
     if (ind == "" || mapIndex.find(ind) == mapIndex.end())
         return nullptr;
     if (mapIndex[ind]->isInterface)
@@ -46,8 +50,12 @@ ModuleIR *lookupIR(std::string ind)
     return mapIndex[ind];
 }
 
-ModuleIR *lookupInterface(std::string ind)
+ModuleIR *lookupInterface(std::string name)
 {
+    std::string ind = name;
+    int i = ind.find("(");
+    if (i > 0)
+        ind = ind.substr(0,i);
     if (ind == "" || interfaceIndex.find(ind) == interfaceIndex.end())
         return nullptr;
     if (!interfaceIndex[ind]->isInterface)
