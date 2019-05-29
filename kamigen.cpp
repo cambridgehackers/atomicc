@@ -34,22 +34,22 @@ static std::string kamiType(std::string type)
     return ret;
 }
 
-static ACCExpr *kamiChanges(ACCExpr *expr)
+static ACCExpr *kamiChanges(ACCExpr *expr, int width)
 {
     std::string value = expr->value;
     if (isIdChar(value[0]))
         value = "#" + value + "_v";
     else if (isdigit(value[0]))
-        value = "$$ (* intwidth *) (natToWord 32 " + value + ")";
+        value = "$$ (* intwidth *) (natToWord " + autostr(width) + " " + value + ")";
     auto ext = allocExpr(value);
     for (auto item: expr->operands)
-        ext->operands.push_back(kamiChanges(item));
+        ext->operands.push_back(kamiChanges(item, width));
     return ext;
 }
 
-static std::string kamiValue(ACCExpr *expr)
+static std::string kamiValue(ACCExpr *expr, int width = 32)
 {
-    return tree2str(kamiChanges(expr));
+    return tree2str(kamiChanges(expr, width));
 }
 
 static std::string kamiCall(ACCExpr *expr, MethodInfo *MI)
@@ -101,7 +101,9 @@ printf("[%s:%d] module '%s'\n", __FUNCTION__, __LINE__, IR->name.c_str());
     fprintf(OStrV, "    Variable instancePrefix: string.\n"
                    "        (* method bindings *)\n");
     std::list<std::string> letList;
+    std::map<std::string, std::string> fieldType;
     for (auto iitem: IR->fields) {
+        fieldType[iitem.fldName] = iitem.type;
         std::string tname = iitem.type;
         int i = tname.find("(");
         if (i > 0)
@@ -169,7 +171,7 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
               fprintf(OStrV, "        Read %s_v: %s <- (instancePrefix--\"%s\") ;\n",
              pitem.name.c_str(), kamiType(pitem.type).c_str(), pitem.name.c_str());
          }
-         fprintf(OStrV, "        Assert(%s);\n", kamiValue(MIRdy->guard).c_str());
+         fprintf(OStrV, "        Assert(%s);\n", kamiValue(cleanupBool(MIRdy->guard), 1).c_str());
          int unusedNumber = 1;
          for (auto citem: MI->callList) {
               MethodInfo *callMI = nullptr;
@@ -185,8 +187,12 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
                      kamiCall(citem->value, callMI).c_str());
          }
          for (auto sitem: MI->storeList) {
-              fprintf(OStrV, "        Write (instancePrefix--\"%s\") : %s <- %s ;\n",
-             tree2str(sitem->dest).c_str(), "BITT", kamiValue(sitem->value).c_str());
+             std::string dest = tree2str(sitem->dest);
+             std::string dtype = fieldType[dest];
+             if (dtype == "")
+                 dtype = "Bit(32)";
+             fprintf(OStrV, "        Write (instancePrefix--\"%s\") : %s <- %s ;\n",
+                 dest.c_str(), kamiType(dtype).c_str(), kamiValue(sitem->value).c_str());
          }
          if (MI->rule)
              fprintf(OStrV, "        Retv ) (* rule %s *)\n", methodName.c_str());
