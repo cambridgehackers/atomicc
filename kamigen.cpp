@@ -23,9 +23,14 @@
 static std::string kamiType(std::string type)
 {
     std::string ret = type;
-    int i = ret.find("(");
-    if (i > 0)
-        ret = ret.substr(0, i) + " " + ret.substr(i + 1, ret.length() - i - 2);
+    int i = ret.find("INTEGER_");
+    if (i == 0) {
+      ret = "(Bit " + ret.substr(i + 8) + ")";
+    } else {
+      int i = ret.find("(");
+      if (i > 0)
+	ret = ret.substr(0, i) + " " + ret.substr(i + 1, ret.length() - i - 2);
+    }
     return ret;
 }
 
