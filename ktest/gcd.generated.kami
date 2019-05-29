@@ -39,13 +39,13 @@ Module module'mkGCD.
         Retv    )
     with Method instancePrefix--"set_m" :=
     (
-        Read in_m_v: Bit_32 <- (instancePrefix--"in_m") ;
+        Read in_m_v: Bit 32 <- (instancePrefix--"in_m") ;
         Assert(( #m_v ) == $$ (* intwidth *) (natToWord 1 0));
         Write (instancePrefix--"m") : Bit 32 <- #in_m_v ;
         Retv    )
     with Method instancePrefix--"set_n" :=
     (
-        Read in_n_v: Bit_32 <- (instancePrefix--"in_n") ;
+        Read in_n_v: Bit 32 <- (instancePrefix--"in_n") ;
         Assert(( #m_v ) == $$ (* intwidth *) (natToWord 1 0));
         Write (instancePrefix--"n") : Bit 32 <- #in_n_v ;
         Retv    )
@@ -103,9 +103,9 @@ Module module'mkMain.
     with Rule instancePrefix--"rl_start" :=
     (
         Assert(( #started_v ) == $$ (* intwidth *) (natToWord 1 0));
-               BKCall unused1 : Void (* actionBinding *) <- gcd'set_n( $$ (* intwidth *) (natToWord 32 100) )  ;
-               BKCall unused2 : Void (* actionBinding *) <- gcd'set_m( $$ (* intwidth *) (natToWord 32 20) )  ;
-        Write (instancePrefix--"started") : Bit 1 <- $$ (* intwidth *) (natToWord 32 1) ;
+               BKCall unused1 : Void (* actionBinding *) <- gcd'set_n (($$ (* intwidth *) (natToWord 32 100)) : Bit 32)  ;
+               BKCall unused2 : Void (* actionBinding *) <- gcd'set_m (($$ (* intwidth *) (natToWord 32 20)) : Bit 32)  ;
+        Write (instancePrefix--"started") : Bit 1 <- $$ (* intwidth *) (natToWord 1 1) ;
         Retv ) (* rule rl_start *)
 
     }). (* mkMain *)

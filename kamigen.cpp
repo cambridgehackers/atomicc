@@ -33,6 +33,14 @@ static std::string kamiType(std::string type)
     }
     return ret;
 }
+static int kamiWidth(std::string type)
+{
+    std::string ktype = kamiType(type);
+    int i = ktype.find(" ");
+    if (i > 0)
+        return atoi(ktype.substr(i+1).c_str());
+    return 32;
+}
 
 static ACCExpr *kamiChanges(ACCExpr *expr, int width)
 {
@@ -60,8 +68,20 @@ static std::string kamiCall(ACCExpr *expr, MethodInfo *MI)
         ret = getRHS(expr, 0)->value + "'";
         expr = getRHS(expr, 1);
     }
-    ret += expr->value;
-    return ret + kamiValue(expr->operands.front());
+    ret += expr->value + " (";
+    expr = expr->operands.front();
+    if (expr->value == "(") {
+        std::string sep;
+        auto param = MI->params.begin();
+        for (auto item: expr->operands) {
+printf("[%s:%d] param type %s = %s\n", __FUNCTION__, __LINE__, param->type.c_str(), kamiType(param->type).c_str());
+dumpExpr("PARAM", item);
+            ret += sep + "(" + kamiValue(item) + ") : " + kamiType(param->type);
+            sep = ", ";
+            param++;
+        }
+    }
+    return ret + ")";
 }
 
 static void generateInterfaces(FILE *OStrV)
@@ -192,7 +212,7 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
              if (dtype == "")
                  dtype = "Bit(32)";
              fprintf(OStrV, "        Write (instancePrefix--\"%s\") : %s <- %s ;\n",
-                 dest.c_str(), kamiType(dtype).c_str(), kamiValue(sitem->value).c_str());
+                 dest.c_str(), kamiType(dtype).c_str(), kamiValue(sitem->value, kamiWidth(dtype)).c_str());
          }
          if (MI->rule)
              fprintf(OStrV, "        Retv ) (* rule %s *)\n", methodName.c_str());
