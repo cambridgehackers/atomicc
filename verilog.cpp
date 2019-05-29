@@ -24,11 +24,8 @@
 int trace_assign;//= 1;
 int trace_declare;//= 1;
 int trace_connect;//= 1;
-int trace_expand;//= 1;
 int trace_skipped;//= 1;
 
-std::map<std::string, RefItem> refList;
-std::map<std::string, ModuleIR *> mapIndex;
 std::list<PrintfInfo> printfFormat;
 std::list<ModData> modNew;
 std::map<std::string, CondGroup> condLines;
@@ -268,6 +265,44 @@ printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, i
         if (ACCExpr *operand = walkRemoveParam(item))
             newExpr->operands.push_back(operand);
     return newExpr;
+}
+
+static void walkRef (ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    std::string item = expr->value;
+    if (isIdChar(item[0])) {
+        std::string base = item;
+        int ind = base.find("[");
+        if (ind > 0)
+            base = base.substr(0, ind);
+        if (!refList[item].pin)
+            printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
+        if (base != item)
+{
+if (trace_assign)
+printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
+item = base;
+}
+        if(!refList[item].pin) {
+            printf("[%s:%d] pin not found '%s'\n", __FUNCTION__, __LINE__, item.c_str());
+            //exit(-1);
+        }
+        refList[item].count++;
+        ACCExpr *temp = assignList[item].value;
+        if (temp && refList[item].count == 1)
+            walkRef(temp);
+    }
+    for (auto item: expr->operands)
+        walkRef(item);
+}
+
+static void decRef(std::string name)
+{
+//return;
+    if (refList[name].count > 0 && refList[name].pin != PIN_MODULE)
+        refList[name].count--;
 }
 
 static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "")

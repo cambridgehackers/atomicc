@@ -120,8 +120,6 @@ ACCExpr *invertExpr(ACCExpr *expr);
 int exprWidth(ACCExpr *expr, bool forceNumeric = false);
 void updateWidth(ACCExpr *item, int len);
 ACCExpr *getRHS(ACCExpr *expr, int match = 1);
-void walkRef (ACCExpr *expr);
-void decRef(std::string name);
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs);
 int walkCount (ACCExpr *expr);
 ACCExpr *dupExpr(ACCExpr *expr);

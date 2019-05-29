@@ -21,6 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+static int trace_readIR = 1;
 static char buf[MAX_READ_LINE];
 static char *bufp;
 static int lineNumber = 0;
@@ -52,21 +53,27 @@ static ACCExpr *getExpression(void)
     }
     while (*bufp == ' ')
         bufp++;
-    return str2tree(std::string(startp, bufp - startp));
+    std::string ret = std::string(startp, bufp - startp);
+    if (trace_readIR)
+        printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
+    return str2tree(ret);
 }
 
 static bool checkItem(const char *val)
 {
-     while (*bufp == ' ')
-         bufp++;
-     int len = strlen(val);
-//printf("[%s:%d] val %s len %d bufp %s\n", __FUNCTION__, __LINE__, val, len, bufp);
-     bool ret = !strncmp(bufp, val, len);
-     if (ret)
-         bufp += len;
-     while (*bufp == ' ')
-         bufp++;
-     return ret;
+    while (*bufp == ' ')
+        bufp++;
+    int len = strlen(val);
+    if (trace_readIR)
+        printf("[%s:%d] val %s len %d bufp '%s'\n", __FUNCTION__, __LINE__, val, len, bufp);
+    bool ret = !strncmp(bufp, val, len);
+    if (ret)
+        bufp += len;
+    while (*bufp == ' ')
+        bufp++;
+    if (trace_readIR)
+        printf("[%s:%d] val %s ret %d\n", __FUNCTION__, __LINE__, val, ret);
+    return ret;
 }
 static void ParseCheck(bool ok, std::string message)
 {
@@ -78,11 +85,19 @@ static void ParseCheck(bool ok, std::string message)
 }
 static bool readLine(void)
 {
-    if (fgets(buf, sizeof(buf), OStrGlobal) == NULL)
-        return false;
-    buf[strlen(buf) - 1] = 0;
-    bufp = buf;
-    lineNumber++;
+    while (1) {
+        if (fgets(buf, sizeof(buf), OStrGlobal) == NULL)
+            return false;
+        do 
+            buf[strlen(buf) - 1] = 0; // strip trailing ' '
+        while (buf[strlen(buf) - 1] == ' ');
+        bufp = buf;
+        lineNumber++;
+        if (buf[0])                   // skip blank lines
+            break;
+    }
+    if (trace_readIR)
+        printf("[%s:%d] inline '%s'\n", __FUNCTION__, __LINE__, bufp);
     return true;
 }
 static std::string getToken()
@@ -95,6 +110,8 @@ static std::string getToken()
     std::string ret = std::string(startp, bufp);
     while (*bufp == ' ')
         bufp++;
+    if (trace_readIR)
+        printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
     return ret;
 }
 

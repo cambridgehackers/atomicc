@@ -33,6 +33,7 @@ static ACCExpr *repeatGet1Token;
 std::map<std::string, int> replaceBlock;
 int flagErrorsCleanup;
 static int inBool;  // allow for recursive invocation!
+std::map<std::string, RefItem> refList;
 
 bool isIdChar(char ch)
 {
@@ -153,13 +154,6 @@ std::string tree2str(ACCExpr *expr)
     return ret;
 }
 
-void decRef(std::string name)
-{
-//return;
-    if (refList[name].count > 0 && refList[name].pin != PIN_MODULE)
-        refList[name].count--;
-}
-
 int walkCount (ACCExpr *expr)
 {
     if (!expr)
@@ -168,37 +162,6 @@ int walkCount (ACCExpr *expr)
     for (auto item: expr->operands)
         count += walkCount(item);
     return count;
-}
-
-void walkRef (ACCExpr *expr)
-{
-    if (!expr)
-        return;
-    std::string item = expr->value;
-    if (isIdChar(item[0])) {
-        std::string base = item;
-        int ind = base.find("[");
-        if (ind > 0)
-            base = base.substr(0, ind);
-        if (!refList[item].pin)
-            printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
-        if (base != item)
-{
-if (trace_expr)
-printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
-item = base;
-}
-        if(!refList[item].pin) {
-            printf("[%s:%d] pin not found '%s'\n", __FUNCTION__, __LINE__, item.c_str());
-            //exit(-1);
-        }
-        refList[item].count++;
-        ACCExpr *temp = assignList[item].value;
-        if (temp && refList[item].count == 1)
-            walkRef(temp);
-    }
-    for (auto item: expr->operands)
-        walkRef(item);
 }
 
 ACCExpr *allocExpr(std::string value, ACCExpr *argl, ACCExpr *argr, ACCExpr *argt)

@@ -21,8 +21,11 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+int trace_expand;//= 1;
+std::map<std::string, ModuleIR *> mapIndex;
 static int trace_iter;//=1;
 static int suppressHack_flag=1;
+
 std::string getRdyName(std::string basename, bool suppressHack)
 {
     std::string rdyName = basename;
