@@ -34,8 +34,8 @@ static void processSerialize(ModuleIR *IR)
 printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     ModuleIR *IIR = lookupInterface(inter.type);
     IR->fields.clear();
-    IR->fields.push_back(FieldElement{"len", -1, "INTEGER_16", false, false, false, false, false, false, false});
-    IR->fields.push_back(FieldElement{"tag", -1, "INTEGER_16", false, false, false, false, false, false, false});
+    IR->fields.push_back(FieldElement{"len", -1, "Bit(16)", false, false, false, false, false, false, false});
+    IR->fields.push_back(FieldElement{"tag", -1, "Bit(16)", false, false, false, false, false, false, false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
     unionIR->isInterface = false;
     IR->fields.push_back(FieldElement{"data", -1, unionIR->name, false, false, false, false, false, false, false});
@@ -64,7 +64,7 @@ exit(-1);
             maxDataLength = dataLength;
         counter++;
     }
-    unionIR->fields.push_back(FieldElement{"data", -1, "INTEGER_" + autostr(maxDataLength), false, false, false, false, false, false, false});
+    unionIR->fields.push_back(FieldElement{"data", -1, "Bit(" + autostr(maxDataLength) + ")", false, false, false, false, false, false, false});
 }
 
 static void processM2P(ModuleIR *IR)

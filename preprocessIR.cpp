@@ -363,7 +363,7 @@ skipLab:;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM", true);
             paramIR->isInterface = true;
             genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false, false});
-            paramIR->fields.push_back(FieldElement{pname, -1, "INTEGER_32", false, false, false, false, true, false, false});
+            paramIR->fields.push_back(FieldElement{pname, -1, "Bit(32)", false, false, false, false, true, false, false});
             //dumpModule("GENERIC", genericIR);
         }
     }

@@ -37,7 +37,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     bool tDir = refList[target].out;
     if (!value)
         return;
-    if (type == "INTEGER_1")
+    if (type == "Bit(1)")
         value = cleanupBool(value);
     if (trace_assign)
         printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
@@ -243,9 +243,9 @@ bool dontDeclare = false, int vecCount = -1, int dimIndex = 0)
                 hasnRST = true;
         }
     if (!handleCLK && !hasCLK && vecCount == -1)
-        refList["CLK"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false, dontDeclare, -1};
+        refList["CLK"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, dontDeclare, -1};
     if (!handleCLK && !hasnRST && vecCount == -1)
-        refList["nRST"] = RefItem{1, "INTEGER_1", false, false, PIN_LOCAL, false, dontDeclare, -1};
+        refList["nRST"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, dontDeclare, -1};
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -729,7 +729,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
         if (!endswith(methodName, "__RDY")) {
             walkRead(MI, MI->guard, nullptr);
             if (MI->rule)
-                setAssign(methodName, allocExpr(getRdyName(methodName)), "INTEGER_1");
+                setAssign(methodName, allocExpr(getRdyName(methodName)), "Bit(1)");
         }
         setAssign(methodName, MI->guard, MI->type); // collect the text of the return value into a single 'assign'
         for (auto info: MI->storeList) {
@@ -820,9 +820,9 @@ dumpExpr("READCALL", value);
     }
     connectInterfaces(IR);
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
-        setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "INTEGER_1");
+        setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
     for (auto item: assignList)
-        if (item.second.type == "INTEGER_1")
+        if (item.second.type == "Bit(1)")
             assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
         else
             assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));

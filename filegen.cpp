@@ -47,7 +47,7 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
             }
             else if (mitem.type == "POINTER")
                 typ = "";
-            else if (startswith(mitem.type, "INTEGER_")) {
+            else if (startswith(mitem.type, "Bit(")) {
                 typ = "integer ";
                 init = "0";
             }

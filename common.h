@@ -29,7 +29,7 @@
 
 #define GENERIC_INT_TEMPLATE_FLAG         999999
 #define GENERIC_INT_TEMPLATE_FLAG_STRING "999999"
-#define PLACE_NAME                       ("INTEGER_" GENERIC_INT_TEMPLATE_FLAG_STRING)
+#define PLACE_NAME                       ("Bit(" GENERIC_INT_TEMPLATE_FLAG_STRING ")")
 
 typedef struct {
     std::string argName;

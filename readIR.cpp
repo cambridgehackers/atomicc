@@ -292,7 +292,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
                     MIRdy = allocMethod(rdyName);
                     addMethod(IR, MIRdy);
                     MIRdy->rule = MI->rule;
-                    MIRdy->type = "INTEGER_1";
+                    MIRdy->type = "Bit(1)";
                 }
                 readMethodInfo(IR, MI, MIRdy);
             }

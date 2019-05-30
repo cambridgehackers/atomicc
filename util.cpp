@@ -75,7 +75,7 @@ uint64_t convertType(std::string arg)
             bp += len;
         return ret;
     };
-    if (checkT("INTEGER_"))
+    if (checkT("Bit("))
         return atoi(bp);
     if (arg == "FLOAT")
         return 1;                 // should never occur in declarations

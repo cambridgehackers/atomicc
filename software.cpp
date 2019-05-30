@@ -143,7 +143,7 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
                         nullptr, true});
                     MethodInfo *MIRdy = allocMethod(getRdyName(methodName));
                     addMethod(muxDef, MIRdy);
-                    MIRdy->type = "INTEGER_1";
+                    MIRdy->type = "Bit(1)";
                     MIRdy->guard = allocExpr("1");
                 };
                 makeEnq("forward$enq__ENA");
