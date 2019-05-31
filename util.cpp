@@ -141,15 +141,15 @@ ModuleIR *iterInterface(ModuleIR *IR, CBFun cbWorker)
 
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
 {
-    if (IR->method.find(name) == IR->method.end()) {
-        if (IR->method.find(name + "__ENA") != IR->method.end())
+    if (IR->methods.find(name) == IR->methods.end()) {
+        if (IR->methods.find(name + "__ENA") != IR->methods.end())
             name += "__ENA";
-        else if (endswith(name, "__ENA") && IR->method.find(name.substr(0, name.length()-5)) != IR->method.end())
+        else if (endswith(name, "__ENA") && IR->methods.find(name.substr(0, name.length()-5)) != IR->methods.end())
             name = name.substr(0, name.length()-5);
         else
             return nullptr;
     }
-    return IR->method[name];
+    return IR->methods[name];
 }
 
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
@@ -335,7 +335,7 @@ bool addMethod(ModuleIR *IR, MethodInfo *MI)
         methodName = methodName.substr(0, methodName.length()-5);
     bool ret = !startswith(methodName, "FOR$");
     if (ret)
-        IR->method[methodName] = MI;
+        IR->methods[methodName] = MI;
     else
         IR->generateBody[methodName] = MI;
     return ret;
@@ -394,7 +394,7 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, n
     }
     for (auto item: IR->interfaceConnect)
         printf("    INTERFACECONNECT %s %s %s\n", item.target.c_str(), item.source.c_str(), item.type.c_str());
-    for (auto FI: IR->method)
+    for (auto FI: IR->methods)
         dumpMethod("", FI.second);
 printf("}\n");
 }

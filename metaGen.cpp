@@ -45,7 +45,7 @@ static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
                 metaList.push_back("//METAINTERNAL; " + fldName + "; " + lookupIR(item.type)->name + ";");
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
     }
-    for (auto FI : IR->method) {
+    for (auto FI : IR->methods) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         std::string gtemp = "; " + tree2str(MI->guard) + ";";
@@ -67,7 +67,7 @@ static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
                 metaList.push_back("//METAINVOKE; " + methodName + "; " + temp);
             std::map<std::string,std::string> metaBefore;
             std::map<std::string,std::string> metaConflict;
-            for (auto innerFI : IR->method) {
+            for (auto innerFI : IR->methods) {
                 MethodInfo *innerMI = innerFI.second;
                 std::string innermethodName = innerMI->name;
                 MetaRef *innerbm = innerMI->meta;
@@ -117,7 +117,7 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
         }
     }
     std::string ruleNames;
-    for (auto FI : IR->method) {
+    for (auto FI : IR->methods) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         if (MI->rule && MI->action)
@@ -129,7 +129,7 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
         std::string tname = item.target;
         std::string sname = item.source;
 //printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
-        for (auto FI: lookupInterface(item.type)->method) {
+        for (auto FI: lookupInterface(item.type)->methods) {
             MethodInfo *MI = FI.second;
             std::string methodName = MI->name;
             metaList.push_back("//METACONNECT; " + tname + MODULE_SEPARATOR + MI->name

@@ -240,7 +240,7 @@ next:;
 void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
 {
     // HACK HACK HACK
-    for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
+    for (auto FI : IR->methods) { // walkRemoveParam depends on the iterField above
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         if (MI->generateFor.size())

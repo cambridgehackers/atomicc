@@ -136,7 +136,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         }
         if (interfaceName != "")
             interfaceName += MODULE_SEPARATOR;
-        for (auto FI: IIR->method) {
+        for (auto FI: IIR->methods) {
             MethodInfo *MI = FI.second;
             std::string name = methodPrefix + interfaceName + MI->name;
             bool out = instance ^ item.isPtr;
@@ -588,7 +588,7 @@ static void connectInterfaces(ModuleIR *IR)
             else
                 setAssign(tstr, allocExpr(sstr), fld.type);
         }
-        for (auto FI : IIR->method) {
+        for (auto FI : IIR->methods) {
             MethodInfo *MI = FI.second;
             if (trace_connect)
                 printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.target.substr(IC.target.length()-1).c_str(), IC.source.c_str());
@@ -691,7 +691,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             }
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
         return nullptr; });
-    for (auto FI : IR->method) { // walkRemoveParam depends on the iterField above
+    for (auto FI : IR->methods) { // walkRemoveParam depends on the iterField above
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be allocated for rules
@@ -722,7 +722,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
 
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
-    for (auto FI : IR->method) {
+    for (auto FI : IR->methods) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         MI->guard = cleanupBool(MI->guard);
@@ -826,7 +826,7 @@ dumpExpr("READCALL", value);
             assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
         else
             assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
-    for (auto FI : IR->method) {
+    for (auto FI : IR->methods) {
         MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         for (auto info: MI->storeList) {

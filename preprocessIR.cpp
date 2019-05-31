@@ -191,7 +191,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
             item.isParameter, item.isShared, item.isLocalInterface});
     for (auto FI : IR->generateBody)
         copyGenericMethod(genericIR, FI.second, pname);
-    for (auto FI : IR->method)
+    for (auto FI : IR->methods)
         copyGenericMethod(genericIR, FI.second, pname);
     for (auto item : IR->interfaces) {
         std::string iname = "l_ainterface_OC_" + irName + MODULE_SEPARATOR + item.fldName;
@@ -320,7 +320,7 @@ typedef struct {
         if (!fieldIR || field.vecCount != -1 || field.isPtr || field.isInput
           || field.isOutput || field.isInout || field.isParameter || field.isLocalInterface)
             goto skipLab;
-        for (auto FI: (*IR)->method) {
+        for (auto FI: (*IR)->methods) {
             MethodInfo *MI = FI.second;
             if (endswith(MI->name, "__RDY") && !MI->callList.size())
                continue;
@@ -386,7 +386,7 @@ skipLab:;
         // expand all subscript calculations before processing the module
         for (auto item: IR->generateBody)
             preprocessMethod(IR, item.second);
-        for (auto item: IR->method)
+        for (auto item: IR->methods)
             preprocessMethod(IR, item.second);
     }
 }
@@ -502,7 +502,7 @@ static void postParseCleanup(MethodInfo *MI)
 void cleanupIR(std::list<ModuleIR *> &irSeq)
 {
     for (auto IR: irSeq) {
-        for (auto item: IR->method)
+        for (auto item: IR->methods)
             postParseCleanup(item.second);
         for (auto item: IR->generateBody)
             postParseCleanup(item.second);
