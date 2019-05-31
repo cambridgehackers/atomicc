@@ -92,6 +92,7 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     preprocessIR(irSeq);
     generateVerilog(irSeq, myName, OutputDir);
     generateMeta(irSeq, myName, OutputDir);
+    generateKami(irSeq, myName, OutputDir);
 
     if (!noVerilator) {
         std::string commandLine = "verilator --cc " + OutputDir + ".v";

@@ -16,8 +16,8 @@
 #
 
 SOURCES = main.cpp verilog.cpp util.cpp interfaces.cpp \
-    expr.cpp filegen.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp
-KAMI_SOURCES = kamigen.cpp util.cpp readIR.cpp expr.cpp preprocessIR.cpp
+    expr.cpp filegen.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp kami.cpp
+KAMI_SOURCES = kmain.cpp kami.cpp util.cpp readIR.cpp expr.cpp preprocessIR.cpp
 LLVMDIR = ../llvm/lib/Target/Atomicc
 CUDDINC = -I../cudd/cudd
 CUDDLIB = ../cudd/cudd/.libs/libcudd.a

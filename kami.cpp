@@ -250,7 +250,7 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
     fprintf(OStrV, "Hint Unfold module'mk%s.mk%sModule : ModuleDefs.\n", name.c_str(), name.c_str());
 }
 
-static void generateKami(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
+void generateKami(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
 {
     FILE *OStrV = fopen((OutputDir + ".kami").c_str(), "w");
     if (!OStrV) {
@@ -268,29 +268,4 @@ static void generateKami(std::list<ModuleIR *> &irSeq, std::string myName, std::
     for (auto IR : irSeq)
         generateModule(OStrV, IR);
     fclose(OStrV);
-}
-
-int main(int argc, char **argv)
-{
-    std::list<ModuleIR *> irSeq;
-printf("[%s:%d] KAMIGEN\n", __FUNCTION__, __LINE__);
-    int argIndex = 1;
-    if (argc - 1 != argIndex) {
-        printf("[%s:%d] kamigen <outputFileStem>\n", __FUNCTION__, __LINE__);
-        exit(-1);
-    }
-    std::string myName = argv[argIndex];
-    std::string OutputDir = myName + ".generated";
-    int ind = myName.rfind('/');
-    if (ind > 0)
-        myName = myName.substr(ind+1);
-
-    readIR(irSeq, OutputDir);
-printf("[%s:%d] AFTERREAD\n", __FUNCTION__, __LINE__);
-    //cleanupIR(irSeq);
-    flagErrorsCleanup = 1;
-    //preprocessIR(irSeq);
-    generateKami(irSeq, myName, OutputDir);
-printf("[%s:%d]DONE\n", __FUNCTION__, __LINE__);
-    return 0;
 }

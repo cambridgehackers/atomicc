@@ -152,6 +152,9 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine);
 void generateVerilogOutput(FILE *OStr);
 void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR);
 
+// kami.cpp
+void generateKami(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir);
+
 extern int trace_assign;
 extern int trace_expand;
 extern int trace_skipped;
