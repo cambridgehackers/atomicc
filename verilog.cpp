@@ -667,7 +667,7 @@ static std::list<ModData> modLine;
 printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), vecCount, item.type.c_str());
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
-            if (startswith(itemIR->name, "l_struct_OC_"))
+            if (itemIR->isStruct)
                 expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount);
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount, -1);
@@ -677,7 +677,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             std::string fldName = item.fldName;
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
-            if (startswith(itemIR->name, "l_struct_OC_")) {
+            if (itemIR->isStruct) {
                 if (vecCount == -1)
                     expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG);
             }

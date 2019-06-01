@@ -217,14 +217,20 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
     while (readLine()) {
-        bool ext = checkItem("EMODULE"), interface = false;
+        bool ext = checkItem("EMODULE"), interface = false, isStruct = false, isSerialize = false;
         if (!ext)
             interface = checkItem("INTERFACE");
-        ParseCheck(ext || interface || checkItem("MODULE"), "Module header missing");
+        if (!ext && !interface)
+            isStruct = checkItem("STRUCT");
+        if (!ext && !interface && !isStruct)
+            isSerialize = checkItem("SERIALIZE");
+        ParseCheck(ext || interface || isStruct || isSerialize || checkItem("MODULE"), "Module header missing");
         std::string name = getToken();
         ModuleIR *IR = allocIR(name, interface);
         IR->isInterface = interface;
-        if (!ext && !interface)
+        IR->isStruct = isStruct;
+        IR->isSerialize = isSerialize;
+        if (!ext && !interface && !isStruct)
             irSeq.push_back(IR);
         ParseCheck(checkItem("{"), "Module '{' missing");
         while (readLine() && !checkItem("}")) {
