@@ -11,14 +11,14 @@ Set Implicit Arguments.
 (* * interface GCD(a) *)
 Record GCD := {
     GCD'mod: Mod;
-    GCD'result : string;
-    GCD'set_m : string;
     GCD'set_n : string;
+    GCD'set_m : string;
+    GCD'result : string;
 }.
 
-Hint Unfold GCD'result : ModuleDefs.
-Hint Unfold GCD'set_m : ModuleDefs.
 Hint Unfold GCD'set_n : ModuleDefs.
+Hint Unfold GCD'set_m : ModuleDefs.
+Hint Unfold GCD'result : ModuleDefs.
 
 Module module'mkGCD.
     Section Section'mkGCD.
@@ -33,9 +33,22 @@ Module module'mkGCD.
          (BKMODULE {
         Register (instancePrefix--"n") : Bit 32 <- Default
     with Register (instancePrefix--"m") : Bit 32 <- Default
-    with Method instancePrefix--"result" :=
+    with Rule instancePrefix--"swap" :=
     (
+        Assert(!( $$ (* intwidth *) (natToWord 1 0) == ( ( ( #n_v ) > ( #m_v ) ) && ( ( #m_v ) != $$ (* intwidth *) (natToWord 1 0) ) ) ));
+        Write (instancePrefix--"n") : Bit 32 <- #m_v ;
+        Write (instancePrefix--"m") : Bit 32 <- #n_v ;
+        Retv ) (* rule swap *)
+    with Rule instancePrefix--"sub" :=
+    (
+        Assert(!( $$ (* intwidth *) (natToWord 1 0) == ( ( ( #n_v ) <= ( #m_v ) ) && ( ( #m_v ) != $$ (* intwidth *) (natToWord 1 0) ) ) ));
+        Write (instancePrefix--"m") : Bit 32 <- ( #m_v ) - ( #n_v ) ;
+        Retv ) (* rule sub *)
+    with Method instancePrefix--"set_n" :=
+    (
+        Read in_n_v: Bit 32 <- (instancePrefix--"in_n") ;
         Assert(( #m_v ) == $$ (* intwidth *) (natToWord 1 0));
+        Write (instancePrefix--"n") : Bit 32 <- #in_n_v ;
         Retv    )
     with Method instancePrefix--"set_m" :=
     (
@@ -43,29 +56,16 @@ Module module'mkGCD.
         Assert(( #m_v ) == $$ (* intwidth *) (natToWord 1 0));
         Write (instancePrefix--"m") : Bit 32 <- #in_m_v ;
         Retv    )
-    with Method instancePrefix--"set_n" :=
+    with Method instancePrefix--"result" :=
     (
-        Read in_n_v: Bit 32 <- (instancePrefix--"in_n") ;
         Assert(( #m_v ) == $$ (* intwidth *) (natToWord 1 0));
-        Write (instancePrefix--"n") : Bit 32 <- #in_n_v ;
         Retv    )
-    with Rule instancePrefix--"sub" :=
-    (
-        Assert(!( $$ (* intwidth *) (natToWord 1 0) == ( ( ( #n_v ) <= ( #m_v ) ) && ( ( #m_v ) != $$ (* intwidth *) (natToWord 1 0) ) ) ));
-        Write (instancePrefix--"m") : Bit 32 <- ( #m_v ) - ( #n_v ) ;
-        Retv ) (* rule sub *)
-    with Rule instancePrefix--"swap" :=
-    (
-        Assert(!( $$ (* intwidth *) (natToWord 1 0) == ( ( ( #n_v ) > ( #m_v ) ) && ( ( #m_v ) != $$ (* intwidth *) (natToWord 1 0) ) ) ));
-        Write (instancePrefix--"n") : Bit 32 <- #m_v ;
-        Write (instancePrefix--"m") : Bit 32 <- #n_v ;
-        Retv ) (* rule swap *)
 
     }). (* mkGCD *)
 
     Hint Unfold mkGCDModule : ModuleDefs.
 (* Module mkGCD type Module#(GCD(Bit(32))) return type GCD(Bit(32)) *)
-    Definition mkGCD := Build_GCD mkGCDModule (instancePrefix--"result") (instancePrefix--"set_m") (instancePrefix--"set_n").
+    Definition mkGCD := Build_GCD mkGCDModule (instancePrefix--"set_n") (instancePrefix--"set_m") (instancePrefix--"result").
     Hint Unfold mkGCD : ModuleDefs.
     Hint Unfold mkGCDModule : ModuleDefs.
 
@@ -85,9 +85,9 @@ Module module'mkMain.
     Let started : string := instancePrefix--"started".
     Let dv : string := instancePrefix--"dv".
     (* instance methods *)
-    Let gcd'result : string := (GCD'result gcd).
-    Let gcd'set_m : string := (GCD'set_m gcd).
     Let gcd'set_n : string := (GCD'set_n gcd).
+    Let gcd'set_m : string := (GCD'set_m gcd).
+    Let gcd'result : string := (GCD'result gcd).
     Local Open Scope kami_expr.
 
     Definition mkMainModule: Mod :=
@@ -95,11 +95,6 @@ Module module'mkMain.
         (BKMod (GCD'mod gcd :: nil))
     with Register (instancePrefix--"started") : Bit 1 <- Default
     with Register (instancePrefix--"dv") : Bit 32 <- Default
-    with Rule instancePrefix--"rl_display" :=
-    (
-        Assert($$ (* intwidth *) (natToWord 1 1));
-        Write (instancePrefix--"dv") : Bit 32 <- #v_v ;
-        Retv ) (* rule rl_display *)
     with Rule instancePrefix--"rl_start" :=
     (
         Assert(( #started_v ) == $$ (* intwidth *) (natToWord 1 0));
@@ -107,6 +102,11 @@ Module module'mkMain.
                BKCall unused2 : Void (* actionBinding *) <- gcd'set_m (($$ (* intwidth *) (natToWord 32 20)) : Bit 32)  ;
         Write (instancePrefix--"started") : Bit 1 <- $$ (* intwidth *) (natToWord 1 1) ;
         Retv ) (* rule rl_start *)
+    with Rule instancePrefix--"rl_display" :=
+    (
+        Assert($$ (* intwidth *) (natToWord 1 1));
+        Write (instancePrefix--"dv") : Bit 32 <- #v_v ;
+        Retv ) (* rule rl_display *)
 
     }). (* mkMain *)
 

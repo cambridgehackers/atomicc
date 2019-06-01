@@ -53,8 +53,7 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
     fprintf(OStrJ, "%s\n        { \"cdecls\": [", jsonSep.c_str());
     std::map<std::string, MethodInfo *> reorderList;
     std::string msep;
-    for (auto FI : swInfo.inter->methods) {
-        MethodInfo *MI = FI.second;
+    for (auto MI : swInfo.inter->methods) {
         std::string methodName = MI->name;
         if (!endswith(methodName, "__ENA"))
             continue;

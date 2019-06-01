@@ -41,8 +41,7 @@ printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     IR->fields.push_back(FieldElement{"data", -1, unionIR->name, false, false, false, false, false, false, false});
     int counter = 0;  // start method number at 0
     uint64_t maxDataLength = 0;
-    for (auto FI: IIR->methods) {
-        MethodInfo *MI = FI.second;
+    for (auto MI: IIR->methods) {
         std::string methodName = MI->name;
         if (endswith(methodName, "__RDY"))
             continue;
@@ -100,8 +99,7 @@ dumpModule("M2P/HIR :" + host, HIR);
     }
     int counter = 0;  // start method number at 0
 assert(HIR);
-    for (auto FI: HIR->methods) {
-        MethodInfo *MI = FI.second;
+    for (auto MI: HIR->methods) {
         std::string methodName = host + MODULE_SEPARATOR + MI->name;
         MethodInfo *MInew = allocMethod(methodName);
         addMethod(IR, MInew);
@@ -158,8 +156,7 @@ dumpModule("P2M/HIR :" + host, HIR);
         }
     }
 assert(HIR);
-    for (auto FI: HIR->methods) {
-        MethodInfo *MI = FI.second;
+    for (auto MI: HIR->methods) {
         std::string methodName = MI->name;
     if (trace_software)
 printf("[%s:%d] P2Mhifmethod %s\n", __FUNCTION__, __LINE__, methodName.c_str());
@@ -177,9 +174,8 @@ printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
 printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEPARATOR + "enq__ENA").c_str(), (void *)MInew);
 assert(MInew);
     int counter = 0;  // start method number at 0
-    for (auto FI: IIR->methods) {
+    for (auto MI: IIR->methods) {
         uint64_t offset = 32;
-        MethodInfo *MI = FI.second;
         std::string methodName = MI->name;
         std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
         if (endswith(methodName, "__RDY"))

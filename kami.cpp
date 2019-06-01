@@ -93,9 +93,8 @@ static void generateInterfaces(FILE *OStrV)
 printf("[%s:%d] interface %s = %s\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
         fprintf(OStrV, "(* * interface %s *)\nRecord %s := {\n    %s'mod: Mod;\n",
              IR->name.c_str(), name.c_str(), name.c_str());
-        for (auto iitem: IR->methods) {
-             std::string methodName = iitem.first;
-             //MethodInfo *MI = iitem.second;
+        for (auto MI: IR->methods) {
+             std::string methodName = MI->name;
              char buf[200];
              if (endswith(methodName, "__RDY"))
                  continue;
@@ -135,9 +134,8 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
                 iitem.fldName.c_str(), tname.c_str(), iitem.fldName.c_str());
             for (auto interfaceItem: IIR->interfaces) {
             auto interfaceIR = lookupInterface(interfaceItem.type);
-            for (auto mitem: interfaceIR->methods) {
-                std::string methodName = mitem.first;
-                //MethodInfo *MI = mitem.second;
+            for (auto MI: interfaceIR->methods) {
+                std::string methodName = MI->name;
                 if (endswith(methodName, "__RDY"))
                     continue;
                 char buf[200];
@@ -179,9 +177,8 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
                 sep.c_str(), iitem.fldName.c_str(), kamiType(iitem.type).c_str());
         sep = "with";
     }
-    for (auto iitem: IR->methods) {
-         std::string methodName = iitem.first;
-         MethodInfo *MI = iitem.second;
+    for (auto MI: IR->methods) {
+         std::string methodName = MI->name;
          if (endswith(methodName, "__RDY"))
              continue;
          MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName));
@@ -199,7 +196,7 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
                   for (auto fitem: IR->fields)
                       if (fitem.fldName == getRHS(citem->value, 0)->value) {
                           ModuleIR *CIR = lookupIR(fitem.type);
-                          callMI = CIR->methods[getRHS(citem->value, 1)->value];
+                          callMI = lookupMethod(CIR, getRHS(citem->value, 1)->value);
                       }
               }
               fprintf(OStrV, "               BKCall unused%d : Void %s <- %s  ;\n",
@@ -228,9 +225,8 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
     std::string interfaceNames;
     for (auto interfaceItem: IR->interfaces) {
         auto interfaceIR = lookupInterface(interfaceItem.type);
-        for (auto mitem: interfaceIR->methods) {
-            std::string methodName = mitem.first;
-            //MethodInfo *MI = mitem.second;
+        for (auto MI: interfaceIR->methods) {
+            std::string methodName = MI->name;
             if (endswith(methodName, "__RDY"))
                 continue;
             char buf[200];

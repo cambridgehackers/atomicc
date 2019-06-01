@@ -136,8 +136,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         }
         if (interfaceName != "")
             interfaceName += MODULE_SEPARATOR;
-        for (auto FI: IIR->methods) {
-            MethodInfo *MI = FI.second;
+        for (auto MI: IIR->methods) {
             std::string name = methodPrefix + interfaceName + MI->name;
             bool out = instance ^ item.isPtr;
             pinMethods.push_back(PinInfo{MI->type, name, out, false, isLocal || item.isLocalInterface, MI});
@@ -588,8 +587,7 @@ static void connectInterfaces(ModuleIR *IR)
             else
                 setAssign(tstr, allocExpr(sstr), fld.type);
         }
-        for (auto FI : IIR->methods) {
-            MethodInfo *MI = FI.second;
+        for (auto MI : IIR->methods) {
             if (trace_connect)
                 printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.target.substr(IC.target.length()-1).c_str(), IC.source.c_str());
             if (IC.target.substr(IC.target.length()-1) == MODULE_SEPARATOR)
@@ -691,8 +689,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
             }
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
         return nullptr; });
-    for (auto FI : IR->methods) { // walkRemoveParam depends on the iterField above
-        MethodInfo *MI = FI.second;
+    for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be allocated for rules
             refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false, false, -1};
@@ -722,8 +719,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount %d type %s\n", __FUNCTION__, __LINE__
 
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
-    for (auto FI : IR->methods) {
-        MethodInfo *MI = FI.second;
+    for (auto MI : IR->methods) {
         std::string methodName = MI->name;
         MI->guard = cleanupBool(MI->guard);
         if (!endswith(methodName, "__RDY")) {
@@ -826,8 +822,7 @@ dumpExpr("READCALL", value);
             assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
         else
             assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
-    for (auto FI : IR->methods) {
-        MethodInfo *MI = FI.second;
+    for (auto MI : IR->methods) {
         std::string methodName = MI->name;
         for (auto info: MI->storeList) {
             std::string item = info->dest->value;
