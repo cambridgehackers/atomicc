@@ -27,14 +27,14 @@ static char *bufp;
 static int lineNumber = 0;
 static FILE *OStrGlobal;
 
-static ACCExpr *getExpression(void)
+static ACCExpr *getExpression(char terminator = 0)
 {
     const char *startp = bufp;
     int level = 0;
-    bool inQuote = false;
+    bool inQuote = false, beforeParen = true;
     while (*bufp == ' ')
         bufp++;
-    while (*bufp && ((*bufp != ' ' && *bufp != ':' && *bufp != ',') || level != 0)) {
+    while (*bufp && ((terminator ? (*bufp != terminator) : beforeParen) || level != 0)) {
         if (inQuote) {
             if (*bufp == '"')
                 inQuote = false;
@@ -44,8 +44,10 @@ static ACCExpr *getExpression(void)
         else {
         if (*bufp == '"')
             inQuote = true;
-        else if (*bufp == '(')
+        else if (*bufp == '(') {
             level++;
+            beforeParen = false;
+        }
         else if (*bufp == ')')
             level--;
         }
@@ -163,45 +165,45 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 MI->alloca[name] = AllocaItem{type, false};
             }
             else if (checkItem("STORE")) {
-                ACCExpr *cond = getExpression();
+                ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
-                ACCExpr *dest = getExpression();
+                ACCExpr *dest = getExpression('=');
                 ParseCheck(checkItem("="), "store = missing");
                 ACCExpr *expr = str2tree(bufp);
                 MI->storeList.push_back(new StoreListElement{dest, expr, cond});
             }
             else if (checkItem("LET")) {
                 std::string type = getToken();
-                ACCExpr *cond = getExpression();
+                ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
-                ACCExpr *dest = getExpression();
+                ACCExpr *dest = getExpression('=');
                 ParseCheck(checkItem("="), "store = missing");
                 ACCExpr *expr = str2tree(bufp);
                 MI->letList.push_back(new LetListElement{dest, expr, cond, type});
             }
             else if (checkItem("CALL")) {
                 bool isAction = checkItem("/Action");
-                ACCExpr *cond = getExpression();
+                ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *expr = str2tree(bufp);
                 MI->callList.push_back(new CallListElement{expr, cond, isAction});
             }
             else if (checkItem("PRINTF")) {
-                ACCExpr *cond = getExpression();
+                ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *expr = str2tree(bufp);
                 MI->printfList.push_back(new CallListElement{expr, cond, false});
             }
             else if (checkItem("GENERATE")) {
-                ACCExpr *cond = getExpression();
+                ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
-                ACCExpr *var = getExpression();
+                ACCExpr *var = getExpression(',');
                 ParseCheck(checkItem(","), "generate ',' missing");
-                ACCExpr *init = getExpression();
+                ACCExpr *init = getExpression(',');
                 ParseCheck(checkItem(","), "generate ',' missing");
-                ACCExpr *term = getExpression();
+                ACCExpr *term = getExpression(',');
                 ParseCheck(checkItem(","), "generate ',' missing");
-                ACCExpr *incr = getExpression();
+                ACCExpr *incr = getExpression(',');
                 ParseCheck(checkItem(","), "generate ',' missing");
                 std::string body = bufp;
                 MI->generateFor.push_back(GenerateForItem{cond, var->value, init, term, incr, body.substr(0, body.length()-5)});

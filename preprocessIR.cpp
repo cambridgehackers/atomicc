@@ -71,6 +71,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
         expr->value += "[" + subscript->value + "]" + post;
         return;
     }
+#if 0 // no longer needed/used
     int size = -1;
     for (auto item: IR->fields)
         if (item.fldName == fieldName) {
@@ -94,6 +95,7 @@ printf("[%s:%d] ARRAAA size %d '%s' post '%s' subscriptval %s\n", __FUNCTION__, 
             expr = nitem;
         }
     }
+#endif
 }
 static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
 {
@@ -220,7 +222,7 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
         walkSubscript(IR, item->cond);
     for (auto item: MI->printfList)
         walkSubscript(IR, item->cond);
-    // subscript processing for calls/assigns requires that we defactor the entire statement,
+    // subscript processing requires that we defactor the entire statement,
     // not just add a condition expression into the tree
     auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> void {
         int size = -1;
