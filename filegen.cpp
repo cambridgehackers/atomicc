@@ -240,21 +240,77 @@ next:;
 void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
 {
     // HACK HACK HACK
+    for (auto item: IR->generateBody) {
+printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.first.c_str());
+dumpMethod(item.first, item.second);
+    }
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
         if (MI->generateFor.size())
             fprintf(OStr, "// start %s\n", methodName.c_str());
         for (auto item: MI->generateFor) {
+            std::list<std::string> alwaysLines;
             //cond
             fprintf(OStr, "    for (%s = %s; %s; %s = %s) begin\n", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
             MethodInfo *MIb = IR->generateBody[item.body];
-            assert(MIb && "body item");
+            if(!MIb) {
+printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
+            }
+            assert(MIb && "body item ");
             for (auto info: MIb->letList) {
                 ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
                 (void)(cond);
                 ACCExpr *value = cleanupExprBuiltin(info->value);
                 ACCExpr *dest = cleanupExprBuiltin(info->dest);
                 fprintf(OStr, "        assign %s = %s;\n", tree2str(dest).c_str(), tree2str(value).c_str());
+            }
+            for (auto info: MIb->storeList) {
+                ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
+                ACCExpr *value = cleanupExprBuiltin(info->value);
+                ACCExpr *dest = cleanupExprBuiltin(info->dest);
+                if (cond)
+                    alwaysLines.push_back("if(" + tree2str(cond) + ")");
+                alwaysLines.push_back("    " + tree2str(dest) + " <= " + tree2str(value));
+            }
+            for (auto info: MIb->callList) {
+                ACCExpr *cond = info->cond;
+                ACCExpr *value = info->value;
+                if (!info->isAction)
+                    continue;
+                std::string calledName = value->value;
+printf("[%s:%d] calledNAmeEEE valu %s cond %s\n", __FUNCTION__, __LINE__, tree2str(value).c_str(), tree2str(cond).c_str());
+                if (!value->operands.size() || value->operands.front()->value != PARAMETER_MARKER) {
+                    printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
+                    exit(-1);
+                }
+                MethodInfo *CI = lookupQualName(IR, calledName);
+                if (!CI) {
+                    printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
+                    exit(-1);
+                }
+                //ACCExpr *tempCond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
+                ACCExpr *tempCond = cond;
+                fprintf(OStr, "        assign %s = %s;\n", calledName.c_str(), tree2str(tempCond).c_str());
+                auto AI = CI->params.begin();
+                std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
+                int argCount = CI->params.size();
+                ACCExpr *param = value->operands.front();
+                for (auto item: param->operands) {
+                    if(argCount-- > 0) {
+                        //appendMux(pname + AI->name, cond, item);
+                        fprintf(OStr, "        assign %s = %s;\n", (pname + AI->name).c_str(), tree2str(item).c_str());
+                        AI++;
+                    }
+                }
+            }
+            if (alwaysLines.size()) {
+                fprintf(OStr, "\n    always @( posedge CLK) begin\n      if (!nRST) begin\n");
+                fprintf(OStr, "      end // nRST\n");
+                fprintf(OStr, "      else begin\n");
+                for (auto info: alwaysLines)
+                    fprintf(OStr, "        %s\n", info.c_str());
+                fprintf(OStr, "      end\n");
+                fprintf(OStr, "    end // always @ (posedge CLK)\n");
             }
             fprintf(OStr, "    end;\n");
         }

@@ -488,7 +488,8 @@ void walkReplaceBuiltin(ACCExpr *expr)
             //dumpExpr("PHI", list);
             newe = allocExpr("|");
             for (auto item: list->operands) {
-                dumpExpr("PHIELEMENTBEF", item);
+                if (trace_expr)
+                    dumpExpr("PHIELEMENTBEF", item);
                 if (checkInteger(getRHS(item), "0"))
                     continue;    // default value is already '0'
                 item->value = "?"; // Change from ':' -> '?'

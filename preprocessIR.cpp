@@ -71,31 +71,6 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
         expr->value += "[" + subscript->value + "]" + post;
         return;
     }
-#if 0 // no longer needed/used
-    int size = -1;
-    for (auto item: IR->fields)
-        if (item.fldName == fieldName) {
-            size = item.vecCount;
-            break;
-        }
-printf("[%s:%d] ARRAAA size %d '%s' post '%s' subscriptval %s\n", __FUNCTION__, __LINE__, size, fieldName.c_str(), post.c_str(), subscript->value.c_str());
-    assert (!isdigit(subscript->value[0]));
-    std::string lastElement = fieldName + "[" + autostr(size - 1) + "]" + post;
-    expr->value = lastElement; // if only 1 element
-    for (int i = 0; i < size - 1; i++) {
-        std::string ind = autostr(i);
-        expr->value = "?";
-        expr->operands.push_back(allocExpr("==", subscript, allocExpr(ind)));
-        expr->operands.push_back(allocExpr(fieldName + "[" + ind + "]" + post));
-        if (i == size - 2)
-            expr->operands.push_back(allocExpr(lastElement));
-        else {
-            ACCExpr *nitem = allocExpr("");
-            expr->operands.push_back(nitem);
-            expr = nitem;
-        }
-    }
-#endif
 }
 static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
 {
@@ -125,13 +100,6 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::stri
         if (ACCExpr *ret = findSubscript(IR, item, size, fieldName, subscript, post))
             return ret;
     return nullptr;
-}
-static ACCExpr *cloneReplaceTree (ACCExpr *expr, ACCExpr *target)
-{
-    ACCExpr *newExpr = allocExpr(expr->value);
-    for (auto item: expr->operands)
-        newExpr->operands.push_back(expr == target ? item : cloneReplaceTree(item, target));
-    return newExpr;
 }
 
 static std::string updateType(std::string type, std::string pname)
@@ -208,6 +176,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
 
 void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
 {
+    static int bodyIndex = 99;
     std::string methodName = MI->name;
     walkSubscript(IR, MI->guard);
     for (auto item: MI->storeList) {
@@ -224,41 +193,66 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
         walkSubscript(IR, item->cond);
     // subscript processing requires that we defactor the entire statement,
     // not just add a condition expression into the tree
-    auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> void {
+bool moved = false;
+    auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> bool {
         int size = -1;
         ACCExpr *cond = *condp, *subscript = nullptr;
         std::string fieldName, post;
         if (ACCExpr *expr = findSubscript(IR, expandArg, size, fieldName, &subscript, post)) {
-            for (int ind = 0; ind < size; ind++) {
-                ACCExpr *newCond = allocExpr("==", subscript, allocExpr(autostr(ind)));
-                if (cond)
-                    newCond = allocExpr("&", cond, newCond);
-                expr->value = fieldName + "[" + autostr(ind) + "]" + post;
-                if (ind == 0)
-                    *condp = newCond;
-                else {
-                    ACCExpr *newExpand = cloneReplaceTree(expandArg, expr);
-                    if (sort == 1)
-                        MI->storeList.push_back(new StoreListElement{newExpand, value, newCond});
-                    else if (sort == 1)
-                        MI->letList.push_back(new LetListElement{newExpand, value, newCond, type});
-                    else if (sort == 3)
-                        MI->callList.push_back(new CallListElement{newExpand, newCond, isAction});
-                    else if (sort == 4)
-                        MI->printfList.push_back(new CallListElement{newExpand, newCond, isAction});
-                }
-            }
-            expr->value = fieldName + "[0]" + post;
+printf("[%s:%d] sort %d FORINDE %d expandard %s expr %s subscr %s\n", __FUNCTION__, __LINE__, sort, bodyIndex, tree2str(expandArg).c_str(),
+tree2str(expr).c_str(), tree2str(subscript).c_str());
+            ACCExpr *var = allocExpr("__inst$Genvar99");
+            cond = cleanupBool(allocExpr("&", allocExpr("==", var, subscript), cond));
+            cond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
+            expr->value = fieldName + "[" + var->value + "]" + post;
+            std::string body = "FOR$" + autostr(bodyIndex++) + "Body__ENA";
+            MethodInfo *BMI = allocMethod(body);
+            BMI->params.push_back(ParamElement{var->value, "Bit(32)"});
+            addMethod(IR, BMI);
+            if (sort == 1)
+                BMI->storeList.push_back(new StoreListElement{expandArg, value, cond});
+            else if (sort == 2)
+                BMI->letList.push_back(new LetListElement{expandArg, value, cond, type});
+            else if (sort == 3)
+                BMI->callList.push_back(new CallListElement{expandArg, cond, isAction});
+            else if (sort == 4)
+                BMI->printfList.push_back(new CallListElement{expandArg, cond, isAction});
+            MI->generateFor.push_back(GenerateForItem{cond, var->value,
+                 allocExpr("0"), allocExpr("<", var, allocExpr(autostr(size))),
+                 allocExpr("+", var, allocExpr("1")), body.substr(0, body.length() - 5)});
+            IR->genvarCount = 1;
+dumpMethod("NEWFOR", BMI);
+moved = true;
+            return true;
         }
+        return false;
     };
-    for (auto item: MI->storeList)
-        expandTree(1, &item->cond, item->dest, false, item->value);
-    for (auto item: MI->letList)
-        expandTree(2, &item->cond, item->dest, false, item->value, item->type);
-    for (auto item: MI->callList)
-        expandTree(3, &item->cond, item->value, item->isAction);
-    for (auto item: MI->printfList)
-        expandTree(4, &item->cond, item->value, item->isAction);
+dumpMethod("BEFORE", MI);
+    for (auto item = MI->storeList.begin(), iteme = MI->storeList.end(); item != iteme; ) {
+        if (expandTree(1, &(*item)->cond, (*item)->dest, false, (*item)->value))
+            item = MI->storeList.erase(item);
+        else
+            item++;
+    }
+    for (auto item = MI->letList.begin(), iteme = MI->letList.end(); item != iteme; ) {
+        if (expandTree(2, &(*item)->cond, (*item)->dest, false, (*item)->value, (*item)->type))
+            item = MI->letList.erase(item);
+        else
+            item++;
+    }
+    for (auto item = MI->callList.begin(), iteme = MI->callList.end(); item != iteme; ) {
+        if (expandTree(3, &(*item)->cond, (*item)->value, (*item)->isAction))
+            item = MI->callList.erase(item);
+        else
+            item++;
+    }
+    for (auto item = MI->printfList.begin(), iteme = MI->printfList.end(); item != iteme; ) {
+        if (expandTree(4, &(*item)->cond, (*item)->value, (*item)->isAction))
+            item = MI->printfList.erase(item);
+        else
+            item++;
+    }
+if (moved) dumpMethod("PREVMETH", MI);
 
     // now replace __bitconcat, __bitsubstr, __phi
     MI->guard = cleanupBool(MI->guard);
@@ -295,18 +289,6 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
 void preprocessIR(std::list<ModuleIR *> &irSeq)
 {
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
-#if 0
-typedef struct {
-    std::string name;
-    std::string type;
-} ParamElement;
-typedef struct {
-    ACCExpr                   *guard;
-    std::string                name;
-    std::string                type;
-    std::list<ParamElement>    params;
-} MethodInfo;
-#endif
         FieldElement field;
         if ((*IR)->interfaceConnect.size()
          || (*IR)->unionList.size()

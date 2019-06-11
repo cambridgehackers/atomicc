@@ -62,7 +62,7 @@ static std::string kamiValue(ACCExpr *expr, int width = 32)
 
 static std::string kamiCall(ACCExpr *expr, MethodInfo *MI)
 {
-    dumpExpr("KCALL", expr);
+    //dumpExpr("KCALL", expr);
     std::string ret;
     if (expr->value == ".") {
         ret = getRHS(expr, 0)->value + "'";
