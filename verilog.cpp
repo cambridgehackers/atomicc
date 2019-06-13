@@ -145,15 +145,16 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         for (auto fld: IIR->fields) {
             std::string name = pinPrefix + item.fldName + fld.fldName;
             bool out = instance ^ fld.isOutput;
-            if (fld.isParameter) {
-                std::string init = "\"FALSE\"";
-                if (fld.type == "FLOAT") {
-                    init = "0.0";
-                }
-                else if (fld.isPtr)
-                    init = "0";
-                else if (startswith(fld.type, "Bit(")) {
-                    init = "0";
+            if (fld.isParameter != "") {
+                std::string init = fld.isParameter;
+                if (init == " ") {
+                    init = "\"FALSE\"";
+                    if (fld.type == "FLOAT")
+                        init = "0.0";
+                    else if (fld.isPtr)
+                        init = "0";
+                    else if (startswith(fld.type, "Bit("))
+                        init = "0";
                 }
                 paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, init});
             }

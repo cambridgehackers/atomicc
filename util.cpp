@@ -306,7 +306,7 @@ std::string pvec;
                     fldName += autostr(dimIndex++);
                 if (trace_iter)
                     printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
-                if (!item.isParameter) {
+                if (item.isParameter == "") {
                     getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
                     offset += convertType(item.type);
                 }

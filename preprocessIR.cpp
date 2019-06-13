@@ -155,7 +155,7 @@ walkToGeneric(item.cond, paramMap), item.var, walkToGeneric(item.init, paramMap)
     }
     //newMI->meta = MI->meta;
     for (auto item : MI->params)
-        newMI->params.push_back(ParamElement{item.name, updateType(item.type, paramMap)});
+        newMI->params.push_back(ParamElement{item.name, updateType(item.type, paramMap), ""});
 }
 
 static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface = false)
@@ -223,7 +223,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str());
             expr->value = fieldName + "[" + var->value + "]" + post;
             std::string body = "FOR$" + autostr(bodyIndex++) + "Body__ENA";
             MethodInfo *BMI = allocMethod(body);
-            BMI->params.push_back(ParamElement{var->value, "Bit(32)"});
+            BMI->params.push_back(ParamElement{var->value, "Bit(32)", ""});
             addMethod(IR, BMI);
             if (sort == 1)
                 BMI->storeList.push_back(new StoreListElement{expandArg, value, cond});
@@ -318,7 +318,7 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
         field = (*IR)->fields.front();
         ModuleIR *fieldIR = lookupIR(field.type);
         if (!fieldIR || field.vecCount != "" || field.isPtr || field.isInput
-          || field.isOutput || field.isInout || field.isParameter || field.isLocalInterface)
+          || field.isOutput || field.isInout || field.isParameter != "" || field.isLocalInterface)
             goto skipLab;
         for (auto MI: (*IR)->methods) {
             if (endswith(MI->name, "__RDY") && !MI->callList.size())
@@ -372,9 +372,9 @@ pname.c_str(), pvalue.c_str());
             genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM", true);
             paramIR->isInterface = true;
-            genericIR->interfaces.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, false, false, false});
+            genericIR->interfaces.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false});
             for (auto item: paramMap)
-                paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", false, false, false, false, true, false, false});
+                paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", false, false, false, false, item.value, false, false});
             dumpModule("GENERIC", genericIR);
         }
     }

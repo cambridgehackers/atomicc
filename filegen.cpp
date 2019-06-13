@@ -40,16 +40,13 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 paramSeen = true;
             }
             std::string typ = "UNKNOWN_PARAM_TYPE[" + mitem.type + "] ";
-            std::string init = "\"FALSE\"";
             if (mitem.type == "FLOAT") {
                 typ = "real ";
-                init = "0.0";
             }
             else if (mitem.type == "POINTER")
                 typ = "";
             else if (startswith(mitem.type, "Bit(")) {
                 typ = "integer ";
-                init = "0";
             }
             fprintf(OStr, "%sparameter %s%s = %s", sep.c_str(), typ.c_str(), mitem.value.c_str(), mitem.isparam.c_str());
             sep = ",\n    ";

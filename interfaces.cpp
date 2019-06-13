@@ -34,11 +34,11 @@ static void processSerialize(ModuleIR *IR)
 printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     ModuleIR *IIR = lookupInterface(inter.type);
     IR->fields.clear();
-    IR->fields.push_back(FieldElement{"len", "", "Bit(16)", false, false, false, false, false, false, false});
-    IR->fields.push_back(FieldElement{"tag", "", "Bit(16)", false, false, false, false, false, false, false});
+    IR->fields.push_back(FieldElement{"len", "", "Bit(16)", false, false, false, false, ""/*not param*/, false, false});
+    IR->fields.push_back(FieldElement{"tag", "", "Bit(16)", false, false, false, false, ""/*not param*/, false, false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
     unionIR->isInterface = false;
-    IR->fields.push_back(FieldElement{"data", "", unionIR->name, false, false, false, false, false, false, false});
+    IR->fields.push_back(FieldElement{"data", "", unionIR->name, false, false, false, false, ""/*not param*/, false, false});
     int counter = 0;  // start method number at 0
     uint64_t maxDataLength = 0;
     for (auto MI: IIR->methods) {
@@ -56,14 +56,14 @@ exit(-1);
         unionIR->unionList.push_back(UnionItem{methodName, variant->name});
         uint64_t dataLength = 0;
         for (auto param: MI->params) {
-            variant->fields.push_back(FieldElement{param.name, "", param.type, false, false, false, false, false, false, false});
+            variant->fields.push_back(FieldElement{param.name, "", param.type, false, false, false, false, ""/*not param*/, false, false});
             dataLength += convertType(param.type);
         }
         if (dataLength > maxDataLength)
             maxDataLength = dataLength;
         counter++;
     }
-    unionIR->fields.push_back(FieldElement{"data", "", "Bit(" + autostr(maxDataLength) + ")", false, false, false, false, false, false, false});
+    unionIR->fields.push_back(FieldElement{"data", "", "Bit(" + autostr(maxDataLength) + ")", false, false, false, false, ""/*not param*/, false, false});
 }
 
 static void processM2P(ModuleIR *IR)
@@ -87,7 +87,7 @@ static void processM2P(ModuleIR *IR)
             if (!II) {
                 II = allocIR(type);
                 II->isInterface = false;
-                II->interfaces.push_back(FieldElement{"ifc", "", inter.type, false, false, false, false, false, false, false});
+                II->interfaces.push_back(FieldElement{"ifc", "", inter.type, false, false, false, false, ""/*not param*/, false, false});
             }
     if (trace_software)
 printf("[%s:%d] IIIIIIIIIII iname %s IRNAME %s type %s\n", __FUNCTION__, __LINE__, iname.c_str(), IR->name.c_str(), type.c_str());

@@ -137,7 +137,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
             if (!first)
                 ParseCheck(checkItem(","), "',' missing");
             std::string type = getToken();
-            MI->params.push_back(ParamElement{getToken(), type});
+            MI->params.push_back(ParamElement{getToken(), type, ""});
             first = false;
         }
     }
@@ -278,7 +278,7 @@ interface, isStruct, isSerialize, ext);
                 }
                 std::string type = getToken();
                 std::string fldName = getToken();
-                IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter, isShared, false});
+                IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter ? " " : "", isShared, false});
             }
             else if (checkItem("PARAMS")) {
                 std::string fldName = getToken();
@@ -293,7 +293,7 @@ interface, isStruct, isSerialize, ext);
                 std::string fldName = getToken();
                 if (fldName == "_")
                     fldName = "";
-                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, false, false, false});
+                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, ""/*not param*/, false, false});
             }
             else if (checkItem("METHOD")) {
                 bool rule = false, action = false;
