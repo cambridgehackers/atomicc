@@ -57,7 +57,7 @@ exit(-1);
         uint64_t dataLength = 0;
         for (auto param: MI->params) {
             variant->fields.push_back(FieldElement{param.name, "", param.type, false, false, false, false, ""/*not param*/, false, false});
-            dataLength += convertType(param.type);
+            dataLength += atoi(convertType(param.type).c_str());
         }
         if (dataLength > maxDataLength)
             maxDataLength = dataLength;
@@ -70,7 +70,7 @@ static void processM2P(ModuleIR *IR)
 {
     ModuleIR *HIR = nullptr;
     std::string host, target;
-    uint64_t pipeArgSize = -1;
+    std::string pipeArgSize = "-1";
     for (auto inter: IR->interfaces) {
         if (inter.isPtr) {
             target = inter.fldName;
@@ -117,11 +117,11 @@ exit(-1);
         uint64_t dataLength = 32; // include length of tag
         for (auto param: MI->params) {
             MInew->params.push_back(param);
-            dataLength += convertType(param.type);
+            dataLength += atoi(convertType(param.type).c_str());
             call = paramPrefix + param.name + ", " + call;
         }
-        if (pipeArgSize > dataLength)
-            call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
+        //if (pipeArgSize > dataLength)
+            //call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
         MInew->callList.push_back(new CallListElement{
              allocExpr(target + "$enq__ENA", allocExpr(PARAMETER_MARKER,
                  allocExpr("{ " + call + "16'd" + autostr(counter) + ", 16'd" + autostr(PORTALNUM) + "}"),
@@ -175,7 +175,7 @@ printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEP
 assert(MInew);
     int counter = 0;  // start method number at 0
     for (auto MI: IIR->methods) {
-        uint64_t offset = 32;
+        std::string offset = "32";
         std::string methodName = MI->name;
         std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
         if (endswith(methodName, "__RDY"))
@@ -183,8 +183,8 @@ assert(MInew);
         ACCExpr *paramList = allocExpr(",");
         ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr(PARAMETER_MARKER, paramList));
         for (auto param: MI->params) {
-            uint64_t upper = offset + convertType(param.type);
-            paramList->operands.push_back(allocExpr(host + "$enq$v[" + autostr(upper-1) + ":" + autostr(offset) + "]"));
+            std::string upper = "(" + offset + " + " + convertType(param.type) + ")";
+            paramList->operands.push_back(allocExpr(host + "$enq$v[" + upper + "-1 + :" + offset + "]"));
             offset = upper;
         }
         if (!endswith(methodName, "__ENA")) {

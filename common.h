@@ -89,10 +89,9 @@ typedef ModuleIR *(^CBFun)(FieldElement &item);
 
 // util.cpp
 std::string getRdyName(std::string basename, bool suppressHack = false);
-uint64_t convertType(std::string arg);
+std::string convertType(std::string arg);
 ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);
-uint64_t convertType(std::string arg);
 std::string sizeProcess(std::string type);
 ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker);
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name);
@@ -119,8 +118,8 @@ ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
 std::string treePost(const ACCExpr *arg);
 bool checkOperand(std::string s);
 ACCExpr *invertExpr(ACCExpr *expr);
-int exprWidth(ACCExpr *expr, bool forceNumeric = false);
-void updateWidth(ACCExpr *item, int len);
+std::string exprWidth(ACCExpr *expr, bool forceNumeric = false);
+void updateWidth(ACCExpr *item, std::string clen);
 ACCExpr *getRHS(ACCExpr *expr, int match = 1);
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs);
 int walkCount (ACCExpr *expr);

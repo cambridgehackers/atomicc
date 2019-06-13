@@ -63,10 +63,10 @@ ModuleIR *lookupInterface(std::string name)
     return interfaceIndex[ind];
 }
 
-uint64_t convertType(std::string arg)
+std::string convertType(std::string arg)
 {
     if (arg == "" || arg == "void")
-        return 0;
+        return "0";
     const char *bp = arg.c_str();
     auto checkT = [&] (const char *val) -> bool {
         int len = strlen(val);
@@ -75,27 +75,34 @@ uint64_t convertType(std::string arg)
             bp += len;
         return ret;
     };
-    if (checkT("Bit("))
-        return atoi(bp);
+    if (checkT("Bit(")) {
+        std::string rets = bp;
+        return rets.substr(0, rets.length()-1);
+    }
     if (arg == "FLOAT")
-        return 1;                 // should never occur in declarations
+        return "1";                 // should never occur in declarations
     if (checkT("ARRAY_")) {
-        uint64_t arr = atoi(bp);
+        std::string arr = bp;
+printf("[%s:%d] ARRAY %s\n", __FUNCTION__, __LINE__, bp);
+exit(-1);
         while (isdigit(*bp) || *bp == '_')
             bp++;
-        return arr * convertType(bp);
+        return "(" + arr + " * " + convertType(bp) + ")";
     }
     if (checkT("@")) {
 //printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
-        return 666666;
+        return "666666";
     }
     if (auto IR = lookupIR(bp)) {
-        uint64_t total = 0;
+        std::string total;
         for (auto item: IR->fields) {
-            uint64_t thisSize = convertType(item.type);
+            std::string thisSize = convertType(item.type);
             if (item.vecCount != "")
-                thisSize *= atoi(item.vecCount.c_str());
-            total += thisSize;
+                thisSize = "(" + thisSize + " * " + item.vecCount + ")";
+            if (total == "")
+                total = thisSize;
+            else
+                total = "(" + total + " + " + thisSize + ")";
         }
         return total;
     }
@@ -109,10 +116,10 @@ std::string sizeProcess(std::string type)
     if (type[0] == '@')
         upper = type.substr(1) + "- 1";
     else {
-        uint64_t val = convertType(type);
-        if (val <= 1)
+        std::string val = convertType(type);
+        if (val == "" || val == "0" || val == "1")
             return "";
-        upper = autostr(val - 1);
+        upper = val + " - 1";
     }
     return "[" + upper + ":0]";
 }
@@ -306,7 +313,7 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
                     printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
                 if (item.isParameter == "") {
                     getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
-                    offset += convertType(item.type);
+                    offset += atoi(convertType(item.type).c_str());
                 }
                 pvec = autostr(atoi(vecCount.c_str()) - 1);
                 if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";

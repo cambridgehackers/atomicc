@@ -72,8 +72,10 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
         std::string upper = autostr(uppern);
         if (fitem.type[0] == '@')
             upper = fitem.type.substr(1) + "+ (" + upper + ")";
+        else if (upper != " ")
+            upper = "(" + upper + " + " + convertType(fitem.type) + ")";
         else
-            upper = autostr(uppern + convertType(fitem.type));
+            upper = convertType(fitem.type);
         std::string base = fldName;
         if (fitem.base != "")
             base = fitem.base;
@@ -366,7 +368,8 @@ static void optimizeBitAssigns(void)
     // concatenate bitfield assigns
     for (auto item: bitfieldList) {
         std::string type = refList[item.first].type;
-        uint64_t size = convertType(type), current = 0;
+        std::string size = convertType(type);
+        uint64_t current = 0;
 printf("[%s:%d] BBBSTART %s type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), type.c_str());
         ACCExpr *newVal = allocExpr("{");
         for (auto bitem: item.second) {
@@ -378,9 +381,9 @@ printf("[%s:%d] BBBSTART %s type %s\n", __FUNCTION__, __LINE__, item.first.c_str
 printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bitem.first, (int)bitem.second.upper, tree2str(bitem.second.value).c_str());
             assignList[item.first + "[" + autostr(bitem.second.upper) + ":" + autostr(bitem.first) + "]"].value = nullptr;
         }
-        size -= current;
-        if (size > 0)
-            newVal->operands.push_back(allocExpr(autostr(size) + "'d0"));
+        size = "(" + size + " - " + autostr(current) + ")";
+        if (isdigit(size[0]))
+            newVal->operands.push_back(allocExpr(size + "'d0"));
         setAssign(item.first, newVal, type);
     }
 }
@@ -497,7 +500,7 @@ static ACCExpr *printfArgs(ACCExpr *listp)
                 continue;
             }
         }
-        int size = exprWidth(item);
+        int size = atoi(exprWidth(item).c_str());
         total_length += size;
         width.push_back(size);
         next->operands.push_back(item);
@@ -769,15 +772,17 @@ static std::list<ModData> modLine;
                 appendMux(splitItem, cond, value);
             }
             for (auto fitem : fieldList) {
-                uint64_t offset = fitem.offset;
-                uint64_t uppern = offset - 1;
-                std::string upper = autostr(uppern);
+                std::string offset = autostr(fitem.offset);
+                std::string upper;
                 if (fitem.type[0] == '@')
-                    upper = fitem.type.substr(1) + "+ (" + upper + ")";
+                    upper = fitem.type.substr(1);
                 else
-                    upper = autostr(uppern + convertType(fitem.type));
+                    upper = convertType(fitem.type);
+                upper += " - 1";
+                if (offset != "0")
+                    upper += " + " + offset;
                 appendMux(fitem.name, cond,
-                    allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(autostr(offset))))));
+                    allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))));
             }
             }
         }

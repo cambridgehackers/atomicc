@@ -337,21 +337,20 @@ ACCExpr *invertExpr(ACCExpr *expr)
     return allocExpr("^", expr, allocExpr("1"));
 }
 
-int exprWidth(ACCExpr *expr, bool forceNumeric)
+std::string exprWidth(ACCExpr *expr, bool forceNumeric)
 {
     if (!expr)
-        return 0;
+        return "0";
     std::string op = expr->value;
     if (relationalOp(op))
-        return 1;
+        return "1";
     if (isdigit(op[0])) {
         int ind = op.find("'");
         if (ind > 0) {
-            std::string temp = op.substr(0, ind);
-            return atoi(temp.c_str());
+            return op.substr(0, ind);
         }
         else if (forceNumeric)
-            return 1;
+            return "1";
     }
     if (isIdChar(op[0])) {
         ACCExpr *lhs = getRHS(expr, 0);
@@ -361,37 +360,43 @@ int exprWidth(ACCExpr *expr, bool forceNumeric)
                 ACCExpr *second = getRHS(first);
                 first = getRHS(first, 0);
                 if (!second)
-                    return 1;
+                    return "1";
                 if (isdigit(first->value[0]) && isdigit(second->value[0]))
-                    return atoi(first->value.c_str()) - atoi(second->value.c_str()) + 1;
+                    return "(" + first->value + " - " + second->value + " + 1)";
             }
             else if (isdigit(first->value[0]))
-                return 1;
+                return "1";
         }
         return convertType(refList[op].type);
     }
     if (op == "?") {
-        if (int len = exprWidth(getRHS(expr, 1), forceNumeric))
+        std::string len = exprWidth(getRHS(expr, 1), forceNumeric);
+        if (len != "" && len != "0")
             return len;
-        if (int len = exprWidth(getRHS(expr, 2), forceNumeric))
+        len = exprWidth(getRHS(expr, 2), forceNumeric);
+        if (len != "" && len != "0")
             return len;
     }
     if (op == "&" || op == "|" || op == "^") {
         for (auto item: expr->operands)
-            if (exprWidth(item, forceNumeric) != 1)
+            if (exprWidth(item, forceNumeric) != "1")
                 goto nextand;
-        return 1;
+        return "1";
 nextand:;
     }
     if (op == "!") {
         return exprWidth(expr->operands.front(), forceNumeric);
     }
-    return 0;
+    return "0";
 }
 
-void updateWidth(ACCExpr *expr, int len)
+void updateWidth(ACCExpr *expr, std::string clen)
 {
-    int ilen = exprWidth(expr);
+    if (clen == "" || !isdigit(clen[0]) || clen.find(" ") != std::string::npos)
+        return;
+    int len = atoi(clen.c_str());
+    std::string cilen = exprWidth(expr);
+    int ilen = atoi(cilen.c_str());
     if (ilen < 0 || len < 0) {
         printf("[%s:%d] len %d ilen %d tree %s\n", __FUNCTION__, __LINE__, len, ilen, tree2str(expr).c_str());
         exit(-1);
@@ -409,10 +414,10 @@ void updateWidth(ACCExpr *expr, int len)
         }
     }
     else if (expr->value == ":") // for __phi
-        updateWidth(getRHS(expr), len);
+        updateWidth(getRHS(expr), clen);
     else if (expr->value == "?") {
-        updateWidth(getRHS(expr), len);
-        updateWidth(getRHS(expr, 2), len);
+        updateWidth(getRHS(expr), clen);
+        updateWidth(getRHS(expr, 2), clen);
     }
     else if (arithOp(expr->value) || expr->value == "(") {
         if (expr->value == "-" && expr->operands.size() == 1
@@ -420,11 +425,11 @@ void updateWidth(ACCExpr *expr, int len)
             /* hack to update width on "~foo", which translates to "foo ^ -1" in the IR */
             expr->value = expr->operands.front()->value;
             expr->operands.clear();
-            updateWidth(expr, len);
+            updateWidth(expr, clen);
         }
         else
         for (auto item: expr->operands)
-            updateWidth(item, len);
+            updateWidth(item, clen);
     }
 }
 
@@ -480,7 +485,7 @@ void walkReplaceBuiltin(ACCExpr *expr)
         ACCExpr *newe = nullptr;
         if (size == 2 && matchExpr(getRHS(firstInList, 0), invertExpr(getRHS(secondInList, 0))))
             newe = allocExpr("?", getRHS(firstInList, 0), getRHS(firstInList), getRHS(secondInList));
-        else if (size == 2 && getRHS(firstInList, 0)->value == "__default" && exprWidth(getRHS(secondInList)) == 1)
+        else if (size == 2 && getRHS(firstInList, 0)->value == "__default" && exprWidth(getRHS(secondInList)) == "1")
             newe = allocExpr("&", getRHS(secondInList, 0), getRHS(secondInList));
         else if (size == 1)
             newe = getRHS(firstInList);
@@ -558,7 +563,7 @@ typedef std::map<std::string, MapItem *> VarMap;
 
 static bool boolPossible(ACCExpr *expr)
 {
-    return expr && (isdigit(expr->value[0]) || exprWidth(expr, true) == 1);
+    return expr && (isdigit(expr->value[0]) || exprWidth(expr, true) == "1");
 }
 
 static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)

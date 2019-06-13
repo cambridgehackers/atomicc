@@ -68,8 +68,8 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
         for (auto pitem: MI->params) {
              fprintf(OStrJ, "%s\n                        { \"pname\": \"%s\", "
                  "\"ptype\": { \"name\": \"Bit\", \"params\": [ { "
-                 "\"name\": \"%d\" } ] } }",
-                 psep.c_str(), pitem.name.c_str(), (int)convertType(pitem.type));
+                 "\"name\": \"%s\" } ] } }",
+                 psep.c_str(), pitem.name.c_str(), convertType(pitem.type).c_str());
              psep = ",";
         }
         fprintf(OStrJ, "\n                    ] }");
