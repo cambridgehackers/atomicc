@@ -39,8 +39,9 @@ typedef struct {
     bool        noDefaultClock;
     int         out;
     bool        inout;
-    bool        isparam;
-    int         vecCount;
+    //bool        isparam;
+    std::string isparam;     // initial value for parameters
+    std::string vecCount;
 } ModData;
 typedef struct {
     std::string name;
@@ -63,7 +64,7 @@ typedef struct {
     int         pin;
     bool        done;
     bool        isGenerated;
-    int         vecCount;
+    std::string vecCount;
 } RefItem;
 typedef struct {
     long        upper;

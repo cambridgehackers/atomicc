@@ -93,8 +93,8 @@ printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
         uint64_t total = 0;
         for (auto item: IR->fields) {
             uint64_t thisSize = convertType(item.type);
-            if (item.vecCount != -1)
-                thisSize *= item.vecCount;
+            if (item.vecCount != "")
+                thisSize *= atoi(item.vecCount.c_str());
             total += thisSize;
         }
         return total;
@@ -121,7 +121,7 @@ ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
 {
     for (auto item: IR->fields) {
         if (trace_iter)
-            printf("[%s:%d] item.fldname %s vec %d\n", __FUNCTION__, __LINE__, item.fldName.c_str(), (int)item.vecCount);
+            printf("[%s:%d] item.fldname %s vec '%s'\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
         if (auto ret = (cbWorker)(item))
             return ret;
     }
@@ -132,7 +132,7 @@ ModuleIR *iterInterface(ModuleIR *IR, CBFun cbWorker)
 {
     for (auto item: IR->interfaces) {
         if (trace_iter)
-            printf("[%s:%d] item.fldname %s vec %d\n", __FUNCTION__, __LINE__, item.fldName.c_str(), (int)item.vecCount);
+            printf("[%s:%d] item.fldname %s vec '%s'\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
         if (auto ret = (cbWorker)(item))
             return ret;
     }
@@ -216,16 +216,21 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
         searchStr = searchStr.substr(ind+1);
         ModuleIR *nextIR = iterField(searchIR, CBAct {
             int dimIndex = 0;
-            int vecCount = item.vecCount;
+            std::string vecCount = item.vecCount;
+std::string pvec;
             do {
                 std::string fldName = item.fldName;
-                if (vecCount != -1)
+                if (vecCount != "")
                     fldName += autostr(dimIndex++);
                 if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+                    printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
                 if (fieldName != "" && fldName == fieldName)
                     return lookupIR(item.type);
-            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
+pvec = autostr(atoi(vecCount.c_str()) - 1);
+if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
+printf("[%s:%d] vecCount %s pvec %s\n", __FUNCTION__, __LINE__, vecCount.c_str(), pvec.c_str());
+if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
         if (!nextIR)
             break;
@@ -241,16 +246,21 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
         }
         ModuleIR *nextIR = iterInterface(searchIR, CBAct {
             int dimIndex = 0;
-            int vecCount = item.vecCount;
+            std::string vecCount = item.vecCount;
+std::string pvec;
             do {
                 std::string fldName = item.fldName;
-                if (vecCount != -1)
+                if (vecCount != "")
                     fldName += autostr(dimIndex++);
                 if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+                    printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
                 if (fieldName != "" && fldName == fieldName)
                     return lookupInterface(item.type);
-            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
+pvec = autostr(atoi(vecCount.c_str()) - 1);
+if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
+printf("[%s:%d] vecCount %s pvec %s\n", __FUNCTION__, __LINE__, vecCount.c_str(), pvec.c_str());
+if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
         if (!nextIR)
             break;
@@ -288,18 +298,23 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
         }
         iterField(IR, CBAct {
             int dimIndex = 0;
-            int vecCount = item.vecCount;
+            std::string vecCount = item.vecCount;
+std::string pvec;
             do {
                 std::string fldName = item.fldName;
-                if (vecCount != -1)
+                if (vecCount != "")
                     fldName += autostr(dimIndex++);
                 if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s vec %d dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), (int)vecCount, dimIndex);
+                    printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
                 if (!item.isParameter) {
                     getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
                     offset += convertType(item.type);
                 }
-            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
+pvec = autostr(atoi(vecCount.c_str()) - 1);
+if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
+printf("[%s:%d] vecCount %s pvec %s\n", __FUNCTION__, __LINE__, vecCount.c_str(), pvec.c_str());
+if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
     }
     else if (force) {
@@ -390,8 +405,8 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, n
         if (item.isPtr)
             ret += "/Ptr";
         ret += " ";
-        if (item.vecCount != -1)
-            ret += "/Count " + autostr(item.vecCount);
+        if (item.vecCount != "")
+            ret += "/Count " + item.vecCount;
         ret += item.type + " " + item.fldName;
         printf("%s\n", ret.c_str());
     }
@@ -402,8 +417,8 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, n
         if (item.isLocalInterface) // interface declaration that is used to connect to local objects (does not appear in module signature)
             ret += "/Local";
         ret += " ";
-        if (item.vecCount != -1)
-            ret += "/Count " + autostr(item.vecCount);
+        if (item.vecCount != "")
+            ret += "/Count " + item.vecCount;
         ret += item.type + " " + item.fldName;
         printf("%s\n", ret.c_str());
     }

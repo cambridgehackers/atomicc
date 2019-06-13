@@ -29,7 +29,7 @@ std::map<std::string, int> genericModule;
 
 std::string genericName(std::string name)
 {
-    int ind = name.find(MODULE_SEPARATOR "__PARAM__" MODULE_SEPARATOR);
+    int ind = name.find(PARAM_MARKER);
     if (ind > 0) {
         name = name.substr(0, ind);
         //if (genericModule[name])   // actual body could be declared externally
@@ -96,7 +96,7 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::stri
         *subscript = sub;
         for (auto item: IR->fields)
             if (item.fldName == expr->value) {
-                size = item.vecCount;
+                size = atoi(item.vecCount.c_str());
                 break;
             }
         return expr;
@@ -105,6 +105,16 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::stri
         if (ACCExpr *ret = findSubscript(IR, item, size, fieldName, subscript, post))
             return ret;
     return nullptr;
+}
+
+static std::string updateCount(std::string count, std::list<PARAM_MAP> &paramMap)
+{
+    for (auto item: paramMap)
+         if (count == item.value) {
+             count = item.name;
+             break;
+         }
+    return count;
 }
 
 static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
@@ -119,12 +129,7 @@ static ACCExpr *walkToGeneric (ACCExpr *expr, std::list<PARAM_MAP> &paramMap)
 {
     if (!expr)
         return expr;
-    ACCExpr *ret = allocExpr(expr->value);
-    for (auto item: paramMap)
-         if (ret->value == item.value) {
-             ret->value = item.name;
-             break;
-         }
+    ACCExpr *ret = allocExpr(updateCount(expr->value, paramMap));
     for (auto item: expr->operands)
         ret->operands.push_back(walkToGeneric(item, paramMap));
     return ret;
@@ -167,8 +172,8 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
     genericIR->isInterface = isInterface;
     for (auto item : IR->fields)
         genericIR->fields.push_back(FieldElement{item.fldName,
-            item.vecCount, updateType(item.type, paramMap), item.isPtr,
-            item.isInput, item.isOutput, item.isInout,
+            updateCount(item.vecCount, paramMap), updateType(item.type, paramMap),
+            item.isPtr, item.isInput, item.isOutput, item.isInout,
             item.isParameter, item.isShared, item.isLocalInterface});
     for (auto FI : IR->generateBody)
         copyGenericMethod(genericIR, FI.second, paramMap);
@@ -312,7 +317,7 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
         {
         field = (*IR)->fields.front();
         ModuleIR *fieldIR = lookupIR(field.type);
-        if (!fieldIR || field.vecCount != -1 || field.isPtr || field.isInput
+        if (!fieldIR || field.vecCount != "" || field.isPtr || field.isInput
           || field.isOutput || field.isInout || field.isParameter || field.isLocalInterface)
             goto skipLab;
         for (auto MI: (*IR)->methods) {
@@ -339,11 +344,11 @@ skipLab:;
         IR++;
     }
     for (auto IR : irSeq) {
-        int ind = IR->name.find(PARAM_MARKER);
-        if (ind > 0)
-        if (endswith(IR->name, MODULE_SEPARATOR GENERIC_INT_TEMPLATE_FLAG_STRING)) {
-            std::string irName = IR->name.substr(0, ind);
-            std::string parg = IR->name.substr(ind + strlen(PARAM_MARKER));
+        std::string modName = IR->name;
+        int ind = modName.find(PARAM_MARKER);
+        if (ind > 0) {
+            std::string irName = modName.substr(0, ind);
+            std::string parg = modName.substr(ind + strlen(PARAM_MARKER));
             std::string pname;
             std::list<PARAM_MAP> paramMap;
             while (parg != "") {
@@ -352,17 +357,24 @@ skipLab:;
                     break;
                 pname = parg.substr(0, indVal);
                 std::string pvalue = parg.substr(indVal+1);
+                parg = "";
+                int indNext = pvalue.find(PARAM_MARKER);
+                if (indNext > 0) {
+                    parg = pvalue.substr(indNext + strlen(PARAM_MARKER));
+                    pvalue = pvalue.substr(0, indNext);
+                }
                 paramMap.push_back(PARAM_MAP{pname, pvalue});
-                parg = parg.substr(indVal + strlen(MODULE_SEPARATOR GENERIC_INT_TEMPLATE_FLAG_STRING));
+printf("[%s:%d] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT '%s' = '%s'\n", __FUNCTION__, __LINE__,
+pname.c_str(), pvalue.c_str());
             }
             ModuleIR *genericIR = buildGeneric(IR, irName, paramMap);
             irSeq.push_back(genericIR);
             genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM", true);
             paramIR->isInterface = true;
-            genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false, false});
+            genericIR->interfaces.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, false, false, false});
             for (auto item: paramMap)
-                paramIR->fields.push_back(FieldElement{item.name, -1, "Bit(32)", false, false, false, false, true, false, false});
+                paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", false, false, false, false, true, false, false});
             dumpModule("GENERIC", genericIR);
         }
     }

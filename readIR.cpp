@@ -265,7 +265,7 @@ interface, isStruct, isSerialize, ext);
                 IR->unionList.push_back(UnionItem{getToken(), type});
             }
             else if (checkItem("FIELD")) {
-                int64_t     vecCount = -1;
+                std::string vecCount;
                 bool        isPtr = checkItem("/Ptr");
                 bool        isInput = checkItem("/input");
                 bool        isOutput = checkItem("/output");
@@ -273,7 +273,7 @@ interface, isStruct, isSerialize, ext);
                 bool        isParameter = checkItem("/parameter");
                 bool        isShared = checkItem("/shared");
                 if (checkItem("/Count")) {
-                    vecCount = atoi(getToken().c_str());
+                    vecCount = getToken();
                     IR->genvarCount = 1;
                 }
                 std::string type = getToken();
@@ -285,10 +285,10 @@ interface, isStruct, isSerialize, ext);
                 IR->params[fldName] = bufp;
             }
             else if (checkItem("INTERFACE")) {
-                int64_t     vecCount = -1;
+                std::string vecCount;
                 bool        isPtr = checkItem("/Ptr");
                 if (checkItem("/Count"))
-                    vecCount = atoi(getToken().c_str());
+                    vecCount = getToken();
                 std::string type = getToken();
                 std::string fldName = getToken();
                 if (fldName == "_")

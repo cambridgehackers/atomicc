@@ -33,7 +33,7 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
             else
                 sep = "(\n    ";
         }
-        else if (mitem.isparam) {
+        else if (mitem.isparam != "") {
             if (!paramSeen) {
                 fprintf(OStr, "#(\n    ");
                 sep = "";
@@ -51,7 +51,7 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 typ = "integer ";
                 init = "0";
             }
-            fprintf(OStr, "%sparameter %s%s = %s", sep.c_str(), typ.c_str(), mitem.value.c_str(), init.c_str());
+            fprintf(OStr, "%sparameter %s%s = %s", sep.c_str(), typ.c_str(), mitem.value.c_str(), mitem.isparam.c_str());
             sep = ",\n    ";
         }
         else {
@@ -87,8 +87,8 @@ static void generateVerilogOutput(FILE *OStr, std::map<std::string, int> &genvar
             printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str());
         if (item.second.pin == PIN_REG) {
             // HACK HACK HACK HACK
-            std::string vecCountStr = " [" + (item.second.vecCount == GENERIC_INT_TEMPLATE_FLAG ? "iovecWidth" : autostr(item.second.vecCount)) + ":0]";
-            if (item.second.vecCount == -1) {
+            std::string vecCountStr = " [" + item.second.vecCount + ":0]";
+            if (item.second.vecCount == "") {
         
                 vecCountStr = "";
                 resetList.push_back(item.first);
@@ -126,10 +126,10 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
     for (auto mitem: modNew) {
         if (mitem.moduleStart) {
             flushOut();
-            isGenerate = mitem.vecCount != -1;
+            isGenerate = mitem.vecCount != "";
             std::string instName = mitem.argName;
             // HACK HACK HACK HACK
-            std::string vecCountStr = mitem.vecCount == GENERIC_INT_TEMPLATE_FLAG ? "iovecWidth" : autostr(mitem.vecCount);
+            std::string vecCountStr = mitem.vecCount;
             if (isGenerate) {
                 std::string g = GENVAR_NAME + autostr(1);
                 if (!genvarMap[g])

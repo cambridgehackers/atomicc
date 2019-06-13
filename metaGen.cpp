@@ -31,18 +31,23 @@ static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
         if (item.isPtr)
         metaList.push_back("//METAEXTERNAL; " + item.fldName + "; " + lookupInterface(item.type)->name + ";");
     for (auto item: IR->fields) {
-        int64_t vecCount = item.vecCount;
+        std::string vecCount = item.vecCount;
         int dimIndex = 0;
+std::string pvec;
         if (lookupIR(item.type))
         do {
             std::string fldName = item.fldName;
-            if (vecCount != -1)
+            if (vecCount != "")
                 fldName += autostr(dimIndex++);
             if (item.isPtr)
                 metaList.push_back("//METAEXTERNAL; " + fldName + "; " + lookupIR(item.type)->name + ";");
             else if (!lookupIR(item.type)->isStruct && !lookupIR(item.type)->isInterface)
                 metaList.push_back("//METAINTERNAL; " + fldName + "; " + lookupIR(item.type)->name + ";");
-        } while(vecCount != GENERIC_INT_TEMPLATE_FLAG && --vecCount > 0);
+pvec = autostr(atoi(vecCount.c_str()) - 1);
+if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
+printf("[%s:%d] vecCount %s pvec %s\n", __FUNCTION__, __LINE__, vecCount.c_str(), pvec.c_str());
+if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+        } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
     }
     for (auto MI : IR->methods) {
         std::string methodName = MI->name;
