@@ -114,7 +114,7 @@ static void generateModule(FILE *OStrV, ModuleIR *IR)
     int i = name.find("(");
     if (i > 0)
         name = name.substr(0, i);
-printf("[%s:%d] module '%s'\n", __FUNCTION__, __LINE__, IR->name.c_str());
+//printf("[%s:%d] module '%s'\n", __FUNCTION__, __LINE__, IR->name.c_str());
     fprintf(OStrV, "\nModule module'mk%s.\n", name.c_str());
     fprintf(OStrV, "    Section Section'mk%s.\n", name.c_str());
     fprintf(OStrV, "    Variable instancePrefix: string.\n"
@@ -127,7 +127,7 @@ printf("[%s:%d] module '%s'\n", __FUNCTION__, __LINE__, IR->name.c_str());
         int i = tname.find("(");
         if (i > 0)
             tname = tname.substr(0, i);
-printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
+//printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
         auto IIR = lookupIR(tname);
         if (IIR) {
             fprintf(OStrV, "    Let (* action binding *) %s := mk%s (instancePrefix--\"%s\").\n",
@@ -154,8 +154,8 @@ printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
         fprintf(OStrV, "%s\n", iitem.c_str());
     std::string interfaceName = "Empty";
     for (auto iitem: IR->interfaces) {
-        auto II = lookupInterface(iitem.type);
-printf("[%s:%d] interfacename %s lookup %s\n", __FUNCTION__, __LINE__, iitem.type.c_str(), II ? II->name.c_str() : "none");
+        //auto II = lookupInterface(iitem.type);
+//printf("[%s:%d] interfacename %s lookup %s\n", __FUNCTION__, __LINE__, iitem.type.c_str(), II ? II->name.c_str() : "none");
         interfaceName = iitem.fldName;
     }
     fprintf(OStrV, "    Local Open Scope kami_expr.\n\n");
@@ -167,7 +167,7 @@ printf("[%s:%d] interfacename %s lookup %s\n", __FUNCTION__, __LINE__, iitem.typ
         int i = tname.find("(");
         if (i > 0)
             tname = tname.substr(0, i);
-printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
+//printf("[%s:%d] tname %s\n", __FUNCTION__, __LINE__, tname.c_str());
         auto IIR = lookupIR(tname);
         if (IIR)
             fprintf(OStrV, "    %s (BKMod (%s'mod %s :: nil))\n",

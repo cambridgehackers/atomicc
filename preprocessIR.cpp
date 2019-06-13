@@ -209,7 +209,7 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
         walkSubscript(IR, item->cond);
     // subscript processing requires that we defactor the entire statement,
     // not just add a condition expression into the tree
-bool moved = false;
+//bool moved = false;
     auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> bool {
         int size = -1;
         ACCExpr *cond = *condp, *subscript = nullptr;
@@ -237,13 +237,13 @@ tree2str(expr).c_str(), tree2str(subscript).c_str());
                  allocExpr("0"), allocExpr("<", var, allocExpr(autostr(size))),
                  allocExpr("+", var, allocExpr("1")), body.substr(0, body.length() - 5)});
             IR->genvarCount = 1;
-dumpMethod("NEWFOR", BMI);
-moved = true;
+//dumpMethod("NEWFOR", BMI);
+//moved = true;
             return true;
         }
         return false;
     };
-dumpMethod("BEFORE", MI);
+//dumpMethod("BEFORE", MI);
     for (auto item = MI->storeList.begin(), iteme = MI->storeList.end(); item != iteme; ) {
         if (expandTree(1, &(*item)->cond, (*item)->dest, false, (*item)->value))
             item = MI->storeList.erase(item);
@@ -268,7 +268,7 @@ dumpMethod("BEFORE", MI);
         else
             item++;
     }
-if (moved) dumpMethod("PREVMETH", MI);
+//if (moved) dumpMethod("PREVMETH", MI);
 
     // now replace __bitconcat, __bitsubstr, __phi
     MI->guard = cleanupBool(MI->guard);
@@ -364,8 +364,6 @@ skipLab:;
                     pvalue = pvalue.substr(0, indNext);
                 }
                 paramMap.push_back(PARAM_MAP{pname, pvalue});
-printf("[%s:%d] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT '%s' = '%s'\n", __FUNCTION__, __LINE__,
-pname.c_str(), pvalue.c_str());
             }
             ModuleIR *genericIR = buildGeneric(IR, irName, paramMap);
             irSeq.push_back(genericIR);
@@ -375,19 +373,18 @@ pname.c_str(), pvalue.c_str());
             genericIR->interfaces.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false});
             for (auto item: paramMap)
                 paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", false, false, false, false, item.value, false, false});
-            dumpModule("GENERIC", genericIR);
+            //dumpModule("GENERIC", genericIR);
         }
     }
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
         if ((*IR)->transformGeneric) {
-            printf("[%s:%d] delete generic %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str());
+            //printf("[%s:%d] delete generic %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str());
             IR = irSeq.erase(IR);
         }
         else
             IR++;
     }
     for (auto IR : irSeq) {
-printf("[%s:%d] preprocess %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
         std::map<std::string, int> localConnect;
         for (auto IC : IR->interfaceConnect)
             if (!IC.isForward) {

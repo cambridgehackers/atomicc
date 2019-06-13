@@ -86,7 +86,7 @@ uint64_t convertType(std::string arg)
         return arr * convertType(bp);
     }
     if (checkT("@")) {
-printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
+//printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
         return 666666;
     }
     if (auto IR = lookupIR(bp)) {
@@ -217,7 +217,7 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
         ModuleIR *nextIR = iterField(searchIR, CBAct {
             int dimIndex = 0;
             std::string vecCount = item.vecCount;
-std::string pvec;
+            std::string pvec;
             do {
                 std::string fldName = item.fldName;
                 if (vecCount != "")
@@ -226,10 +226,9 @@ std::string pvec;
                     printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
                 if (fieldName != "" && fldName == fieldName)
                     return lookupIR(item.type);
-pvec = autostr(atoi(vecCount.c_str()) - 1);
-if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
-printf("[%s:%d] vecCount %s pvec %s\n", __FUNCTION__, __LINE__, vecCount.c_str(), pvec.c_str());
-if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+                pvec = autostr(atoi(vecCount.c_str()) - 1);
+                if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
+                if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
             } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
         if (!nextIR)
@@ -247,7 +246,7 @@ if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
         ModuleIR *nextIR = iterInterface(searchIR, CBAct {
             int dimIndex = 0;
             std::string vecCount = item.vecCount;
-std::string pvec;
+            std::string pvec;
             do {
                 std::string fldName = item.fldName;
                 if (vecCount != "")
@@ -256,10 +255,9 @@ std::string pvec;
                     printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
                 if (fieldName != "" && fldName == fieldName)
                     return lookupInterface(item.type);
-pvec = autostr(atoi(vecCount.c_str()) - 1);
-if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
-printf("[%s:%d] vecCount %s pvec %s\n", __FUNCTION__, __LINE__, vecCount.c_str(), pvec.c_str());
-if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+                pvec = autostr(atoi(vecCount.c_str()) - 1);
+                if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
+                if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
             } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
         if (!nextIR)
@@ -299,7 +297,7 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
         iterField(IR, CBAct {
             int dimIndex = 0;
             std::string vecCount = item.vecCount;
-std::string pvec;
+            std::string pvec;
             do {
                 std::string fldName = item.fldName;
                 if (vecCount != "")
@@ -310,10 +308,9 @@ std::string pvec;
                     getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
                     offset += convertType(item.type);
                 }
-pvec = autostr(atoi(vecCount.c_str()) - 1);
-if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
-printf("[%s:%d] vecCount %s pvec %s\n", __FUNCTION__, __LINE__, vecCount.c_str(), pvec.c_str());
-if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+                pvec = autostr(atoi(vecCount.c_str()) - 1);
+                if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
+                if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
             } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
     }

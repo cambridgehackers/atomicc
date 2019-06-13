@@ -674,7 +674,6 @@ static std::list<ModData> modLine;
         std::string vecCount = item.vecCount;
         if (vecCount != "") {
             std::string fldName = item.fldName;
-printf("[%s:%d] VVVVVVVVV name %s veccount '%s' type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), vecCount.c_str(), item.type.c_str());
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
             if (itemIR->isStruct)
@@ -683,7 +682,7 @@ printf("[%s:%d] VVVVVVVVV name %s veccount '%s' type %s\n", __FUNCTION__, __LINE
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount, -1);
             }
         }
-std::string pvec;
+        std::string pvec;
         do {
             std::string fldName = item.fldName;
             ModuleIR *itemIR = lookupIR(item.type);
@@ -700,10 +699,9 @@ std::string pvec;
                 if (trace_declare)
                     printf("[%s:%d]NEWFLD3 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.type.c_str());
             }
-pvec = autostr(atoi(vecCount.c_str()) - 1);
-if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
-printf("[%s:%d] vecCount %s pvec %s\n", __FUNCTION__, __LINE__, vecCount.c_str(), pvec.c_str());
-if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+            pvec = autostr(atoi(vecCount.c_str()) - 1);
+            if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
+            if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
         return nullptr; });
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
