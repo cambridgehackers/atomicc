@@ -88,8 +88,11 @@ static void ParseCheck(bool ok, std::string message)
 static bool readLine(void)
 {
     while (1) {
-        if (fgets(buf, sizeof(buf), OStrGlobal) == NULL)
+        if (fgets(buf, sizeof(buf), OStrGlobal) == NULL) {
+            if (trace_readIR)
+                printf("[%s:%d] end of input file.  feof %d ferror %d\n", __FUNCTION__, __LINE__, feof(OStrGlobal), ferror(OStrGlobal));
             return false;
+        }
         do 
             buf[strlen(buf) - 1] = 0; // strip trailing ' '
         while (buf[strlen(buf) - 1] == ' ');
@@ -157,6 +160,8 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
     else
         MIRdy->guard = allocExpr("1");
     }
+    if (trace_readIR)
+        printf("[%s:%d] foundOpenBrace %d guard %s remainingbuf %s\n", __FUNCTION__, __LINE__, foundOpenBrace, tree2str(MI->guard).c_str(), bufp);
     if (foundOpenBrace || checkItem("{")) {
         while (readLine() && !checkItem("}")) {
             if (checkItem("ALLOCA")) {
@@ -219,6 +224,8 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
 {
     OStrGlobal = OStr;
     while (readLine()) {
+        if (trace_readIR)
+            printf("[%s:%d] BEFOREMOD remain '%s'\n", __FUNCTION__, __LINE__, bufp);
         bool ext = checkItem("EMODULE"), interface = false, isStruct = false, isSerialize = false;
         if (!ext)
             interface = checkItem("INTERFACE");
@@ -234,6 +241,9 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
         IR->isSerialize = isSerialize;
         if (!ext && !interface && !isStruct)
             irSeq.push_back(IR);
+        if (trace_readIR)
+            printf("[%s:%d] MODULE %s ifc %d struct %d ser %d ext %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), 
+interface, isStruct, isSerialize, ext);
         ParseCheck(checkItem("{"), "Module '{' missing");
         while (readLine() && !checkItem("}")) {
             if (checkItem("SOFTWARE")) {
@@ -307,7 +317,11 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
             else
                 ParseCheck(false, "unknown module item");
         }
+        if (trace_readIR)
+            printf("[%s:%d] finishmoduleIR %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
     }
+    if (trace_readIR)
+        printf("[%s:%d] after readmoduleIR\n", __FUNCTION__, __LINE__);
 }
 
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir)

@@ -27,9 +27,9 @@
 #define ASSIGN_SIZE_LIMIT 6
 #define GENVAR_NAME "__inst$Genvar"
 
+#define PARAM_MARKER (MODULE_SEPARATOR "__PARAM__" MODULE_SEPARATOR)
 #define GENERIC_INT_TEMPLATE_FLAG         999999
 #define GENERIC_INT_TEMPLATE_FLAG_STRING "999999"
-#define PLACE_NAME                       ("Bit(" GENERIC_INT_TEMPLATE_FLAG_STRING ")")
 
 typedef struct {
     std::string argName;
@@ -149,7 +149,6 @@ void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);
 
 // filegen.cpp
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine);
-void generateVerilogOutput(FILE *OStr);
 void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR);
 
 // kami.cpp

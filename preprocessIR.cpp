@@ -21,7 +21,12 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+typedef struct {
+    std::string name;
+    std::string value;
+} PARAM_MAP;
 std::map<std::string, int> genericModule;
+
 std::string genericName(std::string name)
 {
     int ind = name.find(MODULE_SEPARATOR "__PARAM__" MODULE_SEPARATOR);
@@ -102,28 +107,34 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::stri
     return nullptr;
 }
 
-static std::string updateType(std::string type, std::string pname)
+static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
 {
-    if (type == PLACE_NAME)
-        return "@" + pname;
+    for (auto item: paramMap)
+        if (type == "Bit(" + item.value + ")")
+            return "@" + item.name;
     return type;
 };
 
-static ACCExpr *walkToGeneric (ACCExpr *expr, std::string pname)
+static ACCExpr *walkToGeneric (ACCExpr *expr, std::list<PARAM_MAP> &paramMap)
 {
     if (!expr)
         return expr;
-    ACCExpr *ret = allocExpr(expr->value == GENERIC_INT_TEMPLATE_FLAG_STRING ? pname : expr->value);
+    ACCExpr *ret = allocExpr(expr->value);
+    for (auto item: paramMap)
+         if (ret->value == item.value) {
+             ret->value = item.name;
+             break;
+         }
     for (auto item: expr->operands)
-        ret->operands.push_back(walkToGeneric(item, pname));
+        ret->operands.push_back(walkToGeneric(item, paramMap));
     return ret;
 }
 
-static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::string pname)
+static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PARAM_MAP> &paramMap)
 {
     MethodInfo *newMI = allocMethod(MI->name);
     addMethod(genericIR, newMI);
-    newMI->type = updateType(MI->type, pname);
+    newMI->type = updateType(MI->type, paramMap);
     newMI->guard = MI->guard;
     newMI->rule = MI->rule;
     newMI->action = MI->action;
@@ -131,20 +142,20 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::string p
     newMI->letList = MI->letList;
     newMI->callList = MI->callList;
     newMI->printfList = MI->printfList;
-    newMI->type = updateType(MI->type, pname);
+    newMI->type = updateType(MI->type, paramMap);
     newMI->alloca = MI->alloca;
     for (auto item : MI->generateFor) {
         newMI->generateFor.push_back(GenerateForItem{
-walkToGeneric(item.cond, pname), item.var, walkToGeneric(item.init, pname), walkToGeneric(item.limit, pname), walkToGeneric(item.incr, pname), item.body});
+walkToGeneric(item.cond, paramMap), item.var, walkToGeneric(item.init, paramMap), walkToGeneric(item.limit, paramMap), walkToGeneric(item.incr, paramMap), item.body});
     }
     //newMI->meta = MI->meta;
     for (auto item : MI->params)
-        newMI->params.push_back(ParamElement{item.name, updateType(item.type, pname)});
+        newMI->params.push_back(ParamElement{item.name, updateType(item.type, paramMap)});
 }
 
-static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pname, bool isInterface = false)
+static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface = false)
 {
-
+    IR->transformGeneric = true;
     ModuleIR *genericIR = allocIR(irName, isInterface);
     genericIR->genvarCount = IR->genvarCount;
     genericIR->metaList = IR->metaList;
@@ -156,16 +167,16 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::string pnam
     genericIR->isInterface = isInterface;
     for (auto item : IR->fields)
         genericIR->fields.push_back(FieldElement{item.fldName,
-            item.vecCount, updateType(item.type, pname), item.isPtr,
+            item.vecCount, updateType(item.type, paramMap), item.isPtr,
             item.isInput, item.isOutput, item.isInout,
             item.isParameter, item.isShared, item.isLocalInterface});
     for (auto FI : IR->generateBody)
-        copyGenericMethod(genericIR, FI.second, pname);
+        copyGenericMethod(genericIR, FI.second, paramMap);
     for (auto MI : IR->methods)
-        copyGenericMethod(genericIR, MI, pname);
+        copyGenericMethod(genericIR, MI, paramMap);
     for (auto item : IR->interfaces) {
         std::string iname = "l_ainterface_OC_" + irName + MODULE_SEPARATOR + item.fldName;
-        buildGeneric(lookupInterface(item.type), iname, pname, true);
+        buildGeneric(lookupInterface(item.type), iname, paramMap, true);
         genericIR->interfaces.push_back(FieldElement{item.fldName,
              item.vecCount, iname, item.isPtr, item.isInput,
              item.isOutput, item.isInout,
@@ -201,7 +212,7 @@ bool moved = false;
         if (ACCExpr *expr = findSubscript(IR, expandArg, size, fieldName, &subscript, post)) {
 printf("[%s:%d] sort %d FORINDE %d expandard %s expr %s subscr %s\n", __FUNCTION__, __LINE__, sort, bodyIndex, tree2str(expandArg).c_str(),
 tree2str(expr).c_str(), tree2str(subscript).c_str());
-            ACCExpr *var = allocExpr("__inst$Genvar99");
+            ACCExpr *var = allocExpr(GENVAR_NAME "99");
             cond = cleanupBool(allocExpr("&", allocExpr("==", var, subscript), cond));
             cond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
             expr->value = fieldName + "[" + var->value + "]" + post;
@@ -320,6 +331,7 @@ printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name
                  if (item->type == (*IR)->name)
                      item->type = field.type;
         }
+// Why?
         IR = irSeq.erase(IR);
         continue;
         }
@@ -327,36 +339,43 @@ skipLab:;
         IR++;
     }
     for (auto IR : irSeq) {
-        int ind = IR->name.find(MODULE_SEPARATOR "__PARAM__" MODULE_SEPARATOR);
+        int ind = IR->name.find(PARAM_MARKER);
         if (ind > 0)
         if (endswith(IR->name, MODULE_SEPARATOR GENERIC_INT_TEMPLATE_FLAG_STRING)) {
             std::string irName = IR->name.substr(0, ind);
-            std::string parg = IR->name.substr(ind + 11);
+            std::string parg = IR->name.substr(ind + strlen(PARAM_MARKER));
             std::string pname;
+            std::list<PARAM_MAP> paramMap;
             while (parg != "") {
-                int ind = parg.find(MODULE_SEPARATOR);
-                if (ind <= 0)
+                int indVal = parg.find(MODULE_SEPARATOR);
+                if (indVal <= 0)
                     break;
-                pname = parg.substr(0, ind);
-                parg = parg.substr(ind + strlen(MODULE_SEPARATOR GENERIC_INT_TEMPLATE_FLAG_STRING));
+                pname = parg.substr(0, indVal);
+                std::string pvalue = parg.substr(indVal+1);
+                paramMap.push_back(PARAM_MAP{pname, pvalue});
+                parg = parg.substr(indVal + strlen(MODULE_SEPARATOR GENERIC_INT_TEMPLATE_FLAG_STRING));
             }
-            ModuleIR *genericIR = buildGeneric(IR, irName, pname);
+            ModuleIR *genericIR = buildGeneric(IR, irName, paramMap);
             irSeq.push_back(genericIR);
             genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM", true);
             paramIR->isInterface = true;
             genericIR->interfaces.push_back(FieldElement{"", -1, paramIR->name, false, false, false, false, false, false, false});
-            paramIR->fields.push_back(FieldElement{pname, -1, "Bit(32)", false, false, false, false, true, false, false});
-            //dumpModule("GENERIC", genericIR);
+            for (auto item: paramMap)
+                paramIR->fields.push_back(FieldElement{item.name, -1, "Bit(32)", false, false, false, false, true, false, false});
+            dumpModule("GENERIC", genericIR);
         }
     }
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
-        if (genericName((*IR)->name) != "")
+        if ((*IR)->transformGeneric) {
+            printf("[%s:%d] delete generic %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str());
             IR = irSeq.erase(IR);
+        }
         else
             IR++;
     }
     for (auto IR : irSeq) {
+printf("[%s:%d] preprocess %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
         std::map<std::string, int> localConnect;
         for (auto IC : IR->interfaceConnect)
             if (!IC.isForward) {

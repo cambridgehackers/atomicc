@@ -77,7 +77,7 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
     fprintf(OStr, ");\n");
 }
 
-void generateVerilogOutput(FILE *OStr)
+static void generateVerilogOutput(FILE *OStr, std::map<std::string, int> &genvarMap)
 {
     bool isGenerate = false;
     std::list<std::string> resetList;
@@ -132,6 +132,9 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             std::string vecCountStr = mitem.vecCount == GENERIC_INT_TEMPLATE_FLAG ? "iovecWidth" : autostr(mitem.vecCount);
             if (isGenerate) {
                 std::string g = GENVAR_NAME + autostr(1);
+                if (!genvarMap[g])
+                    fprintf(OStr, "    genvar %s;\n", g.c_str());
+                genvarMap[g] = 1;
                 fprintf(OStr, "    for(%s = 0; %s < %s; %s = %s + 1) begin : %s\n",
                     g.c_str(), g.c_str(), vecCountStr.c_str(), g.c_str(), g.c_str(), mitem.argName.c_str());
                 instName = "data";
@@ -239,6 +242,16 @@ next:;
 
 void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
 {
+    std::map<std::string, int> genvarMap;
+#if 0
+        if (IR->genvarCount) {
+            std::string genstr;
+            for (int i = 1; i <= IR->genvarCount; i++)
+                genstr = ", " GENVAR_NAME + autostr(i);
+            fprintf(OStrV, "    genvar %s;\n", genstr.substr(1).c_str());
+        }
+#endif
+    generateVerilogOutput(OStr, genvarMap);
     // HACK HACK HACK
     for (auto item: IR->generateBody) {
 printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.first.c_str());
@@ -251,7 +264,10 @@ dumpMethod(item.first, item.second);
         for (auto item: MI->generateFor) {
             std::list<std::string> alwaysLines;
             //cond
-            fprintf(OStr, "    for (%s = %s; %s; %s = %s) begin\n", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
+            if (!genvarMap[item.var])
+                fprintf(OStr, "    genvar %s;\n", item.var.c_str());
+            genvarMap[item.var] = 1;
+            fprintf(OStr, "    for(%s = %s; %s; %s = %s) begin\n", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
             MethodInfo *MIb = IR->generateBody[item.body];
             if(!MIb) {
 printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
@@ -270,7 +286,7 @@ printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
                 ACCExpr *dest = cleanupExprBuiltin(info->dest);
                 if (cond)
                     alwaysLines.push_back("if(" + tree2str(cond) + ")");
-                alwaysLines.push_back("    " + tree2str(dest) + " <= " + tree2str(value));
+                alwaysLines.push_back("    " + tree2str(dest) + " <= " + tree2str(value) + ";");
             }
             for (auto info: MIb->callList) {
                 ACCExpr *cond = info->cond;
