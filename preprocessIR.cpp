@@ -140,19 +140,38 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
     MethodInfo *newMI = allocMethod(MI->name);
     addMethod(genericIR, newMI);
     newMI->type = updateType(MI->type, paramMap);
-    newMI->guard = MI->guard;
+    newMI->guard = walkToGeneric(MI->guard, paramMap);
     newMI->rule = MI->rule;
     newMI->action = MI->action;
-    newMI->storeList = MI->storeList;
-    newMI->letList = MI->letList;
-    newMI->callList = MI->callList;
-    newMI->printfList = MI->printfList;
-    newMI->type = updateType(MI->type, paramMap);
-    newMI->alloca = MI->alloca;
-    for (auto item : MI->generateFor) {
+    for (auto item : MI->storeList)
+        newMI->storeList.push_back(new StoreListElement{
+            walkToGeneric(item->dest, paramMap),
+            walkToGeneric(item->value, paramMap),
+            walkToGeneric(item->cond, paramMap)});
+    for (auto item : MI->letList)
+        newMI->letList.push_back(new LetListElement{
+            walkToGeneric(item->dest, paramMap),
+            walkToGeneric(item->value, paramMap),
+            walkToGeneric(item->cond, paramMap),
+            updateType(item->type, paramMap)});
+    for (auto item : MI->callList)
+        newMI->callList.push_back(new CallListElement{
+            walkToGeneric(item->value, paramMap),
+            walkToGeneric(item->cond, paramMap),
+            item->isAction});
+    for (auto item : MI->printfList)
+        newMI->printfList.push_back(new CallListElement{
+            walkToGeneric(item->value, paramMap),
+            walkToGeneric(item->cond, paramMap),
+            item->isAction});
+    for (auto item : MI->alloca)
+        newMI->alloca[item.first] = AllocaItem{item.second.type, item.second.noReplace};
+    for (auto item : MI->generateFor)
         newMI->generateFor.push_back(GenerateForItem{
-walkToGeneric(item.cond, paramMap), item.var, walkToGeneric(item.init, paramMap), walkToGeneric(item.limit, paramMap), walkToGeneric(item.incr, paramMap), item.body});
-    }
+            walkToGeneric(item.cond, paramMap), item.var,
+            walkToGeneric(item.init, paramMap),
+            walkToGeneric(item.limit, paramMap),
+            walkToGeneric(item.incr, paramMap), item.body});
     //newMI->meta = MI->meta;
     for (auto item : MI->params)
         newMI->params.push_back(ParamElement{item.name, updateType(item.type, paramMap), ""});
@@ -169,7 +188,10 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
     genericIR->params = IR->params;
     genericIR->unionList = IR->unionList;
     genericIR->interfaceConnect = IR->interfaceConnect;
+    genericIR->genvarCount = IR->genvarCount;
     genericIR->isInterface = isInterface;
+    genericIR->isStruct = IR->isStruct;
+    genericIR->isSerialize = IR->isSerialize;
     for (auto item : IR->fields)
         genericIR->fields.push_back(FieldElement{item.fldName,
             updateCount(item.vecCount, paramMap), updateType(item.type, paramMap),
