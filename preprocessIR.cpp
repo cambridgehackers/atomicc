@@ -29,7 +29,7 @@ std::map<std::string, int> genericModule;
 
 std::string genericName(std::string name)
 {
-    int ind = name.find(PARAM_MARKER);
+    int ind = name.find("(");
     if (ind > 0) {
         name = name.substr(0, ind);
         //if (genericModule[name])   // actual body could be declared externally
@@ -39,9 +39,9 @@ std::string genericName(std::string name)
 }
 std::string genericModuleParam(std::string name)
 {
-    int ind = name.rfind(MODULE_SEPARATOR);
+    int ind = name.rfind("=");
     if (ind > 0)
-        return name.substr(ind+1);
+        return name.substr(ind+1, name.length()-1 - (ind + 1));
     return "";
 }
 static void walkSubst (ModuleIR *IR, ACCExpr *expr)
@@ -180,7 +180,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
     for (auto MI : IR->methods)
         copyGenericMethod(genericIR, MI, paramMap);
     for (auto item : IR->interfaces) {
-        std::string iname = "l_ainterface_OC_" + irName + MODULE_SEPARATOR + item.fldName;
+        std::string iname = irName + MODULE_SEPARATOR + item.fldName;
         buildGeneric(lookupInterface(item.type), iname, paramMap, true);
         genericIR->interfaces.push_back(FieldElement{item.fldName,
              item.vecCount, iname, item.isPtr, item.isInput,
@@ -345,24 +345,30 @@ skipLab:;
     }
     for (auto IR : irSeq) {
         std::string modName = IR->name;
-        int ind = modName.find(PARAM_MARKER);
+        int ind = modName.find("(");
         if (ind > 0) {
             std::string irName = modName.substr(0, ind);
-            std::string parg = modName.substr(ind + strlen(PARAM_MARKER));
+            std::string parg = modName.substr(ind + 1);
+            if(parg.substr(parg.length()-1) != ")") {
+                printf("[%s:%d] modname '%s' irname '%s' parg '%s'\n", __FUNCTION__, __LINE__, modName.c_str(), irName.c_str(), parg.c_str());
+                exit(-1);
+            }
+            parg = parg.substr(0, parg.length() - 1);
             std::string pname;
             std::list<PARAM_MAP> paramMap;
             while (parg != "") {
-                int indVal = parg.find(MODULE_SEPARATOR);
+                int indVal = parg.find("=");
                 if (indVal <= 0)
                     break;
                 pname = parg.substr(0, indVal);
                 std::string pvalue = parg.substr(indVal+1);
                 parg = "";
-                int indNext = pvalue.find(PARAM_MARKER);
+                int indNext = pvalue.find(",");
                 if (indNext > 0) {
-                    parg = pvalue.substr(indNext + strlen(PARAM_MARKER));
+                    parg = pvalue.substr(indNext + 1);
                     pvalue = pvalue.substr(0, indNext);
                 }
+//printf("[%s:%d] name %s val %s\n", __FUNCTION__, __LINE__, pname.c_str(), pvalue.c_str());
                 paramMap.push_back(PARAM_MAP{pname, pvalue});
             }
             ModuleIR *genericIR = buildGeneric(IR, irName, paramMap);

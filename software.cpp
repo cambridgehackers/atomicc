@@ -88,7 +88,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
             for (auto iitem: IR->interfaces) {
                 if (iitem.fldName == interfaceName) {
                     ModuleIR *inter = lookupInterface(iitem.type);
-                    softwareNameList[inter->name.substr(strlen("l_ainterface_OC_"))] = SoftwareItem{iitem, IR, inter};
+                    softwareNameList[inter->name] = SoftwareItem{iitem, IR, inter};
                 }
             }
         }
@@ -115,7 +115,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         std::string localName = "DUT__" + dutType;
         std::string muxName = "mux";
         std::string muxTypeName = "MuxPipe";
-        std::string pipeName = "l_ainterface_OC_PipeIn";
+        std::string pipeName = "PipeIn";
         IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false});
         if (hasPrintf) {
 #if 0
@@ -133,7 +133,7 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
                 auto makeEnq = [&](std::string methodName) -> void {
                     MethodInfo *MI = allocMethod(methodName);
                     addMethod(muxDef, MI);
-                    MI->params.push_back(ParamElement{"v", "l_struct_OC_NOCData", ""});
+                    MI->params.push_back(ParamElement{"v", "NOCData", ""});
                     std::string call;
                     MI->callList.push_back(new CallListElement{
                         allocExpr("out$enq__ENA", allocExpr(PARAMETER_MARKER, allocExpr(

@@ -40,9 +40,9 @@ std::string getRdyName(std::string basename, bool suppressHack)
 ModuleIR *lookupIR(std::string name)
 {
     std::string ind = name;
-    int i = ind.find("(");
-    if (i > 0)
-        ind = ind.substr(0,i);
+    //int i = ind.find("(");
+    //if (i > 0)
+        //ind = ind.substr(0,i);
     if (ind == "" || mapIndex.find(ind) == mapIndex.end())
         return nullptr;
     if (mapIndex[ind]->isInterface)
@@ -53,9 +53,9 @@ ModuleIR *lookupIR(std::string name)
 ModuleIR *lookupInterface(std::string name)
 {
     std::string ind = name;
-    int i = ind.find("(");
-    if (i > 0)
-        ind = ind.substr(0,i);
+    //int i = ind.find("(");
+    //if (i > 0)
+        //ind = ind.substr(0,i);
     if (ind == "" || interfaceIndex.find(ind) == interfaceIndex.end())
         return nullptr;
     if (!interfaceIndex[ind]->isInterface)
@@ -338,9 +338,9 @@ ModuleIR *allocIR(std::string name, bool isInterface)
     ModuleIR *IR = new ModuleIR;
     IR->name = name;
     IR->genvarCount = 0;
-    int i = iname.find("(");
-    if (i > 0)
-        iname = iname.substr(0,i);
+    //int i = iname.find("(");
+    //if (i > 0)
+        //iname = iname.substr(0,i);
     if (isInterface)
         interfaceIndex[iname] = IR;
     else

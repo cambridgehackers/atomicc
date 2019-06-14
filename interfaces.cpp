@@ -80,13 +80,14 @@ static void processM2P(ModuleIR *IR)
         else {
             HIR = lookupInterface(inter.type);
             host = inter.fldName;
-            std::string iname = inter.type.substr(16);
+            std::string iname = inter.type;
             IR->name = iname + "___M2P";
-            std::string type = "l_serialize_OC_" + iname + "__Data";
+            std::string type = iname + "__Data";
             ModuleIR *II = lookupIR(type);
             if (!II) {
                 II = allocIR(type);
                 II->isInterface = false;
+                II->isSerialize = true;
                 II->interfaces.push_back(FieldElement{"ifc", "", inter.type, false, false, false, false, ""/*not param*/, false, false});
             }
     if (trace_software)
@@ -140,9 +141,9 @@ static void processP2M(ModuleIR *IR)
         if (inter.isPtr) {
             IIR = lookupInterface(inter.type);
             target = inter.fldName;
-            std::string iname = inter.type.substr(16);
+            std::string iname = inter.type;
             IR->name = iname + "___P2M";
-            std::string type = "l_serialize_OC_P2M_MD_" + iname + "_OD__KD__KD_Data";
+            std::string type = "P2M_MD_" + iname + "_OD__KD__KD_Data";
     if (trace_software)
 dumpModule("P2M/IIR :" + target, IIR);
         }
@@ -207,7 +208,7 @@ void processInterfaces(std::list<ModuleIR *> &irSeq)
         if (!IR) {
 printf("[%s:%d] module pointer missing %s\n", __FUNCTION__, __LINE__, mapp.first.c_str());
         }
-        if (startswith(IR->name, "l_serialize_"))
+        if (IR->isSerialize)
             processSerialize(IR);
         if (startswith(IR->name, "P2M")) {
     if (trace_software)
