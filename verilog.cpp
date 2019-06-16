@@ -688,12 +688,7 @@ static void generateMethod(ModuleIR *IR, MethodInfo *MI, NamedExprList &enableLi
         }
         for (auto fitem : fieldList) {
             std::string offset = autostr(fitem.offset);
-            std::string upper;
-            if (fitem.type[0] == '@')
-                upper = fitem.type.substr(1);
-            else
-                upper = convertType(fitem.type);
-            upper += " - 1";
+            std::string upper = convertType(fitem.type) + " - 1";
             if (offset != "0")
                 upper += " + " + offset;
             appendMux(fitem.name, cond,

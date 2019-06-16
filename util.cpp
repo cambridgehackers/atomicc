@@ -91,7 +91,7 @@ exit(-1);
     }
     if (checkT("@")) {
 //printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
-        return "666666";
+        return bp;
     }
     if (auto IR = lookupIR(bp)) {
         std::string total;
@@ -112,16 +112,10 @@ exit(-1);
 
 std::string sizeProcess(std::string type)
 {
-    std::string upper;
-    if (type[0] == '@')
-        upper = type.substr(1) + "- 1";
-    else {
-        std::string val = convertType(type);
-        if (val == "" || val == "0" || val == "1")
-            return "";
-        upper = val + " - 1";
-    }
-    return "[" + upper + ":0]";
+    std::string val = convertType(type);
+    if (val == "" || val == "0" || val == "1")
+        return "";
+    return "[" + val + " - 1:0]";
 }
 
 ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
