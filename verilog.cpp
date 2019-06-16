@@ -389,8 +389,81 @@ printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bi
     }
 }
 
+static bool checkRecursion(ACCExpr *expr)
+{
+    std::string item = expr->value;
+    if (isIdChar(item[0]) && !expr->operands.size()) {
+        if (replaceBlock[item]) // flag multiple expansions of an item
+            return false;
+        ACCExpr *res = assignList[item].value;
+        if (res && !assignList[item].noRecursion) {
+            replaceBlock[item] = tree2str(res).length();
+            if (!checkRecursion(res))
+                return false;
+        }
+    }
+    for (auto item: expr->operands)
+        if (!checkRecursion(item))
+            return false;
+    return true;
+}
+
+static ACCExpr *simpleReplace (ACCExpr *expr)
+{
+    if (!expr)
+        return expr;
+    ACCExpr *newExpr = allocExpr(expr->value);
+    std::string item = expr->value;
+    if (isIdChar(item[0]) && !expr->operands.size()) {
+        if (ACCExpr *assignValue = assignList[item].value)
+        if (refList[item].pin != PIN_MODULE && !assignList[item].noRecursion
+             && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
+            if (trace_assign)
+            printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
+            decRef(item);
+            return simpleReplace(assignValue);
+        }
+    }
+    for (auto item: expr->operands)
+        newExpr->operands.push_back(simpleReplace(item));
+    return newExpr;
+}
+
 static void setAssignRefCount(ModuleIR *IR)
 {
+    for (auto item: assignList)
+        if (item.second.type == "Bit(1)")
+            assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
+        else
+            assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
+    for (auto item: assignList) {
+        int i = 0;
+        if (!item.second.value)
+            continue;
+        while (true) {
+            replaceBlock.clear();
+            if (checkRecursion(item.second.value))
+                break;
+            std::string name;
+            int length = 0;
+            for (auto rep: replaceBlock) {
+                 if (rep.second > length && !endswith(rep.first, "__RDY") && !endswith(rep.first, "__ENA")) {
+                     name = rep.first;
+                     length = rep.second;
+                 }
+            }
+            if (name == "")
+                break;
+printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LINE__, name.c_str());
+            assignList[name].noRecursion = true;
+            if (i++ > 1000) {
+                printf("[%s:%d]checkRecursion loop; exit\n", __FUNCTION__, __LINE__);
+                for (auto rep: replaceBlock)
+                    printf("[%s:%d] name %s length %d\n", __FUNCTION__, __LINE__, rep.first.c_str(), rep.second);
+                exit(-1);
+            }
+        }
+    }
     for (auto tcond = condLines.begin(), tend = condLines.end(); tcond != tend; tcond++) {
         std::string methodName = tcond->first;
         walkRef(tcond->second.guard);
@@ -520,46 +593,6 @@ static ACCExpr *printfArgs(ACCExpr *listp)
     return ret;
 }
 
-static bool checkRecursion(ACCExpr *expr)
-{
-    std::string item = expr->value;
-    if (isIdChar(item[0]) && !expr->operands.size()) {
-        if (replaceBlock[item]) // flag multiple expansions of an item
-            return false;
-        ACCExpr *res = assignList[item].value;
-        if (res && !assignList[item].noRecursion) {
-            replaceBlock[item] = tree2str(res).length();
-            if (!checkRecursion(res))
-                return false;
-        }
-    }
-    for (auto item: expr->operands)
-        if (!checkRecursion(item))
-            return false;
-    return true;
-}
-
-static ACCExpr *simpleReplace (ACCExpr *expr)
-{
-    if (!expr)
-        return expr;
-    ACCExpr *newExpr = allocExpr(expr->value);
-    std::string item = expr->value;
-    if (isIdChar(item[0]) && !expr->operands.size()) {
-        if (ACCExpr *assignValue = assignList[item].value)
-        if (refList[item].pin != PIN_MODULE && !assignList[item].noRecursion
-             && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
-            if (trace_assign)
-            printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
-            decRef(item);
-            return simpleReplace(assignValue);
-        }
-    }
-    for (auto item: expr->operands)
-        newExpr->operands.push_back(simpleReplace(item));
-    return newExpr;
-}
-
 static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value)
 {
     dest = replaceAssign(dest);
@@ -643,15 +676,15 @@ static void connectInterfaces(ModuleIR *IR)
 
 void appendMux(std::string name, ACCExpr *cond, ACCExpr *value, NamedExprList &muxValueList)
 {
-    ACCExpr *args = muxValueList[name];
-    if (!args) {
-        args = allocExpr("(");
-        muxValueList[name] = args;
+    ACCExpr *phi = muxValueList[name];
+    if (!phi) {
+        phi = allocExpr("__phi", allocExpr("("));
+        muxValueList[name] = phi;
     }
-    args->operands.push_back(allocExpr(":", cond, value));
+    phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
 }
 
-static void generateMethod(ModuleIR *IR, MethodInfo *MI, NamedExprList &enableList, NamedExprList &muxValueList)
+static void generateMethod(ModuleIR *IR, MethodInfo *MI, NamedExprList &enableList, NamedExprList &muxValueList, bool hasPrintf)
 {
     std::string methodName = MI->name;
     MI->guard = cleanupBool(MI->guard);
@@ -664,6 +697,11 @@ static void generateMethod(ModuleIR *IR, MethodInfo *MI, NamedExprList &enableLi
     for (auto info: MI->storeList) {
         walkRead(MI, info->cond, nullptr);
         walkRead(MI, info->value, info->cond);
+        std::string item = info->dest->value;
+        if (isIdChar(item[0]) && !info->dest->operands.size() && refList[item].pin == PIN_WIRE)
+            setAssign(item, info->value, refList[item].type);
+        else
+            appendLine(methodName, info->cond, info->dest, info->value);
     }
     for (auto info: MI->letList) {
         ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
@@ -737,6 +775,9 @@ dumpExpr("READCALL", value);
             }
         }
     }
+    if (!hasPrintf)
+        for (auto info: MI->printfList)
+            appendLine(methodName, info->cond, nullptr, info->value);
 }
 
 /*
@@ -828,63 +869,13 @@ static std::list<ModData> modLine;
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
     for (auto MI : IR->methods)
-        generateMethod(IR, MI, enableList, muxValueList);
+        generateMethod(IR, MI, enableList, muxValueList, hasPrintf);
     // combine mux'ed assignments into a single 'assign' statement
-    for (auto item: muxValueList) {
-        setAssign(item.first,
-           cleanupExprBuiltin(allocExpr("__phi", item.second)),
-           refList[item.first].type);
-    }
+    for (auto item: muxValueList)
+        setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
     connectInterfaces(IR);
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
         setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
-    for (auto item: assignList)
-        if (item.second.type == "Bit(1)")
-            assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
-        else
-            assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
-    for (auto MI : IR->methods) {
-        std::string methodName = MI->name;
-        for (auto info: MI->storeList) {
-            std::string item = info->dest->value;
-            if (isIdChar(item[0]) && !info->dest->operands.size() && refList[item].pin == PIN_WIRE)
-                setAssign(item, info->value, refList[item].type);
-            else
-                appendLine(methodName, info->cond, info->dest, info->value);
-        }
-        if (!hasPrintf)
-            for (auto info: MI->printfList)
-                appendLine(methodName, info->cond, nullptr, info->value);
-    }
-
-    for (auto item: assignList) {
-        int i = 0;
-        if (!item.second.value)
-            continue;
-        while (true) {
-            replaceBlock.clear();
-            if (checkRecursion(item.second.value))
-                break;
-            std::string name;
-            int length = 0;
-            for (auto rep: replaceBlock) {
-                 if (rep.second > length && !endswith(rep.first, "__RDY") && !endswith(rep.first, "__ENA")) {
-                     name = rep.first;
-                     length = rep.second;
-                 }
-            }
-            if (name == "")
-                break;
-printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LINE__, name.c_str());
-            assignList[name].noRecursion = true;
-            if (i++ > 1000) {
-                printf("[%s:%d]checkRecursion loop; exit\n", __FUNCTION__, __LINE__);
-                for (auto rep: replaceBlock)
-                    printf("[%s:%d] name %s length %d\n", __FUNCTION__, __LINE__, rep.first.c_str(), rep.second);
-                exit(-1);
-            }
-        }
-    }
 
     setAssignRefCount(IR);
     collectCSE();
