@@ -29,6 +29,7 @@ int trace_skipped;//= 1;
 std::list<PrintfInfo> printfFormat;
 std::list<ModData> modNew;
 std::map<std::string, CondGroup> condLines;
+typedef std::map<std::string, ACCExpr *> NamedExprList;
 
 std::map<std::string, AssignItem> assignList;
 
@@ -640,6 +641,108 @@ static void connectInterfaces(ModuleIR *IR)
     }
 }
 
+void appendMux(std::string name, ACCExpr *cond, ACCExpr *value, NamedExprList &muxValueList)
+{
+    ACCExpr *args = muxValueList[name];
+    if (!args) {
+        args = allocExpr("(");
+        muxValueList[name] = args;
+    }
+    args->operands.push_back(allocExpr(":", cond, value));
+}
+
+static void generateMethod(ModuleIR *IR, MethodInfo *MI, NamedExprList &enableList, NamedExprList &muxValueList)
+{
+    std::string methodName = MI->name;
+    MI->guard = cleanupBool(MI->guard);
+    if (!endswith(methodName, "__RDY")) {
+        walkRead(MI, MI->guard, nullptr);
+        if (MI->rule)
+            setAssign(methodName, allocExpr(getRdyName(methodName)), "Bit(1)");
+    }
+    setAssign(methodName, MI->guard, MI->type); // collect the text of the return value into a single 'assign'
+    for (auto info: MI->storeList) {
+        walkRead(MI, info->cond, nullptr);
+        walkRead(MI, info->value, info->cond);
+    }
+    for (auto info: MI->letList) {
+        ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
+        ACCExpr *value = info->value;
+        updateWidth(value, convertType(info->type));
+        walkRead(MI, cond, nullptr);
+        walkRead(MI, value, cond);
+        std::string dest = tree2str(info->dest);
+        std::list<FieldItem> fieldList;
+        getFieldList(fieldList, dest, "", info->type, 1, true);
+        if (fieldList.size() == 1) {
+            std::string first = fieldList.front().name;
+            appendMux(dest, cond, value, muxValueList);
+            if (first != dest)
+                appendMux(first, cond, value, muxValueList);
+        }
+        else {
+        std::string splitItem = tree2str(value);
+        if ((value->operands.size() || !isIdChar(value->value[0]))) {
+            splitItem = dest + "$lettemp";
+            appendMux(splitItem, cond, value, muxValueList);
+        }
+        for (auto fitem : fieldList) {
+            std::string offset = autostr(fitem.offset);
+            std::string upper;
+            if (fitem.type[0] == '@')
+                upper = fitem.type.substr(1);
+            else
+                upper = convertType(fitem.type);
+            upper += " - 1";
+            if (offset != "0")
+                upper += " + " + offset;
+            appendMux(fitem.name, cond,
+                allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))), muxValueList);
+        }
+        }
+    }
+    for (auto info: MI->callList) {
+        ACCExpr *cond = info->cond;
+        ACCExpr *value = info->value;
+        if (isIdChar(value->value[0]) && value->operands.size() && value->operands.front()->value == PARAMETER_MARKER)
+            MI->meta[MetaInvoke][value->value].insert(tree2str(cond));
+        else {
+            printf("[%s:%d] called method name not found %s\n", __FUNCTION__, __LINE__, tree2str(value).c_str());
+dumpExpr("READCALL", value);
+                exit(-1);
+        }
+        walkRead(MI, cond, nullptr);
+        walkRead(MI, value, cond);
+        if (!info->isAction)
+            continue;
+        ACCExpr *tempCond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
+        std::string calledName = value->value;
+//printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
+//dumpExpr("CALLCOND", tempCond);
+        if (!value->operands.size() || value->operands.front()->value != PARAMETER_MARKER) {
+            printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
+            exit(-1);
+        }
+        if (!enableList[calledName])
+            enableList[calledName] = allocExpr("|");
+        enableList[calledName]->operands.push_back(tempCond);
+        MethodInfo *CI = lookupQualName(IR, calledName);
+        if (!CI) {
+            printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
+            exit(-1);
+        }
+        auto AI = CI->params.begin();
+        std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
+        int argCount = CI->params.size();
+        ACCExpr *param = value->operands.front();
+        for (auto item: param->operands) {
+            if(argCount-- > 0) {
+                appendMux(pname + AI->name, tempCond, item, muxValueList);
+                AI++;
+            }
+        }
+    }
+}
 
 /*
  * Generate *.v and *.vh for a Verilog module
@@ -653,18 +756,10 @@ static std::list<ModData> modLine;
     condLines.clear();
     generateModuleSignature(IR, "", modLineTop, "");
     bool hasPrintf = false;
-    std::map<std::string, ACCExpr *> enableList;
+    NamedExprList enableList;
     // 'Mux' together parameter settings from all invocations of a method from this class
-    std::map<std::string, ACCExpr *> muxValueList;
+    NamedExprList muxValueList;
 
-    auto appendMux = [&](std::string name, ACCExpr *cond, ACCExpr *value) -> void {
-        ACCExpr *args = muxValueList[name];
-        if (!args) {
-            args = allocExpr("(");
-            muxValueList[name] = args;
-        }
-        args->operands.push_back(allocExpr(":", cond, value));
-    };
     modLine.clear();
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
 
@@ -737,102 +832,13 @@ static std::list<ModData> modLine;
 
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
-    for (auto MI : IR->methods) {
-        std::string methodName = MI->name;
-        MI->guard = cleanupBool(MI->guard);
-        if (!endswith(methodName, "__RDY")) {
-            walkRead(MI, MI->guard, nullptr);
-            if (MI->rule)
-                setAssign(methodName, allocExpr(getRdyName(methodName)), "Bit(1)");
-        }
-        setAssign(methodName, MI->guard, MI->type); // collect the text of the return value into a single 'assign'
-        for (auto info: MI->storeList) {
-            walkRead(MI, info->cond, nullptr);
-            walkRead(MI, info->value, info->cond);
-        }
-        for (auto info: MI->letList) {
-            ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
-            ACCExpr *value = info->value;
-            updateWidth(value, convertType(info->type));
-            walkRead(MI, cond, nullptr);
-            walkRead(MI, value, cond);
-            std::string dest = tree2str(info->dest);
-            std::list<FieldItem> fieldList;
-            getFieldList(fieldList, dest, "", info->type, 1, true);
-            if (fieldList.size() == 1) {
-                std::string first = fieldList.front().name;
-                appendMux(dest, cond, value);
-                if (first != dest)
-                    appendMux(first, cond, value);
-            }
-            else {
-            std::string splitItem = tree2str(value);
-            if ((value->operands.size() || !isIdChar(value->value[0]))) {
-                splitItem = dest + "$lettemp";
-                appendMux(splitItem, cond, value);
-            }
-            for (auto fitem : fieldList) {
-                std::string offset = autostr(fitem.offset);
-                std::string upper;
-                if (fitem.type[0] == '@')
-                    upper = fitem.type.substr(1);
-                else
-                    upper = convertType(fitem.type);
-                upper += " - 1";
-                if (offset != "0")
-                    upper += " + " + offset;
-                appendMux(fitem.name, cond,
-                    allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))));
-            }
-            }
-        }
-        for (auto info: MI->callList) {
-            ACCExpr *cond = info->cond;
-            ACCExpr *value = info->value;
-            if (isIdChar(value->value[0]) && value->operands.size() && value->operands.front()->value == PARAMETER_MARKER)
-                MI->meta[MetaInvoke][value->value].insert(tree2str(cond));
-            else {
-                printf("[%s:%d] called method name not found %s\n", __FUNCTION__, __LINE__, tree2str(value).c_str());
-dumpExpr("READCALL", value);
-                    exit(-1);
-            }
-            walkRead(MI, cond, nullptr);
-            walkRead(MI, value, cond);
-            if (!info->isAction)
-                continue;
-            ACCExpr *tempCond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
-            std::string calledName = value->value;
-//printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
-//dumpExpr("CALLCOND", tempCond);
-            if (!value->operands.size() || value->operands.front()->value != PARAMETER_MARKER) {
-                printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
-                exit(-1);
-            }
-            if (!enableList[calledName])
-                enableList[calledName] = allocExpr("|");
-            enableList[calledName]->operands.push_back(tempCond);
-            MethodInfo *CI = lookupQualName(IR, calledName);
-            if (!CI) {
-                printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
-                exit(-1);
-            }
-            auto AI = CI->params.begin();
-            std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
-            int argCount = CI->params.size();
-            ACCExpr *param = value->operands.front();
-            for (auto item: param->operands) {
-                if(argCount-- > 0) {
-                    appendMux(pname + AI->name, tempCond, item);
-                    AI++;
-                }
-            }
-        }
-    }
+    for (auto MI : IR->methods)
+        generateMethod(IR, MI, enableList, muxValueList);
     // combine mux'ed assignments into a single 'assign' statement
     for (auto item: muxValueList) {
-        updateWidth(item.second, convertType(refList[item.first].type));
-        ACCExpr *phi = cleanupExprBuiltin(allocExpr("__phi", item.second));
-        setAssign(item.first, phi, refList[item.first].type);
+        setAssign(item.first,
+           cleanupExprBuiltin(allocExpr("__phi", item.second)),
+           refList[item.first].type);
     }
     connectInterfaces(IR);
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
