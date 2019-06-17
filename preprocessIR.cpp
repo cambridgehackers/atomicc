@@ -77,7 +77,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
         return;
     }
 }
-static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
+static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
 {
     if (isIdChar(expr->value[0]) && expr->operands.size() && expr->operands.front()->value == SUBSCRIPT_MARKER) {
         fieldName = expr->value;
@@ -96,7 +96,7 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, int &size, std::stri
         *subscript = sub;
         for (auto item: IR->fields)
             if (item.fldName == expr->value) {
-                size = atoi(item.vecCount.c_str());
+                size = item.vecCount;
                 break;
             }
         return expr;
@@ -233,13 +233,13 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
     // not just add a condition expression into the tree
 //bool moved = false;
     auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> bool {
-        int size = -1;
+        std::string size;
         ACCExpr *cond = *condp, *subscript = nullptr;
         std::string fieldName, post;
         if (ACCExpr *expr = findSubscript(IR, expandArg, size, fieldName, &subscript, post)) {
-printf("[%s:%d] sort %d FORINDE %d expandard %s expr %s subscr %s\n", __FUNCTION__, __LINE__, sort, bodyIndex, tree2str(expandArg).c_str(),
-tree2str(expr).c_str(), tree2str(subscript).c_str());
-            ACCExpr *var = allocExpr(GENVAR_NAME "99");
+printf("[%s:%d] sort %d FORINDE %d expandard %s expr %s subscr %s size %s\n", __FUNCTION__, __LINE__, sort, bodyIndex, tree2str(expandArg).c_str(),
+tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
+            ACCExpr *var = allocExpr(GENVAR_NAME "1");
             cond = cleanupBool(allocExpr("&", allocExpr("==", var, subscript), cond));
             cond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
             expr->value = fieldName + "[" + var->value + "]" + post;
@@ -256,7 +256,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str());
             else if (sort == 4)
                 BMI->printfList.push_back(new CallListElement{expandArg, cond, isAction});
             MI->generateFor.push_back(GenerateForItem{cond, var->value,
-                 allocExpr("0"), allocExpr("<", var, allocExpr(autostr(size))),
+                 allocExpr("0"), allocExpr("<", var, allocExpr(size)),
                  allocExpr("+", var, allocExpr("1")), body.substr(0, body.length() - 5)});
             IR->genvarCount = 1;
 //dumpMethod("NEWFOR", BMI);

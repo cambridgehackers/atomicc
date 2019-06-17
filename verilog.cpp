@@ -892,7 +892,7 @@ static std::list<ModData> modLine;
         NamedExprList muxValueList;
         genvarMap[item.var] = 1;
         char tempBuf[1000];
-        snprintf(tempBuf, sizeof(tempBuf), "    for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
+        snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
         generateSection = tempBuf;
         MethodInfo *MIb = IR->generateBody[item.body];
         if(!MIb) {
