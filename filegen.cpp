@@ -18,6 +18,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+std::map<std::string, int> genvarMap;
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
 {
     std::string sep;
@@ -120,6 +121,17 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         }
         tempOutput.clear();
     };
+    for (auto mitem: modNew)
+        if (mitem.moduleStart && mitem.vecCount != "")
+            genvarMap[GENVAR_NAME + autostr(1)] = 1;
+    if (genvarMap.size() > 0) {
+        const char *sep = "    genvar ";
+        for (auto gitem: genvarMap) {
+            fprintf(OStr, "%s%s", sep, gitem.first.c_str());
+            sep = ", ";
+        }
+        fprintf(OStr, ";\n");
+    }
     for (auto mitem: modNew) {
         if (mitem.moduleStart) {
             flushOut();
@@ -129,9 +141,6 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             std::string vecCountStr = mitem.vecCount;
             if (isGenerate) {
                 std::string g = GENVAR_NAME + autostr(1);
-                if (!genvarMap[g])
-                    fprintf(OStr, "    genvar %s;\n", g.c_str());
-                genvarMap[g] = 1;
                 fprintf(OStr, "    for(%s = 0; %s < %s; %s = %s + 1) begin : %s\n",
                     g.c_str(), g.c_str(), vecCountStr.c_str(), g.c_str(), g.c_str(), mitem.argName.c_str());
                 instName = "data";
@@ -189,17 +198,30 @@ next:;
             refList[temp].done = true; // mark that assigns have already been output
         }
     }
+    for (auto ctop: condAssignList) {
+        fprintf(OStr, "%s\n", ctop.first.c_str());
+        for (auto item: ctop.second) {
+            fprintf(OStr, "        assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
+        }
+        fprintf(OStr, "    end;\n");
+    }
 
     // generate clocked updates to state elements
-    if (condLines.size() || resetList.size()) {
+    auto ctop = condLines.begin(), ctopEnd = condLines.end();
+    for (; ctop != ctopEnd || resetList.size(); ctop++) { // process all generate sections
+    if (resetList.size() || ctop->second.size()) {
+        std::string ctopLoop = ctop != ctopEnd ? ctop->first : "";
+        if (ctopLoop != "")
+            fprintf(OStr, "\n    %s\n", ctopLoop.c_str());
         fprintf(OStr, "\n    always @( posedge CLK) begin\n      if (!nRST) begin\n");
         for (auto item: resetList)
             fprintf(OStr, "        %s <= 0;\n", item.c_str());
+        resetList.clear();
         fprintf(OStr, "      end // nRST\n");
-        if (condLines.size() > 0) {
+        if (ctop != ctopEnd && ctop->second.size() > 0) {
             fprintf(OStr, "      else begin\n");
             std::list<std::string> alwaysLines;
-            for (auto tcond: condLines) {
+            for (auto tcond: ctop->second) {
                 std::string methodName = tcond.first, endStr;
                 if (checkInteger(tcond.second.guard, "1"))
                     alwaysLines.push_back("// " + methodName);
@@ -234,100 +256,15 @@ next:;
             fprintf(OStr, "      end\n");
         }
         fprintf(OStr, "    end // always @ (posedge CLK)\n");
+        if (ctopLoop != "")
+            fprintf(OStr, "   end // end of generate\n");
+        if (ctop == ctopEnd)
+            break;
+    }
     }
 }
 
 void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
 {
-    std::map<std::string, int> genvarMap;
-#if 0
-        if (IR->genvarCount) {
-            std::string genstr;
-            for (int i = 1; i <= IR->genvarCount; i++)
-                genstr = ", " GENVAR_NAME + autostr(i);
-            fprintf(OStrV, "    genvar %s;\n", genstr.substr(1).c_str());
-        }
-#endif
     generateVerilogOutput(OStr, genvarMap);
-    // HACK HACK HACK
-    for (auto item: IR->generateBody) {
-printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.first.c_str());
-dumpMethod(item.first, item.second);
-    }
-    for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
-        std::string methodName = MI->name;
-        if (MI->generateFor.size())
-            fprintf(OStr, "// start %s\n", methodName.c_str());
-        for (auto item: MI->generateFor) {
-            std::list<std::string> alwaysLines;
-            //cond
-            if (!genvarMap[item.var])
-                fprintf(OStr, "    genvar %s;\n", item.var.c_str());
-            genvarMap[item.var] = 1;
-            fprintf(OStr, "    for(%s = %s; %s; %s = %s) begin\n", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
-            MethodInfo *MIb = IR->generateBody[item.body];
-            if(!MIb) {
-printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
-            }
-            assert(MIb && "body item ");
-            for (auto info: MIb->letList) {
-                ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
-                (void)(cond);
-                ACCExpr *value = cleanupExprBuiltin(info->value);
-                ACCExpr *dest = cleanupExprBuiltin(info->dest);
-                fprintf(OStr, "        assign %s = %s;\n", tree2str(dest).c_str(), tree2str(value).c_str());
-            }
-            for (auto info: MIb->storeList) {
-                ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
-                ACCExpr *value = cleanupExprBuiltin(info->value);
-                ACCExpr *dest = cleanupExprBuiltin(info->dest);
-                if (cond)
-                    alwaysLines.push_back("if(" + tree2str(cond) + ")");
-                alwaysLines.push_back("    " + tree2str(dest) + " <= " + tree2str(value) + ";");
-            }
-            for (auto info: MIb->callList) {
-                ACCExpr *cond = info->cond;
-                ACCExpr *value = info->value;
-                if (!info->isAction)
-                    continue;
-                std::string calledName = value->value;
-printf("[%s:%d] calledNAmeEEE valu %s cond %s\n", __FUNCTION__, __LINE__, tree2str(value).c_str(), tree2str(cond).c_str());
-                if (!value->operands.size() || value->operands.front()->value != PARAMETER_MARKER) {
-                    printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
-                    exit(-1);
-                }
-                MethodInfo *CI = lookupQualName(IR, calledName);
-                if (!CI) {
-                    printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
-                    exit(-1);
-                }
-                //ACCExpr *tempCond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
-                ACCExpr *tempCond = cond;
-                fprintf(OStr, "        assign %s = %s;\n", calledName.c_str(), tree2str(tempCond).c_str());
-                auto AI = CI->params.begin();
-                std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
-                int argCount = CI->params.size();
-                ACCExpr *param = value->operands.front();
-                for (auto item: param->operands) {
-                    if(argCount-- > 0) {
-                        //appendMux(pname + AI->name, cond, item);
-                        fprintf(OStr, "        assign %s = %s;\n", (pname + AI->name).c_str(), tree2str(item).c_str());
-                        AI++;
-                    }
-                }
-            }
-            if (alwaysLines.size()) {
-                fprintf(OStr, "\n    always @( posedge CLK) begin\n      if (!nRST) begin\n");
-                fprintf(OStr, "      end // nRST\n");
-                fprintf(OStr, "      else begin\n");
-                for (auto info: alwaysLines)
-                    fprintf(OStr, "        %s\n", info.c_str());
-                fprintf(OStr, "      end\n");
-                fprintf(OStr, "    end // always @ (posedge CLK)\n");
-            }
-            fprintf(OStr, "    end;\n");
-        }
-        if (MI->generateFor.size())
-            fprintf(OStr, "// end %s\n", methodName.c_str());
-    }
 }

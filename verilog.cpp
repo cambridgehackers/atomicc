@@ -28,10 +28,12 @@ int trace_skipped;//= 1;
 
 std::list<PrintfInfo> printfFormat;
 std::list<ModData> modNew;
-std::map<std::string, CondGroup> condLines;
+std::map<std::string, std::map<std::string, CondGroup>> condLines;
 typedef std::map<std::string, ACCExpr *> NamedExprList;
 
 std::map<std::string, AssignItem> assignList;
+std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
+static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
@@ -42,7 +44,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         value = cleanupBool(value);
     if (trace_assign)
         printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
-    if (!refList[target].pin) {
+    if (!refList[target].pin && generateSection == "") {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         exit(-1);
     }
@@ -59,7 +61,10 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
 //}
         exit(-1);
     }
-    assignList[target] = AssignItem{value, type, false};
+    if (generateSection != "")
+        condAssignList[generateSection][target] = AssignItem{value, type, false};
+    else
+        assignList[target] = AssignItem{value, type, false};
 }
 
 static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign = true, std::string vecCount = "")
@@ -464,7 +469,8 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
             }
         }
     }
-    for (auto tcond = condLines.begin(), tend = condLines.end(); tcond != tend; tcond++) {
+    for (auto ctop = condLines.begin(), ctopEnd = condLines.end(); ctop != ctopEnd; ctop++) { // process all generate sections
+    for (auto tcond = ctop->second.begin(), tend = ctop->second.end(); tcond != tend; tcond++) {
         std::string methodName = tcond->first;
         walkRef(tcond->second.guard);
         tcond->second.guard = cleanupBool(replaceAssign(tcond->second.guard));
@@ -484,6 +490,7 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
                     walkRef(citem.value->operands.front());
             }
         }
+    }
     }
 
     for (auto item: assignList)
@@ -597,13 +604,13 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
 {
     dest = replaceAssign(dest);
     value = replaceAssign(value);
-    for (auto CI = condLines[methodName].info.begin(), CE = condLines[methodName].info.end(); CI != CE; CI++)
+    for (auto CI = condLines[generateSection][methodName].info.begin(), CE = condLines[generateSection][methodName].info.end(); CI != CE; CI++)
         if (matchExpr(cond, CI->first)) {
             CI->second.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[methodName].guard = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName))));
-    condLines[methodName].info[cond].push_back(CondInfo{dest, value});
+    condLines[generateSection][methodName].guard = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName))));
+    condLines[generateSection][methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
 static void connectInterfaces(ModuleIR *IR)
@@ -684,9 +691,8 @@ void appendMux(std::string name, ACCExpr *cond, ACCExpr *value, NamedExprList &m
     phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
 }
 
-static void generateMethod(ModuleIR *IR, MethodInfo *MI, NamedExprList &enableList, NamedExprList &muxValueList, bool hasPrintf)
+static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI, NamedExprList &enableList, NamedExprList &muxValueList, bool hasPrintf)
 {
-    std::string methodName = MI->name;
     MI->guard = cleanupBool(MI->guard);
     if (!endswith(methodName, "__RDY")) {
         walkRead(MI, MI->guard, nullptr);
@@ -786,10 +792,13 @@ dumpExpr("READCALL", value);
 void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop)
 {
 static std::list<ModData> modLine;
+    generateSection = "";
+    condAssignList.clear();
     refList.clear();
     assignList.clear();
     modNew.clear();
     condLines.clear();
+    genvarMap.clear();
     generateModuleSignature(IR, "", modLineTop, "");
     bool hasPrintf = false;
     NamedExprList enableList;
@@ -868,14 +877,36 @@ static std::list<ModData> modLine;
 
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
+    connectInterfaces(IR);
     for (auto MI : IR->methods)
-        generateMethod(IR, MI, enableList, muxValueList, hasPrintf);
+        generateMethod(IR, MI->name, MI, enableList, muxValueList, hasPrintf);
     // combine mux'ed assignments into a single 'assign' statement
     for (auto item: muxValueList)
         setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
-    connectInterfaces(IR);
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
         setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
+#if 1
+    for (auto MI : IR->methods)
+    for (auto item: MI->generateFor) {
+        NamedExprList enableList;
+        NamedExprList muxValueList;
+        genvarMap[item.var] = 1;
+        char tempBuf[1000];
+        snprintf(tempBuf, sizeof(tempBuf), "    for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
+        generateSection = tempBuf;
+        MethodInfo *MIb = IR->generateBody[item.body];
+        if(!MIb) {
+printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
+        }
+        assert(MIb && "body item ");
+        generateMethod(IR, MI->name, MIb, enableList, muxValueList, hasPrintf);
+        for (auto item: muxValueList)
+            setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
+        for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
+            setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
+    }
+    generateSection = "";
+#endif
 
     setAssignRefCount(IR);
     collectCSE();

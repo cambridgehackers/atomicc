@@ -147,6 +147,7 @@ void cleanupIR(std::list<ModuleIR *> &irSeq);
 void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);
 
 // filegen.cpp
+extern std::map<std::string, int> genvarMap;
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine);
 void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR);
 
@@ -158,11 +159,12 @@ extern int trace_expand;
 extern int trace_skipped;
 extern std::map<std::string, RefItem> refList;
 extern std::map<std::string, AssignItem> assignList;
+extern std::map<std::string, std::map<std::string, AssignItem>> condAssignList;
 extern std::map<std::string, ModuleIR *> mapIndex;
 extern std::map<std::string, ModuleIR *> interfaceIndex;
 extern std::map<std::string, int> replaceBlock;
 extern std::list<ModData> modNew;
-extern std::map<std::string, CondGroup> condLines;
+extern std::map<std::string, std::map<std::string, CondGroup>> condLines;
 extern std::list<PrintfInfo> printfFormat;
 extern std::map<std::string, int> genericModule;
 extern int globalExprCleanup;
