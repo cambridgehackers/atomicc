@@ -75,7 +75,7 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
     fprintf(OStr, ");\n");
 }
 
-static void generateVerilogOutput(FILE *OStr, std::map<std::string, int> &genvarMap)
+void generateVerilogOutput(FILE *OStr)
 {
     bool isGenerate = false;
     std::list<std::string> resetList;
@@ -262,9 +262,4 @@ next:;
             break;
     }
     }
-}
-
-void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR)
-{
-    generateVerilogOutput(OStr, genvarMap);
 }

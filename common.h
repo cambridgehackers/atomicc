@@ -149,7 +149,7 @@ void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);
 // filegen.cpp
 extern std::map<std::string, int> genvarMap;
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine);
-void generateVerilogGenerateOutput(FILE *OStr, ModuleIR *IR);
+void generateVerilogOutput(FILE *OStr);
 
 // kami.cpp
 void generateKami(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir);
