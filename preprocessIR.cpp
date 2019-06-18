@@ -54,12 +54,12 @@ static void walkSubst (ModuleIR *IR, ACCExpr *expr)
         walkSubst(IR, item);
 }
 
-static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
+static void walkSubscript (ModuleIR *IR, ACCExpr *expr, bool inGenerate)
 {
     if (!expr)
         return;
     for (auto item: expr->operands)
-        walkSubscript(IR, item);
+        walkSubscript(IR, item, inGenerate);
     std::string fieldName = expr->value;
     if (!isIdChar(fieldName[0]) || !expr->operands.size() || expr->operands.front()->value != SUBSCRIPT_MARKER)
         return;
@@ -72,8 +72,8 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr)
         if (post[0] == '$')
             post = "." + post.substr(1);
     }
-    if (isdigit(subscript->value[0]) || startswith(subscript->value, GENVAR_NAME)) {
-        expr->value += "[" + subscript->value + "]" + post;
+    if (isdigit(subscript->value[0]) || startswith(subscript->value, GENVAR_NAME) || inGenerate) {
+        expr->value += "[" + tree2str(subscript) + "]" + post;
         return;
     }
 }
@@ -212,23 +212,25 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
     return genericIR;
 }
 
-void preprocessMethod(ModuleIR *IR, MethodInfo *MI)
+void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
 {
     static int bodyIndex = 99;
     std::string methodName = MI->name;
-    walkSubscript(IR, MI->guard);
+    walkSubscript(IR, MI->guard, isGenerate);
     for (auto item: MI->storeList) {
-        walkSubscript(IR, item->cond);
-        walkSubscript(IR, item->value);
+        walkSubscript(IR, item->dest, isGenerate);
+        walkSubscript(IR, item->cond, isGenerate);
+        walkSubscript(IR, item->value, isGenerate);
     }
     for (auto item: MI->letList) {
-        walkSubscript(IR, item->cond);
-        walkSubscript(IR, item->value);
+        walkSubscript(IR, item->dest, isGenerate);
+        walkSubscript(IR, item->cond, isGenerate);
+        walkSubscript(IR, item->value, isGenerate);
     }
     for (auto item: MI->callList)
-        walkSubscript(IR, item->cond);
+        walkSubscript(IR, item->cond, isGenerate);
     for (auto item: MI->printfList)
-        walkSubscript(IR, item->cond);
+        walkSubscript(IR, item->cond, isGenerate);
     // subscript processing requires that we defactor the entire statement,
     // not just add a condition expression into the tree
 //bool moved = false;
@@ -241,7 +243,7 @@ printf("[%s:%d] sort %d FORINDE %d expandard %s expr %s subscr %s size %s\n", __
 tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
             cond = cleanupBool(allocExpr("&", allocExpr("==", var, subscript), cond));
-            cond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
+            //cond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
             expr->value = fieldName + "[" + var->value + "]" + post;
             std::string body = "FOR$" + autostr(bodyIndex++) + "Body__ENA";
             MethodInfo *BMI = allocMethod(body);
@@ -266,6 +268,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
         return false;
     };
 //dumpMethod("BEFORE", MI);
+    if (!isGenerate) {
     for (auto item = MI->storeList.begin(), iteme = MI->storeList.end(); item != iteme; ) {
         if (expandTree(1, &(*item)->cond, (*item)->dest, false, (*item)->value))
             item = MI->storeList.erase(item);
@@ -290,6 +293,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
         else
             item++;
     }
+    } // isGenerate
 //if (moved) dumpMethod("PREVMETH", MI);
 
     // now replace __bitconcat, __bitsubstr, __phi
@@ -423,10 +427,10 @@ skipLab:;
             if (localConnect[item->fldName])
                 item->isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)
         // expand all subscript calculations before processing the module
-        for (auto item: IR->generateBody)
-            preprocessMethod(IR, item.second);
         for (auto MI: IR->methods)
-            preprocessMethod(IR, MI);
+            preprocessMethod(IR, MI, false);
+        for (auto item: IR->generateBody)
+            preprocessMethod(IR, item.second, true);
     }
 }
 
