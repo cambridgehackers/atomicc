@@ -82,7 +82,7 @@ void generateVerilogOutput(FILE *OStr)
     // generate local state element declarations and wires
     for (auto item: refList) {
         if (trace_assign)
-            printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str());
+            printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s vecCount %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str(), item.second.vecCount.c_str());
         if (item.second.pin == PIN_REG) {
             // HACK HACK HACK HACK
             std::string vecCountStr = " [" + item.second.vecCount + ":0]";

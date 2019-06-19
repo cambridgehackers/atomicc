@@ -46,6 +46,8 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin && generateSection == "") {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
+int ind = target.find("[");
+if (ind == -1)
         exit(-1);
     }
     updateWidth(value, convertType(type));
@@ -838,13 +840,14 @@ static std::list<ModData> modLine;
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != "", vecCount, dimIndex++);
             }
             else { // if (convertType(item.type) != 0)
-                refList[fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, ""};
+                refList[fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, vecCount};
                 if (trace_declare)
                     printf("[%s:%d]NEWFLD3 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.type.c_str());
             }
             pvec = autostr(atoi(vecCount.c_str()) - 1);
             if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
             if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
+//break;
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
         return nullptr; });
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
