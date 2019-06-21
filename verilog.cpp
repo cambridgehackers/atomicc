@@ -46,8 +46,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin && generateSection == "") {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
-int ind = target.find("[");
-if (ind == -1)
+        if (target.find("[") == std::string::npos)
         exit(-1);
     }
     updateWidth(value, convertType(type));
@@ -61,6 +60,8 @@ if (ind == -1)
         printf("[%s:%d] duplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
 //}
+        if (target.find("[") == std::string::npos)
+        if (tree2str(assignList[target].value).find("[") == std::string::npos)
         exit(-1);
     }
     if (generateSection != "")
@@ -69,37 +70,57 @@ if (ind == -1)
         assignList[target] = AssignItem{value, type, false};
 }
 
-static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign = true, std::string vecCount = "")
+static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign, std::string vecCount)
 {
     ACCExpr *itemList = allocExpr("{");
     std::list<FieldItem> fieldList;
     getFieldList(fieldList, fldName, "", type, out != 0, force);
     for (auto fitem : fieldList) {
+        std::string lvecCount = vecCount;
+        std::string tempType = fitem.type;
+        if (startswith(fitem.type, "ARRAY_")) {
+            tempType = fitem.type.substr(6);
+            int ind = tempType.find("_");
+            if (ind > 0) {
+                if (lvecCount != "") {
+                    printf("[%s:%d] dup veccount %s new %s\n", __FUNCTION__, __LINE__, lvecCount.c_str(), tempType.c_str());
+                    exit(-1);
+                }
+                lvecCount = tempType.substr(0, ind);
+                tempType = tempType.substr(ind+1);
+            }
+        }
         uint64_t offset = fitem.offset;
-        uint64_t uppern = offset - 1;
+        int64_t uppern = offset - 1;
         std::string upper = autostr(uppern);
-        if (fitem.type[0] == '@')
-            upper = fitem.type.substr(1) + "+ (" + upper + ")";
+        if (uppern < 0)
+            upper = "-" + autostr(-uppern);
+        if (tempType[0] == '@')
+            upper = tempType.substr(1) + "+ (" + upper + ")";
         else if (upper != " ")
-            upper = "(" + upper + " + " + convertType(fitem.type) + ")";
+            upper = "(" + upper + " + " + convertType(tempType) + ")";
         else
-            upper = convertType(fitem.type);
+            upper = convertType(tempType);
         std::string base = fldName;
         if (fitem.base != "")
             base = fitem.base;
         std::string fnew = base + "[" + upper + ":" + autostr(offset) + "]";
         ACCExpr *fexpr = allocExpr(base, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(autostr(offset)))));
 if (trace_expand || refList[fitem.name].pin)
-printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fitem.type.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
+printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), tempType.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
         assert (!refList[fitem.name].pin);
-        refList[fitem.name] = RefItem{0, fitem.type, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false, vecCount};
-        refList[fnew] = RefItem{0, fitem.type, out != 0, false, PIN_ALIAS, false, false, vecCount};
+        refList[fitem.name] = RefItem{0, tempType, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false, lvecCount};
+        refList[fnew] = RefItem{0, tempType, out != 0, false, PIN_ALIAS, false, false, lvecCount};
         if (trace_declare)
-            printf("[%s:%d]NEWREF %s %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fnew.c_str(), fitem.type.c_str());
+            printf("[%s:%d]NEWREF %s %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fnew.c_str(), tempType.c_str());
         if (!fitem.alias && out)
             itemList->operands.push_front(allocExpr(fitem.name));
-        else if (assign)
+        else if (assign) {
+//printf("[%s:%d]AAAAAAAA name %s fexpr %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), tree2str(fexpr).c_str(), fitem.type.c_str());
             setAssign(fitem.name, fexpr, fitem.type);
+//refList[fitem.name + " "].count++;
+//refList[fitem.name].count++;
+        }
     }
     if (force) {
         refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false, vecCount};
@@ -201,7 +222,7 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
         if (trace_connect)
             printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d dDecl %d vec '%s' dim %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, dontDeclare, vecCount.c_str(), dimIndex);
         if (isparam == "")
-        expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE);
+        expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE, true, vecCount);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     pinPorts.clear();
@@ -834,7 +855,7 @@ static std::list<ModData> modLine;
             if (itemIR && !item.isPtr) {
             if (itemIR->isStruct) {
                 if (vecCount == "")
-                    expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG);
+                    expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount);
             }
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != "", vecCount, dimIndex++);
@@ -866,7 +887,7 @@ static std::list<ModData> modLine;
             }
         }
         for (auto item: MI->alloca) // be sure to define local temps before walkRemoveParam
-            expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE);
+            expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE, true, "");
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))

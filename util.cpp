@@ -83,8 +83,9 @@ std::string convertType(std::string arg)
         return "1";                 // should never occur in declarations
     if (checkT("ARRAY_")) {
         std::string arr = bp;
-printf("[%s:%d] ARRAY %s\n", __FUNCTION__, __LINE__, bp);
-exit(-1);
+        int ind = arr.find("_");
+        if (ind > 0)
+            arr = arr.substr(0, ind);
         while (isdigit(*bp) || *bp == '_')
             bp++;
         return "(" + arr + " * " + convertType(bp) + ")";
@@ -309,7 +310,7 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
                     getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
                     offset += atoi(convertType(item.type).c_str());
                 }
-                pvec = autostr(atoi(vecCount.c_str()) - 1);
+                pvec = "(" + vecCount + "- 1)";
                 if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
                 if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
             } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");

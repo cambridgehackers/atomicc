@@ -87,7 +87,6 @@ void generateVerilogOutput(FILE *OStr)
             // HACK HACK HACK HACK
             std::string vecCountStr = " [" + item.second.vecCount + ":0]";
             if (item.second.vecCount == "") {
-        
                 vecCountStr = "";
                 resetList.push_back(item.first);
             }
@@ -98,7 +97,10 @@ void generateVerilogOutput(FILE *OStr)
         std::string temp = item.first;
         if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL) {
         if (item.second.count && !item.second.isGenerated) {
-            fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first).c_str());
+            std::string vecCountStr = " [" + item.second.vecCount + ":0]";
+            if (item.second.vecCount == "")
+                vecCountStr = "";
+            fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());
 if (trace_assign && item.second.out) {
 printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
 //exit(-1);

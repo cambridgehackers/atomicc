@@ -186,6 +186,8 @@ static struct {
 } opPrec[] = {
     {"," , 1},
 
+    {"," , 2},
+
     {"?", 10}, {":", 10},
 
     {"&", 12}, {"|", 12},
@@ -407,6 +409,7 @@ void updateWidth(ACCExpr *expr, std::string clen)
         if (trace_expr)
             printf("[%s:%d] ID %s ilen %d len %d\n", __FUNCTION__, __LINE__, tree2str(expr).c_str(), ilen, len);
         if (ilen > len && len > 0 && !expr->operands.size()) {
+printf("[%s:%d] expr %s clen %s conv %s\n", __FUNCTION__, __LINE__, tree2str(expr).c_str(), clen.c_str(), convertType(refList[expr->value].type).c_str());
             ACCExpr *subexpr = allocExpr(":", allocExpr(autostr(len-1)));
             if (len > 1)
                 subexpr->operands.push_back(allocExpr("0"));
@@ -470,7 +473,7 @@ void walkReplaceBuiltin(ACCExpr *expr)
         ACCExpr *list = expr->operands.front();
         ACCExpr *bitem = list->operands.front();
         if (!isIdChar(bitem->value[0])) {  // can only do bit select on net or reg (not expressions)
-            printf("[%s:%d] can only do __bitsubstr on elementary items\n", __FUNCTION__, __LINE__);
+            printf("[%s:%d] can only do __bitsubstr on elementary items '%s'\n", __FUNCTION__, __LINE__, bitem->value.c_str());
             dumpExpr("BITSUB", expr);
             exit(-1);
         }
@@ -734,11 +737,14 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                                 L = TOP->value;
                                 lprec = findPrec(L);
                             }
+                            if (TOP->value == "," && tok->value == ",")
+                                goto lll;
                         }
                     }
                     TOP = tok;
                 }
                 TOP->operands.push_back(currentOperand);
+lll:;
                 currentOperand = nullptr;
             }
         }
@@ -760,7 +766,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                 head = TOP;
         }
     }
-    head = cleanupExpr(head, preserveParen);
+    head = cleanupExpr(head, preserveParen || true);
     return head;
 }
 
