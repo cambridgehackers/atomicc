@@ -81,7 +81,7 @@ static bool shiftOp(std::string s)
 }
 static bool arithOp(std::string s)
 {
-    return bitOp(s) || s == "+" || s == "-" || s == "*" || s == "%" || s == "?" || s == ":";
+    return bitOp(s) || s == "+" || s == "-" || s == "*" || s == "%" || s == "?" || s == ":" || s == "/";
 }
 
 static bool relationalOp(std::string s)
