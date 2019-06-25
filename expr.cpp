@@ -766,7 +766,7 @@ lll:;
                 head = TOP;
         }
     }
-    head = cleanupExpr(head, preserveParen || true);
+    head = cleanupExpr(head, preserveParen);
     return head;
 }
 

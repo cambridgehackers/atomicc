@@ -27,14 +27,14 @@ static char *bufp;
 static int lineNumber = 0;
 static FILE *OStrGlobal;
 
-static ACCExpr *getExpression(char terminator = 0)
+static std::string getExpressionString(char terminator = 0)
 {
     const char *startp = bufp;
-    int level = 0;
+    int level = 0, levelb = 0;
     bool inQuote = false, beforeParen = true;
     while (*bufp == ' ')
         bufp++;
-    while (*bufp && ((terminator ? (*bufp != terminator) : beforeParen) || level != 0)) {
+    while (*bufp && ((terminator ? (*bufp != terminator) : beforeParen) || level != 0 || levelb != 0)) {
         if (inQuote) {
             if (*bufp == '"')
                 inQuote = false;
@@ -46,18 +46,33 @@ static ACCExpr *getExpression(char terminator = 0)
             inQuote = true;
         else if (*bufp == '(') {
             level++;
+            if (beforeParen)
+                terminator = 0;    // if we encounter parenthesized expr, go to end
             beforeParen = false;
         }
         else if (*bufp == ')')
             level--;
+        else if (*bufp == '{') {
+            levelb++;
+            if (beforeParen)
+                terminator = 0;    // if we encounter parenthesized expr, go to end
+            beforeParen = false;
+        }
+        else if (*bufp == '}')
+            levelb--;
         }
         bufp++;
     }
-    while (*bufp == ' ')
-        bufp++;
     std::string ret = std::string(startp, bufp - startp);
     if (trace_readIR)
         printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
+    return ret;
+}
+static ACCExpr *getExpression(char terminator = 0)
+{
+    std::string ret = getExpressionString(terminator);
+    while (*bufp == ' ')
+        bufp++;
     return str2tree(ret);
 }
 
@@ -119,6 +134,22 @@ static std::string getToken()
         printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
     return ret;
 }
+static std::string getType()
+{
+    char *startp = bufp;
+    while (*bufp == ' ')
+        bufp++;
+    while (*bufp && *bufp != ' ' && *bufp != '(')
+        bufp++;
+    std::string ret = std::string(startp, bufp);
+    if (*bufp == '(')
+        ret += getExpressionString();
+    while (*bufp == ' ')
+        bufp++;
+    if (trace_readIR)
+        printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
+    return ret;
+}
 
 static std::string cleanInterface(std::string name)
 {
@@ -136,7 +167,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
         while (!checkItem(")")) {
             if (!first)
                 ParseCheck(checkItem(","), "',' missing");
-            std::string type = getToken();
+            std::string type = getType();
             MI->params.push_back(ParamElement{getToken(), type, ""});
             first = false;
         }
@@ -146,7 +177,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
     if (!foundOpenBrace) {
         foundIf = checkItem("if");
         if (!foundIf)
-            MI->type = getToken();
+            MI->type = getType();
     }
     if (checkItem("="))
         MI->guard = getExpression();
@@ -165,7 +196,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
     if (foundOpenBrace || checkItem("{")) {
         while (readLine() && !checkItem("}")) {
             if (checkItem("ALLOCA")) {
-                std::string type = getToken();
+                std::string type = getType();
                 std::string name = getToken();
                 MI->alloca[name] = AllocaItem{type, false};
             }
@@ -178,7 +209,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 MI->storeList.push_back(new StoreListElement{dest, expr, cond});
             }
             else if (checkItem("LET")) {
-                std::string type = getToken();
+                std::string type = getType();
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *dest = getExpression('=');
@@ -257,11 +288,11 @@ interface, isStruct, isSerialize, ext);
                 bool        isForward = checkItem("/Forward");
                 std::string target = cleanInterface(getToken());
                 std::string source = cleanInterface(getToken());
-                std::string type = getToken();
+                std::string type = getType();
                 IR->interfaceConnect.push_back(InterfaceConnectType{target, source, type, isForward});
             }
             else if (checkItem("UNION")) {
-                std::string type = getToken();
+                std::string type = getType();
                 IR->unionList.push_back(UnionItem{getToken(), type});
             }
             else if (checkItem("FIELD")) {
@@ -276,7 +307,7 @@ interface, isStruct, isSerialize, ext);
                     vecCount = getToken();
                     IR->genvarCount = 1;
                 }
-                std::string type = getToken();
+                std::string type = getType();
                 std::string fldName = getToken();
                 IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter ? " " : "", isShared, false});
             }
@@ -289,7 +320,7 @@ interface, isStruct, isSerialize, ext);
                 bool        isPtr = checkItem("/Ptr");
                 if (checkItem("/Count"))
                     vecCount = getToken();
-                std::string type = getToken();
+                std::string type = getType();
                 std::string fldName = getToken();
                 if (fldName == "_")
                     fldName = "";
