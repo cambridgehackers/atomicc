@@ -117,14 +117,6 @@ static std::string updateCount(std::string count, std::list<PARAM_MAP> &paramMap
     return count;
 }
 
-static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
-{
-    for (auto item: paramMap)
-        if (type == "Bit(" + item.value + ")")
-            return "@" + item.name;
-    return type;
-};
-
 static ACCExpr *walkToGeneric (ACCExpr *expr, std::list<PARAM_MAP> &paramMap)
 {
     if (!expr)
@@ -134,6 +126,19 @@ static ACCExpr *walkToGeneric (ACCExpr *expr, std::list<PARAM_MAP> &paramMap)
         ret->operands.push_back(walkToGeneric(item, paramMap));
     return ret;
 }
+
+static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
+{
+    if (type.find(" ") != std::string::npos && startswith(type, "Bit(") && endswith(type, ")")) {
+        // perform substitution on bit length expressions
+        ACCExpr *expr = walkToGeneric(str2tree(type.substr(4, type.length() - 5)), paramMap);
+        type = "Bit(" + tree2str(expr) + ")";
+    }
+    for (auto item: paramMap)
+        if (type == "Bit(" + item.value + ")")
+            return "@" + item.name;
+    return type;
+};
 
 static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PARAM_MAP> &paramMap)
 {
