@@ -135,7 +135,7 @@ static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
 {
     if (type.find(" ") != std::string::npos && startswith(type, "Bit(") && endswith(type, ")")) {
         // perform substitution on bit length expressions
-        ACCExpr *expr = walkToGeneric(str2tree(type.substr(4, type.length() - 5)), paramMap);
+        ACCExpr *expr = walkToGeneric(str2tree(type.substr(4, type.length() - 5)), paramMap); // Bit()
         type = "Bit(" + tree2str(expr) + ")";
     }
     for (auto item: paramMap)
@@ -252,7 +252,6 @@ printf("[%s:%d] sort %d FORINDE %d expandard %s expr %s subscr %s size %s\n", __
 tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
             cond = cleanupBool(allocExpr("&", allocExpr("==", var, subscript), cond));
-            //cond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
             expr->value = fieldName + "[" + var->value + "]" + post;
             std::string body = "FOR$" + autostr(bodyIndex++) + "Body__ENA";
             MethodInfo *BMI = allocMethod(body);
@@ -268,7 +267,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
                 BMI->printfList.push_back(new CallListElement{expandArg, cond, isAction});
             MI->generateFor.push_back(GenerateForItem{cond, var->value,
                  allocExpr("0"), allocExpr("<", var, allocExpr(size)),
-                 allocExpr("+", var, allocExpr("1")), body.substr(0, body.length() - 5)});
+                 allocExpr("+", var, allocExpr("1")), baseMethodName(body)});
             IR->genvarCount = 1;
 //dumpMethod("NEWFOR", BMI);
 //moved = true;

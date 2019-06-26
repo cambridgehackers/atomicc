@@ -242,7 +242,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ACCExpr *incr = getExpression(',');
                 ParseCheck(checkItem(","), "generate ',' missing");
                 std::string body = bufp;
-                MI->generateFor.push_back(GenerateForItem{cond, var->value, init, term, incr, body.substr(0, body.length()-5)});
+                MI->generateFor.push_back(GenerateForItem{cond, var->value, init, term, incr, baseMethodName(body)});
                 IR->genvarCount = 1;
             }
             else
@@ -337,7 +337,7 @@ interface, isStruct, isSerialize, ext);
                 MI->rule = rule;
                 MI->action = action;
                 if (addMethod(IR, MI)) {
-                    std::string rdyName = getRdyName(methodName, true);
+                    std::string rdyName = getRdyName(methodName);
                     MIRdy = allocMethod(rdyName);
                     addMethod(IR, MIRdy);
                     MIRdy->rule = MI->rule;

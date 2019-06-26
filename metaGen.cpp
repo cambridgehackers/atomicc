@@ -53,7 +53,7 @@ static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
         std::string gtemp = "; " + tree2str(MI->guard) + ";";
         if (endswith(methodName, "__RDY"))
             metaList.push_back("//METAGUARD; "
-                + methodName.substr(0, methodName.length()-5) + gtemp);
+                + baseMethodName(methodName) + gtemp);
         else if (endswith(methodName, "__READY"))
             metaList.push_back("//METAGUARDV; "
                 + methodName.substr(0, methodName.length()-7) + gtemp);
@@ -121,7 +121,7 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
     for (auto MI : IR->methods) {
         std::string methodName = MI->name;
         if (MI->rule && MI->action)
-            ruleNames += "; " + methodName.substr(0, methodName.length()-5);
+            ruleNames += "; " + baseMethodName(methodName);
     }
     if (ruleNames != "")
         metaList.push_back("//METARULES" + ruleNames);

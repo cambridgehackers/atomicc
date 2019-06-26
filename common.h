@@ -87,7 +87,9 @@ typedef ModuleIR *(^CBFun)(FieldElement &item);
 #define CBAct ^ ModuleIR * (FieldElement &item)
 
 // util.cpp
-std::string getRdyName(std::string basename, bool suppressHack = false);
+std::string baseMethodName(std::string pname);
+std::string getRdyName(std::string basename);
+std::string getEnaName(std::string basename);
 std::string convertType(std::string arg);
 ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);

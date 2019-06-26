@@ -35,12 +35,6 @@ std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 
-static std::string baseMethodName(std::string pname)
-{
-    if (endswith(pname, "__ENA"))
-        pname = pname.substr(0, pname.length()-5);
-    return pname;
-}
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
     bool tDir = refList[target].out;
@@ -642,7 +636,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
             CI->second.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[generateSection][methodName].guard = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName))));
+    condLines[generateSection][methodName].guard = cleanupBool(allocExpr("&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
     condLines[generateSection][methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
@@ -730,7 +724,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
     if (!endswith(methodName, "__RDY")) {
         walkRead(MI, MI->guard, nullptr);
         if (MI->rule)
-            setAssign(methodName, allocExpr(getRdyName(methodName)), "Bit(1)");
+            setAssign(getEnaName(methodName), allocExpr(getRdyName(methodName)), "Bit(1)");
     }
     setAssign(methodName, MI->guard, MI->type); // collect the text of the return value into a single 'assign'
     for (auto info: MI->storeList) {
@@ -787,17 +781,17 @@ dumpExpr("READCALL", value);
         walkRead(MI, value, cond);
         if (!info->isAction)
             continue;
-        ACCExpr *tempCond = cleanupBool(allocExpr("&", allocExpr(methodName), allocExpr(getRdyName(methodName)), cond));
-        std::string calledName = value->value;
+        ACCExpr *tempCond = cleanupBool(allocExpr("&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName)), cond));
+        std::string calledName = value->value, calledEna = getEnaName(calledName);
 //printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
 //dumpExpr("CALLCOND", tempCond);
         if (!value->operands.size() || value->operands.front()->value != PARAMETER_MARKER) {
             printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
             exit(-1);
         }
-        if (!enableList[calledName])
-            enableList[calledName] = allocExpr("|");
-        enableList[calledName]->operands.push_back(tempCond);
+        if (!enableList[calledEna])
+            enableList[calledEna] = allocExpr("|");
+        enableList[calledEna]->operands.push_back(tempCond);
         MethodInfo *CI = lookupQualName(IR, calledName);
         if (!CI) {
             printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());

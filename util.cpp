@@ -25,16 +25,21 @@ int trace_expand;//= 1;
 std::map<std::string, ModuleIR *> mapIndex;
 std::map<std::string, ModuleIR *> interfaceIndex;
 static int trace_iter;//=1;
-static int suppressHack_flag=1;
 
-std::string getRdyName(std::string basename, bool suppressHack)
+std::string baseMethodName(std::string pname)
 {
-    std::string rdyName = basename;
-    if (endswith(rdyName, "__ENA"))
-        rdyName = rdyName.substr(0, rdyName.length()-5);
-    if (!(suppressHack_flag || suppressHack) && endswith(rdyName, "out$first")) //HACK HACK HACK HACK for fifo
-        rdyName = rdyName.substr(0, rdyName.length() - 5) + "deq";   // temp hack to simplify Fifo expressions
-    return rdyName + "__RDY";
+    if (endswith(pname, "__ENA") || endswith(pname, "__RDY"))
+        pname = pname.substr(0, pname.length()-5);
+    return pname;
+}
+std::string getRdyName(std::string basename)
+{
+    return baseMethodName(basename) + "__RDY";
+}
+
+std::string getEnaName(std::string basename)
+{
+    return baseMethodName(basename) + "__ENA";
 }
 
 ModuleIR *lookupIR(std::string name)
@@ -145,24 +150,13 @@ MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
 {
     std::string nameENA = name + "__ENA";
     std::string nameShort = name;
-    if (endswith(name, "__ENA"))
-        nameShort = name.substr(0, name.length() - 5);
+    if (endswith(nameShort, "__ENA"))
+        nameShort = baseMethodName(nameShort);
     for (auto MI : IR->methods) {
         if (MI->name == name || MI->name == nameENA || MI->name == nameShort)
             return MI;
     }
     return nullptr;
-#if 0
-    if (IR->methods.find(name) == IR->methods.end()) {
-        if (IR->methods.find(name + "__ENA") != IR->methods.end())
-            name += "__ENA";
-        else if (endswith(name, "__ENA") && IR->methods.find(name.substr(0, name.length()-5)) != IR->methods.end())
-            name = name.substr(0, name.length()-5);
-        else
-            return nullptr;
-    }
-    return IR->methods[name];
-#endif
 }
 
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
@@ -355,7 +349,7 @@ MethodInfo *allocMethod(std::string name)
 
 bool addMethod(ModuleIR *IR, MethodInfo *MI)
 {
-    std::string methodName = MI->name;
+    std::string methodName = MI->name; // baseMethodName??
     if (endswith(methodName, "__ENA"))
         methodName = methodName.substr(0, methodName.length()-5);
     bool ret = !startswith(methodName, "FOR$");

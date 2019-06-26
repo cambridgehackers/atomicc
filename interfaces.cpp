@@ -50,7 +50,7 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
 exit(-1);
             continue;
         }
-        methodName = methodName.substr(0, methodName.length()-5);
+        methodName = baseMethodName(methodName);
         ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
         variant->isInterface = false;
         unionIR->unionList.push_back(UnionItem{methodName, variant->name});
@@ -113,7 +113,7 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
 exit(-1);
             continue;
         }
-        std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
+        std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
         std::string call;
         uint64_t dataLength = 32; // include length of tag
         for (auto param: MI->params) {
@@ -178,7 +178,7 @@ assert(MInew);
     for (auto MI: IIR->methods) {
         std::string offset = "32";
         std::string methodName = MI->name;
-        std::string paramPrefix = methodName.substr(0, methodName.length()-5) + MODULE_SEPARATOR;
+        std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
         if (endswith(methodName, "__RDY"))
             continue;
         ACCExpr *paramList = allocExpr(",");

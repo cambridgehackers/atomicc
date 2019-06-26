@@ -57,7 +57,7 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
         std::string methodName = MI->name;
         if (!endswith(methodName, "__ENA"))
             continue;
-        reorderList[methodName.substr(0, methodName.length()-5)] = MI;
+        reorderList[baseMethodName(methodName)] = MI;
     }
     for (auto item: reorderList) {
         MethodInfo *MI = item.second;
@@ -137,8 +137,7 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
                     std::string call;
                     MI->callList.push_back(new CallListElement{
                         allocExpr("out$enq__ENA", allocExpr(PARAMETER_MARKER, allocExpr(
-                            methodName.substr(0, methodName.length()-5)
-                               + MODULE_SEPARATOR + "v"))),
+                            baseMethodName(methodName) + MODULE_SEPARATOR + "v"))),
                         nullptr, true});
                     MethodInfo *MIRdy = allocMethod(getRdyName(methodName));
                     addMethod(muxDef, MIRdy);
