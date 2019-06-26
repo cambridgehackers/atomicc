@@ -35,6 +35,12 @@ std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 
+static std::string baseMethodName(std::string pname)
+{
+    if (endswith(pname, "__ENA"))
+        pname = pname.substr(0, pname.length()-5);
+    return pname;
+}
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
     bool tDir = refList[target].out;
@@ -155,6 +161,7 @@ typedef struct {
     bool        isOutput, isInout, isLocal;
     MethodInfo *MI;
     std::string init; /* for parameters */
+    bool        action;
 } PinInfo;
 std::list<PinInfo> pinPorts, pinMethods, paramPorts;
 static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal)
@@ -171,7 +178,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         for (auto MI: IIR->methods) {
             std::string name = methodPrefix + interfaceName + MI->name;
             bool out = instance ^ item.isPtr;
-            pinMethods.push_back(PinInfo{MI->type, name, out, false, isLocal || item.isLocalInterface, MI, ""/*not param*/});
+            pinMethods.push_back(PinInfo{MI->type, name, out, false, isLocal || item.isLocalInterface, MI, ""/*not param*/, MI->action});
         }
         for (auto fld: IIR->fields) {
             std::string name = pinPrefix + item.fldName + fld.fldName;
@@ -187,10 +194,10 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
                     else if (startswith(fld.type, "Bit("))
                         init = "0";
                 }
-                paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, init});
+                paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, init, false});
             }
             else
-                pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, ""/*not param*/});
+                pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, ""/*not param*/, false});
         }
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
             methodPrefix + interfaceName, isLocal || item.isLocalInterface);
@@ -261,10 +268,13 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
             checkWire(item.name, item.type, item.isOutput, item.isInout, item.init, item.isLocal);
     for (auto item: pinMethods) {
         checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, ""/*not param*/, item.isLocal);
+        if (item.action && !endswith(item.name, "__ENA"))
+            checkWire(item.name + "__ENA", "", item.isOutput ^ (0), false, ""/*not param*/, item.isLocal);
         if (trace_connect)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.name.c_str(), item.type.c_str());
-        for (auto pitem: item.MI->params)
-            checkWire(item.name.substr(0, item.name.length()-5) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal);
+        for (auto pitem: item.MI->params) {
+            checkWire(baseMethodName(item.name) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal);
+        }
     }
     for (auto item: pinPorts)
         checkWire(item.name, item.type, item.isOutput, item.isInout, ""/*not param*/, item.isLocal);
@@ -685,8 +695,8 @@ static void connectInterfaces(ModuleIR *IR)
                 setAssign(sstr, allocExpr(tstr), MI->type);
             else
                 setAssign(tstr, allocExpr(sstr), MI->type);
-            tstr = tstr.substr(0, tstr.length()-5) + MODULE_SEPARATOR;
-            sstr = sstr.substr(0, sstr.length()-5) + MODULE_SEPARATOR;
+            tstr = baseMethodName(tstr) + MODULE_SEPARATOR;
+            sstr = baseMethodName(sstr) + MODULE_SEPARATOR;
             for (auto info: MI->params) {
                 std::string sparm = sstr + info.name, tparm = tstr + info.name;
                 if (!IC.isForward) {
@@ -794,7 +804,7 @@ dumpExpr("READCALL", value);
             exit(-1);
         }
         auto AI = CI->params.begin();
-        std::string pname = calledName.substr(0, calledName.length()-5) + MODULE_SEPARATOR;
+        std::string pname = baseMethodName(calledName) + MODULE_SEPARATOR;
         int argCount = CI->params.size();
         ACCExpr *param = value->operands.front();
         for (auto item: param->operands) {
