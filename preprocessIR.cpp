@@ -48,6 +48,8 @@ static void walkSubst (ModuleIR *IR, ACCExpr *expr)
 {
     if (!expr)
         return;
+    if (expr->value == "__clog2")
+        expr->value = "$clog2";
     if (isIdChar(expr->value[0]))
          expr->value = fixupQualPin(IR, expr->value);  // fixup interface names
     for (auto item: expr->operands)
@@ -121,6 +123,8 @@ static ACCExpr *walkToGeneric (ACCExpr *expr, std::list<PARAM_MAP> &paramMap)
 {
     if (!expr)
         return expr;
+    if (expr->value == "__clog2")
+        expr->value = "$clog2";
     ACCExpr *ret = allocExpr(updateCount(expr->value, paramMap));
     for (auto item: expr->operands)
         ret->operands.push_back(walkToGeneric(item, paramMap));
