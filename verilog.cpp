@@ -730,9 +730,11 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
     for (auto info: MI->storeList) {
         walkRead(MI, info->cond, nullptr);
         walkRead(MI, info->value, info->cond);
-        std::string item = info->dest->value;
-        if (isIdChar(item[0]) && !info->dest->operands.size() && refList[item].pin == PIN_WIRE)
-            setAssign(item, info->value, refList[item].type);
+        std::string dest = info->dest->value;
+        if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
+            ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getEnaName(methodName)), info->cond));
+            appendMux(dest, cond, info->value, muxValueList);
+        }
         else
             appendLine(methodName, info->cond, info->dest, info->value);
     }
