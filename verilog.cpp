@@ -466,8 +466,8 @@ assignList["ifc$readBin$temp"].noRecursion = true;
 static void setAssignRefCount(ModuleIR *IR)
 {
     for (auto item: assignList) {
-        assignList[item.first].noRecursion = true;
-printf("[%s:%d] ref[%s].norec %d\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion);
+        //assignList[item.first].noRecursion = true;
+//printf("[%s:%d] ref[%s].norec %d\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion);
         if (item.second.type == "Bit(1)")
             assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
         else
