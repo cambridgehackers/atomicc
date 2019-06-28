@@ -293,17 +293,19 @@ static ACCExpr *get1Token(void)
     return ret;
 }
 
-bool checkInteger(ACCExpr *expr, std::string pattern)
+bool checkIntegerString(std::string val, std::string pattern)
 {
-    if (!expr)
-        return false;
-    std::string val = expr->value;
     if (!isdigit(val[0]))
         return false;
     int ind = val.find("'");
     if (ind > 0)    // strip off radix
         val = val.substr(ind+2);
     return val == pattern;
+}
+
+bool checkInteger(ACCExpr *expr, std::string pattern)
+{
+    return expr && checkIntegerString(expr->value, pattern);
 }
 
 ACCExpr *invertExpr(ACCExpr *expr)

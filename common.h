@@ -125,6 +125,7 @@ ACCExpr *getRHS(ACCExpr *expr, int match = 1);
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs);
 int walkCount (ACCExpr *expr);
 ACCExpr *dupExpr(ACCExpr *expr);
+bool checkIntegerString(std::string val, std::string pattern);
 bool checkInteger(ACCExpr *expr, std::string pattern);
 
 // readIR.cpp

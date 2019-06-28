@@ -112,7 +112,7 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, s
 static std::string updateCount(std::string count, std::list<PARAM_MAP> &paramMap)
 {
     for (auto item: paramMap)
-         if (count == item.value) {
+         if (checkIntegerString(count, item.value)) {
              count = item.name;
              break;
          }
@@ -139,7 +139,7 @@ static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
         type = "Bit(" + tree2str(expr) + ")";
     }
     for (auto item: paramMap)
-        if (type == "Bit(" + item.value + ")")
+        if (startswith(type, "Bit(") && endswith(type, ")") && checkIntegerString(type.substr(4, type.length() - 5), item.value))
             return "@" + item.name;
     return type;
 };

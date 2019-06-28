@@ -46,6 +46,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin && generateSection == "") {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
+if (0)
         if (target.find("[") == std::string::npos)
         exit(-1);
     }
@@ -452,22 +453,26 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
              && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
             if (trace_assign)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
+assignList["ifc$readBin$temp"].noRecursion = true;
             decRef(item);
             return simpleReplace(assignValue);
         }
     }
-    for (auto item: expr->operands)
-        newExpr->operands.push_back(simpleReplace(item));
+    for (auto oitem: expr->operands)
+        newExpr->operands.push_back(simpleReplace(oitem));
     return newExpr;
 }
 
 static void setAssignRefCount(ModuleIR *IR)
 {
-    for (auto item: assignList)
+    for (auto item: assignList) {
+        assignList[item.first].noRecursion = true;
+printf("[%s:%d] ref[%s].norec %d\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion);
         if (item.second.type == "Bit(1)")
             assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
         else
             assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
+    }
     for (auto item: assignList) {
         int i = 0;
         if (!item.second.value)
