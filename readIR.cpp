@@ -30,11 +30,11 @@ static FILE *OStrGlobal;
 static std::string getExpressionString(char terminator = 0)
 {
     const char *startp = bufp;
-    int level = 0, levelb = 0;
+    int level = 0, levelb = 0, levelc = 0;
     bool inQuote = false, beforeParen = true;
     while (*bufp == ' ')
         bufp++;
-    while (*bufp && ((terminator ? (*bufp != terminator) : beforeParen) || level != 0 || levelb != 0)) {
+    while (*bufp && ((terminator ? (*bufp != terminator) : beforeParen) || level != 0 || levelb != 0 || levelc != 0)) {
         if (inQuote) {
             if (*bufp == '"')
                 inQuote = false;
@@ -46,20 +46,22 @@ static std::string getExpressionString(char terminator = 0)
             inQuote = true;
         else if (*bufp == '(') {
             level++;
-            if (beforeParen)
-                terminator = 0;    // if we encounter parenthesized expr, go to end
             beforeParen = false;
         }
         else if (*bufp == ')')
             level--;
         else if (*bufp == '{') {
             levelb++;
-            if (beforeParen)
-                terminator = 0;    // if we encounter parenthesized expr, go to end
             beforeParen = false;
         }
         else if (*bufp == '}')
             levelb--;
+        else if (*bufp == '[') {
+            levelc++;
+            beforeParen = false;
+        }
+        else if (*bufp == ']')
+            levelc--;
         }
         bufp++;
     }
