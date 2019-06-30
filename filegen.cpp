@@ -67,6 +67,8 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
             std::string dirs = dirStr[mitem.out];
             if (mitem.inout)
                 dirs = "inout wire";
+            if (mitem.vecCount == "")
+                mitem.vecCount = convertType(mitem.type, 2);
             fprintf(OStr, "%s %s%s", dirs.c_str(), sizeProcess(mitem.type).c_str(), mitem.value.c_str());
         }
     }
@@ -85,7 +87,9 @@ void generateVerilogOutput(FILE *OStr)
             printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s vecCount %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str(), item.second.vecCount.c_str());
         if (item.second.pin == PIN_REG) {
             // HACK HACK HACK HACK
-            std::string vecCountStr = " [" + item.second.vecCount + ":0]";
+            if (item.second.vecCount == "")
+                item.second.vecCount = convertType(item.second.type, 2);
+            std::string vecCountStr = " [" + item.second.vecCount + " - 1:0]";
             if (item.second.vecCount == "") {
                 vecCountStr = "";
                 resetList.push_back(item.first);
@@ -97,7 +101,9 @@ void generateVerilogOutput(FILE *OStr)
         std::string temp = item.first;
         if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL) {
         if (item.second.count && !item.second.isGenerated) {
-            std::string vecCountStr = " [" + item.second.vecCount + ":0]";
+            if (item.second.vecCount == "")
+                item.second.vecCount = convertType(item.second.type, 2);
+            std::string vecCountStr = " [" + item.second.vecCount + " - 1:0]";
             if (item.second.vecCount == "")
                 vecCountStr = "";
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());
@@ -137,6 +143,8 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
     for (auto mitem: modNew) {
         if (mitem.moduleStart) {
             flushOut();
+            if (mitem.vecCount == "")
+                mitem.vecCount = convertType(mitem.type, 2);
             isGenerate = mitem.vecCount != "";
             std::string instName = mitem.argName;
             // HACK HACK HACK HACK

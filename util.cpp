@@ -68,10 +68,8 @@ ModuleIR *lookupInterface(std::string name)
     return interfaceIndex[ind];
 }
 
-std::string convertType(std::string arg)
+std::string convertType(std::string arg, int arrayProcess)
 {
-    if (arg == "" || arg == "void")
-        return "0";
     const char *bp = arg.c_str();
     auto checkT = [&] (const char *val) -> bool {
         int len = strlen(val);
@@ -80,12 +78,6 @@ std::string convertType(std::string arg)
             bp += len;
         return ret;
     };
-    if (checkT("Bit(")) {
-        std::string rets = bp;
-        return rets.substr(0, rets.length()-1);
-    }
-    if (arg == "FLOAT")
-        return "1";                 // should never occur in declarations
     if (checkT("ARRAY_")) {
         std::string arr = bp;
         int ind = arr.find("_");
@@ -93,8 +85,22 @@ std::string convertType(std::string arg)
             arr = arr.substr(0, ind);
         while (isdigit(*bp) || *bp == '_')
             bp++;
+        if (arrayProcess == 1) // element only
+            return convertType(bp); // only return element size (caller handles array decl)
+        if (arrayProcess == 2) // array size only
+            return arr;
         return "(" + arr + " * " + convertType(bp) + ")";
     }
+    if (arrayProcess == 2) // array size only
+        return "";
+    if (arg == "" || arg == "void")
+        return "0";
+    if (checkT("Bit(")) {
+        std::string rets = bp;
+        return rets.substr(0, rets.length()-1);
+    }
+    if (arg == "FLOAT")
+        return "1";                 // should never occur in declarations
     if (checkT("@")) {
 //printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
         return bp;
@@ -118,7 +124,7 @@ std::string convertType(std::string arg)
 
 std::string sizeProcess(std::string type)
 {
-    std::string val = convertType(type);
+    std::string val = convertType(type, 1); // get element size only for arrays
     if (val == "" || val == "0" || val == "1")
         return "";
     return "[" + val + " - 1:0]";
