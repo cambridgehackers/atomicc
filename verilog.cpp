@@ -67,8 +67,14 @@ if (0)
     }
     if (generateSection != "")
         condAssignList[generateSection][target] = AssignItem{value, type, false};
-    else
+    else {
         assignList[target] = AssignItem{value, type, false};
+        int ind = target.find('[');
+        if (ind != -1) {
+            refList[target.substr(0,ind)].count++;
+            assignList[target].noRecursion = true;
+        }
+    }
 }
 
 static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign, std::string vecCount)
@@ -453,7 +459,6 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
              && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
             if (trace_assign)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
-assignList["ifc$readBin$temp"].noRecursion = true;
             decRef(item);
             return simpleReplace(assignValue);
         }
@@ -897,8 +902,10 @@ static std::list<ModData> modLine;
                     listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
             }
         }
-        for (auto item: MI->alloca) // be sure to define local temps before walkRemoveParam
-            expandStruct(IR, item.first, item.second.type, 1, false, true, PIN_WIRE, true, "");
+        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
+            refList[item.first] = RefItem{0, item.second.type, true, false, PIN_WIRE, false, false, convertType(item.second.type, 2)};
+            expandStruct(IR, item.first, item.second.type, 1, false, false, PIN_WIRE, true, "");
+        }
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))

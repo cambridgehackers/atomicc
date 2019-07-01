@@ -217,21 +217,11 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
         fieldName = searchStr.substr(0, ind);
         searchStr = searchStr.substr(ind+1);
         ModuleIR *nextIR = iterField(searchIR, CBAct {
-            int dimIndex = 0;
-            std::string vecCount = item.vecCount;
-            std::string pvec;
-            do {
                 std::string fldName = item.fldName;
-                if (vecCount != "")
-                    fldName += autostr(dimIndex++);
                 if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
+                    printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
                 if (fieldName != "" && fldName == fieldName)
                     return lookupIR(item.type);
-                pvec = autostr(atoi(vecCount.c_str()) - 1);
-                if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
-                if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
-            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
         if (!nextIR)
             break;
@@ -246,21 +236,11 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
             searchStr = searchStr.substr(ind+1);
         }
         ModuleIR *nextIR = iterInterface(searchIR, CBAct {
-            int dimIndex = 0;
-            std::string vecCount = item.vecCount;
-            std::string pvec;
-            do {
                 std::string fldName = item.fldName;
-                if (vecCount != "")
-                    fldName += autostr(dimIndex++);
                 if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
+                    printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
                 if (fieldName != "" && fldName == fieldName)
                     return lookupInterface(item.type);
-                pvec = autostr(atoi(vecCount.c_str()) - 1);
-                if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
-                if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
-            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
         if (!nextIR)
             break;
@@ -281,7 +261,7 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
 void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force, uint64_t aoffset, bool alias, bool init)
 {
     if (trace_expand)
-        printf("[%s:%d] entry %s\n", __FUNCTION__, __LINE__, name.c_str());
+        printf("[%s:%d] entry %s type %s force %d init %d\n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), force, init);
     __block uint64_t offset = aoffset;
     std::string sname = name + MODULE_SEPARATOR;
     if (init)
@@ -297,23 +277,13 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
             getFieldList(fieldList, sname + item.name, tname, item.type, out, true, toff, true, false);
         }
         iterField(IR, CBAct {
-            int dimIndex = 0;
-            std::string vecCount = item.vecCount;
-            std::string pvec;
-            do {
                 std::string fldName = item.fldName;
-                if (vecCount != "")
-                    fldName += autostr(dimIndex++);
                 if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s vec '%s' dimIndex %d\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str(), vecCount.c_str(), dimIndex);
+                    printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
                 if (item.isParameter == "") {
                     getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
                     offset += atoi(convertType(item.type).c_str());
                 }
-                pvec = "(" + vecCount + "- 1)";
-                if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
-                if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
-            } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
             return nullptr; });
     }
     else if (force) {

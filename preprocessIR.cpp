@@ -74,10 +74,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr, bool inGenerate)
         if (post[0] == '$')
             post = "." + post.substr(1);
     }
-    if (isdigit(subscript->value[0]) || startswith(subscript->value, GENVAR_NAME) || inGenerate) {
-        expr->value += "[" + tree2str(subscript) + "]" + post;
-        return;
-    }
+    expr->value += "[" + tree2str(subscript) + "]" + post;
 }
 static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
 {

@@ -200,12 +200,12 @@ next:;
         int ind = temp.find('[');
         if (ind != -1)
             temp = temp.substr(0,ind);
-        if (item.second.value && refList[temp].count && !refList[temp].done) {
+        if (item.second.value && refList[temp].count && !refList[item.first].done) {
             if (!seen)
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
             seen = true;
             fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
-            refList[temp].done = true; // mark that assigns have already been output
+            refList[item.first].done = true; // mark that assigns have already been output
         }
     }
     for (auto ctop: condAssignList) {
