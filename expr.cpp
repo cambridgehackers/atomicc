@@ -135,7 +135,11 @@ std::string tree2str(ACCExpr *expr)
     else if (isIdChar(op[0])) {
         ret += op;
     }
-    else if (!expr->operands.size() || ((op == "-" || op == "!")/*unary*/ && expr->operands.size() == 1))
+    else if (((op == "-")/*unary*/ && expr->operands.size() == 1))
+        ret += op;
+    else if (op[0] == '@')
+        ret += op.substr(1);
+    else if (op == "!" || !expr->operands.size())
         ret += op;
     bool topOp = checkOperand(expr->value) || expr->value == "," || expr->value == "[" || expr->value == PARAMETER_MARKER;
     for (auto item: expr->operands) {
@@ -424,8 +428,8 @@ printf("[%s:%d] expr %s clen %s conv %s\n", __FUNCTION__, __LINE__, tree2str(exp
         updateWidth(getRHS(expr), clen);
         updateWidth(getRHS(expr, 2), clen);
     }
-    else if (arithOp(expr->value) || expr->value == "(") {
-        if (expr->value == "-" && expr->operands.size() == 1
+    else if (arithOp(expr->value) || expr->value == "(" || expr->value == "@-") {
+        if (expr->value == "@-"
             && isdigit(expr->operands.front()->value[0]) && len == 1) {
             /* hack to update width on "~foo", which translates to "foo ^ -1" in the IR */
             expr->value = expr->operands.front()->value;
@@ -464,7 +468,14 @@ ACCExpr *dupExpr(ACCExpr *expr)
 void walkReplaceBuiltin(ACCExpr *expr)
 {
     while(1) {
-    if (expr->value == "__bitconcat") {
+    if (expr->value == "__reduce") {
+        ACCExpr *list = expr->operands.front();
+        std::string op = getRHS(list, 0)->value;
+        expr->value = "@" + op.substr(1, op.length() - 2);
+        expr->operands.clear();
+        expr->operands.push_back(getRHS(list, 1));
+    }
+    else if (expr->value == "__bitconcat") {
         ACCExpr *list = expr->operands.front();
         if (list->value == PARAMETER_MARKER)
             list->value = "{";
@@ -693,7 +704,14 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
                 else
                     tnext = get1Token();
                 repeatCurrentToken = false;
-                if ((tok->value == "-" || tok->value == "!") && !tok->operands.size()) { // unary '-'
+                std::string val = tok->value;
+                if (val[0] == '@') {
+printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA '%s'\n", __FUNCTION__, __LINE__, val.c_str());
+                    val = val.substr(1);
+                }
+                if ((val == "-" || val == "!" || val == "^" || val == "|" || val == "&") && !tok->operands.size()) { // unary '-'
+                    if (val != "!")
+                        tok->value = "@" + tok->value;
                     unary = tok;
                     tok = tnext;
                     tnext = get1Token();
