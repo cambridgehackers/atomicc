@@ -267,7 +267,7 @@ next:;
         }
         fprintf(OStr, "    end // always @ (posedge CLK)\n");
         if (ctopLoop != "")
-            fprintf(OStr, "   end // end of generate\n");
+            fprintf(OStr, "   end // end of forloop\n");
         if (ctop == ctopEnd)
             break;
     }

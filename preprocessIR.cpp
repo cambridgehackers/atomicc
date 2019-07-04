@@ -501,8 +501,15 @@ static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replace
         item->cond = walkReplaceExpr(item->cond, pattern, replacement);
     }
 }
-static void postParseCleanup(MethodInfo *MI)
+static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
 {
+    for (auto item: MI->generateFor) {
+        if (MethodInfo *MIb = IR->generateBody[item.body])
+        for (auto pitem: MIb->params) {
+            if (MI->alloca.find(pitem.name) != MI->alloca.end())
+                MI->alloca[pitem.name].noReplace = true;
+        }
+    }
     rewriteExpr(MI, MI->guard);
     for (auto item: MI->storeList) {
         rewriteExpr(MI, item->dest);
@@ -551,8 +558,8 @@ void cleanupIR(std::list<ModuleIR *> &irSeq)
 {
     for (auto IR: irSeq) {
         for (auto MI: IR->methods)
-            postParseCleanup(MI);
+            postParseCleanup(IR, MI);
         for (auto item: IR->generateBody)
-            postParseCleanup(item.second);
+            postParseCleanup(IR, item.second);
     }
 }
