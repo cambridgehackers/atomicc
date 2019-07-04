@@ -185,7 +185,7 @@ assert(MInew);
         ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr(PARAMETER_MARKER, paramList));
         for (auto param: MI->params) {
             std::string upper = "(" + offset + " + " + convertType(param.type) + ")";
-            paramList->operands.push_back(allocExpr(host + "$enq$v[" + upper + "-1 + :" + offset + "]"));
+            paramList->operands.push_back(allocExpr(host + "$enq$v[" + upper + " -1 :" + offset + "]"));
             offset = upper;
         }
         if (!endswith(methodName, "__ENA")) {
