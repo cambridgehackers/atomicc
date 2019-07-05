@@ -55,7 +55,7 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
     std::string msep;
     for (auto MI : swInfo.inter->methods) {
         std::string methodName = MI->name;
-        if (!endswith(methodName, "__ENA"))
+        if (endswith(methodName, "__RDY"))
             continue;
         reorderList[baseMethodName(methodName)] = MI;
     }
@@ -73,6 +73,15 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
              psep = ",";
         }
         fprintf(OStrJ, "\n                    ] }");
+#if 0
+        if (MI->type != "") {
+            char buffer[1000];
+            sprintf(buffer, ", \"rtype\": { \"name\": \"Bit\", \"params\": [ { "
+                 "\"name\": \"%s\" } ] }", convertType(MI->type).c_str());
+            retType = buffer;
+        }
+        fprintf(OStrJ, "\n                    ]%s }", retType.c_str());
+#endif
         msep = ",";
     }
     fprintf(OStrJ, "\n            ], \"direction\": \"%d\", \"cname\": \"%s\" }",
@@ -88,7 +97,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
             for (auto iitem: IR->interfaces) {
                 if (iitem.fldName == interfaceName) {
                     ModuleIR *inter = lookupInterface(iitem.type);
-                    softwareNameList[inter->name] = SoftwareItem{iitem, IR, inter};
+                    softwareNameList[CBEMangle(inter->name)] = SoftwareItem{iitem, IR, inter};
                 }
             }
         }

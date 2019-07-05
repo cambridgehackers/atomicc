@@ -345,7 +345,11 @@ void dumpMethod(std::string name, MethodInfo *MI)
         printf("%s%s %s", sep.c_str(), param.type.c_str(), param.name.c_str());
         sep = ", ";
     }
-    printf(") %s = %s {\n", MI->type.c_str(), tree2str(MI->guard).c_str());
+    printf(")");
+    std::string retType = MI->type, retVal = tree2str(MI->guard);
+    if (retType != "" || retVal != "")
+        printf(" %s = %s\n", retType.c_str(), retVal.c_str());
+    printf(" {\n");
     for (auto item: MI->alloca)
         printf("      ALLOCA %s %s\n", item.second.type.c_str(), item.first.c_str());
     for (auto item: MI->letList)
@@ -406,4 +410,18 @@ std::string findType(std::string name)
 printf("[%s:%d] reference to '%s', but could not locate RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR \n", __FUNCTION__, __LINE__, name.c_str());
     exit(-1);
     return "";
+}
+std::string CBEMangle(const std::string &S)
+{
+    std::string Result;
+    for (unsigned i = 0, e = S.size(); i != e; ++i)
+        if (isalnum(S[i]) || S[i] == '_' || S[i] == '$')
+            Result += S[i];
+        else {
+            Result += '_';
+            Result += 'A'+(S[i]&15);
+            Result += 'A'+((S[i]>>4)&15);
+            Result += '_';
+        }
+    return Result;
 }

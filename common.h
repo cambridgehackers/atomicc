@@ -105,6 +105,7 @@ bool addMethod(ModuleIR *IR, MethodInfo *MI);
 void dumpMethod(std::string name, MethodInfo *MI);
 void dumpModule(std::string name, ModuleIR *IR);
 std::string findType(std::string name);
+std::string CBEMangle(const std::string &S);
 
 // expr.cpp
 std::string tree2str(ACCExpr *expr);
@@ -127,6 +128,9 @@ int walkCount (ACCExpr *expr);
 ACCExpr *dupExpr(ACCExpr *expr);
 bool checkIntegerString(std::string val, std::string pattern);
 bool checkInteger(ACCExpr *expr, std::string pattern);
+bool booleanBinop(std::string s);
+bool arithOp(std::string s);
+bool relationalOp(std::string s);
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);

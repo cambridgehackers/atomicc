@@ -45,11 +45,6 @@ printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
         std::string methodName = MI->name;
         if (endswith(methodName, "__RDY"))
             continue;
-        if (!endswith(methodName, "__ENA")) {
-printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
-exit(-1);
-            continue;
-        }
         methodName = baseMethodName(methodName);
         ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
         variant->isInterface = false;
@@ -81,7 +76,7 @@ static void processM2P(ModuleIR *IR)
             HIR = lookupInterface(inter.type);
             host = inter.fldName;
             std::string iname = inter.type;
-            IR->name = iname + "___M2P";
+            IR->name = "___M2P" + iname;
             std::string type = iname + "__Data";
             ModuleIR *II = lookupIR(type);
             if (!II) {
@@ -108,11 +103,11 @@ assert(HIR);
         MInew->guard = MI->guard;
         if (endswith(methodName, "__RDY"))
             continue;
-        if (!endswith(methodName, "__ENA")) {
-printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
-exit(-1);
-            continue;
-        }
+        //if (!endswith(methodName, "__ENA")) {
+//printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
+//exit(-1);
+            //continue;
+        //}
         std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
         std::string call;
         uint64_t dataLength = 32; // include length of tag
@@ -137,12 +132,13 @@ static void processP2M(ModuleIR *IR)
 {
     ModuleIR *IIR = nullptr, *HIR = nullptr;
     std::string host, target;
+    bool addedReturnInd = false;
     for (auto inter: IR->interfaces) {
         if (inter.isPtr) {
             IIR = lookupInterface(inter.type);
             target = inter.fldName;
             std::string iname = inter.type;
-            IR->name = iname + "___P2M";
+            IR->name = "___P2M" + iname;
             std::string type = "P2M_MD_" + iname + "_OD__KD__KD_Data";
     if (trace_software)
 dumpModule("P2M/IIR :" + target, IIR);
@@ -190,11 +186,25 @@ assert(MInew);
         }
         if (!endswith(methodName, "__ENA")) {
 printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
-exit(-1);
-            continue;
+//exit(-1);
+            //continue;
         }
-        MInew->callList.push_back(new CallListElement{call, allocExpr("==", allocExpr(host + "$enq$v[31:16]"),
-                 allocExpr("16'd" + autostr(counter))), true});
+        ACCExpr *cond = allocExpr("==", allocExpr(host + "$enq$v[31:16]"),
+                 allocExpr("16'd" + autostr(counter)));
+        if (!endswith(methodName, "__ENA")) {
+            if (!addedReturnInd)
+                IR->interfaces.push_back(FieldElement{"returnInd", "", "PipeIn", true, false, false, false, ""/*not param*/, false, false});
+            addedReturnInd = true;
+            // when calling 'value' or 'actionValue' method, enqueue return value
+            std::string destName = "V__" + methodName;
+            ACCExpr *dest = allocExpr(destName);
+            MInew->alloca[destName] = AllocaItem{MI->type, false};
+            call->operands.clear();
+            MInew->letList.push_back(new LetListElement{dest, call, cond, MI->type});
+            std::string ntarget = "returnInd";
+            call = allocExpr(ntarget + "$enq__ENA", allocExpr(PARAMETER_MARKER, dest));
+        }
+        MInew->callList.push_back(new CallListElement{call, cond, true});
         counter++;
     }
     if (trace_software)

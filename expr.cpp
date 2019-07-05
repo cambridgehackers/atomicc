@@ -71,7 +71,7 @@ static bool bitOp(std::string s)
 {
     return s == "^" || s == "&" || s == "|";
 }
-static bool booleanBinop(std::string s)
+bool booleanBinop(std::string s)
 {
     return bitOp(s) || s == "&&" || s == "||";
 }
@@ -79,12 +79,12 @@ static bool shiftOp(std::string s)
 {
     return s == "<<" || s == ">>";
 }
-static bool arithOp(std::string s)
+bool arithOp(std::string s)
 {
     return bitOp(s) || s == "+" || s == "-" || s == "*" || s == "%" || s == "?" || s == ":" || s == "/";
 }
 
-static bool relationalOp(std::string s)
+bool relationalOp(std::string s)
 {
     return s == "==" || s == "!=" || s == "<" || s == ">" || s == "<=" || s == ">=";
 }
@@ -603,7 +603,7 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
                 goto next; // we can analyze relops on booleans
             if (trace_bool)
                 printf("[%s:%d] boolnot %d %d = %s\n", __FUNCTION__, __LINE__, boolPossible(getRHS(expr,0)), boolPossible(getRHS(expr,1)), tree2str(expr).c_str());
-            if (isIdChar(lhs->value[0])) {
+            if (lhs && isIdChar(lhs->value[0])) {
                 if (trace_bool)
                     printf("[%s:%d] name %s type %s\n", __FUNCTION__, __LINE__, lhs->value.c_str(), refList[lhs->value].type.c_str());
             }

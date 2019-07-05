@@ -304,19 +304,29 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
 {
     ACCExpr *newExpr = allocExpr(expr->value);
-    std::string item = expr->value;
-    if (isIdChar(item[0])) {
-        int pin = refList[item].pin;
+    std::string op = expr->value;
+    if (isIdChar(op[0])) {
+        int pin = refList[op].pin;
         if (pin != PIN_OBJECT && pin != PIN_REG) {
 //if (trace_assign)
-printf("[%s:%d] reject use of non-state item %s %d\n", __FUNCTION__, __LINE__, item.c_str(), pin);
+printf("[%s:%d] reject use of non-state op %s %d\n", __FUNCTION__, __LINE__, op.c_str(), pin);
             return nullptr;
         }
-        //assert(refList[item].pin);
+        //assert(refList[op].pin);
     }
-    for (auto item: expr->operands)
-        if (ACCExpr *operand = walkRemoveParam(item))
-            newExpr->operands.push_back(operand);
+    for (auto oitem: expr->operands) {
+        ACCExpr *operand = walkRemoveParam(oitem);
+        if (!operand) {
+            continue;
+            if (booleanBinop(op) || arithOp(op))
+                continue;
+            if (relationalOp(op))
+                return nullptr;
+printf("[%s:%d] removedope %s relational %d operator %s orig %s\n", __FUNCTION__, __LINE__, tree2str(oitem).c_str(), relationalOp(op), expr->value.c_str(), tree2str(expr).c_str());
+            continue;
+        }
+        newExpr->operands.push_back(operand);
+    }
     return newExpr;
 }
 
@@ -912,7 +922,7 @@ static std::list<ModData> modLine;
         for (auto item: MI->callList) {
             ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
             if (item->cond)
-                tempCond = allocExpr("|", invertExpr(walkRemoveParam(item->cond)), tempCond);
+                tempCond = allocExpr("|", walkRemoveParam(invertExpr(item->cond)), tempCond);
             MIRdy->guard = cleanupBool(allocExpr("&", MIRdy->guard, tempCond));
         }
     }
