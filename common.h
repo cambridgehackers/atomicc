@@ -64,6 +64,7 @@ typedef struct {
     bool        done;
     bool        isGenerated;
     std::string vecCount;
+    bool        isArgument;
 } RefItem;
 typedef struct {
     long        upper;

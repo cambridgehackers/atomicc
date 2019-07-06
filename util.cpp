@@ -300,12 +300,12 @@ printf("%s: name %s base %s type %s %s offset %d\n", __FUNCTION__, fitem.name.c_
 ModuleIR *allocIR(std::string name, bool isInterface)
 {
     std::string iname = name;
-    ModuleIR *IR = new ModuleIR;
-    IR->name = name;
-    IR->genvarCount = 0;
-    //int i = iname.find("(");
-    //if (i > 0)
-        //iname = iname.substr(0,i);
+    ModuleIR *IR = new ModuleIR{name/*name*/,
+        {}/*metaList*/, {}/*softwareName*/, {}/*methods*/,
+        {}/*generateBody*/, {}/*priority*/, {}/*fields*/,
+        {}/*params*/, {}/*unionList*/, {}/*interfaces*/,
+        {}/*interfaceConnect*/, 0/*genvarCount*/, false/*isInterface*/,
+        false/*isStruct*/, false/*isSerialize*/, false/*transformGeneric*/};
     if (isInterface)
         interfaceIndex[iname] = IR;
     else
@@ -316,10 +316,9 @@ ModuleIR *allocIR(std::string name, bool isInterface)
 MethodInfo *allocMethod(std::string name)
 {
     MethodInfo *MI = new MethodInfo{nullptr/*guard*/,
-        ""/*name*/, false/*rule*/, false/*action*/,
+        name/*name*/, false/*rule*/, false/*action*/,
         {}/*storeList*/, {}/*letList*/, {}/*callList*/, {}/*printfList*/,
         ""/*type*/, {}/*params*/, {}/*generateFor*/, {}/*alloca*/, {{}}/*meta*/};
-    MI->name = name;
     return MI;
 }
 
@@ -348,8 +347,11 @@ void dumpMethod(std::string name, MethodInfo *MI)
     printf(")");
     std::string retType = MI->type, retVal = tree2str(MI->guard);
     if (retType != "" || retVal != "")
-        printf(" %s = %s\n", retType.c_str(), retVal.c_str());
-    printf(" {\n");
+        printf(" %s = %s", retType.c_str(), retVal.c_str());
+    printf(" {");
+    if (MI->alloca.size() || MI->letList.size() || MI->storeList.size()
+        || MI->callList.size() || MI->generateFor.size()) {
+    printf("\n");
     for (auto item: MI->alloca)
         printf("      ALLOCA %s %s\n", item.second.type.c_str(), item.first.c_str());
     for (auto item: MI->letList)
@@ -362,6 +364,7 @@ void dumpMethod(std::string name, MethodInfo *MI)
         printf("      GENERATE %s: %s, %s, %s, %s, %s\n", tree2str(item.cond).c_str(),
             item.var.c_str(), tree2str(item.init).c_str(),
             tree2str(item.limit).c_str(), tree2str(item.incr).c_str(), item.body.c_str());
+    }
     printf("    }\n");
 }
 

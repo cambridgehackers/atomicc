@@ -195,14 +195,13 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
             if (!addedReturnInd)
                 IR->interfaces.push_back(FieldElement{"returnInd", "", "PipeIn", true, false, false, false, ""/*not param*/, false, false});
             addedReturnInd = true;
+            if (MI->action) {
+                // when calling 'actionValue', guarded call needed
+                // need to call xxx__ENA function here!
+                //MInew->callList.push_back(new CallListElement{call, cond, true});
+            }
             // when calling 'value' or 'actionValue' method, enqueue return value
-            std::string destName = "V__" + methodName;
-            ACCExpr *dest = allocExpr(destName);
-            MInew->alloca[destName] = AllocaItem{MI->type, false};
-            call->operands.clear();
-            MInew->letList.push_back(new LetListElement{dest, call, cond, MI->type});
-            std::string ntarget = "returnInd";
-            call = allocExpr(ntarget + "$enq__ENA", allocExpr(PARAMETER_MARKER, dest));
+            call = allocExpr("returnInd$enq__ENA", allocExpr(PARAMETER_MARKER, allocExpr(call->value)));
         }
         MInew->callList.push_back(new CallListElement{call, cond, true});
         counter++;
@@ -222,7 +221,7 @@ printf("[%s:%d] module pointer missing %s\n", __FUNCTION__, __LINE__, mapp.first
             processSerialize(IR);
         if (startswith(IR->name, "P2M")) {
     if (trace_software)
-dumpModule("P2M", IR);
+dumpModule("P2Morig", IR);
             irSeq.push_back(IR);
             processP2M(IR);
         }

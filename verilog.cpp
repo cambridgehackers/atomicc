@@ -77,7 +77,7 @@ if (0)
     }
 }
 
-static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign, std::string vecCount)
+static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign, std::string vecCount, bool isArgument)
 {
     ACCExpr *itemList = allocExpr("{");
     std::list<FieldItem> fieldList;
@@ -116,8 +116,8 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
 if (trace_expand || refList[fitem.name].pin)
 printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), tempType.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
         assert (!refList[fitem.name].pin);
-        refList[fitem.name] = RefItem{0, tempType, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false, lvecCount};
-        refList[fnew] = RefItem{0, tempType, out != 0, false, PIN_ALIAS, false, false, lvecCount};
+        refList[fitem.name] = RefItem{0, tempType, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false, lvecCount, isArgument};
+        refList[fnew] = RefItem{0, tempType, out != 0, false, PIN_ALIAS, false, false, lvecCount, isArgument};
         if (trace_declare)
             printf("[%s:%d]NEWREF %s %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fnew.c_str(), tempType.c_str());
         if (!fitem.alias && out)
@@ -130,7 +130,7 @@ printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d
         }
     }
     if (force) {
-        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false, vecCount};
+        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false, vecCount, isArgument};
         if (trace_declare)
             printf("[%s:%d]NEWREF2 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), type.c_str());
     }
@@ -214,7 +214,7 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
     std::string minst;
     if (instance != "")
         minst = instance.substr(0, instance.length()-1);
-    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal) -> void {
+    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument) -> void {
         int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
         std::string instName = instance + name;
         if (vecCount != "") {
@@ -224,13 +224,13 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
                 instName = name;
         }
         if (!isLocal || instance == "" || dontDeclare)
-        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare, ""};
+        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare, "", isArgument};
         if (!isLocal && !dontDeclare)
         modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
         if (trace_connect)
             printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d dDecl %d vec '%s' dim %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, dontDeclare, vecCount.c_str(), dimIndex);
         if (isparam == "")
-        expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE, true, vecCount);
+        expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE, true, vecCount, isArgument);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     pinPorts.clear();
@@ -266,19 +266,19 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
         modParam.push_back(ModData{minst, moduleInstantiation, "", true, pinPorts.size() > 0, 0, false, ""/*not param*/, vecCount});
     if (instance == "")
         for (auto item: paramPorts)
-            checkWire(item.name, item.type, item.isOutput, item.isInout, item.init, item.isLocal);
+            checkWire(item.name, item.type, item.isOutput, item.isInout, item.init, item.isLocal, true/*isArgument*/);
     for (auto item: pinMethods) {
-        checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, ""/*not param*/, item.isLocal);
+        checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, ""/*not param*/, item.isLocal, false/*isArgument*/);
         if (item.action && !endswith(item.name, "__ENA"))
-            checkWire(item.name + "__ENA", "", item.isOutput ^ (0), false, ""/*not param*/, item.isLocal);
+            checkWire(item.name + "__ENA", "", item.isOutput ^ (0), false, ""/*not param*/, item.isLocal, false/*isArgument*/);
         if (trace_connect)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.name.c_str(), item.type.c_str());
         for (auto pitem: item.MI->params) {
-            checkWire(baseMethodName(item.name) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal);
+            checkWire(baseMethodName(item.name) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal, instance==""/*isArgument*/);
         }
     }
     for (auto item: pinPorts)
-        checkWire(item.name, item.type, item.isOutput, item.isInout, ""/*not param*/, item.isLocal);
+        checkWire(item.name, item.type, item.isOutput, item.isInout, ""/*not param*/, item.isLocal, instance==""/*isArgument*/);
     if (instance != "")
         return;
     bool hasCLK = false, hasnRST = false;
@@ -296,9 +296,9 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
                 hasnRST = true;
         }
     if (!handleCLK && !hasCLK && vecCount == "")
-        refList["CLK"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, dontDeclare, ""};
+        refList["CLK"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, dontDeclare, "", false};
     if (!handleCLK && !hasnRST && vecCount == "")
-        refList["nRST"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, dontDeclare, ""};
+        refList["nRST"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, dontDeclare, "", false};
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -307,7 +307,7 @@ static ACCExpr *walkRemoveParam (ACCExpr *expr)
     std::string op = expr->value;
     if (isIdChar(op[0])) {
         int pin = refList[op].pin;
-        if (pin != PIN_OBJECT && pin != PIN_REG) {
+        if (refList[op].isArgument) {
 //if (trace_assign)
 printf("[%s:%d] reject use of non-state op %s %d\n", __FUNCTION__, __LINE__, op.c_str(), pin);
             return nullptr;
@@ -317,11 +317,11 @@ printf("[%s:%d] reject use of non-state op %s %d\n", __FUNCTION__, __LINE__, op.
     for (auto oitem: expr->operands) {
         ACCExpr *operand = walkRemoveParam(oitem);
         if (!operand) {
-            continue;
+            //continue;
+            if (relationalOp(op) || op == "!")
+                return nullptr;
             if (booleanBinop(op) || arithOp(op))
                 continue;
-            if (relationalOp(op))
-                return nullptr;
 printf("[%s:%d] removedope %s relational %d operator %s orig %s\n", __FUNCTION__, __LINE__, tree2str(oitem).c_str(), relationalOp(op), expr->value.c_str(), tree2str(expr).c_str());
             continue;
         }
@@ -869,7 +869,7 @@ static std::list<ModData> modLine;
             ModuleIR *itemIR = lookupIR(item.type);
             if (itemIR && !item.isPtr) {
             if (itemIR->isStruct)
-                expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount);
+                expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount, false);
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount, -1);
             }
@@ -881,13 +881,13 @@ static std::list<ModData> modLine;
             if (itemIR && !item.isPtr) {
             if (itemIR->isStruct) {
                 if (vecCount == "")
-                    expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount);
+                    expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount, false);
             }
             else
                 generateModuleSignature(itemIR, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != "", vecCount, dimIndex++);
             }
             else { // if (convertType(item.type) != 0)
-                refList[fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, vecCount};
+                refList[fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, vecCount, false};
                 if (trace_declare)
                     printf("[%s:%d]NEWFLD3 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.type.c_str());
             }
@@ -900,7 +900,7 @@ static std::list<ModData> modLine;
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
         if (MI->rule)    // both RDY and ENA must be allocated for rules
-            refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false, false, ""};
+            refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false, false, "", false};
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
             value->value = "(";   // change from PARAMETER_MARKER
@@ -913,8 +913,9 @@ static std::list<ModData> modLine;
             }
         }
         for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
-            refList[item.first] = RefItem{0, item.second.type, true, false, PIN_WIRE, false, false, convertType(item.second.type, 2)};
-            expandStruct(IR, item.first, item.second.type, 1, false, false, PIN_WIRE, true, "");
+            refList[item.first] = RefItem{0, item.second.type, true, false, PIN_WIRE, false, false, convertType(item.second.type, 2), false};
+            expandStruct(IR, item.first, item.second.type, 1, false, false, PIN_WIRE, true, "", false);
+            refList[item.first].count++;
         }
         // lift guards from called method interfaces
         if (!endswith(methodName, "__RDY"))
