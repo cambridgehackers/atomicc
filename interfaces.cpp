@@ -193,7 +193,7 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
                  allocExpr("16'd" + autostr(counter)));
         if (!endswith(methodName, "__ENA")) {
             if (!addedReturnInd)
-                IR->interfaces.push_back(FieldElement{"returnInd", "", "PipeIn", true, false, false, false, ""/*not param*/, false, false});
+                IR->interfaces.push_back(FieldElement{"returnInd", "", "PipeInH", true, false, false, false, ""/*not param*/, false, false});
             addedReturnInd = true;
             if (MI->action) {
                 // when calling 'actionValue', guarded call needed
@@ -201,7 +201,15 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
                 //MInew->callList.push_back(new CallListElement{call, cond, true});
             }
             // when calling 'value' or 'actionValue' method, enqueue return value
-            call = allocExpr("returnInd$enq__ENA", allocExpr(PARAMETER_MARKER, allocExpr(call->value)));
+            uint64_t dataLength = 48; // include length of tag
+            uint64_t thisLen = atoi(convertType(MI->type).c_str());
+            dataLength += thisLen;
+            call = allocExpr("returnInd$enq__ENA", allocExpr(PARAMETER_MARKER,
+                allocExpr("{ " + call->value
+                               + ", 16'd" + autostr(thisLen) // bit len used
+                               + ", 16'd" + autostr(counter) // which method had return
+                               + ", 16'd" + autostr(PORTALNUM) + "}"),
+                allocExpr("16'd" + autostr(dataLength/32))));
         }
         MInew->callList.push_back(new CallListElement{call, cond, true});
         counter++;

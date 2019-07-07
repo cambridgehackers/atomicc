@@ -62,7 +62,7 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
     for (auto item: reorderList) {
         MethodInfo *MI = item.second;
         std::string methodName = item.first; // reorderList, not method!!
-        std::string psep;
+        std::string psep, retType;
         fprintf(OStrJ, "%s\n                { \"dname\": \"%s\", \"dparams\": [",
              msep.c_str(), methodName.c_str());
         for (auto pitem: MI->params) {
@@ -72,16 +72,15 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
                  psep.c_str(), pitem.name.c_str(), convertType(pitem.type).c_str());
              psep = ",";
         }
-        fprintf(OStrJ, "\n                    ] }");
-#if 0
+#if 1
         if (MI->type != "") {
             char buffer[1000];
             sprintf(buffer, ", \"rtype\": { \"name\": \"Bit\", \"params\": [ { "
                  "\"name\": \"%s\" } ] }", convertType(MI->type).c_str());
             retType = buffer;
         }
-        fprintf(OStrJ, "\n                    ]%s }", retType.c_str());
 #endif
+        fprintf(OStrJ, "\n                    ]%s }", retType.c_str());
         msep = ",";
     }
     fprintf(OStrJ, "\n            ], \"direction\": \"%d\", \"cname\": \"%s\" }",
@@ -162,13 +161,15 @@ dumpModule("MUX", muxDef);
         }
         localName += MODULE_SEPARATOR;
         muxName += MODULE_SEPARATOR;
+        bool hasIndication = false;
+        std::string fieldName;
         for (auto item: softwareNameList) {
             jsonGenerate(OStrJ, item.first, item.second);
             bool outcall = item.second.field.isPtr;
             std::string userTypeName = item.second.inter->name;
             std::string userInterface = item.second.field.fldName;
             std::string pName = pipeName + (outcall ? "H" : "");
-            std::string fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
+            fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             ModuleIR *ifcIR = allocIR(fieldName);
             ifcIR->isInterface = false;
             ifcIR->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false});
@@ -178,6 +179,8 @@ dumpModule("MUX", muxDef);
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 localName + userInterface,
                 fieldName + MODULE_SEPARATOR + "method", userTypeName, true});
+            if (userInterface == "indication")
+                hasIndication = true;
             if (outcall && hasPrintf) {
                 IR->interfaceConnect.push_back(InterfaceConnectType{
                     muxName + "in", fieldName + MODULE_SEPARATOR + "pipe", pName, true});
@@ -189,6 +192,12 @@ dumpModule("MUX", muxDef);
             else
                 IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
                     fieldName + MODULE_SEPARATOR + "pipe", pName, true});
+        }
+        if (!hasIndication) {
+            IR->interfaces.push_back(FieldElement{"indication", "", "PipeInH",
+                true/*outcall*/, false, false, false, ""/*not param*/, false, false});
+            IR->interfaceConnect.push_back(InterfaceConnectType{ "indication",
+                fieldName + MODULE_SEPARATOR + "returnInd", "PipeInH", true});
         }
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);

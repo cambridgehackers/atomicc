@@ -44,6 +44,7 @@ if __name__=='__main__':
     cppgen.generateJson = False
     cppgen.generatePacketOnly = True
     cppgen.suppressGeneratedMakefile = True
+    cppgen.synchronousInvoke = True
     cppgen.generate_cpp(".", False, jsondata)
     #open('jni/ConnectalProjectConfig.h', 'w').write(connectalProjectString)
     open('jni/driver_signature_file.h', 'w')
