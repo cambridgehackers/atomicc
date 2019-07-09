@@ -59,8 +59,9 @@ int i;
 
 bool dump_vcd = false;
 const char *vcd_file_name = "dump.vcd";
-vluint64_t main_time = 0;
+vluint64_t main_time = 0, trace_offset_time = 0;
 vluint64_t derived_time = 0;
+static bool traceData = false, traceStarted = false;
 
 static int trace_xsimtop;//= 1;
 static int masterfpga_fd = -1, clientfd = -1, masterfpga_number = 5;
@@ -120,6 +121,8 @@ top:
             }
         }
         else if (len == sizeof(uint32_t)) {
+            if (!traceStarted)
+                traceData = true;
             rxLength = rxBuffer[0] & 0xffff;
             int rc = portalRecvFd(clientfd, (void *)&rxBuffer[1], (rxLength-1) * sizeof(uint32_t), &sendFd);
             if (rc > 0) {
@@ -157,16 +160,9 @@ extern "C" void dpi_msgSend_beat(int beat, int last)
         txIndex = 1;
     }
 }
-static bool traceData = false;
-static bool traceStarted = false;
-static vluint64_t trace_offset_time = 0;
 extern "C" void dpi_traceFlag(int flag)
 {
     traceData = (flag == 1);
-    if (!traceStarted) {
-        traceStarted = true;
-        trace_offset_time = main_time;
-    }
     if (flag == 2)
         Verilated::gotFinish(true);
 }
@@ -241,6 +237,9 @@ int main(int argc, char **argv, char **env)
     main_time++;
     if (main_time & 1)
       derived_time++;
+    if (!traceStarted)
+      trace_offset_time = main_time;
+    traceStarted |= traceData;
   }
   top->final();
 #if VM_TRACE
