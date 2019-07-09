@@ -2,9 +2,10 @@
 THISDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CONNECTALDIR = $(THISDIR)/../../connectal
 VERILOG_PATH = $(THISDIR)/verilog $(DTOP)/generated $(VERILOG_LIB)
+#VERILATOR_TRACE= --trace
 VERILATOR_ARGS= -O3 -CFLAGS "-I$(CONNECTALDIR)/cpp -I$(DTOP)/jni -I$(DTOP)/verilator -O " -LDFLAGS "-O " \
     -Wno-fatal -exe --profile-cfuncs --output-split 20000 $(VERILOG_PATH:%=-y %) \
-    -DDerivedClockPeriod=4 -DMainClockPeriod=4
+    -DDerivedClockPeriod=4 -DMainClockPeriod=4 $(VERILATOR_TRACE)
 
 LIB=$(DTOP)/verilator/lib/
 SIM_CXX_COMMON = $(addprefix $(CONNECTALDIR)/cpp/, sock_utils.c portalPrintf.c)
@@ -17,6 +18,7 @@ $1/$(notdir $(basename $3)).o: $3
 	$(CXX) -c $2 -o $1/$(notdir $(basename $3)).o $3
 endef
 SIM_CXXFLAGS= -g -fPIC -I $(CONNECTALDIR)/cpp -I $(CONNECTALDIR) -I$(DTOP)/jni -I$(DTOP)/verilator -O
+
 $(foreach src, $(SIM_CXX_COMMON), $(eval $(call SIM_CXX_RULE, $(DTOP)/verilator/lib, $(SIM_CXXFLAGS), $(src))))
 
 run:
@@ -41,8 +43,8 @@ $(DTOP)/verilator/bin/vlsim: $(DTOP)/verilator/obj_dir/vlsim.mk
 
 CC=$(TOOLCHAIN)gcc
 CXX=$(TOOLCHAIN)g++
-CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR) -I$(CONNECTALDIR)/cpp -I$(DTOP)/verilator -D__ATOMICC__ \
-    -std=c++11
+CFLAGS_COMMON = -O -g -I$(DTOP)/jni -I$(CONNECTALDIR) -I$(CONNECTALDIR)/cpp -I$(DTOP)/verilator \
+    -D__ATOMICC__ -std=c++11
 CFLAGS = $(CFLAGS_COMMON)
 
 PORTAL_INFRA := portal.c transportHardware.c transportSocket.c portalPrintf.c poller.cpp sock_utils.c timer.c

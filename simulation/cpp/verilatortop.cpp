@@ -157,6 +157,14 @@ extern "C" void dpi_msgSend_beat(int beat, int last)
         txIndex = 1;
     }
 }
+static bool traceData = false;
+extern "C" void dpi_traceFlag(int flag)
+{
+    traceData = (flag == 1);
+printf("[%s:%d] tracedata %d\n", __FUNCTION__, __LINE__, flag);
+    if (flag == 2)
+        Verilated::gotFinish(true);
+}
 
 static void parseArgs(int argc, char **argv)
 {
@@ -222,7 +230,7 @@ int main(int argc, char **argv, char **env)
     top->eval();
 
 #if VM_TRACE
-    if (tfp) tfp->dump (main_time); // Create waveform trace for this timestamp                                                                
+    if (tfp && traceData) tfp->dump (main_time); // Create waveform trace for this timestamp
 #endif
 
     main_time++;
