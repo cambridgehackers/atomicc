@@ -158,10 +158,15 @@ extern "C" void dpi_msgSend_beat(int beat, int last)
     }
 }
 static bool traceData = false;
+static bool traceStarted = false;
+static vluint64_t trace_offset_time = 0;
 extern "C" void dpi_traceFlag(int flag)
 {
     traceData = (flag == 1);
-printf("[%s:%d] tracedata %d\n", __FUNCTION__, __LINE__, flag);
+    if (!traceStarted) {
+        traceStarted = true;
+        trace_offset_time = main_time;
+    }
     if (flag == 2)
         Verilated::gotFinish(true);
 }
@@ -230,7 +235,7 @@ int main(int argc, char **argv, char **env)
     top->eval();
 
 #if VM_TRACE
-    if (tfp && traceData) tfp->dump (main_time); // Create waveform trace for this timestamp
+    if (tfp && traceData) tfp->dump (main_time - trace_offset_time); // Create waveform trace for this timestamp
 #endif
 
     main_time++;
