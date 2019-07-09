@@ -69,6 +69,12 @@ if (0)
         condAssignList[generateSection][target] = AssignItem{value, type, false};
     else {
         assignList[target] = AssignItem{value, type, false};
+        if ((endswith(target, "__ENA") || endswith(target, "__RDY"))
+         && !checkInteger(value, "1")
+         && !endswith(value->value, "__ENA")
+         && !endswith(value->value, "__RDY")) {   // preserve these for ease of reading verilog
+            assignList[target].noRecursion = true;
+        }
         int ind = target.find('[');
         if (ind != -1) {
             refList[target.substr(0,ind)].count++;
@@ -381,8 +387,9 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "")
             printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
             return allocExpr("1");
         }
+        if (!assignList[item].noRecursion)
         if (ACCExpr *assignValue = assignList[item].value)
-        if (!assignList[item].noRecursion && (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT)) {
+        if (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
         decRef(item);
         walkRef(assignValue);
         if (trace_assign)
@@ -444,8 +451,8 @@ static bool checkRecursion(ACCExpr *expr)
     if (isIdChar(item[0]) && !expr->operands.size()) {
         if (replaceBlock[item]) // flag multiple expansions of an item
             return false;
-        ACCExpr *res = assignList[item].value;
-        if (res && !assignList[item].noRecursion) {
+        if (!assignList[item].noRecursion)
+        if (ACCExpr *res = assignList[item].value) {
             replaceBlock[item] = tree2str(res).length();
             if (!checkRecursion(res))
                 return false;
@@ -464,8 +471,9 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
     ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
     if (isIdChar(item[0]) && !expr->operands.size()) {
+        if (!assignList[item].noRecursion)
         if (ACCExpr *assignValue = assignList[item].value)
-        if (refList[item].pin != PIN_MODULE && !assignList[item].noRecursion
+        if (refList[item].pin != PIN_MODULE
              && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
             if (trace_assign)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
@@ -482,7 +490,7 @@ static void setAssignRefCount(ModuleIR *IR)
 {
     for (auto item: assignList) {
         //assignList[item.first].noRecursion = true;
-//printf("[%s:%d] ref[%s].norec %d\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion);
+//printf("[%s:%d] ref[%s].norec %d value %s\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion, tree2str(item.second.value).c_str());
         if (item.second.type == "Bit(1)")
             assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
         else
