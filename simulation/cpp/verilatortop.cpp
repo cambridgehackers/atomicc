@@ -109,10 +109,12 @@ top:
         int sendFd;
         int len = portalRecvFd(clientfd, (void *)rxBuffer, sizeof(uint32_t), &sendFd);
         if (len == 0) { /* EOF */
+            Verilated::gotFinish(true);
             printf("VerilatorTop.disconnect called %d\n", clientfd);
             close(clientfd);
             clientfd = -1;
-            exit(-1);
+            //exit(-1); // let main loop finish
+            return 0;
         }
         else if (len == -1) {
             if (errno != EAGAIN) {
@@ -162,7 +164,8 @@ extern "C" void dpi_msgSend_beat(int beat, int last)
 }
 extern "C" void dpi_traceFlag(int flag)
 {
-    traceData = (flag == 1);
+    // 0 -> trace off; 1 -> trace on; 2 -> finish and exit simulator
+    traceData = (flag != 0);
     if (flag == 2)
         Verilated::gotFinish(true);
 }

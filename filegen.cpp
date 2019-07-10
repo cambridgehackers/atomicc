@@ -253,6 +253,8 @@ next:;
                     for (auto citem: item.second) {
                         if (citem.dest)
                             alwaysLines.push_back("    " + tree2str(citem.dest) + " <= " + tree2str(citem.value) + ";");
+                        else if (citem.value->value == "$finish;")
+                            alwaysLines.push_back("    $finish;");
                         else
                             alwaysLines.push_back("    $display" + tree2str(citem.value->operands.front()) + ";");
                     }

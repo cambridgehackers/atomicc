@@ -819,6 +819,10 @@ dumpExpr("READCALL", value);
             printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
             exit(-1);
         }
+        if (calledName == "__finish") {
+            appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"));
+            break;
+        }
         if (!enableList[calledEna])
             enableList[calledEna] = allocExpr("|");
         enableList[calledEna]->operands.push_back(tempCond);
@@ -929,6 +933,8 @@ static std::list<ModData> modLine;
         if (!endswith(methodName, "__RDY"))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
         for (auto item: MI->callList) {
+            if (item->value->value == "__finish")
+                continue;
             ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
             if (item->cond)
                 tempCond = allocExpr("|", walkRemoveParam(invertExpr(item->cond)), tempCond);
