@@ -1,7 +1,7 @@
 
 THISDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CONNECTALDIR = $(THISDIR)/../../connectal
-VERILOG_PATH = $(THISDIR)/verilog $(DTOP)/generated $(VERILOG_LIB)
+VERILOG_PATH = $(THISDIR)/verilog $(DTOP)/generated $(VERILOG_LIB) $(VERILOG_LIB)/../verilog
 #VERILATOR_TRACE= --trace
 VERILATOR_ARGS= -O3 -CFLAGS "-I$(CONNECTALDIR)/cpp -I$(DTOP)/jni -I$(DTOP)/verilator -O " -LDFLAGS "-O " \
     -Wno-fatal -exe --profile-cfuncs --output-split 20000 $(VERILOG_PATH:%=-y %) \
