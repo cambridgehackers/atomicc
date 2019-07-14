@@ -51,17 +51,12 @@ static std::string jsonSep;
 static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
 {
     fprintf(OStrJ, "%s\n        { \"cdecls\": [", jsonSep.c_str());
-    std::map<std::string, MethodInfo *> reorderList;
     std::string msep;
     for (auto MI : swInfo.inter->methods) {
         std::string methodName = MI->name;
         if (endswith(methodName, "__RDY"))
             continue;
-        reorderList[baseMethodName(methodName)] = MI;
-    }
-    for (auto item: reorderList) {
-        MethodInfo *MI = item.second;
-        std::string methodName = item.first; // reorderList, not method!!
+        methodName = baseMethodName(methodName);
         std::string psep, retType;
         fprintf(OStrJ, "%s\n                { \"dname\": \"%s\", \"dparams\": [",
              msep.c_str(), methodName.c_str());
