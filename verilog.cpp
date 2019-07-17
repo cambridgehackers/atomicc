@@ -664,7 +664,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
             CI->second.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[generateSection][methodName].guard = cleanupBool(allocExpr("&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
+    condLines[generateSection][methodName].guard = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
     condLines[generateSection][methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
@@ -760,14 +760,14 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
         walkRead(MI, info->value, info->cond);
         std::string dest = info->dest->value;
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
-            ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getEnaName(methodName)), info->cond));
+            ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond));
             appendMux(dest, cond, info->value, muxValueList);
         }
         else
             appendLine(methodName, info->cond, info->dest, info->value);
     }
     for (auto info: MI->letList) {
-        ACCExpr *cond = cleanupBool(allocExpr("&", allocExpr(getRdyName(methodName)), info->cond));
+        ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getRdyName(methodName)), info->cond));
         ACCExpr *value = info->value;
         updateWidth(value, convertType(info->type));
         walkRead(MI, cond, nullptr);
@@ -811,7 +811,7 @@ dumpExpr("READCALL", value);
         walkRead(MI, value, cond);
         if (!info->isAction)
             continue;
-        ACCExpr *tempCond = cleanupBool(allocExpr("&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName)), cond));
+        ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName)), cond));
         std::string calledName = value->value, calledEna = getEnaName(calledName);
 //printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
 //dumpExpr("CALLCOND", tempCond);
@@ -938,7 +938,7 @@ static std::list<ModData> modLine;
             ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
             if (item->cond)
                 tempCond = allocExpr("|", walkRemoveParam(invertExpr(item->cond)), tempCond);
-            MIRdy->guard = cleanupBool(allocExpr("&", MIRdy->guard, tempCond));
+            MIRdy->guard = cleanupBool(allocExpr("&&", MIRdy->guard, tempCond));
         }
     }
 

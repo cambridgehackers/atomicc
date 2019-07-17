@@ -336,8 +336,8 @@ ACCExpr *invertExpr(ACCExpr *expr)
             return allocExpr("1");
         return allocExpr("==", lhs, getRHS(expr));
     }
-    if (v == "&" || v == "|") {
-        ACCExpr *temp = allocExpr(v == "&" ? "|" : "&");
+    if (v == "&" || v == "&&" || v == "|" || v == "||") {
+        ACCExpr *temp = allocExpr((v == "&" || v == "&&") ? "||" : "&&");
         for (auto item: expr->operands)
             temp->operands.push_back(invertExpr(item));
         return temp;
@@ -385,7 +385,7 @@ std::string exprWidth(ACCExpr *expr, bool forceNumeric)
         if (len != "" && len != "0")
             return len;
     }
-    if (op == "&" || op == "|" || op == "^") {
+    if (bitOp(op)) {
         for (auto item: expr->operands)
             if (exprWidth(item, forceNumeric) != "1")
                 goto nextand;
@@ -448,7 +448,7 @@ bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
         return true;
     if (!lhs || !rhs || lhs->value != rhs->value || lhs->operands.size() != rhs->operands.size())
         return false;
-    if ((lhs->value == "&" || lhs->value == "|") && lhs->operands.size() == 2) // check commutativity
+    if ((lhs->value == "&" || lhs->value == "&&" || lhs->value == "|" || lhs->value == "||") && lhs->operands.size() == 2) // check commutativity
         if (matchExpr(getRHS(lhs), getRHS(rhs, 0)) && matchExpr(getRHS(lhs, 0), getRHS(rhs)))
             return true;
     for (auto lcur = lhs->operands.begin(), lend = lhs->operands.end(), rcur = rhs->operands.begin(); lcur != lend; lcur++, rcur++)
@@ -502,7 +502,7 @@ void walkReplaceBuiltin(ACCExpr *expr)
         if (size == 2 && matchExpr(getRHS(firstInList, 0), invertExpr(getRHS(secondInList, 0))))
             newe = allocExpr("?", getRHS(firstInList, 0), getRHS(firstInList), getRHS(secondInList));
         else if (size == 2 && getRHS(firstInList, 0)->value == "__default" && exprWidth(getRHS(secondInList)) == "1")
-            newe = allocExpr("&", getRHS(secondInList, 0), getRHS(secondInList));
+            newe = allocExpr("&&", getRHS(secondInList, 0), getRHS(secondInList));
         else if (size == 1)
             newe = getRHS(firstInList);
         else {
@@ -709,7 +709,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
 printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA '%s'\n", __FUNCTION__, __LINE__, val.c_str());
                     val = val.substr(1);
                 }
-                if ((val == "-" || val == "!" || val == "^" || val == "|" || val == "&") && !tok->operands.size()) { // unary '-'
+                if ((val == "-" || val == "!" || bitOp(val)) && !tok->operands.size()) { // unary '-'
                     if (val != "!")
                         tok->value = "@" + tok->value;
                     unary = tok;
