@@ -948,8 +948,10 @@ static std::list<ModData> modLine;
     for (auto MI : IR->methods)
         generateMethod(IR, MI->name, MI, enableList, muxValueList, hasPrintf);
     // combine mux'ed assignments into a single 'assign' statement
-    for (auto item: muxValueList)
+    for (auto item: muxValueList) {
         setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
+        assignList[item.first].noRecursion = true;
+    }
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
         setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
 #if 1
