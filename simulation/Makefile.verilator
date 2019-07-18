@@ -50,7 +50,7 @@ CFLAGS = $(CFLAGS_COMMON)
 PORTAL_INFRA := portal.c transportHardware.c transportSocket.c portalPrintf.c poller.cpp sock_utils.c timer.c
 SOURCES := $(addprefix $(CONNECTALDIR)/cpp/, $(PORTAL_INFRA)) \
       $(THISDIR)/cpp/printfHandler.cpp \
-      $(addprefix $(DTOP)/, $(PROJECT_CPP)) $(DTOP)/jni/*.c $(DTOP)/jni/*.cpp
+      $(addprefix $(DTOP)/, $(CPPFILES)) $(DTOP)/jni/*.c $(DTOP)/jni/*.cpp
 
 LDLIBS := -lpthread
 
