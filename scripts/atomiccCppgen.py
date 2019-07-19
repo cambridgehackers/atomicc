@@ -24,17 +24,6 @@ import os, sys, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/../../connectal/scripts')
 import cppgen
 
-connectalProjectString = '''
-#ifndef _ConnectalProjectConfig_h
-#define _ConnectalProjectConfig_h
-
-#define MainClockPeriod 20
-#define SIMULATION ""
-#define BOARD_verilator ""
-
-#endif // _ConnectalProjectConfig_h
-'''
-
 if __name__=='__main__':
     print 'new', sys.argv
     filename = "generatedDesignInterfaceFile.json"
@@ -43,8 +32,6 @@ if __name__=='__main__':
     jsondata = json.loads(open(filename).read())
     cppgen.generateJson = False
     cppgen.generatePacketOnly = True
-    cppgen.suppressGeneratedMakefile = True
     cppgen.synchronousInvoke = True
     cppgen.generate_cpp(".", False, jsondata)
-    #open('jni/ConnectalProjectConfig.h', 'w').write(connectalProjectString)
     open('jni/driver_signature_file.h', 'w')
