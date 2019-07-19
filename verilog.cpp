@@ -346,6 +346,7 @@ static void walkRef (ACCExpr *expr)
         int ind = base.find("[");
         if (ind > 0)
             base = base.substr(0, ind);
+        if (!startswith(item, "__inst$Genvar")) {
         if (!refList[item].pin)
             printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
         if (base != item)
@@ -357,6 +358,7 @@ item = base;
         if(!refList[item].pin) {
             printf("[%s:%d] pin not found '%s'\n", __FUNCTION__, __LINE__, item.c_str());
             //exit(-1);
+        }
         }
         refList[item].count++;
         ACCExpr *temp = assignList[item].value;
