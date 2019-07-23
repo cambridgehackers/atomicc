@@ -247,6 +247,21 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 MI->generateFor.push_back(GenerateForItem{cond, var->value, init, term, incr, baseMethodName(body)});
                 IR->genvarCount = 1;
             }
+            else if (checkItem("INSTANTIATE")) {
+                ACCExpr *cond = getExpression(':');
+                ParseCheck(checkItem(":"), "':' missing");
+                ACCExpr *var = getExpression(',');
+                ParseCheck(checkItem(","), "generate ',' missing");
+                ACCExpr *init = getExpression(',');
+                ParseCheck(checkItem(","), "generate ',' missing");
+                ACCExpr *term = getExpression(',');
+                ParseCheck(checkItem(","), "generate ',' missing");
+                ACCExpr *incr = getExpression(',');
+                ParseCheck(checkItem(","), "generate ',' missing");
+                ACCExpr *sub = str2tree(bufp);
+                MI->instantiateFor.push_back(InstantiateForItem{cond, var->value, init, term, incr, sub});
+                IR->genvarCount = 1;
+            }
             else
                 ParseCheck(false, "unknown method item");
         }
