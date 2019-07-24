@@ -2,26 +2,28 @@
 \rSec0[atomicc.basic]{Basic}
 
 Since the introduction of Verilog in 1984, hardware description languages have
-become the dominant technique used for designing hardware logic.  Over time, features
-have been borrowed from the software language community, increasing their descriptive
-ability.  Sadly, proving hardware designs correct before fabrication remains persistently
-out of reach; large scale reasoning about highly parallel algorithms remains problematic.
-This leads design teams to spend a large fraction of development budget on
-validation, preventing agile exploration of new ideas and design evolution.
+become the dominant technique for designing hardware logic.  Over time,
+HDL descriptive ability has increased by borrowing features that have proven
+effective in software.
+Analysis of fine grained highly parallel systems remains quite difficult,
+leading to
+excessive dependance on testing and verification to detect errors and
+prohibitive hardware development costs.
 
-To address these issues, there has been a long term research effort into Guarded Atomic Actions (GAA),
-structuring and automating the parallel interactions permissible between unitary sections of
-logic.  By generating code that is guaranteed to be sequentially consistent and by automating
+To address parallel system design,
+there has been a long term research effort into Guarded Atomic Actions (GAA),
+structuring and automating the parallel interactions permissible between static single assignment (SSA)
+transactions.
+By generating code that is guaranteed to be sequentially consistent and by automating
 the propagation of execution guards, designs become more tractable at design time, leading
 to correctness proofs of designs rather than merely relying on validation.
-
-Unfortunately, these ideas have not spread widely into the hardware design world for a variety of reasons:
-\begin{itemize}
-\item The only complete implementation is a proprietary licensed product
-\item The constructs are embedded in a hybrid of a functional language with aspects taken from HDLs, unfamiliar to most practioners
-\item The generated verilog is quite difficult to read
-The volume of the generated code has made verification even more difficult
-\end{itemize}
+Unfortunately, these ideas have not spread widely into the hardware design world for a variety of reasons.
+%%\begin{itemize}
+%%\item The only complete implementation is a proprietary licensed product
+%%\item The constructs are embedded in a hybrid of a functional language with aspects taken from HDLs, unfamiliar to most practioners
+%%\item The generated verilog is quite difficult to read
+%%The volume of the generated code has made verification even more difficult
+%%\end{itemize}
 
 AtomicC attempts to address all these issues, providing a structured alternative to Verilog
 that is quick to understand and easy to deploy.  By making the source code openly available
