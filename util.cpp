@@ -351,7 +351,7 @@ void dumpMethod(std::string name, MethodInfo *MI)
         printf(" %s = %s", retType.c_str(), retVal.c_str());
     printf(" {");
     if (MI->alloca.size() || MI->letList.size() || MI->storeList.size()
-        || MI->callList.size() || MI->generateFor.size()) {
+        || MI->callList.size() || MI->generateFor.size() || MI->instantiateFor.size()) {
     printf("\n");
     for (auto item: MI->alloca)
         printf("      ALLOCA %s %s\n", item.second.type.c_str(), item.first.c_str());
@@ -365,6 +365,11 @@ void dumpMethod(std::string name, MethodInfo *MI)
         printf("      GENERATE %s: %s, %s, %s, %s, %s\n", tree2str(item.cond).c_str(),
             item.var.c_str(), tree2str(item.init).c_str(),
             tree2str(item.limit).c_str(), tree2str(item.incr).c_str(), item.body.c_str());
+    for (auto item: MI->instantiateFor)
+        printf("      INSTANTIATE %s: %s, %s, %s, %s, %s, %s\n", tree2str(item.cond).c_str(),
+            item.var.c_str(), tree2str(item.init).c_str(),
+            tree2str(item.limit).c_str(), tree2str(item.incr).c_str(),
+            tree2str(item.sub).c_str(), item.body.c_str());
     }
     printf("    }\n");
 }

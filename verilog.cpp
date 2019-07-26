@@ -169,6 +169,7 @@ typedef struct {
     MethodInfo *MI;
     std::string init; /* for parameters */
     bool        action;
+    std::string vecCount;
 } PinInfo;
 std::list<PinInfo> pinPorts, pinMethods, paramPorts;
 static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal)
@@ -185,7 +186,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         for (auto MI: IIR->methods) {
             std::string name = methodPrefix + interfaceName + MI->name;
             bool out = instance ^ item.isPtr;
-            pinMethods.push_back(PinInfo{MI->type, name, out, false, isLocal || item.isLocalInterface, MI, ""/*not param*/, MI->action});
+            pinMethods.push_back(PinInfo{MI->type, name, out, false, isLocal || item.isLocalInterface, MI, ""/*not param*/, MI->action, item.vecCount});
         }
         for (auto fld: IIR->fields) {
             std::string name = pinPrefix + item.fldName + fld.fldName;
@@ -201,10 +202,10 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
                     else if (startswith(fld.type, "Bit("))
                         init = "0";
                 }
-                paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, init, false});
+                paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, init, false, item.vecCount});
             }
             else
-                pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, ""/*not param*/, false});
+                pinPorts.push_back(PinInfo{fld.type, name, out, fld.isInout, isLocal || item.isLocalInterface, nullptr, ""/*not param*/, false, item.vecCount});
         }
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
             methodPrefix + interfaceName, isLocal || item.isLocalInterface);
@@ -220,10 +221,13 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
     std::string minst;
     if (instance != "")
         minst = instance.substr(0, instance.length()-1);
-    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument) -> void {
+    auto checkWire = [&](std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string interfaceVecCount) -> void {
+        std::string vc = vecCount;
+        if (interfaceVecCount != "")
+            vc = interfaceVecCount;   // HACKHACKHACK
         int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
         std::string instName = instance + name;
-        if (vecCount != "") {
+        if (vc != "") {
             if (dontDeclare && dimIndex != -1)
                 instName = minst + "[" + autostr(dimIndex) + "]." + name;
             else
@@ -232,11 +236,11 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
         if (!isLocal || instance == "" || dontDeclare)
         refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare, "", isArgument};
         if (!isLocal && !dontDeclare)
-        modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
+        modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
         if (trace_connect)
-            printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d dDecl %d vec '%s' dim %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, dontDeclare, vecCount.c_str(), dimIndex);
+            printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d dDecl %d vec '%s' dim %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, dontDeclare, vc.c_str(), dimIndex);
         if (isparam == "")
-        expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE, true, vecCount, isArgument);
+        expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE, true, vc, isArgument);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
     pinPorts.clear();
@@ -272,19 +276,19 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
         modParam.push_back(ModData{minst, moduleInstantiation, "", true, pinPorts.size() > 0, 0, false, ""/*not param*/, vecCount});
     if (instance == "")
         for (auto item: paramPorts)
-            checkWire(item.name, item.type, item.isOutput, item.isInout, item.init, item.isLocal, true/*isArgument*/);
+            checkWire(item.name, item.type, item.isOutput, item.isInout, item.init, item.isLocal, true/*isArgument*/, item.vecCount);
     for (auto item: pinMethods) {
-        checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, ""/*not param*/, item.isLocal, false/*isArgument*/);
+        checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, ""/*not param*/, item.isLocal, false/*isArgument*/, item.vecCount);
         if (item.action && !endswith(item.name, "__ENA"))
-            checkWire(item.name + "__ENA", "", item.isOutput ^ (0), false, ""/*not param*/, item.isLocal, false/*isArgument*/);
+            checkWire(item.name + "__ENA", "", item.isOutput ^ (0), false, ""/*not param*/, item.isLocal, false/*isArgument*/, item.vecCount);
         if (trace_connect)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.name.c_str(), item.type.c_str());
         for (auto pitem: item.MI->params) {
-            checkWire(baseMethodName(item.name) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal, instance==""/*isArgument*/);
+            checkWire(baseMethodName(item.name) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal, instance==""/*isArgument*/, item.vecCount);
         }
     }
     for (auto item: pinPorts)
-        checkWire(item.name, item.type, item.isOutput, item.isInout, ""/*not param*/, item.isLocal, instance==""/*isArgument*/);
+        checkWire(item.name, item.type, item.isOutput, item.isInout, ""/*not param*/, item.isLocal, instance==""/*isArgument*/, item.vecCount);
     if (instance != "")
         return;
     bool hasCLK = false, hasnRST = false;
@@ -957,7 +961,7 @@ static std::list<ModData> modLine;
     for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
         setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
 #if 1
-    for (auto MI : IR->methods)
+    for (auto MI : IR->methods) {
     for (auto item: MI->generateFor) {
         NamedExprList enableList;
         NamedExprList muxValueList;
@@ -975,6 +979,25 @@ printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
             setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
         for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
             setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
+    }
+    for (auto item: MI->instantiateFor) {
+        NamedExprList enableList;
+        NamedExprList muxValueList;
+        genvarMap[item.var] = 1;
+        char tempBuf[1000];
+        snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
+        generateSection = tempBuf;
+        MethodInfo *MIb = IR->generateBody[item.body];
+        if(!MIb) {
+printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
+        }
+        assert(MIb && "body item ");
+        generateMethod(IR, MI->name + "[" + tree2str(item.sub) + "]", MIb, enableList, muxValueList, hasPrintf);
+        for (auto item: muxValueList)
+            setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
+        for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
+            setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
+    }
     }
     generateSection = "";
 #endif

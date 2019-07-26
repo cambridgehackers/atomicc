@@ -96,7 +96,12 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, s
         for (auto item: IR->fields)
             if (item.fldName == expr->value) {
                 size = item.vecCount;
-                break;
+                return expr;
+            }
+        for (auto item: IR->interfaces)
+            if (item.fldName == expr->value) {
+                size = item.vecCount;
+                return expr;
             }
         return expr;
     }
@@ -178,6 +183,13 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
             walkToGeneric(item.init, paramMap),
             walkToGeneric(item.limit, paramMap),
             walkToGeneric(item.incr, paramMap), item.body});
+    for (auto item : MI->instantiateFor)
+        newMI->instantiateFor.push_back(InstantiateForItem{
+            walkToGeneric(item.cond, paramMap), item.var,
+            walkToGeneric(item.init, paramMap),
+            walkToGeneric(item.limit, paramMap),
+            walkToGeneric(item.incr, paramMap),
+            walkToGeneric(item.sub, paramMap), item.body});
     //newMI->meta = MI->meta;
     for (auto item : MI->params)
         newMI->params.push_back(ParamElement{item.name, updateType(item.type, paramMap), ""});
@@ -273,7 +285,6 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
         return false;
     };
 //dumpMethod("BEFORE", MI);
-    if (!isGenerate) {
     for (auto item = MI->storeList.begin(), iteme = MI->storeList.end(); item != iteme; ) {
         if (expandTree(1, &(*item)->cond, (*item)->dest, false, (*item)->value))
             item = MI->storeList.erase(item);
@@ -298,7 +309,6 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
         else
             item++;
     }
-    } // isGenerate
 //if (moved) dumpMethod("PREVMETH", MI);
 
     // now replace __bitconcat, __bitsubstr, __phi
@@ -504,7 +514,16 @@ static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replace
 static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
 {
     for (auto item: MI->generateFor) {
-        if (MethodInfo *MIb = IR->generateBody[item.body])
+        MethodInfo *MIb = IR->generateBody[item.body];
+        assert(MIb);
+        for (auto pitem: MIb->params) {
+            if (MI->alloca.find(pitem.name) != MI->alloca.end())
+                MI->alloca[pitem.name].noReplace = true;
+        }
+    }
+    for (auto item: MI->instantiateFor) {
+        MethodInfo *MIb = IR->generateBody[item.body];
+        assert(MIb);
         for (auto pitem: MIb->params) {
             if (MI->alloca.find(pitem.name) != MI->alloca.end())
                 MI->alloca[pitem.name].noReplace = true;

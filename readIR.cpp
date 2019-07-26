@@ -258,8 +258,10 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ParseCheck(checkItem(","), "generate ',' missing");
                 ACCExpr *incr = getExpression(',');
                 ParseCheck(checkItem(","), "generate ',' missing");
-                ACCExpr *sub = str2tree(bufp);
-                MI->instantiateFor.push_back(InstantiateForItem{cond, var->value, init, term, incr, sub});
+                ACCExpr *sub = getExpression(',');
+                ParseCheck(checkItem(","), "generate ',' missing");
+                std::string body = bufp;
+                MI->instantiateFor.push_back(InstantiateForItem{cond, var->value, init, term, incr, sub, baseMethodName(body)});
                 IR->genvarCount = 1;
             }
             else
