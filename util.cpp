@@ -28,29 +28,35 @@ static int trace_iter;//=1;
 
 std::string baseMethodName(std::string pname)
 {
-    int ind = pname.find("[");
+    int ind = pname.find("__ENA[");
+    if (ind == -1)
+        ind = pname.find("__RDY[");
     if (ind > 0)
-        pname = pname.substr(0, ind);
+        pname = pname.substr(0, ind) + pname.substr(ind + 5);
     if (endswith(pname, "__ENA") || endswith(pname, "__RDY"))
         pname = pname.substr(0, pname.length()-5);
     return pname;
 }
 std::string getRdyName(std::string basename)
 {
-    std::string sub;
-    int ind = basename.find("[");
-    if (ind > 0)
-        sub = basename.substr(ind);
-    return baseMethodName(basename) + "__RDY" + sub;
+    std::string base = baseMethodName(basename), sub;
+    if (endswith(base, "]")) {
+        int ind = base.find("[");
+        sub = base.substr(ind);
+        base = base.substr(0, ind);
+    }
+    return base + "__RDY" + sub;
 }
 
 std::string getEnaName(std::string basename)
 {
-    std::string sub;
-    int ind = basename.find("[");
-    if (ind > 0)
-        sub = basename.substr(ind);
-    return baseMethodName(basename) + "__ENA" + sub;
+    std::string base = baseMethodName(basename), sub;
+    if (endswith(base, "]")) {
+        int ind = base.find("[");
+        sub = base.substr(ind);
+        base = base.substr(0, ind);
+    }
+    return base + "__ENA" + sub;
 }
 
 ModuleIR *lookupIR(std::string name)

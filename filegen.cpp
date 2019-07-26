@@ -71,7 +71,6 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 mitem.vecCount = convertType(mitem.type, 2);
             std::string array;
             std::string sizeStr = sizeProcess(mitem.type);
-printf("[%s:%d]VVVVVVVVVVVVVVV val %s size %s type %s vec %s\n", __FUNCTION__, __LINE__, mitem.value.c_str(), sizeStr.c_str(), mitem.type.c_str(), mitem.vecCount.c_str());
             if (mitem.vecCount != "") {
                 if (sizeStr == "")
                     array = "[" + mitem.vecCount + " - 1:0]";
