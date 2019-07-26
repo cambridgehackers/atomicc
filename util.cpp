@@ -28,18 +28,29 @@ static int trace_iter;//=1;
 
 std::string baseMethodName(std::string pname)
 {
+    int ind = pname.find("[");
+    if (ind > 0)
+        pname = pname.substr(0, ind);
     if (endswith(pname, "__ENA") || endswith(pname, "__RDY"))
         pname = pname.substr(0, pname.length()-5);
     return pname;
 }
 std::string getRdyName(std::string basename)
 {
-    return baseMethodName(basename) + "__RDY";
+    std::string sub;
+    int ind = basename.find("[");
+    if (ind > 0)
+        sub = basename.substr(ind);
+    return baseMethodName(basename) + "__RDY" + sub;
 }
 
 std::string getEnaName(std::string basename)
 {
-    return baseMethodName(basename) + "__ENA";
+    std::string sub;
+    int ind = basename.find("[");
+    if (ind > 0)
+        sub = basename.substr(ind);
+    return baseMethodName(basename) + "__ENA" + sub;
 }
 
 ModuleIR *lookupIR(std::string name)
