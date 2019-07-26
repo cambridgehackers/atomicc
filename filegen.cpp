@@ -69,7 +69,16 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 dirs = "inout wire";
             if (mitem.vecCount == "")
                 mitem.vecCount = convertType(mitem.type, 2);
-            fprintf(OStr, "%s %s%s", dirs.c_str(), sizeProcess(mitem.type).c_str(), mitem.value.c_str());
+            std::string array;
+            std::string sizeStr = sizeProcess(mitem.type);
+printf("[%s:%d]VVVVVVVVVVVVVVV val %s size %s type %s vec %s\n", __FUNCTION__, __LINE__, mitem.value.c_str(), sizeStr.c_str(), mitem.type.c_str(), mitem.vecCount.c_str());
+            if (mitem.vecCount != "") {
+                if (sizeStr == "")
+                    array = "[" + mitem.vecCount + " - 1:0]";
+                else
+                    sizeStr = "[" + mitem.vecCount + " * " + sizeStr.substr(1);
+            }
+            fprintf(OStr, "%s %s%s%s", dirs.c_str(), sizeStr.c_str(), mitem.value.c_str(), array.c_str());
         }
     }
     if (handleCLK)
