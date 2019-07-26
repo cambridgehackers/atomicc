@@ -42,6 +42,20 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         return;
     if (type == "Bit(1)")
         value = cleanupBool(value);
+    int ind = target.find("[");
+    if (ind > 0) {
+        std::string base = target.substr(0, ind);
+        std::string sub = target.substr(ind);
+        ind = sub.rfind("]");
+        if (ind > 0) {
+            std::string after = sub.substr(ind+1);
+            sub = sub.substr(0, ind+1);
+            if (after != "" && after[0] == '.')
+                base += MODULE_SEPARATOR + after.substr(1);
+            if (refList[base].pin == PIN_MODULE) // normalize subscript location for module pin refs
+                target = base + sub;
+        }
+    }
     if (trace_assign)
         printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin && generateSection == "") {
@@ -233,8 +247,11 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
             else
                 instName = name;
         }
-        if (!isLocal || instance == "" || dontDeclare)
+        if (!isLocal || instance == "" || dontDeclare) {
         refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare, "", isArgument};
+            if(instance == "" && interfaceVecCount != "")
+                refList[instName].done = true;  // prevent default blanket assignment generation
+        }
         if (!isLocal && !dontDeclare)
         modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
         if (trace_connect)
