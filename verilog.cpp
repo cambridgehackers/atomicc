@@ -83,10 +83,10 @@ if (0)
         condAssignList[generateSection][target] = AssignItem{value, type, false};
     else {
         assignList[target] = AssignItem{value, type, false};
-        if ((endswith(target, "__ENA") || endswith(target, "__RDY"))
+        if ((isEnaName(target) || isRdyName(target))
          && !checkInteger(value, "1")
-         && !endswith(value->value, "__ENA")
-         && !endswith(value->value, "__RDY")) {   // preserve these for ease of reading verilog
+         && !isEnaName(value->value)
+         && !isRdyName(value->value)) {   // preserve these for ease of reading verilog
             assignList[target].noRecursion = true;
         }
         int ind = target.find('[');
@@ -296,7 +296,7 @@ bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
             checkWire(item.name, item.type, item.isOutput, item.isInout, item.init, item.isLocal, true/*isArgument*/, item.vecCount);
     for (auto item: pinMethods) {
         checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, ""/*not param*/, item.isLocal, false/*isArgument*/, item.vecCount);
-        if (item.action && !endswith(item.name, "__ENA"))
+        if (item.action && !isEnaName(item.name))
             checkWire(item.name + "__ENA", "", item.isOutput ^ (0), false, ""/*not param*/, item.isLocal, false/*isArgument*/, item.vecCount);
         if (trace_connect)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.name.c_str(), item.type.c_str());
@@ -497,7 +497,7 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
         if (!assignList[item].noRecursion)
         if (ACCExpr *assignValue = assignList[item].value)
         if (refList[item].pin != PIN_MODULE
-             && (checkOperand(assignValue->value) || endswith(item, "__RDY") || endswith(item, "__ENA"))) {
+             && (checkOperand(assignValue->value) || isRdyName(item) || isEnaName(item))) {
             if (trace_assign)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
             decRef(item);
@@ -530,7 +530,7 @@ static void setAssignRefCount(ModuleIR *IR)
             std::string name;
             int length = 0;
             for (auto rep: replaceBlock) {
-                 if (rep.second > length && !endswith(rep.first, "__RDY") && !endswith(rep.first, "__ENA")) {
+                 if (rep.second > length && !isRdyName(rep.first) && !isEnaName(rep.first)) {
                      name = rep.first;
                      length = rep.second;
                  }
@@ -771,8 +771,11 @@ void appendMux(std::string name, ACCExpr *cond, ACCExpr *value, NamedExprList &m
 
 static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI, NamedExprList &enableList, NamedExprList &muxValueList, bool hasPrintf)
 {
+    if (MI->subscript)      // from instantiateFor
+        methodName += "[" + tree2str(MI->subscript) + "]";
+    generateSection = MI->generateSection;
     MI->guard = cleanupBool(MI->guard);
-    if (!endswith(methodName, "__RDY")) {
+    if (!isRdyName(methodName)) {
         walkRead(MI, MI->guard, nullptr);
         if (MI->rule)
             setAssign(getEnaName(methodName), allocExpr(getRdyName(methodName)), "Bit(1)");
@@ -953,15 +956,31 @@ static std::list<ModData> modLine;
             refList[item.first].count++;
         }
         // lift guards from called method interfaces
-        if (!endswith(methodName, "__RDY"))
-        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
-        for (auto item: MI->callList) {
+        if (!isRdyName(methodName))
+        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName))) {
+        auto appendGuard = [&] (CallListElement *item) -> void {
             if (item->value->value == "__finish")
-                continue;
+                return;
             ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
             if (item->cond)
                 tempCond = allocExpr("|", walkRemoveParam(invertExpr(item->cond)), tempCond);
             MIRdy->guard = cleanupBool(allocExpr("&&", MIRdy->guard, tempCond));
+        };
+        for (auto item: MI->callList)
+            appendGuard(item);
+        for (auto item: MI->generateFor) {
+            MethodInfo *MIb = IR->generateBody[item.body];
+            assert(MIb);
+            for (auto item: MIb->callList)
+                appendGuard(item);
+        }
+        // instantiateFor needs to subscript the RDY
+        for (auto item: MI->instantiateFor) {
+            MethodInfo *MIb = IR->generateBody[item.body];
+            assert(MIb);
+            for (auto item: MIb->callList)
+                appendGuard(item);
+        }
         }
     }
 
@@ -969,6 +988,7 @@ static std::list<ModData> modLine;
     // from each method
     connectInterfaces(IR);
     for (auto MI : IR->methods)
+        if (MI->generateSection == "")
         generateMethod(IR, MI->name, MI, enableList, muxValueList, hasPrintf);
     // combine mux'ed assignments into a single 'assign' statement
     for (auto item: muxValueList) {
@@ -979,18 +999,16 @@ static std::list<ModData> modLine;
         setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
 #if 1
     for (auto MI : IR->methods) {
+    for (auto MI : IR->methods)
+        if (MI->generateSection != "")
+        generateMethod(IR, MI->name, MI, enableList, muxValueList, hasPrintf);
     for (auto item: MI->generateFor) {
         NamedExprList enableList;
         NamedExprList muxValueList;
         genvarMap[item.var] = 1;
-        char tempBuf[1000];
-        snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
-        generateSection = tempBuf;
         MethodInfo *MIb = IR->generateBody[item.body];
-        if(!MIb) {
-printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
-        }
         assert(MIb && "body item ");
+        //generateSection = MIb->generateSection;
         generateMethod(IR, MI->name, MIb, enableList, muxValueList, hasPrintf);
         for (auto item: muxValueList)
             setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
@@ -1001,15 +1019,10 @@ printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
         NamedExprList enableList;
         NamedExprList muxValueList;
         genvarMap[item.var] = 1;
-        char tempBuf[1000];
-        snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
-        generateSection = tempBuf;
         MethodInfo *MIb = IR->generateBody[item.body];
-        if(!MIb) {
-printf("[%s:%d] bodyitem %s\n", __FUNCTION__, __LINE__, item.body.c_str());
-        }
         assert(MIb && "body item ");
-        generateMethod(IR, MI->name + "[" + tree2str(item.sub) + "]", MIb, enableList, muxValueList, hasPrintf);
+        //generateSection = MIb->generateSection;
+        generateMethod(IR, MI->name, MIb, enableList, muxValueList, hasPrintf);
         for (auto item: muxValueList)
             setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
         for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY

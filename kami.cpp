@@ -96,7 +96,7 @@ printf("[%s:%d] interface %s = %s\n", __FUNCTION__, __LINE__, name.c_str(), IR->
         for (auto MI: IR->methods) {
              std::string methodName = MI->name;
              char buf[200];
-             if (endswith(methodName, "__RDY"))
+             if (isRdyName(methodName))
                  continue;
              snprintf(buf, sizeof(buf), "Hint Unfold %s'%s : ModuleDefs.", name.c_str(), methodName.c_str());
              hints.push_back(buf);
@@ -136,7 +136,7 @@ static void generateModule(FILE *OStrV, ModuleIR *IR)
             auto interfaceIR = lookupInterface(interfaceItem.type);
             for (auto MI: interfaceIR->methods) {
                 std::string methodName = MI->name;
-                if (endswith(methodName, "__RDY"))
+                if (isRdyName(methodName))
                     continue;
                 char buf[200];
                 snprintf(buf, sizeof(buf), "    Let %s'%s : string := (%s'%s %s).", iitem.fldName.c_str(),
@@ -179,7 +179,7 @@ static void generateModule(FILE *OStrV, ModuleIR *IR)
     }
     for (auto MI: IR->methods) {
          std::string methodName = MI->name;
-         if (endswith(methodName, "__RDY"))
+         if (isRdyName(methodName))
              continue;
          MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName));
          fprintf(OStrV, "    %s %s instancePrefix--\"%s\" :=\n    (\n", sep.c_str(),
@@ -227,7 +227,7 @@ static void generateModule(FILE *OStrV, ModuleIR *IR)
         auto interfaceIR = lookupInterface(interfaceItem.type);
         for (auto MI: interfaceIR->methods) {
             std::string methodName = MI->name;
-            if (endswith(methodName, "__RDY"))
+            if (isRdyName(methodName))
                 continue;
             char buf[200];
             snprintf(buf, sizeof(buf), " (instancePrefix--\"%s\")", methodName.c_str());

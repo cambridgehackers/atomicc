@@ -54,7 +54,7 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
     std::string msep;
     for (auto MI : swInfo.inter->methods) {
         std::string methodName = MI->name;
-        if (endswith(methodName, "__RDY"))
+        if (isRdyName(methodName))
             continue;
         methodName = baseMethodName(methodName);
         std::string psep, retType;

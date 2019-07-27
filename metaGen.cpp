@@ -51,7 +51,7 @@ static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
     for (auto MI : IR->methods) {
         std::string methodName = MI->name;
         std::string gtemp = "; " + tree2str(MI->guard) + ";";
-        if (endswith(methodName, "__RDY"))
+        if (isRdyName(methodName))
             metaList.push_back("//METAGUARD; "
                 + baseMethodName(methodName) + gtemp);
         else if (endswith(methodName, "__READY"))

@@ -91,6 +91,8 @@ typedef ModuleIR *(^CBFun)(FieldElement &item);
 std::string baseMethodName(std::string pname);
 std::string getRdyName(std::string basename);
 std::string getEnaName(std::string basename);
+bool isRdyName(std::string name);
+bool isEnaName(std::string name);
 std::string convertType(std::string arg, int arrayProcess = 0);
 ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);

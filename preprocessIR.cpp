@@ -152,6 +152,8 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
     addMethod(genericIR, newMI);
     newMI->type = updateType(MI->type, paramMap);
     newMI->guard = walkToGeneric(MI->guard, paramMap);
+    newMI->subscript = MI->subscript;
+    newMI->generateSection = MI->generateSection;
     newMI->rule = MI->rule;
     newMI->action = MI->action;
     for (auto item : MI->storeList)
@@ -341,6 +343,33 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
         info->cond = cleanupBool(info->cond);
         info->value = cleanupExprBuiltin(info->value);
     }
+    for (auto item: MI->generateFor) {
+        MethodInfo *MIb = IR->generateBody[item.body];
+        assert(MIb);
+        for (auto pitem: MIb->params) {
+            if (MI->alloca.find(pitem.name) != MI->alloca.end())
+                MI->alloca[pitem.name].noReplace = true;
+        }
+        char tempBuf[1000];
+        snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
+        MIb->generateSection = tempBuf;
+    }
+    for (auto item: MI->instantiateFor) {
+        MethodInfo *MIb = IR->generateBody[item.body];
+        assert(MIb);
+        for (auto pitem: MIb->params) {
+            if (MI->alloca.find(pitem.name) != MI->alloca.end())
+                MI->alloca[pitem.name].noReplace = true;
+        }
+        MethodInfo *MIRdy = lookupMethod(IR, getRdyName(MI->name));
+        assert(MIRdy);
+        char tempBuf[1000];
+        snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
+        MIb->subscript = item.sub;     // make sure enable line is subscripted(body is in separate function!)
+        MIb->generateSection = tempBuf;
+        MIRdy->subscript = item.sub;   // make sure ready line is subscripted
+        MIRdy->generateSection = tempBuf;
+    }
 }
 
 void preprocessIR(std::list<ModuleIR *> &irSeq)
@@ -362,7 +391,7 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
           || field.isOutput || field.isInout || field.isParameter != "" || field.isLocalInterface)
             goto skipLab;
         for (auto MI: (*IR)->methods) {
-            if (endswith(MI->name, "__RDY") && !MI->callList.size())
+            if (isRdyName(MI->name) && !MI->callList.size())
                continue;
             if (MI->rule || MI->storeList.size() || MI->callList.size() != 1
              || MI->alloca.size() || MI->letList.size() || MI->printfList.size())
@@ -513,22 +542,6 @@ static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replace
 }
 static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
 {
-    for (auto item: MI->generateFor) {
-        MethodInfo *MIb = IR->generateBody[item.body];
-        assert(MIb);
-        for (auto pitem: MIb->params) {
-            if (MI->alloca.find(pitem.name) != MI->alloca.end())
-                MI->alloca[pitem.name].noReplace = true;
-        }
-    }
-    for (auto item: MI->instantiateFor) {
-        MethodInfo *MIb = IR->generateBody[item.body];
-        assert(MIb);
-        for (auto pitem: MIb->params) {
-            if (MI->alloca.find(pitem.name) != MI->alloca.end())
-                MI->alloca[pitem.name].noReplace = true;
-        }
-    }
     rewriteExpr(MI, MI->guard);
     for (auto item: MI->storeList) {
         rewriteExpr(MI, item->dest);

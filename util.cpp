@@ -59,6 +59,18 @@ std::string getEnaName(std::string basename)
     return base + "__ENA" + sub;
 }
 
+bool isRdyName(std::string name)
+{
+    std::string rname = getRdyName(name);
+    return name == rname;
+}
+
+bool isEnaName(std::string name)
+{
+    std::string rname = getEnaName(name);
+    return name == rname;
+}
+
 ModuleIR *lookupIR(std::string name)
 {
     std::string ind = name;
@@ -173,7 +185,7 @@ MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
 {
     std::string nameENA = name + "__ENA";
     std::string nameShort = name;
-    if (endswith(nameShort, "__ENA"))
+    if (isEnaName(nameShort))
         nameShort = baseMethodName(nameShort);
     for (auto MI : IR->methods) {
         if (MI->name == name || MI->name == nameENA || MI->name == nameShort)
@@ -333,6 +345,7 @@ ModuleIR *allocIR(std::string name, bool isInterface)
 MethodInfo *allocMethod(std::string name)
 {
     MethodInfo *MI = new MethodInfo{nullptr/*guard*/,
+        nullptr/*subscript*/, ""/*generateSection*/,
         name/*name*/, false/*rule*/, false/*action*/,
         {}/*storeList*/, {}/*letList*/, {}/*callList*/, {}/*printfList*/,
         ""/*type*/, {}/*params*/, {}/*generateFor*/, {}/*instantiateFor*/,
@@ -343,8 +356,8 @@ MethodInfo *allocMethod(std::string name)
 bool addMethod(ModuleIR *IR, MethodInfo *MI)
 {
     std::string methodName = MI->name; // baseMethodName??
-    if (endswith(methodName, "__ENA"))
-        methodName = methodName.substr(0, methodName.length()-5);
+    if (isEnaName(methodName))
+        methodName = baseMethodName(methodName);
     bool ret = !startswith(methodName, "FOR$");
     if (ret)
         IR->methods.push_back(MI);

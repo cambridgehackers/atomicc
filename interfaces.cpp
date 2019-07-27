@@ -43,7 +43,7 @@ printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     uint64_t maxDataLength = 0;
     for (auto MI: IIR->methods) {
         std::string methodName = MI->name;
-        if (endswith(methodName, "__RDY"))
+        if (isRdyName(methodName))
             continue;
         methodName = baseMethodName(methodName);
         ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
@@ -101,9 +101,9 @@ assert(HIR);
         addMethod(IR, MInew);
         MInew->type = MI->type;
         MInew->guard = MI->guard;
-        if (endswith(methodName, "__RDY"))
+        if (isRdyName(methodName))
             continue;
-        //if (!endswith(methodName, "__ENA")) {
+        //if (!isEnaName(methodName)) {
 //printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
 //exit(-1);
             //continue;
@@ -175,7 +175,7 @@ assert(MInew);
         std::string offset = "32";
         std::string methodName = MI->name;
         std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
-        if (endswith(methodName, "__RDY"))
+        if (isRdyName(methodName))
             continue;
         ACCExpr *paramList = allocExpr(",");
         ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr(PARAMETER_MARKER, paramList));
@@ -184,14 +184,14 @@ assert(MInew);
             paramList->operands.push_back(allocExpr(host + "$enq$v[" + upper + " -1 :" + offset + "]"));
             offset = upper;
         }
-        if (!endswith(methodName, "__ENA")) {
+        if (!isEnaName(methodName)) {
 printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
 //exit(-1);
             //continue;
         }
         ACCExpr *cond = allocExpr("==", allocExpr(host + "$enq$v[31:16]"),
                  allocExpr("16'd" + autostr(counter)));
-        if (!endswith(methodName, "__ENA")) {
+        if (!isEnaName(methodName)) {
             if (!addedReturnInd)
                 IR->interfaces.push_back(FieldElement{"returnInd", "", "PipeInH", true, false, false, false, ""/*not param*/, false, false});
             addedReturnInd = true;
