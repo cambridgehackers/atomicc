@@ -99,6 +99,16 @@ bool checkOperand(std::string s)
     return isIdChar(s[0]) || isdigit(s[0]) || s == "(" || s == "{" || s[0] == '"';
 }
 
+bool isConstExpr(ACCExpr *expr)
+{
+    if (!isdigit(expr->value[0]) && !startswith(expr->value, GENVAR_NAME) && !checkOperator(expr->value))
+        return false;
+    for (auto item: expr->operands)
+        if (!isConstExpr(item))
+            return false;
+    return true;
+}
+
 void dumpExpr(std::string tag, ACCExpr *next)
 {
     printf("DE: %s %p %s\n", tag.c_str(), (void *)next, next ? next->value.c_str() : "");

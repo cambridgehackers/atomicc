@@ -76,6 +76,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr, bool inGenerate)
     }
     expr->value += "[" + tree2str(subscript) + "]" + post;
 }
+
 static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
 {
     if (isIdChar(expr->value[0]) && expr->operands.size() && expr->operands.front()->value == SUBSCRIPT_MARKER) {
@@ -88,8 +89,8 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, s
             if (post[0] == '$')
                 post = "." + post.substr(1);
         }
-        if (isdigit(sub->value[0]) || startswith(sub->value, GENVAR_NAME)) {
-            expr->value += "[" + sub->value + "]" + post;
+        if (isConstExpr(sub)) {
+            expr->value += "[" + tree2str(sub) + "]" + post;
             return nullptr;
         }
         *subscript = sub;

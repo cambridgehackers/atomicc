@@ -134,6 +134,7 @@ bool checkInteger(ACCExpr *expr, std::string pattern);
 bool booleanBinop(std::string s);
 bool arithOp(std::string s);
 bool relationalOp(std::string s);
+bool isConstExpr(ACCExpr *expr);
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);
