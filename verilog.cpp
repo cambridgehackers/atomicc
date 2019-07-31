@@ -29,10 +29,10 @@ int trace_skipped;//= 1;
 std::list<PrintfInfo> printfFormat;
 std::list<ModData> modNew;
 std::map<std::string, std::map<std::string, CondGroup>> condLines;
-typedef std::map<std::string, ACCExpr *> NamedExprList;
 
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
+std::map<std::string, std::map<std::string, ACCExpr *>> enableList, muxValueList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
@@ -759,17 +759,17 @@ static void connectInterfaces(ModuleIR *IR)
     }
 }
 
-void appendMux(std::string name, ACCExpr *cond, ACCExpr *value, NamedExprList &muxValueList)
+void appendMux(std::string name, ACCExpr *cond, ACCExpr *value)
 {
-    ACCExpr *phi = muxValueList[name];
+    ACCExpr *phi = muxValueList[generateSection][name];
     if (!phi) {
         phi = allocExpr("__phi", allocExpr("("));
-        muxValueList[name] = phi;
+        muxValueList[generateSection][name] = phi;
     }
     phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
 }
 
-static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI, NamedExprList &enableList, NamedExprList &muxValueList, bool hasPrintf)
+static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI, bool hasPrintf)
 {
     if (MI->subscript)      // from instantiateFor
         methodName += "[" + tree2str(MI->subscript) + "]";
@@ -787,7 +787,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
         std::string dest = info->dest->value;
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
             ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond));
-            appendMux(dest, cond, info->value, muxValueList);
+            appendMux(dest, cond, info->value);
         }
         else
             appendLine(methodName, info->cond, info->dest, info->value);
@@ -803,15 +803,15 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
         getFieldList(fieldList, dest, "", info->type, 1, true);
         if (fieldList.size() == 1) {
             std::string first = fieldList.front().name;
-            appendMux(dest, cond, value, muxValueList);
+            appendMux(dest, cond, value);
             if (first != dest)
-                appendMux(first, cond, value, muxValueList);
+                appendMux(first, cond, value);
         }
         else {
         std::string splitItem = tree2str(value);
         if ((value->operands.size() || !isIdChar(value->value[0]))) {
             splitItem = dest + "$lettemp";
-            appendMux(splitItem, cond, value, muxValueList);
+            appendMux(splitItem, cond, value);
         }
         for (auto fitem : fieldList) {
             std::string offset = autostr(fitem.offset);
@@ -819,7 +819,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
             if (offset != "0")
                 upper += " + " + offset;
             appendMux(fitem.name, cond,
-                allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))), muxValueList);
+                allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))));
         }
         }
     }
@@ -849,9 +849,9 @@ dumpExpr("READCALL", value);
             appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"));
             break;
         }
-        if (!enableList[calledEna])
-            enableList[calledEna] = allocExpr("|");
-        enableList[calledEna]->operands.push_back(tempCond);
+        if (!enableList[generateSection][calledEna])
+            enableList[generateSection][calledEna] = allocExpr("|");
+        enableList[generateSection][calledEna]->operands.push_back(tempCond);
         MethodInfo *CI = lookupQualName(IR, calledName);
         if (!CI) {
             printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
@@ -863,7 +863,7 @@ dumpExpr("READCALL", value);
         ACCExpr *param = value->operands.front();
         for (auto item: param->operands) {
             if(argCount-- > 0) {
-                appendMux(pname + AI->name, tempCond, item, muxValueList);
+                appendMux(pname + AI->name, tempCond, item);
                 AI++;
             }
         }
@@ -888,9 +888,9 @@ static std::list<ModData> modLine;
     genvarMap.clear();
     generateModuleSignature(IR, "", modLineTop, "");
     bool hasPrintf = false;
-    NamedExprList enableList;
+    enableList.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
-    NamedExprList muxValueList;
+    muxValueList.clear();
 
     modLine.clear();
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
@@ -989,48 +989,39 @@ static std::list<ModData> modLine;
     connectInterfaces(IR);
     for (auto MI : IR->methods)
         if (MI->generateSection == "")
-        generateMethod(IR, MI->name, MI, enableList, muxValueList, hasPrintf);
-    // combine mux'ed assignments into a single 'assign' statement
-    for (auto item: muxValueList) {
-        setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
-        assignList[item.first].noRecursion = true;
-    }
-    for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
-        setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
-#if 1
-    for (auto MI : IR->methods) {
+        generateMethod(IR, MI->name, MI, hasPrintf);
     for (auto MI : IR->methods)
         if (MI->generateSection != "")
-        generateMethod(IR, MI->name, MI, enableList, muxValueList, hasPrintf);
+        generateMethod(IR, MI->name, MI, hasPrintf);
+    for (auto MI : IR->methods) {
     for (auto item: MI->generateFor) {
-        NamedExprList enableList;
-        NamedExprList muxValueList;
         genvarMap[item.var] = 1;
         MethodInfo *MIb = IR->generateBody[item.body];
         assert(MIb && "body item ");
-        //generateSection = MIb->generateSection;
-        generateMethod(IR, MI->name, MIb, enableList, muxValueList, hasPrintf);
-        for (auto item: muxValueList)
-            setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
-        for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
-            setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
+        generateMethod(IR, MI->name, MIb, hasPrintf);
     }
     for (auto item: MI->instantiateFor) {
-        NamedExprList enableList;
-        NamedExprList muxValueList;
         genvarMap[item.var] = 1;
         MethodInfo *MIb = IR->generateBody[item.body];
         assert(MIb && "body item ");
-        //generateSection = MIb->generateSection;
-        generateMethod(IR, MI->name, MIb, enableList, muxValueList, hasPrintf);
-        for (auto item: muxValueList)
-            setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
-        for (auto item: enableList) // remove dependancy of the __ENA line on the __RDY
-            setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
+        generateMethod(IR, MI->name, MIb, hasPrintf);
     }
+    }
+    // combine mux'ed assignments into a single 'assign' statement
+    for (auto top: muxValueList) {
+        generateSection = top.first;
+        for (auto item: top.second) {
+        setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
+        assignList[item.first].noRecursion = true;
+        }
+    }
+    for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY
+        generateSection = top.first;
+        for (auto item: top.second) {
+        setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
+        }
     }
     generateSection = "";
-#endif
 
     setAssignRefCount(IR);
     collectCSE();
