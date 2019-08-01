@@ -120,7 +120,6 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen = false);
 ACCExpr *cleanupExprBuiltin(ACCExpr *expr);
 ACCExpr *cleanupBool(ACCExpr *expr);
 ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
-std::string treePost(const ACCExpr *arg);
 bool checkOperand(std::string s);
 ACCExpr *invertExpr(ACCExpr *expr);
 std::string exprWidth(ACCExpr *expr, bool forceNumeric = false);

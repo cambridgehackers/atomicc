@@ -587,12 +587,13 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
     }
     for (auto item: MI->instantiateFor) {
         MethodInfo *MIb = IR->generateBody[item.body];
+        std::string methodName = baseMethodName(MI->name) + MODULE_SEPARATOR;
         assert(MIb);
         for (auto pitem: MIb->params) {
              // make sure that parameters are subscripted with instance parameter when processed
-             if (startswith(pitem.name, MI->name + MODULE_SEPARATOR)) {
-printf("[%s:%d] METH %s name %s\n", __FUNCTION__, __LINE__, MIb->name.c_str(), pitem.name.c_str());
-                 replaceMethodExpr(MIb, allocExpr(pitem.name), allocExpr(pitem.name, item.sub));
+             if (startswith(pitem.name, methodName)) {
+                 replaceMethodExpr(MIb, allocExpr(pitem.name),
+                     allocExpr(pitem.name, allocExpr(SUBSCRIPT_MARKER, item.sub)));
              }
         }
     }

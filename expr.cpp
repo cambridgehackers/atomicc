@@ -51,18 +51,18 @@ static bool isParen(char ch)
     return isParen(item);
 }
 
-std::string treePost(const ACCExpr *arg)
+static std::string treePost(std::string val)
 {
     std::string space = " ";
-    if (arg->value == "[")
+    if (val == "[")
         return " ]";
-    else if (arg->value == "(")
+    else if (val == "(")
         return " )";
-    else if (arg->value == "{")
+    else if (val == "{")
         return " }";
-    else if (arg->value == SUBSCRIPT_MARKER)
+    else if (val == SUBSCRIPT_MARKER)
         return space + SUBSCRIPT_CLOSE;
-    else if (arg->value == PARAMETER_MARKER)
+    else if (val == PARAMETER_MARKER)
         return space + PARAMETER_CLOSE;
     return "";
 }
@@ -135,7 +135,10 @@ std::string tree2str(ACCExpr *expr)
 {
     if (!expr)
         return "";
-    std::string ret, sep, op = expr->value;
+    std::string ret, sep, orig = expr->value;
+    if (orig[0] == '@')
+        orig = orig.substr(1);
+    std::string op = orig;
     if (isParen(op)) {
         ret += op;
         if (expr->operands.size())
@@ -147,8 +150,6 @@ std::string tree2str(ACCExpr *expr)
     }
     else if (((op == "-")/*unary*/ && expr->operands.size() == 1))
         ret += op;
-    else if (op[0] == '@')
-        ret += op.substr(1);
     else if (op == "!" || !expr->operands.size())
         ret += op;
     bool topOp = checkOperand(expr->value) || expr->value == "," || expr->value == "[" || expr->value == PARAMETER_MARKER;
@@ -164,7 +165,7 @@ std::string tree2str(ACCExpr *expr)
         if (op == "?")
             op = ":";
     }
-    ret += treePost(expr);
+    ret += treePost(orig);
     return ret;
 }
 
@@ -297,7 +298,7 @@ static ACCExpr *get1Token(void)
         std::string val = ret->value;
         if (trace_expr)
             printf("[%s:%d] before subparse of '%s'\n", __FUNCTION__, __LINE__, ret->value.c_str());
-        ret = getExprList(ret, treePost(ret).substr(1), false, true);
+        ret = getExprList(ret, treePost(val).substr(1), false, true);
         if (ret->value != val)
             ret = allocExpr(val, ret); // over optimization of '(<singleItem>)'
         if (trace_expr) {
