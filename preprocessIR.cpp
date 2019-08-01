@@ -576,7 +576,7 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
     for (auto item: MI->alloca) {
         if (!item.second.noReplace)
             continue;
-        ACCExpr *itemList = allocExpr("{");
+        ACCExpr *itemList = allocExpr("{"); // }
         std::list<FieldItem> fieldList;
         getFieldList(fieldList, item.first, "", item.second.type, true, true);
         for (auto fitem : fieldList)
@@ -584,6 +584,17 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
                 itemList->operands.push_front(allocExpr(fitem.name));
         if (itemList->operands.size() > 1)
             replaceMethodExpr(MI, allocExpr(item.first), itemList);
+    }
+    for (auto item: MI->instantiateFor) {
+        MethodInfo *MIb = IR->generateBody[item.body];
+        assert(MIb);
+        for (auto pitem: MIb->params) {
+             // make sure that parameters are subscripted with instance parameter when processed
+             if (startswith(pitem.name, MI->name + MODULE_SEPARATOR)) {
+printf("[%s:%d] METH %s name %s\n", __FUNCTION__, __LINE__, MIb->name.c_str(), pitem.name.c_str());
+                 replaceMethodExpr(MIb, allocExpr(pitem.name), allocExpr(pitem.name, item.sub));
+             }
+        }
     }
 }
 

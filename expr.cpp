@@ -214,13 +214,14 @@ static struct {
 
     {"+", 30}, {"-", 30},
     {"*", 40}, {"%", 40},
+    {".", 99},
 
     {nullptr, -1}};
     int ind = 0;
     while (opPrec[ind].op && opPrec[ind].op != s)
         ind++;
     if (s != "" && !opPrec[ind].op) {
-        printf("[%s:%d] PPPPPPPPPPPP %s\n", __FUNCTION__, __LINE__, s.c_str());
+        printf("[%s] ERROR: failed to find precedence for operator %s\n", __FUNCTION__, s.c_str());
         exit(-1);
     }
     return opPrec[ind].prec;
@@ -549,6 +550,17 @@ static int level;
     level++;
     if (expr->operands.size() == 1 && expr->operands.front()->value != "," && (!preserveParen && expr->value == "("))
         expr = expr->operands.front();
+    if (expr->value == ".") {
+        // fold member specifier into base name
+        ACCExpr *lhs = getRHS(expr, 0), *rhs = getRHS(expr, 1);
+        if (expr->operands.size() != 2) {
+            dumpExpr("BADFIELDSPEC", expr);
+        }
+        else if (isIdChar(lhs->value[0]) && isIdChar(rhs->value[0]) && !rhs->operands.size()) {
+            expr = lhs;
+            expr->value += MODULE_SEPARATOR + rhs->value;
+        }
+    }
     if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
     ACCExpr *ret = allocExpr(expr->value);
