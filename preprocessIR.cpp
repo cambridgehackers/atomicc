@@ -226,7 +226,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
         std::string iname = irName + MODULE_SEPARATOR + item.fldName;
         buildGeneric(lookupInterface(item.type), iname, paramMap, true);
         genericIR->interfaces.push_back(FieldElement{item.fldName,
-             item.vecCount, iname, item.isPtr, item.isInput,
+             updateCount(item.vecCount, paramMap), iname, item.isPtr, item.isInput,
              item.isOutput, item.isInout,
              item.isParameter, item.isShared, item.isLocalInterface});
     }
