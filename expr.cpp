@@ -214,7 +214,7 @@ static struct {
     {">>", 25}, {"<<", 25},
 
     {"+", 30}, {"-", 30},
-    {"*", 40}, {"%", 40},
+    {"*", 40}, {"%", 40}, {"/", 40},
     {".", 99},
 
     {nullptr, -1}};
@@ -260,11 +260,14 @@ static ACCExpr *get1Token(void)
         else if (lexToken == "__defaultnReset")
             lexToken = "nRST";
     }
-    else if (isdigit(lexChar))
+    else if (isdigit(lexChar)) {
         do {
             getNext();
         } while (isdigit(lexChar) || lexChar == '.' || lexChar == '\'' || lexChar == 'b'
             || lexChar == 'h' || lexChar == 'd' || lexChar == 'o');
+        if (lexChar == 'U') // unsigned
+            lexChar = lexString[lexIndex++]; // skip 'U'
+    }
     else if (lexChar == '+' || lexChar == '-' || lexChar == '*' || lexChar == '&' || lexChar == '|')
         do {
             getNext();
