@@ -323,7 +323,7 @@ interface, isStruct, isSerialize, ext);
                 bool        isParameter = checkItem("/parameter");
                 bool        isShared = checkItem("/shared");
                 if (checkItem("/Count")) {
-                    vecCount = getToken();
+                    vecCount = tree2str(getExpression(' '));
                     IR->genvarCount = 1;
                 }
                 std::string type = getType();
@@ -337,8 +337,9 @@ interface, isStruct, isSerialize, ext);
             else if (checkItem("INTERFACE")) {
                 std::string vecCount;
                 bool        isPtr = checkItem("/Ptr");
-                if (checkItem("/Count"))
-                    vecCount = getToken();
+                if (checkItem("/Count")) {
+                    vecCount = tree2str(getExpression(' '));
+                }
                 std::string type = getType();
                 std::string fldName = getToken();
                 if (fldName == "_")
