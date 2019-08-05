@@ -87,12 +87,16 @@ typedef struct {
 typedef ModuleIR *(^CBFun)(FieldElement &item);
 #define CBAct ^ ModuleIR * (FieldElement &item)
 
+typedef std::map<std::string, std::string> MapNameValue;
+
 // util.cpp
 std::string baseMethodName(std::string pname);
 std::string getRdyName(std::string basename);
 std::string getEnaName(std::string basename);
 bool isRdyName(std::string name);
 bool isEnaName(std::string name);
+void extractParam(std::string replaceList, MapNameValue &mapValue);
+std::string instantiateType(std::string arg, MapNameValue &mapValue);
 std::string convertType(std::string arg, int arrayProcess = 0);
 ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);

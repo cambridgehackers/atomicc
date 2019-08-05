@@ -61,11 +61,11 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
         fprintf(OStrJ, "%s\n                { \"dname\": \"%s\", \"dparams\": [",
              msep.c_str(), methodName.c_str());
         for (auto pitem: MI->params) {
-             fprintf(OStrJ, "%s\n                        { \"pname\": \"%s\", "
-                 "\"ptype\": { \"name\": \"Bit\", \"params\": [ { "
-                 "\"name\": \"%s\" } ] } }",
-                 psep.c_str(), pitem.name.c_str(), convertType(pitem.type).c_str());
-             psep = ",";
+            fprintf(OStrJ, "%s\n                        { \"pname\": \"%s\", "
+                "\"ptype\": { \"name\": \"Bit\", \"params\": [ { "
+                "\"name\": \"%s\" } ] } }",
+                psep.c_str(), pitem.name.c_str(), convertType(pitem.type).c_str());
+            psep = ",";
         }
 #if 1
         if (MI->type != "") {
@@ -187,6 +187,7 @@ dumpModule("MUX", muxDef);
             else
                 IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
                     fieldName + MODULE_SEPARATOR + "pipe", pName, true});
+            //dumpModule("SWIFC", ifcIR);
         }
         if (!hasIndication) {
             IR->interfaces.push_back(FieldElement{"indication", "", "PipeInH",

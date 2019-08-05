@@ -71,6 +71,27 @@ bool isEnaName(std::string name)
     return name == rname;
 }
 
+void extractParam(std::string replaceList, MapNameValue &mapValue)
+{
+    int ind = replaceList.find("(");
+    if (ind > 0) {
+        replaceList = replaceList.substr(ind+1);
+        replaceList = replaceList.substr(0, replaceList.length()-1); // remove ')'
+        while ((ind = replaceList.find("=")) > 0) {
+            std::string name = replaceList.substr(0, ind);
+            replaceList = replaceList.substr(ind+1);
+            ind = replaceList.find(",");
+            std::string value = replaceList;
+            replaceList = "";
+            if (ind > 0) {
+                replaceList = value.substr(ind+1);
+                value = value.substr(0, ind);
+            }
+            mapValue[name] = value;
+        }
+    }
+}
+
 ModuleIR *lookupIR(std::string name)
 {
     std::string ind = name;
@@ -97,6 +118,59 @@ ModuleIR *lookupInterface(std::string name)
     return interfaceIndex[ind];
 }
 
+std::string instantiateType(std::string arg, MapNameValue &mapValue)
+{
+    const char *bp = arg.c_str();
+    auto checkT = [&] (const char *val) -> bool {
+        int len = strlen(val);
+        bool ret = !strncmp(bp, val, len);
+        if (ret)
+            bp += len;
+        return ret;
+    };
+    auto mapReturn = [&] (std::string rets) -> std::string {
+        bool hasAtSign = rets[0] == '@';
+        if (hasAtSign)
+            rets = rets.substr(1);
+        std::string newval = mapValue[rets];
+        if (newval != "") {
+printf("[%s:%d] INSTTTANTIATEEEEEEEEEEEEEEEEEEEEEEEEEEE %s -> %s\n", __FUNCTION__, __LINE__, arg.c_str(), newval.c_str());
+            rets = newval;
+        }
+        if (hasAtSign)
+            rets = "@" + rets;
+        return rets;
+    };
+    if (checkT("ARRAY_")) {
+        std::string arr = bp;
+        int ind = arr.find("_");
+        if (ind > 0)
+            arr = arr.substr(0, ind);
+        while (isdigit(*bp) || *bp == '_')
+            bp++;
+        std::string newtype = "ARRAY_" + arr + "_" + instantiateType(bp, mapValue);
+printf("[%s:%d] oldtype %s newtype %s\n", __FUNCTION__, __LINE__, arg.c_str(), newtype.c_str());
+        return newtype;
+    }
+    if (arg == "" || arg == "void")
+        return arg;
+    if (checkT("Bit(")) {
+        std::string rets = bp;
+        return "Bit(" + mapReturn(rets.substr(0, rets.length()-1)) + ")";
+    }
+    if (arg == "FLOAT")
+        return arg;
+    if (checkT("@")) {
+//printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
+        return mapReturn(arg);
+    }
+    if (auto IR = lookupIR(bp)) {
+        return mapReturn(bp);
+    }
+    printf("[%s:%d] instantiateType FAILED '%s'\n", __FUNCTION__, __LINE__, bp);
+    exit(-1);
+}
+
 std::string convertType(std::string arg, int arrayProcess)
 {
     const char *bp = arg.c_str();
@@ -110,10 +184,10 @@ std::string convertType(std::string arg, int arrayProcess)
     if (checkT("ARRAY_")) {
         std::string arr = bp;
         int ind = arr.find("_");
-        if (ind > 0)
+        if (ind > 0) {
             arr = arr.substr(0, ind);
-        while (isdigit(*bp) || *bp == '_')
-            bp++;
+            bp += ind + 1;
+        }
         if (arrayProcess == 1) // element only
             return convertType(bp); // only return element size (caller handles array decl)
         if (arrayProcess == 2) // array size only
@@ -333,7 +407,7 @@ ModuleIR *allocIR(std::string name, bool isInterface)
         {}/*metaList*/, {}/*softwareName*/, {}/*methods*/,
         {}/*generateBody*/, {}/*priority*/, {}/*fields*/,
         {}/*params*/, {}/*unionList*/, {}/*interfaces*/,
-        {}/*interfaceConnect*/, 0/*genvarCount*/, false/*isInterface*/,
+        {}/*interfaceConnect*/, 0/*genvarCount*/, isInterface,
         false/*isStruct*/, false/*isSerialize*/, false/*transformGeneric*/};
     if (isInterface)
         interfaceIndex[iname] = IR;

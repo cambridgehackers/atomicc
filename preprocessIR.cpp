@@ -143,7 +143,7 @@ static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
     }
     for (auto item: paramMap)
         if (startswith(type, "Bit(") && endswith(type, ")") && checkIntegerString(type.substr(4, type.length() - 5), item.value))
-            return "@" + item.name;
+            return "Bit(" + item.name + ")";
     return type;
 };
 
@@ -179,7 +179,7 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
             walkToGeneric(item->cond, paramMap),
             item->isAction});
     for (auto item : MI->alloca)
-        newMI->alloca[item.first] = AllocaItem{item.second.type, item.second.noReplace};
+        newMI->alloca[item.first] = AllocaItem{updateType(item.second.type, paramMap), item.second.noReplace};
     for (auto item : MI->generateFor)
         newMI->generateFor.push_back(GenerateForItem{
             walkToGeneric(item.cond, paramMap), item.var,
@@ -375,6 +375,8 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
 
 void preprocessIR(std::list<ModuleIR *> &irSeq)
 {
+    // Check/replace dummy intermediate classes that are only present for typechecking
+    // e.g., Fifo1 -> Fifo1Base
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
         FieldElement field;
         if ((*IR)->interfaceConnect.size()
@@ -498,7 +500,7 @@ static void rewriteExpr(MethodInfo *MI, ACCExpr *expr)
             if (expr->value != ptr->first && startswith(expr->value, ptr->first)) {
                 ptr->second.noReplace = true;
 //printf("[%s:%d] %s: expr %s first %s\n", __FUNCTION__, __LINE__, MI->name.c_str(), expr->value.c_str(), ptr->first.c_str());
-}
+            }
         }
     }
     for (auto item: expr->operands)
@@ -541,6 +543,46 @@ static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replace
         item->cond = walkReplaceExpr(item->cond, pattern, replacement);
     }
 }
+void copyInterface(std::string oldName, std::string newName, MapNameValue &mapValue)
+{
+    ModuleIR *oldIR = lookupInterface(oldName);
+    ModuleIR *IR = allocIR(newName, oldIR->isInterface);
+    IR->metaList = oldIR->metaList;
+    IR->softwareName = oldIR->softwareName;
+    IR->generateBody = oldIR->generateBody;
+    IR->priority = oldIR->priority;
+    IR->fields = oldIR->fields;
+    IR->params = oldIR->params;
+    IR->unionList = oldIR->unionList;
+    IR->interfaces = oldIR->interfaces;
+    IR->interfaceConnect = oldIR->interfaceConnect;
+    IR->genvarCount = oldIR->genvarCount;
+    IR->isStruct = oldIR->isStruct;
+    IR->isSerialize = oldIR->isSerialize;
+    IR->transformGeneric = oldIR->transformGeneric;
+    for (auto MI : oldIR->methods) {
+        MethodInfo *nMI = allocMethod(MI->name);
+        IR->methods.push_back(nMI);
+        for (auto pitem: MI->params)
+            nMI->params.push_back(ParamElement{pitem.name, instantiateType(pitem.type, mapValue), pitem.init});
+        nMI->guard = MI->guard;
+        nMI->subscript = MI->subscript;
+        nMI->generateSection = MI->generateSection;
+        nMI->rule = MI->rule;
+        nMI->action = MI->action;
+        nMI->storeList = MI->storeList;
+        nMI->letList = MI->letList;
+        nMI->callList = MI->callList;
+        nMI->printfList = MI->printfList;
+        nMI->type = instantiateType(MI->type, mapValue);
+        nMI->generateFor = MI->generateFor;
+        nMI->instantiateFor = MI->instantiateFor;
+        nMI->alloca = MI->alloca;
+        //nMI->meta = MI->meta;
+    }
+//dumpModule("NEWMOD", IR);
+}
+
 static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
 {
     rewriteExpr(MI, MI->guard);
@@ -565,7 +607,9 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
     }
     for (auto item = MI->letList.begin(), iteme = MI->letList.end(); item != iteme;) {
         std::string dest = tree2str((*item)->dest);
-        if (!(*item)->cond && MI->alloca.find(dest) != MI->alloca.end() && !MI->alloca[dest].noReplace) {
+        std::string guard = tree2str(MI->guard);
+        if (!(*item)->cond && MI->alloca.find(dest) != MI->alloca.end() && !MI->alloca[dest].noReplace
+          && dest == guard && !MI->storeList.size() && !MI->generateFor.size() && !MI->instantiateFor.size()) {
             replaceMethodExpr(MI, (*item)->dest, (*item)->value);
             MI->alloca.erase(dest);
             item = MI->letList.erase(item);
@@ -602,6 +646,15 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
 void cleanupIR(std::list<ModuleIR *> &irSeq)
 {
     for (auto IR: irSeq) {
+        for (auto items = IR->interfaces.begin(), iteme = IR->interfaces.end(); items != iteme; items++) {
+            MapNameValue mapValue;
+            extractParam(items->type, mapValue);
+            if (mapValue.size() > 0) {
+                std::string newName = CBEMangle(items->type);
+                copyInterface(items->type, newName, mapValue);
+                items->type = newName;
+            }
+        }
         for (auto MI: IR->methods)
             postParseCleanup(IR, MI);
         for (auto item: IR->generateBody)
