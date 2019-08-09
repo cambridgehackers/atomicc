@@ -286,9 +286,7 @@ exit(-1);
     pinPorts.clear();
     pinMethods.clear();
     paramPorts.clear();
-printf("[%s:%d] beforecollect instance %s\n", __FUNCTION__, __LINE__, instance.c_str());
     collectInterfacePins(IR, instance != "", "", "", false, mapValue);
-printf("[%s:%d] aftercoll\n", __FUNCTION__, __LINE__);
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
         std::string genericMName = genericName(IR->name);

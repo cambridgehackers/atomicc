@@ -26,6 +26,7 @@ typedef struct {
     std::string value;
 } PARAM_MAP;
 std::map<std::string, int> genericModule;
+static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest = false);
 
 std::string genericName(std::string name)
 {
@@ -357,11 +358,8 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
     }
     for (auto item: MI->instantiateFor) {
         MethodInfo *MIb = IR->generateBody[item.body];
+        std::string methodName = baseMethodName(MI->name) + MODULE_SEPARATOR;
         assert(MIb);
-        for (auto pitem: MIb->params) {
-            if (MI->alloca.find(pitem.name) != MI->alloca.end())
-                MI->alloca[pitem.name].noReplace = true;
-        }
         MethodInfo *MIRdy = lookupMethod(IR, getRdyName(MI->name));
         assert(MIRdy);
         char tempBuf[1000];
@@ -370,6 +368,24 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
         MIb->generateSection = tempBuf;
         MIRdy->subscript = item.sub;   // make sure ready line is subscripted
         MIRdy->generateSection = tempBuf;
+        for (auto pitem: MIb->params) {
+            if (MI->alloca.find(pitem.name) != MI->alloca.end())
+                MI->alloca[pitem.name].noReplace = true;
+            // make sure that parameters are subscripted with instance parameter when processed
+            if (startswith(pitem.name, methodName)) {
+                std::string arraySize = convertType(pitem.type, 2);
+                std::string elementSize = convertType(pitem.type, 1);
+                ACCExpr *lsb = MIb->subscript;
+                ACCExpr *msb = allocExpr("+", MIb->subscript, allocExpr("1"));
+                if (elementSize != "1") {
+                    lsb = allocExpr("*", allocExpr(elementSize), lsb);
+                    msb = allocExpr("*", allocExpr(elementSize), msb);
+                }
+                replaceMethodExpr(MIb, allocExpr(pitem.name),
+                    allocExpr(pitem.name, allocExpr(SUBSCRIPT_MARKER,
+                        allocExpr(":", allocExpr("-", msb, allocExpr("1")), lsb))));
+            }
+        }
     }
 }
 
@@ -520,7 +536,7 @@ static ACCExpr *walkReplaceExpr (ACCExpr *expr, ACCExpr *pattern, ACCExpr *repla
             newExpr->operands.push_back(operand);
     return newExpr;
 }
-static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest = false)
+static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest)
 {
     MI->guard = walkReplaceExpr(MI->guard, pattern, replacement);
     for (auto item: MI->storeList) {
@@ -628,18 +644,6 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
                 itemList->operands.push_front(allocExpr(fitem.name));
         if (itemList->operands.size() > 1)
             replaceMethodExpr(MI, allocExpr(item.first), itemList);
-    }
-    for (auto item: MI->instantiateFor) {
-        MethodInfo *MIb = IR->generateBody[item.body];
-        std::string methodName = baseMethodName(MI->name) + MODULE_SEPARATOR;
-        assert(MIb);
-        for (auto pitem: MIb->params) {
-             // make sure that parameters are subscripted with instance parameter when processed
-             if (startswith(pitem.name, methodName)) {
-                 replaceMethodExpr(MIb, allocExpr(pitem.name),
-                     allocExpr(pitem.name, allocExpr(SUBSCRIPT_MARKER, item.sub)));
-             }
-        }
     }
 }
 
