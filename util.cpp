@@ -490,9 +490,9 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, n
         std::string ret = "    FIELD";
         if (item.isPtr)
             ret += "/Ptr";
-        ret += " ";
         if (item.vecCount != "")
             ret += "/Count " + item.vecCount;
+        ret += " ";
         ret += item.type + " " + item.fldName;
         printf("%s\n", ret.c_str());
     }
@@ -502,14 +502,14 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s{\n", __FUNCTION__, __LINE__, n
             ret += "/Ptr";
         if (item.isLocalInterface) // interface declaration that is used to connect to local objects (does not appear in module signature)
             ret += "/Local";
-        ret += " ";
         if (item.vecCount != "")
             ret += "/Count " + item.vecCount;
+        ret += " ";
         ret += item.type + " " + item.fldName;
         printf("%s\n", ret.c_str());
     }
     for (auto item: IR->interfaceConnect)
-        printf("    INTERFACECONNECT %s %s %s\n", item.target.c_str(), item.source.c_str(), item.type.c_str());
+        printf("    INTERFACECONNECT %s %s %s\n", tree2str(item.target).c_str(), tree2str(item.source).c_str(), item.type.c_str());
     for (auto MI: IR->methods)
         dumpMethod("", MI);
 printf("}\n");

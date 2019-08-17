@@ -481,11 +481,18 @@ skipLab:;
     }
     for (auto IR : irSeq) {
         std::map<std::string, int> localConnect;
-        for (auto IC : IR->interfaceConnect)
+        for (auto IC : IR->interfaceConnect) {
+            walkSubscript(IR, IC.target, false);
+            walkSubscript(IR, IC.source, false);
+            //walkSubst(IR, info->target);
+            //walkSubst(IR, info->source);
+            //info->target = cleanupExprBuiltin(info->target);
+            //info->source = cleanupExprBuiltin(info->source);
             if (!IC.isForward) {
-                localConnect[IC.target] = 1;
-                localConnect[IC.source] = 1;
+                localConnect[tree2str(IC.target)] = 1;
+                localConnect[tree2str(IC.source)] = 1;
             }
+        }
         for (auto item = IR->interfaces.begin(); item != IR->interfaces.end(); item++)
             if (localConnect[item->fldName])
                 item->isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)

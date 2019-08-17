@@ -126,8 +126,8 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
     if (ruleNames != "")
         metaList.push_back("//METARULES" + ruleNames);
     for (auto item: IR->interfaceConnect) {
-        std::string tname = item.target;
-        std::string sname = item.source;
+        std::string tname = tree2str(item.target);
+        std::string sname = tree2str(item.source);
 //printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
         for (auto MI: lookupInterface(item.type)->methods) {
             std::string methodName = MI->name;

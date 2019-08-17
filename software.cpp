@@ -172,28 +172,28 @@ dumpModule("MUX", muxDef);
             IR->fields.push_back(FieldElement{fieldName, "", ifcIR->name, false, false, false, false, ""/*not param*/, false, false});
             IR->interfaces.push_back(FieldElement{userInterface, "", pName, outcall, false, false, false, ""/*not param*/, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
-                localName + userInterface,
-                fieldName + MODULE_SEPARATOR + "method", userTypeName, true});
+                allocExpr(localName + userInterface),
+                allocExpr(fieldName + MODULE_SEPARATOR + "method"), userTypeName, true});
             if (userInterface == "indication")
                 hasIndication = true;
             if (outcall && hasPrintf) {
                 IR->interfaceConnect.push_back(InterfaceConnectType{
-                    muxName + "in", fieldName + MODULE_SEPARATOR + "pipe", pName, true});
+                    allocExpr(muxName + "in"), allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pName, true});
                 IR->interfaceConnect.push_back(InterfaceConnectType{
-                    muxName + "forward", localName + "printfp", pName, true});
-                IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
-                    muxName + "out", pName, true});
+                    allocExpr(muxName + "forward"), allocExpr(localName + "printfp"), pName, true});
+                IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(userInterface),
+                    allocExpr(muxName + "out"), pName, true});
             }
             else
-                IR->interfaceConnect.push_back(InterfaceConnectType{userInterface,
-                    fieldName + MODULE_SEPARATOR + "pipe", pName, true});
+                IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(userInterface),
+                    allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pName, true});
             //dumpModule("SWIFC", ifcIR);
         }
         if (!hasIndication) {
             IR->interfaces.push_back(FieldElement{"indication", "", "PipeInH",
                 true/*outcall*/, false, false, false, ""/*not param*/, false, false});
-            IR->interfaceConnect.push_back(InterfaceConnectType{ "indication",
-                fieldName + MODULE_SEPARATOR + "returnInd", "PipeInH", true});
+            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
+                allocExpr(fieldName + MODULE_SEPARATOR + "returnInd"), "PipeInH", true});
         }
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);

@@ -153,13 +153,15 @@ static std::string getType()
     return ret;
 }
 
-static std::string cleanInterface(std::string name)
+static ACCExpr *cleanInterface(ACCExpr *expr)
 {
+    std::string name = expr->value;
     if (name == "_")
         name = "";
     else if (endswith(name, "$_"))
         name = name.substr(0, name.length()-1);
-    return name;
+    expr->value = name;
+    return expr;
 }
 
 static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
@@ -305,8 +307,8 @@ interface, isStruct, isSerialize, ext);
             }
             else if (checkItem("INTERFACECONNECT")) {
                 bool        isForward = checkItem("/Forward");
-                std::string target = cleanInterface(getToken());
-                std::string source = cleanInterface(getToken());
+                ACCExpr *target = cleanInterface(getExpression(' '));
+                ACCExpr *source = cleanInterface(getExpression(' '));
                 std::string type = getType();
                 IR->interfaceConnect.push_back(InterfaceConnectType{target, source, type, isForward});
             }

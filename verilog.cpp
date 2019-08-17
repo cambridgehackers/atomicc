@@ -717,22 +717,24 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
 static void connectInterfaces(ModuleIR *IR)
 {
     for (auto IC : IR->interfaceConnect) {
+        std::string ICtarget = tree2str(IC.target);
+        std::string ICsource = tree2str(IC.source);
         ModuleIR *IIR = lookupInterface(IC.type);
         if (!IIR)
             dumpModule("MISSINGCONNECT", IR);
         assert(IIR && "interfaceConnect interface type");
         bool targetLocal = false, sourceLocal = false;
         for (auto item: IR->interfaces) {
-            if (item.fldName == IC.target)
+            if (item.fldName == ICtarget)
                 targetLocal = true;
-            if (item.fldName == IC.source)
+            if (item.fldName == ICsource)
                 sourceLocal = true;
         }
         if (trace_connect)
-            printf("%s: CONNECT target %s/%d source %s/%d forward %d\n", __FUNCTION__, IC.target.c_str(), targetLocal, IC.source.c_str(), sourceLocal, IC.isForward);
+            printf("%s: CONNECT target %s/%d source %s/%d forward %d\n", __FUNCTION__, ICtarget.c_str(), targetLocal, ICsource.c_str(), sourceLocal, IC.isForward);
         for (auto fld : IIR->fields) {
-            std::string tstr = IC.target + fld.fldName,
-                        sstr = IC.source + fld.fldName;
+            std::string tstr = ICtarget + fld.fldName,
+                        sstr = ICsource + fld.fldName;
             if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
                 printf("%s: IFCCCfield %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (!IC.isForward) {
@@ -746,13 +748,13 @@ static void connectInterfaces(ModuleIR *IR)
         }
         for (auto MI : IIR->methods) {
             if (trace_connect)
-                printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, IC.target.c_str(), IC.target.substr(IC.target.length()-1).c_str(), IC.source.c_str());
-            if (IC.target.substr(IC.target.length()-1) == MODULE_SEPARATOR)
-                IC.target = IC.target.substr(0, IC.target.length()-1);
-            if (IC.source.substr(IC.source.length()-1) == MODULE_SEPARATOR)
-                IC.source = IC.source.substr(0, IC.source.length()-1);
-            std::string tstr = IC.target + MODULE_SEPARATOR + MI->name,
-                        sstr = IC.source + MODULE_SEPARATOR + MI->name;
+                printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICtarget.substr(ICtarget.length()-1).c_str(), ICsource.c_str());
+            if (ICtarget.substr(ICtarget.length()-1) == MODULE_SEPARATOR)
+                ICtarget = ICtarget.substr(0, ICtarget.length()-1);
+            if (ICsource.substr(ICsource.length()-1) == MODULE_SEPARATOR)
+                ICsource = ICsource.substr(0, ICsource.length()-1);
+            std::string tstr = ICtarget + MODULE_SEPARATOR + MI->name,
+                        sstr = ICsource + MODULE_SEPARATOR + MI->name;
             if (!IC.isForward) {
                 refList[tstr].out ^= targetLocal;
                 refList[sstr].out ^= sourceLocal;
