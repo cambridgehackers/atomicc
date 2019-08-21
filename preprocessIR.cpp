@@ -296,7 +296,25 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
             item++;
     }
     for (auto item = MI->letList.begin(), iteme = MI->letList.end(); item != iteme; ) {
-        if (expandTree(2, &(*item)->cond, (*item)->dest, false, (*item)->value, (*item)->type))
+        std::string iname = (*item)->type;
+        if (startswith(iname, "ARRAY_")) {
+            iname = iname.substr(6);
+            int ind = iname.find("_");
+            if (ind > 0)
+                iname = iname.substr(ind+1);
+        }
+        if (lookupInterface(iname)) {
+            bool        isForward = false; //checkItem("/Forward");
+            std::string target = tree2str((*item)->dest);
+            std::string source = tree2str((*item)->value);
+            for (auto iitem: IR->interfaces) {
+                if (target == iitem.fldName || source == iitem.fldName)
+                    isForward = true;
+            }
+            IR->interfaceConnect.push_back(InterfaceConnectType{(*item)->dest, (*item)->value, (*item)->type, isForward});
+            item = MI->letList.erase(item);
+        }
+        else if (expandTree(2, &(*item)->cond, (*item)->dest, false, (*item)->value, (*item)->type))
             item = MI->letList.erase(item);
         else
             item++;

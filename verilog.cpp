@@ -719,24 +719,33 @@ static void connectInterfaces(ModuleIR *IR)
     for (auto IC : IR->interfaceConnect) {
         std::string ICtarget = tree2str(IC.target);
         std::string ICsource = tree2str(IC.source);
-        ModuleIR *IIR = lookupInterface(IC.type);
+        std::string iname = IC.type;
+        if (startswith(iname, "ARRAY_")) {
+            iname = iname.substr(6);
+            int ind = iname.find("_");
+            if (ind > 0)
+                iname = iname.substr(ind+1);
+        }
+        ModuleIR *IIR = lookupInterface(iname);
         if (!IIR)
             dumpModule("MISSINGCONNECT", IR);
         assert(IIR && "interfaceConnect interface type");
         bool targetLocal = false, sourceLocal = false;
         for (auto item: IR->interfaces) {
-            if (item.fldName == ICtarget)
+            if (item.fldName == IC.target->value)
                 targetLocal = true;
-            if (item.fldName == ICsource)
+            if (item.fldName == IC.source->value)
                 sourceLocal = true;
         }
         if (trace_connect)
-            printf("%s: CONNECT target %s/%d source %s/%d forward %d\n", __FUNCTION__, ICtarget.c_str(), targetLocal, ICsource.c_str(), sourceLocal, IC.isForward);
+            printf("%s: CONNECT target '%s'/%d source '%s'/%d forward %d\n", __FUNCTION__, ICtarget.c_str(), targetLocal, ICsource.c_str(), sourceLocal, IC.isForward);
         for (auto fld : IIR->fields) {
-            std::string tstr = ICtarget + fld.fldName,
-                        sstr = ICsource + fld.fldName;
+            ACCExpr *target = dupExpr(IC.target), *source = dupExpr(IC.source);
+            target->value += fld.fldName;
+            source->value += fld.fldName;
+            std::string tstr = tree2str(target), sstr = tree2str(source);
             if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
-                printf("%s: IFCCCfield %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+                printf("%s: IFCCCfield '%s'/%d '%s'/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (!IC.isForward) {
                 refList[tstr].out = 1;   // for local connections, don't bias for 'output'
                 refList[sstr].out = 0;
@@ -747,38 +756,43 @@ static void connectInterfaces(ModuleIR *IR)
                 setAssign(tstr, allocExpr(sstr), fld.type);
         }
         for (auto MI : IIR->methods) {
+            ACCExpr *target = dupExpr(IC.target), *source = dupExpr(IC.source);
             if (trace_connect)
                 printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICtarget.substr(ICtarget.length()-1).c_str(), ICsource.c_str());
-            if (ICtarget.substr(ICtarget.length()-1) == MODULE_SEPARATOR)
-                ICtarget = ICtarget.substr(0, ICtarget.length()-1);
-            if (ICsource.substr(ICsource.length()-1) == MODULE_SEPARATOR)
-                ICsource = ICsource.substr(0, ICsource.length()-1);
-            std::string tstr = ICtarget + MODULE_SEPARATOR + MI->name,
-                        sstr = ICsource + MODULE_SEPARATOR + MI->name;
+            if (target->value.substr(target->value.length()-1) == MODULE_SEPARATOR)
+                target->value = target->value.substr(0, target->value.length()-1);
+            if (source->value.substr(source->value.length()-1) == MODULE_SEPARATOR)
+                source->value = source->value.substr(0, source->value.length()-1);
+            target->value += MODULE_SEPARATOR + MI->name;
+            source->value += MODULE_SEPARATOR + MI->name;
+            std::string tstr = tree2str(target), sstr = tree2str(source);
             if (!IC.isForward) {
                 refList[tstr].out ^= targetLocal;
                 refList[sstr].out ^= sourceLocal;
             }
             if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
-                printf("%s: IFCCCmeth %s/%d %s/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+                printf("%s: IFCCCmeth '%s'/%d '%s'/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
             if (refList[sstr].out)
-                setAssign(sstr, allocExpr(tstr), MI->type);
+                setAssign(sstr, target, MI->type);
             else
-                setAssign(tstr, allocExpr(sstr), MI->type);
-            tstr = baseMethodName(tstr) + MODULE_SEPARATOR;
-            sstr = baseMethodName(sstr) + MODULE_SEPARATOR;
+                setAssign(tstr, source, MI->type);
+            tstr = baseMethodName(target->value) + MODULE_SEPARATOR;
+            sstr = baseMethodName(source->value) + MODULE_SEPARATOR;
             for (auto info: MI->params) {
-                std::string sparm = sstr + info.name, tparm = tstr + info.name;
+                ACCExpr *target = dupExpr(IC.target), *source = dupExpr(IC.source);
+                target->value = tstr + info.name;
+                source->value = sstr + info.name;
+                std::string tparm = tree2str(target), sparm = tree2str(source);
                 if (!IC.isForward) {
                     refList[tparm].out ^= targetLocal;
                     refList[sparm].out ^= sourceLocal;
                 }
                 if (trace_connect)
-                    printf("%s: IFCCCparam %s/%d %s/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
+                    printf("%s: IFCCCparam '%s'/%d '%s'/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
                 if (refList[sparm].out)
-                    setAssign(sparm, allocExpr(tparm), info.type);
+                    setAssign(sparm, target, info.type);
                 else
-                    setAssign(tparm, allocExpr(sparm), info.type);
+                    setAssign(tparm, source, info.type);
             }
         }
     }

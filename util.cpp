@@ -221,6 +221,8 @@ std::string convertType(std::string arg, int arrayProcess)
         }
         return total;
     }
+    if (lookupInterface(bp))
+        return "0";
     printf("[%s:%d] convertType FAILED '%s'\n", __FUNCTION__, __LINE__, bp);
     exit(-1);
 }

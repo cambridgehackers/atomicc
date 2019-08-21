@@ -128,8 +128,15 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
     for (auto item: IR->interfaceConnect) {
         std::string tname = tree2str(item.target);
         std::string sname = tree2str(item.source);
+        std::string iname = item.type;
+        if (startswith(iname, "ARRAY_")) {
+            iname = iname.substr(6);
+            int ind = iname.find("_");
+            if (ind > 0)
+                iname = iname.substr(ind+1);
+        }
 //printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
-        for (auto MI: lookupInterface(item.type)->methods) {
+        for (auto MI: lookupInterface(iname)->methods) {
             std::string methodName = MI->name;
             metaList.push_back("//METACONNECT; " + tname + MODULE_SEPARATOR + MI->name
                                               + "; " + sname + MODULE_SEPARATOR + MI->name);
