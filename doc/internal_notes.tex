@@ -1,76 +1,37 @@
 %!TEX root = std.tex
 \rSec0[atomicc.basic]{Basic}
 
-\rSec1[atomicc.basic]{Background}
-A sustained, exponential decrease in hardware fabrication costs, Moore's Law,
-has powered the widespread deployment of computers and productivity changes.
-By decoupling digital design into: a) physical design of a limited number
-of reusable logic elements and b) logical design, the
-connection of those elements to produce desired application behavior, each aspect
-can evolve independently.
-
-As the hardware element costs drop, design complexity increases
-proportionally, leveraging the lower costs to deliver greater functionality and/or speed.
-Although logical design is often described as "just a netlist",
-the shift from graphical design techniques to text-based designs, subsequently
-followed by increasingly structured design methodology has improved productivity
-in building large designs.
-
-In designing systems there are 10x cost increases at each stage: 1) errors found
-at compilation, 2) errors found in unit testing, 3) errors found in system testing,
-4) errors found after manufacturing, 5) errors found after deployment to the field.
-Due to the dramatic increase in costs of delayed error discovery, there is high
-motivation to find/fix errors at early stages.
-
-As system complexity increases, it becomes increasingly desirable to build
-new solutions reusing trusted components, treating them as black boxes.
-In this way, testing effort is proportional to the size of new code created,
-not to the total size of the code in the resulting system.  (In current hardware
-development styles, it is even worse, proportional to the size of the resulting
-instantiated system).
-Separately compiled library reuse promotes minimizes the amount of newly synthesized
-code, reducing verification needs.
-
 Since the introduction of Verilog in 1984, hardware description languages have
 become the dominant technique for designing hardware logic.  Over time,
 HDL descriptive ability has increased by borrowing features that have proven
 effective in software.
-The language has been extended (including System Verilog) to support more extensive
-data structuring operations, leading to improved clarity and consiseness
-in algorithm expression, but with little improvement on static checking of
-dynamic behavior of the design, nor of interface interactions with reused modules.
+Analysis of fine grained highly parallel systems remains quite difficult,
+leading to excessive dependance on testing and verification to detect errors.
+Despite rapidly decreasing costs of hardware fabrication,
+prohibitive hardware testing costs have caused complex system design
+to be limited to only the highest volume devices.
 
-\rSec1[atomicc.approach]{Approach}
+To address parallel system design,
+there has been a long term research effort into Guarded Atomic Actions (GAA),
+structuring and automating the parallel interactions permissible between static single assignment (SSA)
+transactions.
+By generating code that is guaranteed to be sequentially consistent and by automating
+the propagation of execution guards, designs become more tractable at design time, leading
+to correctness proofs of designs rather than merely relying on validation.
+Unfortunately, these ideas have not spread widely into the hardware design world for a variety of reasons.
+%%\begin{itemize}
+%%\item The only complete implementation is a proprietary licensed product
+%%\item The constructs are embedded in a hybrid of a functional language with aspects taken from HDLs, unfamiliar to most practioners
+%%\item The generated verilog is quite difficult to read
+%%The volume of the generated code has made verification even more difficult
+%%\end{itemize}
 
-AtomicC focuses on improving design scaling costs:
-\begin{itemize}
-\item Reliable reuse (without retesting) of existing design components,
-\item Correct by construction for composition of parallel operations, preventing generation
-of code with safety errors.
-\item Separate generation of Verilog modules, simplifying the integration with existing
-systems and toolflows.
-\end{itemize}
+AtomicC attempts to address all these issues, providing a structured alternative to Verilog
+that is quick to understand and easy to deploy.  By making the source code openly available
+to the research community, we hope that broader analysis of the concepts of GAA will become
+practical, leading to methods that better control the spiraling costs of hardware design.
 
-In AtomicC, user operations are written as SSA transactions, called "rules".  Since the
-compiler can statically analyze the read and write sets of the rule as well as the
-invocation conditions, it can guarantee that the generated code always executes
-in a Sequentially Correct (SC) manner: parallel execution of transactions can be
-guaranteed to never interfere.
-
-In AtomicC, reused code can guarantee that interfaces are invoked only when the
-interface provider determines the conditions are valid.  Since hardware has no notion of
-execution thread blocking, a 'ready' signal
-is exported to the calling rule, preventing execution.
-
-This makes compile time proofs of correctness possible.
-
-AtomicC provids a structured alternative to Verilog
-that is quick to understand and easy to deploy.  
-By making the generated output easy for experienced designers to understand and integrate
-into existing designs and toolflows,
-we hope that barriers to adoption will be low, leading to robust experimentation.
-
-\rSec1[atomicc.intro]{Details}
+\rSec1[atomicc.intro]{Introduction}
 
 AtomicC is a timed, structural hardware description language for
 the high level specification of algorithms to be instantiated
