@@ -3,14 +3,46 @@
 
 \gramSec[agram.stmt]{Statements}
 
+AtomicC does not attempt to emulate the serialized execution
+behavior of all C++ constructs in hardware.
+Instead it uses a subset of the C++ language to specify
+code blocks that have at most
+one enabled assignment to any state element.
+This form is called \textit{static single assignment} form,
+or SSA form\cite{Alpern:1988}.
+In the eventual runtime execution, these assignments are
+all made in a single clock cycle, when the rule or method
+is enabled.
+
+Constant bound "for" statements that can be fully unrolled are supported.
+
+Since AtomicC does not generate logic to orchestrate sequential execution behavior from
+language constructs,
+traditional C++ statements with non-static control flow behavior are not supported.
+
+Examples include:
+\begin{itemize}
+\item Non-constant bound "for" statements.  
+\item "do", "while" statements
+\item Usages of "goto" that result in a cyclic directed graph of execution blocks
+\item Method and function calls that are not inlinable at compilation time (for example, recursion is prohibited)
+\end{itemize}
+
+
 \rSec1[atomicc.rule]{__rule}
 
-Rules specify a group of operations that must execute as an atomiclly.
-A rule operates
-transactionally: when a rule's guard and the guards of all of its
-method invocations are satisfied, then it is ready to fire. It will
-fire on a clock cycle when it does not conflict with any higher
-priority rule.
+Rules specify a group of operations that must
+execute transactionally: when a rule's guard
+is satisfied, then it is ready to fire.
+
+Module behaviorial statements are encapsulated into transactions (\textbf{rules})
+following ACID semantics
+\cite{NikhilSemantics,GrayR93};
+all rules executed during a given clock cycle are
+\textit{sequentially consistent} (SC) \cite{Lamport:1979:MMC:1311099.1311750},
+guaranteeing each rule executes
+independently of any other rules executing at the same time
+\cite[Sec.~7.1]{GrayR93}.
 
 \begin{bnf}
 \nontermdef{rule-statement}\br
@@ -27,21 +59,29 @@ priority rule.
 \end{codeblock}
 \end{example}
 
-\rSec1[atomicc.nostmt]{Restrictions on C++ statements}
+\rSec1[atomicc.nostmt]{Model details}
 
-Unlike the serialized execution model of C++, AtomicC supports a fully parallel,
-single cycle execution of rules which satisfy which are able to fire.
+C block semantics do not correctly process the 2 statements: a = b; b = a;.
+(binding of read values should occur at beginning of block, so that it is clear the
+2nd assign refers to the 'previous' value).
+Thinking again: if we retain C semantics, we have: temp = a; a = b; b = temp;, which
+gives the correct value mapping.
 
-Since AtomicC does not generate any extra logic to support sequential execution behavior from
-language constructs,
-traditional C++ statements with non-static control flow behavior are not supported.
-
-Examples include:
-\begin{itemize}
-\item Non-constant bound "for" statements.  Constant bound "for" statements that can be fully unrolled
-are supported.
-\item "do", "while" statements
-\item Usages of "goto" that result in a cyclic directed graph of execution blocks
-\item Method and function calls that are not inlinable at compilation time (for example, recursion is prohibited)
-\end{itemize}
-
+To preserve the standard interpretation of C++ source code
+in methods and rules,
+a \textbf{modification in-private} \cite[Sec.~3.2]{Prinz03operationalsemantics}
+execution model is used:
+\begin{enumerate}
+\item Wrap each rule/method with prelude code and postprocessing code
+\item Prelude code:
+For each state element \textbf{A} in module, add the declaration of a shadow item:
+\begin{codeblock}
+decltype(this->A) A = this->A;    // create shadow of state element
+\end{codeblock}
+\item Postprocessing code:
+For each state element actually written during execution of the code block:
+\begin{codeblock}
+this->A = A;                // update state elements only at end of code block
+\end{codeblock}
+All assignments in the postprocessing section occur on a single clock cycle.
+\end{enumerate}

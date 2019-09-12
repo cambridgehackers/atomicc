@@ -1,7 +1,51 @@
 %!TEX root = std.tex
-\rSec0[atomicc.modularization]{Modularization}
+\rSec0[modules]{Modules}%
 
-\rSec1[atomicc.independant]{Independant compilation of modules}
+\gramSec[agram.class]{Classes}
+
+The basic building block of AtomicC is the module declaration, made of 3 parts:
+\begin{itemize}
+\item Instantiation of state elements used by the module,
+\item Interface declarations for interacting with other modules,
+\item Rules, which group assignment statements and method invocations into atomic transactions.
+\end{itemize}
+
+\rSec1[atomicc.interface]{Module interface definition}
+
+An \textbf{interface} is a named collection of method signatures, defining
+the behavior of an abstract data type(ADT).
+
+There are 2 types of methods:
+\begin{itemize}
+\item \textbf{Value method functions} allow \textit{inspection} of module state elements.
+\item \textbf{Action method procedures} allow \textit{modification}
+(including inspection) of state elements,
+can take parameters and do not have return values.
+A compiler generated
+\textbf{valid} signal indicates that the caller wishes to perform the method invocation.
+\end{itemize}
+
+Both value and action methods use a compiler generated \textbf{ready} signal
+to indicate when the callee is available and
+stall scheduling of the calling transaction until
+execution pre-conditions are statisfied.
+
+\begin{example}
+\begin{codeblock}
+     __interface EchoRequest {
+         void say(__int(32) v);
+         void say2(__int(16) a, __int(16) b);
+     };
+\end{codeblock}
+\end{example}
+
+\rSec1[atomicc.module]{Module declaration and definition}
+
+Modules are independently compiled.
+Rule and interface method scheduling logic is generated as part of the
+generated module.  Scheduling constraints (read set, write set and relation to
+other scheduled elements) are generated into a metadata file, allowing
+schedule consistency checks between modules to be verified by the linker.
 
 The design is separated into modules that can export and import interfaces to other modules.
 Each source language module compiles into a single verilog module.  Modules are independantly
@@ -17,129 +61,152 @@ Exported interfaces can be used in several ways:
 \item 'connected' to an 'interface reference' of another module in the instantiating scope.
 \end{itemize}
 
-\rSec1[atomicc.econtrol]{Execution control}
+\begin{example}
+\begin{codeblock}
+     __module Echo {
+         EchoRequest      request;               // exported interface (defined by this module)
+         EchoIndication   *indication;           // imported interface (defined by the instantiator of this module)
+         bool busy;
+         __int(32) itemSay;
+         ...
+         // implementation of method request.say(). Note the guard "if (!busy)".
+         void request.say(__int(32) v) if(!busy) {
+             itemSay = v;
+             ...
+         }
+         void request.saw(__int(16) a, __int(16) b) if(!busy) {
+             ...
+         }
+     };
+\end{codeblock}
+\end{example}
 
-There are 2 common styles for communication of execution control information for a method:
+To reference a module from a separate compilation unit, use "__emodule".  External
+module definitions need only specify the exported/imported interfaces.
+
+\begin{example}
+\begin{codeblock}
+     __emodule EchoResponder {
+         EchoIndication   indication;           // exported interface
+     };
+\end{codeblock}
+\end{example}
+
+\rSec1[atomicc.guard]{Guard clauses on module interface methods}
+
+\pnum
+Method definitions in __module declarations have the form:
+
+\begin{bnf}
+\nontermdef{atomicc-method-definition}\br
+    \opt{decl-specifier-seq} interface-qualifier-seq identifier parameters-and-qualifiers function-body
+\end{bnf}
+
+\begin{bnf}
+\nontermdef{interface-qualifier}\br
+    identifier \terminal{.}
+
+\nontermdef{interface-qualifier-seq} \br
+    interface-qualifier \br
+    interface-qualifier-seq interface-qualifier
+\end{bnf}
+
+\begin{bnf}
+\nontermdef{atomicc-function-body}\br
+    \opt{if-guard} compound-statement
+
+\nontermdef{if-guard}\br
+    \terminal{if (} condition \terminal{)}
+
+\end{bnf}
+
+
+Rules are only ready to fire if the rule's guard is true and all the
+guards on methods invoked within the rule are also true.
+
+\begin{codeblock}
+         void request.say(__int(32) v) if(!busy) {
+             itemSay = v;
+             ...
+         }
+\end{codeblock}
+
+\rSec1[atomicc.connect]{Connecting exported interfaces to imported references}
+The __connect statement allows exported interface declarations to be connected
+with imported interface references between objects within a module declaration.
+
+\begin{bnf}
+\nontermdef{connect-declaration}\br
+    \terminal{__connect} identifier \terminal{=} identifier \terminal{;}
+\end{bnf}
+
+\begin{example}
+\begin{multicols}{2}
+AtomicC example
+\begin{codeblock}
+     __interface ExampleRequest {
+         void say(__int(32) v);
+     };
+
+     __module A {
+          ExampleRequest callIn;
+     };
+
+     __module B {
+         ExampleRequest *callOut;
+     };
+
+     __module C {
+         A consumer;
+         B producer;
+         __connect producer.callOut = consumer.callIn;
+     };
+\end{codeblock}
+\columnbreak
+BSV example
+\begin{codeblock}
+    BSV example
+    BSV example
+    BSV example
+    BSV example
+    BSV example
+\end{codeblock}
+\end{multicols}
+\end{example}
+
+Comparision with BSV:
 \begin{itemize}
-\item Asymmetric (ready/enable signalling)
-A method/rule is invoked by asserting the "enable" signal.  This signal can only be
-asserted if the "ready" signal was valid, allowing the called module to restrict
-permissible execution sequences.
-
-\item Symmetric (ready/valid signalling)
-Both caller/callee have "able to be executed" signals.  Execution is deemed to take
-place in each cycle where both "ready" (from the callee) and "valid" (from the caller)
-are asserted.
+\item The declaration for 'A' is just like BSV.
+In BSV, the declaration for B requires the interface instance for 'callOut' be passed in as
+an interface parameter (forcing a textual ordering to the source code
+declaration sequence).
+\item In AtomicC, the interfaces are stitched together outside in any
+convenient sequence in a location where both the concrete instances
+for A and B are visible.
 \end{itemize}
 
-Bluespec uses the Asymmetric signalling style, collecting all scheduling control into a central location for analysis/generation.
-AtomicC uses the Symmetric signalling style, giving modules local control over their allowable execution patterns.  Conflicts between local schedules for modules when they are connected together are detected by the linker.
+\rSec1[atomicc.export]{Exporting interfaces from contained objects}
 
-\rSec1[atomicc.linker]{Linking of groups of modules}
-
-To verify that an instantiated group of modules has SC compliant execution characteristics, a linker is used to cross check information from the metadata files for each module.
-
-\rSec1[atomicc.verilog]{Interfacing with verilog modules}
-
-To reference a module in verilog, fields can be declared in __interface items.
+In a design, there are times when the engineer wishes to declare an object locally,
+but allow external modules to access specific interfaces of the local object.
+This is done by declaring an interface to the containing object of compatible
+type and just 'assigning' the local object's interface to it.
 
 \begin{example}
 \begin{codeblock}
-     __interface CNCONNECTNET2 {
-         __input  __int(1)         IN1;
-         __input  __int(1)         IN2;
-         __output __int(1)         OUT1;
-         __output __int(1)         OUT2;
-     };
-     __emodule CONNECTNET2 {
-         CNCONNECTNET2 _;
-     };
+     __module CWrapper {
+         A consumer;
+         ExampleRequest request = A.callIn;
+      };
 \end{codeblock}
 \end{example}
 
-This will allow references/instantiation of an externally defined verilog module CONNECTNET2
-that has 2 'input' ports, IN1 and IN2, as well as 2 'output' ports, OUT1 and OUT2.
+CWrapper just forwards the interface 'request' down into the instance 'consumer'.
 
-\rSec2[atomicc.param]{Parameterized modules}
-
-Verilog modules that have module instantiation parameters can also be declared/referenced.
-
-\begin{example}
-\begin{codeblock}
-     __interface Mmcme2MMCME2_ADV {
-         __parameter const char *  BANDWIDTH;
-         __parameter float         CLKFBOUT_MULT_F;
-         __input  __uint(1)        CLKFBIN;
-         __output __uint(1)        CLKFBOUT;
-         __output __uint(1)        CLKFBOUTB;
-     };
-     __emodule MMCME2_ADV {
-         Mmcme2MMCME2_ADV _;
-     };
-\end{codeblock}
-\end{example}
-
-This example can be instantiated as:
-
-\begin{example}
-\begin{codeblock}
-     __module Test {
-         ...
-         MMCME2_ADV#(BANDWIDTH="WIDE",CLKFBOUT_MULT_F=1.0) mmcm;
-         ...
-         Test() {
-            __rule initRule {
-                mmcm._.CLKFBIN = mmcm._.CLKFBOUT;
-            }
-         }
-     }
-\end{codeblock}
-\end{example}
-
-\rSec2[atomicc.refsyntax]{Reference syntax}
-
+\rSec1[atomicc.classsyn]{Syntax extension to C++}
 \begin{bnf}
-\nontermdef{atomicc-method-declaration}\br
-    \opt{attribute-specifier-seq} \opt{pin-type} \opt{decl-specifier-seq} \opt{member-declarator-list} \terminal{;}
+\nontermdef{atomicc-class-key}\br
+    \terminal{__interface} \br
+    \terminal{__emodule} \br
+    \terminal{__module}
 \end{bnf}
-
-\begin{bnf}
-\nontermdef{pin-type} \br
-    \terminal{__input} \br
-    \terminal{__output} \br
-    \terminal{__inout} \br
-    \terminal{__parameter}
-\end{bnf}
-
-\begin{example}
-\begin{codeblock}
-     __interface <interfaceName> {
-          __input __uint(1) executeMethod;
-          __input __uint(16) methodArgument;
-          __output __uint(1) methodReady;
-     }
-\end{codeblock}
-\end{example}
-
-For '__parameter' items, supported datatypes include: "const char *", "float", "int".
-
-Factoring of interfaces into sub interfaces is also supported.
-
-\rSec2[atomicc.clockReset]{Clock/reset ports}
-Note that if interface port pins are declared in a module interface declaration, then
-CLK and nRST are _not_ automatically declared/instantiated.  (Since the user needs the
-flexibility to not require them when interfacing with legacy code).
-
-Note that this also allows arbitrary signals (like the output of clock generators) to be
-passed to modules as CLK/nRST signals.  (For Atomicc generated modules, please note that the
-default clock/reset signals for a module will always have these names)
-
-\rSec2[atomicc.itool]{Import tooling}
-
-There is a tool to automate the creation of AtomicC header files from verilog source files.
-\begin{example}
-\begin{codeblock}
-     atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 zynq.lib
-     atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
-\end{codeblock}
-\end{example}

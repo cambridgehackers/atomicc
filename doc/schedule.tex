@@ -1,11 +1,140 @@
-\Annex{scheduleExample}{Scheduling example}{}
-%%\infannex{scheduleExample}{Scheduling example}
+\Annex{scheduleDetail}{Scheduling Algorithm}{}
 
-\rSec1[orderExample.sw]{Source program}
+\rSec1[atomicc.schedgoal]{Goals}
+To guarantee \textit{isolation} in transaction systems,
+some form of concurrency control is necessary.
+We can see a classification of concurrency control algorithms below (adapted from
+\cite[Sec.~11.2]{OV11}):
+
+\begin{importgraphic}
+{Concurrency Control Algorithms}
+{fig:concurrency}
+{concurrency.jpg}
+\end{importgraphic}
+
+ADD TO PICTURE: Static schedule
+
+To guarantee \textit{isolation} in the presence of
+parallelism in software systems,
+\textit{dynamic allocation}\cite[Sec.~7.3.1]{GrayR93} of schedules is used.
+In hardware design with AtomicC,
+the set of state elements accessed by a transaction,
+the operations on these state elements (read-only or write)
+and the boolean condition when the transaction is performed
+are all known at compile time.
+This allows static allocation of \textbf{schedules}
+(sequences of transaction execution)
+and compile time validation of SC.
+
+
+\textbf{Should we just generate fair schedules in case of conflicts?}
+\begin{itemize}
+\item for write conflicts, use multiway RR arbiter
+\item for SC conflicts, break cycle with an alternating boolean
+\end{itemize}
+
+
+\rSec1[atomicc.schedsignal]{Signalling}
+
+AtomicC uses \textbf{valid/ready} \textit{hand-shaking signalling}
+\cite{Fletcher2009, AXISpec} to invoke action methods,
+giving both the invoker(master) and invokee(slave) the ability to control invocation
+execution timing.
+The master uses the \textbf{valid} signal
+of an action method to show when parameter data is available
+and the operation should be performed.
+The method invocation succeeds only when
+both \textbf{valid} and \textbf{ready} are HIGH in the same clock cycle.
+\newline
+In TRS notation\cite[p.~22]{Hoe:Thesis}:
+\begin{itemize}[label= ]
+\item $\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$.
+\end{itemize}
+
+\rSec1[atomicc.schedalg]{Algorithm}
+The scheduling algorithm is:
+\begin{itemize}
+\item For each module, rules and methods that have some overlap of state element usage
+(\textit{read set} and \textit{write set}\cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis})
+are greedily gathered into \textit{schedule sets}.
+Since there can be no execution interactions between sets,
+each set will be independently scheduled.
+\item A \textit{constraint graph} is a partially-ordered directed graph modeling
+the schedule sequencing dependencies within a \textit{schedule set}:
+\begin{itemize}
+\item \textit{nodes} in a constraint graph represent atomic rule and method instances,
+\item \textit{edges} represent \textbf{write-after-read (WAR)} ordering dependency
+for a specific storage element\cite[Sec.~3]{Cain2003}.
+
+In addition, each edge has a symbolic boolean \textit{edge condition} for when the
+the ordering dependency exists: the boolean
+condition when one rule/method actually reads a given state element
+and the other actually writes it.
+\end{itemize}
+
+\item The transitive closure of these orders on the constraint graph nodes
+dictate the \textbf{schedule} in which each rule must \textit{appear} to execute in
+order to be considered SC
+\cite[Sec.~11.1]{OV11}.
+Of course, since all rules execute in a single cycle, "schedule" does not
+refer to an actual time sequenced evolution of state,
+but to a \textit{abstract} "sub-cycle" ordering.
+
+\item For each pair of nodes in the constraint digraph, we define the \textit{node condition}
+between 2 nodes as the conjunction of the \textit{edge conditions} of all the edges between
+them (i.e., the condition that \textit{any} of the edges causes a dependency).
+For each cycle in the digraph, we define the \textit{path condition}
+as the disjunction of the \textit{node conditions} for all sequential pairs of nodes
+in the cycle (i.e., the condition that \textit{all} the edges, hence the cycle exists).
+
+\item Since potential conflicts between methods (called from rules outside the module)
+and module rules are quite common,
+if cycle has some method $M$ \& some rule $R$, then the compiler can
+automatically rewrite the term $valid(R)$ to add a disjunction with the term $\neg valid(M)$, breaking
+the cycle.
+
+\item When the \textit{path condition} is not identically false, a total ordering of
+the digraph can not be guaranteed and the \textit{schedule set} is not SC.
+In this case, the compiler or linker reports an error,
+requiring resolution by the user.
+\end{itemize}
+
+A simple example of a constraint graph is given in \ref{scheduleExample}, at the end of this document.
+
+Since AtomicC performs scheduling analysis independantly for each
+declared module, external method invocation conflicts in rules cannot be validated.
+Schedule processing for external method calls is delayed until the "module group binding"
+stage of linking, where separately compiled AtomicC output is combined and
+verified
+for SC scheduling.  Errors and conflicts detected at this stage must be repaired
+in the module source text and recompiled before proceeding.
+
+\rSec1[atomicc.schedprev]{Previous scheduling work}
+
+In Rule Composition\cite{Dave2007}, scheduling
+is reformulated in terms of rule composition, leading to a succinct discussion
+of issues involved, including a concise description of the Esposito and
+Performance Guarantees schedulers.  The resulting schedules are quite close
+to the user-specified scheduling in AtomicC.
+In contrast to AtomicC, the Bluespec kernel language they use
+for analysis also has a sequential composition operator, creating rules
+that execute for multiple clock cycles.
+
+The Esposito Scheduler\cite{Esposito:Patent,Dave2007},
+is the standard scheduler generation algorithm in the Bluespec Compiler.
+It uses a heuristic designed to produce a concrete total ordering of rules.
+
+The Performance Guarantees scheduler\cite{Rosenband:PerformanceGuarantees}
+was proposed to address issues with intra-cycle data passing.
+
+
+\rSec1[scheduleExample]{Scheduling example}{}
+
+\rSec2[orderExample.sw]{Source program}
 
 \input{examples/order.cpp.tex}
 
-\rSec1[orderExample.conflict]{Constraint graph}
+\rSec2[orderExample.conflict]{Constraint graph}
 
 \begin{importgraphic}
 {Simple ordering example}
@@ -20,10 +149,10 @@ Sequentially consistent schedules are:
 \item when 'running == 0': B -> A -> C
 \end{itemize}
 
-\rSec1[orderExample.verilog]{Verilog output}
+\rSec2[orderExample.verilog]{Verilog output}
 
 \lstinputlisting[language=Verilog,basicstyle=\tiny\ttfamily]{examples/Order.v.tex}
 
-\rSec1[orderExample.ir]{Intermediate representation output}
+\rSec2[orderExample.ir]{Intermediate representation output}
 
 \lstinputlisting[language=Verilog,basicstyle=\tiny\ttfamily]{examples/generated/order.generated.IR}

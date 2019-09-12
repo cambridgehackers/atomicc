@@ -1,159 +1,179 @@
 %!TEX root = std.tex
 \rSec0[atomicc.basic]{Basic}
 
-\rSec1[atomicc.basic]{Background}
-A sustained, exponential decrease in hardware fabrication costs, Moore's Law,
-has powered the widespread deployment of computers and productivity changes.
-By decoupling digital design into: a) physical design of a limited number
-of reusable logic elements and b) logical design, the
-connection of those elements to produce desired application behavior, each aspect
-can evolve independently.
+\rSec1[atomicc.background]{Background}
 
-As the hardware element costs drop, design complexity increases
-proportionally, leveraging the lower costs to deliver greater functionality and/or speed.
-Although logical design is often described as "just a netlist",
-the shift from graphical design techniques to text-based designs, subsequently
-followed by increasingly structured design methodology has improved productivity
-in building large designs.
+Moore's law has given us
+dramatic increases in hardware system capability,
+but the \textit{verification gap} in digital logic development process restricts wider,
+more diverse application.
+In software, testing costs are proportional to the amount of new code in a design;
+in hardware, verification costs are proportional to the size of the finished design (including
+all instances of reused libraries).
+How can we make the development of 
+\textit{verified} designs more efficient and predictable?
 
-In designing systems there are 10x cost increases at each stage: 1) errors found
-at compilation, 2) errors found in unit testing, 3) errors found in system testing,
-4) errors found after manufacturing, 5) errors found after deployment to the field.
-Due to the dramatic increase in costs of delayed error discovery, there is high
-motivation to find/fix errors at early stages.
+Compilation has few compile checks for invalid concurrent access and proof checks of invariants.
+While module reuse simplifies design effort, it retains
+an expensive re-verification burden.  Using vendor tooling,
+the FPGA synthesis process is slow and unstable, preventing developers
+from lightweight, frequent testing of design changes during the
+authorship process.
+No standard debugging when doing on-device testing of interactions
+with external components.
+Pipelining of the design must be done manually.
+Runtime testing (verification) is relied upon as a key aspect
+of product delivery quality.
 
-As system complexity increases, it becomes increasingly desirable to build
-new solutions reusing trusted components, treating them as black boxes.
-In this way, testing effort is proportional to the size of new code created,
-not to the total size of the code in the resulting system.  (In current hardware
-development styles, it is even worse, proportional to the size of the resulting
-instantiated system).
-Separately compiled library reuse promotes minimizes the amount of newly synthesized
-code, reducing verification needs.
+All of the above issues are similar to those afflicting software development
+in the 1960's, leading to what has been described as "the software crisis".
+Although the underlying model is considerably different from software,
+analysis of hardware using modern frameworks
+leads to robust solutions for each of the above issues.
+All of these issues have a direct impact on both design development cost
+and on project schedule uncertainty.  By improving the agility of the design
+process, hardware design can move away from the problematic waterfall development
+process and more easily accomodate evolving application requirements.
 
-Since the introduction of Verilog in 1984, hardware description languages have
-become the dominant technique for designing hardware logic.  Over time,
-HDL descriptive ability has increased by borrowing features that have proven
-effective in software.
-The language has been extended (including System Verilog) to support more extensive
-data structuring operations, leading to improved clarity and consiseness
-in algorithm expression, but with little improvement on static checking of
-dynamic behavior of the design, nor of interface interactions with reused modules.
+In this project, we try to solve many of the major
+productivity issues in producing validated digital logic designs,
+enabling wider and more efficient deployment of sophisticated
+hardware solutions.
 
 \rSec1[atomicc.approach]{Approach}
-
-AtomicC focuses on improving design scaling costs:
-\begin{itemize}
-\item Reliable reuse (without retesting) of existing design components,
-\item Correct by construction for composition of parallel operations, preventing generation
-of code with safety errors.
-\item Separate generation of Verilog modules, simplifying the integration with existing
-systems and toolflows.
-\end{itemize}
-
-In AtomicC, user operations are written as SSA transactions, called "rules".  Since the
-compiler can statically analyze the read and write sets of the rule as well as the
-invocation conditions, it can guarantee that the generated code always executes
-in a Sequentially Correct (SC) manner: parallel execution of transactions can be
-guaranteed to never interfere.
-
-In AtomicC, reused code can guarantee that interfaces are invoked only when the
-interface provider determines the conditions are valid.  Since hardware has no notion of
-execution thread blocking, a 'ready' signal
-is exported to the calling rule, preventing execution.
-
-This makes compile time proofs of correctness possible.
-
-AtomicC provids a structured alternative to Verilog
-that is quick to understand and easy to deploy.  
-By making the generated output easy for experienced designers to understand and integrate
-into existing designs and toolflows,
-we hope that barriers to adoption will be low, leading to robust experimentation.
-
-\rSec1[atomicc.intro]{Details}
 
 AtomicC is a timed, structural hardware description language for
 the high level specification of algorithms to be instantiated
 directly in hardware.
 AtomicC extends C++
 with support for Guarded Atomic Actions
-\cite{Hoe:Thesis,HoeArvind:TRS_Synthesis2,Dave2007}:
+\cite{Hoe:Thesis,HoeArvind:TRSSynthesis2,Dave2007}:
 Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
+
+Finding errors early -- compile time checks:
+\begin{itemize}
+\item check that there are no dynamic concurrency interleaving errors.  By 
+conveying developer intent by grouping
+signal assertions into transactions with guards, we can verify at compile time
+that there are no invalid combinations at runtime.
+\item By grouping signal assertions as atomic transactions, we can use proofs
+to check that user design specific variants are preserved at all times, rather
+than attempting to check through runtime testing.
+\item Refinement
+\item Safety. A safety property asserts that nothing "bad" happens throughout execution
+\begin{itemize}
+\item Invariant:  Basis.  Inductive step.
+\item Deadlock freedom
+\end{itemize}
+\item Liveness. A liveness property asserts that something "good" eventually does happen.
+\begin{itemize}
+\item Termination
+\item Response
+\end{itemize}
+\end{itemize}
+
+Example: declarations in Unity:
+\begin{itemize}
+\item Methods: \textit{requires} and \textit{ensures}
+\item Rules: \textit{Invariant} and \textit{Decrements}
+\item SystemVerilog: \textit{assume} and \textit{assert}.  \textit{restrict}
+\end{itemize}
+
+Modularize -- reuse without reverification:
+\begin{itemize}
+\item contemporary systems contain many components,
+often designed by distributed teams of engineers.  To lower the burden
+of retesting, these components need to be able to guarantee that
+runtime operation requirements are preserved.
+\item By allowing modules to hold off invocations of callers, these module
+can guarantee that their operating environments are always consistent, hence
+yield consistent results
+\item Module reuse without resynthesis: generated Verilog code is reused without regeneration
+\item Parameterized generated code: propagation of module parameterization from
+source through to generated Verilog allows reuse without generation for each parameter instance.
+\end{itemize}
+
+Timing closure -- simplifying retiming:
+\begin{itemize}
+\item timing closure issues
+can be separated to 2 groups: interblock and intrablock.
+By using self-timed interfaces intrablock, long timing closure paths can be eliminated
+\item simple decoration of source expression trees can be used to generate
+fifo pipelined implementation of transactions.
+\end{itemize}
+
+Faster edit-compile-test cycles:
+\begin{itemize}
+\item By physically partitioning the design into connected, placed regions, only the
+logic block that has been actually changed needs to be recompiled.  Modular reuse through pre-placed modules
+\end{itemize}
+
+Richer debug environment:
+\begin{itemize}
+\item hardware/software interactions are facilitated by a NOC DMA to processor memory,
+smoothing interactions between high clock speed/narrow thread software and low clock
+speed/wide thread hardware.
+\item runtime support of 'printf' into logs for user logic simplifies the debugging for 'did we get here' type issues.
+\item distributed logging for signal tracing, supported by simple forwarding of traced signals to software host.
+\end{itemize}
+
+
+%%The addition of compile time checks of invalid conditions
+%%allows proof that well-formed programs will not violate these conditions at runtime.
+
+%%Modularity is the most important technique for controlling the complexity
+%%of systems.  Systems can be decomposed into separate components with precisely
+%%specified, and tightly controlled, interactions.  Sharing of components
+%%across different systems and instances within a system amortizes the development
+%%cost and helps limit errors by limiting coding effort \cite{Harper_2016}.
+%%Separately compiled library reuse minimizes the amount of newly synthesized
+%%code, reducing verification needs.
+
+%%In hardware design, the design phase is followed by significant validation effort
+%%to ensure manufacturability.  Since the number of system parameters is
+%%large, there is an extreme need to keep all unrelated areas of a design constant
+%%when implementing engineering change orders to fix problems descovered
+%%in the manufacturing process.
+%%By modular generation of Verilog code and by enforced runtime isolation
+%%of modules, ECOs are independant.
 
 The language is designed for
 the construction of \textbf{modules}\cite{Parnas:1972} that are \textit{correct-by-construction composable}:
 validated smaller modules can be aggregated to form
-a larger validated module with
-no loss of correctness of the component modules:
+a larger validated module:
 \begin{itemize}
+
+\item All state elements in the hardware
+netlist are explicit in the source code of the design.
+All module data is private to the module, accessable externally only by method invocation.
+
 \item Module interactions are performed with
 latency insensitive\cite{Ng2010,AbbasB18}
 \textbf{method} calls, allowing methods to enforce invocation pre-conditions
 and transitive support for stalling.
-\item Module behaviorial statements are encapsulated into transactions (\textbf{rules})
-following ACID semantics
-\cite{NikhilSemantics,GrayR93}:
-%% harris2005composable, nurvitadhi2011automatic,fox2003algebraic
-\begin{itemize}
-\item \textit{Atomic}: all enabled rules in all modules execute on every clock cycle.
-\item \textit{Consistent}: The compiler synthesizes control signals, allowing rules to fire
-only when their referenced method invocations (\textit{implicit conditions})
-are ready.
-\item \textit{Isolated}: all rules executed during a given clock cycle are
-\textit{sequentially consistent} (SC) \cite{Lamport:1979:MMC:1311099.1311750},
-guaranteeing each rule executes
-independently of any other rules executing at the same time
-\cite[Sec.~7.1]{GrayR93}.
-\item \textit{Durable}: all transactions read from and write to state elements in the design
-\end{itemize}
 
 \item An \textbf{interface} is a named collection of method signatures, defining
-the behavior of an abstract data type(ADT) \cite{Liskov74programmingwith}.
+the behavior of an abstract data type(ADT).
 Modules can declare
 multiple \textbf{interfaces}, giving each interface an explicit name,
 giving flexibility in coupling with other modules.
 Interfaces can be exported (defined in the module) or imported (used in
 the module, but defined externally), giving flexibility in algorithm
-representation \cite[Sec.~4.1]{Dave:ROB}.
-By using interfaces to describe behavior of a module instead of relying
-on inheritance, the user is able to specify clearly that no implementation
-information is inherited.
-\item All state elements in the hardware
-netlist are explicit in the source code of the design.
-All module data is private to the module, accessable externally only by method invocation.
+representation.
+
+\item In AtomicC, user operations are written as SSA transactions, called \textbf{rules}.  Since the
+compiler can statically analyze the read and write sets of the rule as well as the
+invocation conditions, it can guarantee that the generated code always executes
+in a Sequentially Correct (SC) manner: concurrent execution of transactions can be
+guaranteed to be isolated.
+
+\item Like Connectal\cite{king2015software}, AtomicC designs may include both hardware and
+software components, using interfaces to specify type safe communication.
+The AtomicC compiler generates the code and transactors to pass
+arguments between hardware and software.
+
 \end{itemize}
-These features support the reliable reuse of pre-compiled, incrementally validated
-libraries, improving productivity on large designs.
-
-AtomicC does not attempt to emulate the behavior of all C++ constructs in hardware.
-It instead uses a subset of the C++ language to specify
-code blocks that have the property that there is at most
-one assignment to each state element.
-This form is called \textit{static single assignment} form,
-or SSA form\cite{Alpern:1988} and is a functional program\cite{Appel98ssais}.
-In the eventual runtime execution, these assignments are
-all made in a single clock cycle, when the rule or method
-is enabled.
-
-To preserve the standard interpretation of C++ source code
-in methods and rules,
-a \textbf{modification in-private} \cite[Sec.~3.2]{Prinz03operationalsemantics}
-execution model is used:
-\begin{enumerate}
-\item Wrap each rule/method with prelude code and postprocessing code
-\item Prelude code:
-For each state element \textbf{A} in module, add the declaration of a shadow item:
-\begin{codeblock}
-decltype(this->A) A = this->A;    // create shadow of state element
-\end{codeblock}
-\item Postprocessing code:
-For each state element actually written during execution of the code block:
-\begin{codeblock}
-this->A = A;                // update state elements only at end of code block
-\end{codeblock}
-All assignments in the postprocessing section occur on a single clock cycle.
-\end{enumerate}
 
 The AtomicC compiler 
 generates a single Verilog module for each defined AtomicC module.
@@ -162,34 +182,12 @@ generated modules.
 Standard Verilog backend tools are used to synthesize
 the resulting ASIC or FPGA.
 Particular emphasis is put on making the Verilog output both readable
-and stable to incremental change.  Synthesized names in the verilog
-output depend only on the named structual context, not on aspects
-like 'source line number' that will change globally, even when there is no
-local module definition source change.
+and stable to incremental change.
 Incremental source code changes produce locally incremental generated
 code changes, easing the management of ECOs and version control
 on successive releases (for example, management of Verilog output
 files using git repositories).
-Since project development often involves many people over an
-extended interval of time, predictable reuse and evolution
-of modules is considered key to improving productivity.
 
-Like Connectal\cite{king2015software}, AtomicC designs may include both hardware and
-software components, using interfaces to specify hardware/software communication
-in a type safe manner. The AtomicC compiler generates the code and transactors to pass
-arguments between hardware and software.
-
-In summary, although AtomicC is a way of constructing highly parallel hardware,
-the usage model is quite simple:
-\begin{itemize}
-\item Methods/rules are written as though they were locally serially executed,
-\item Updates to state elements only occur atomiccally, as transactions.
-Intermediate state evolution is not visible to other transactions,
-\item Concurrent execution of transactions is guaranteed to be SC by the compiler framework,
-\item Correct concurrent implementation of the code for each individual method/rule
-is guaranteed by the compiler's
-translation of the SSA source text into logic.
-\end{itemize}
 Of course, if the underlying algorithm is not designed to allow parallel
 execution of incremental computations, it will perform poorly and there
 is nothing the compiler can do to help.  AtomicC allows
@@ -197,200 +195,18 @@ the user to focus solely on the algorithm itself,
 without the burden of the bare mechanics of orchestrating concurrent consistency,
 increasing quality and productivity.
 
-\rSec1[atomicc.module]{Modules}
-
-The basic building block of AtomicC is the module declaration, made of 3 parts:
-\begin{itemize}
-\item Instantiation of state elements used by the module,
-\item Interface declarations for interacting with other modules,
-\item Rules, which group assignment statements and method invocations into atomic transactions.
-\end{itemize}
-
-There are 2 types of methods:
-\begin{itemize}
-\item \textbf{Value method functions} allow \textit{inspection} of module state elements.
-\item \textbf{Action method procedures} allow \textit{modification}
-(including inspection) of state elements,
-can take parameters and do not have return values.
-A compiler generated
-\textbf{valid} signal indicates that the caller wishes to perform the method invocation.
-\end{itemize}
-
-Both value and action methods use a compiler generated \textbf{ready} signal
-to indicate when the callee is available and
-stall scheduling of the calling transaction until
-execution pre-conditions are statisfied.
-
-AtomicC uses \textbf{valid/ready} \textit{hand-shaking signalling}
-\cite{Fletcher2009, AXISpec} to invoke action methods,
-giving both the invoker(master) and invokee(slave) the ability to control invocation
-execution timing.
-The master uses the \textbf{valid} signal
-of an action method to show when parameter data is available
-and the operation should be performed.
-The method invocation succeeds only when
-both \textbf{valid} and \textbf{ready} are HIGH in the same clock cycle.
-\newline
-In TRS notation\cite[p.~22]{Hoe:Thesis}:
-\begin{itemize}[label= ]
-\item $\pi(M_{i}) \equiv ready(M_{i})\ \wedge valid(M_{i})$.
-\end{itemize}
-
-\rSec1[atomicc.schedule]{Scheduling}
-
-\rSec2[atomicc.schedgoal]{Goals}
-In software systems, to guarantee \textit{isolation} in the presence of
-parallelism, \textit{dynamic allocation}\cite[p.~377]{GrayR93} of schedules
-and locking\cite[Sec.~11.2]{OV11} are used.
-In hardware design with AtomicC,
-the set of state elements accessed by a transaction,
-the operations on these state elements (read-only or write)
-and the boolean condition when the transaction is performed
-are all known at compile time.
-This allows \textit{static allocation}\cite[Sec.~7.3.1]{GrayR93} of \textbf{schedules}
-(sequences of transaction execution)
-and compile time validation of SC.
-\newline
-\rSec2[atomicc.schedalg]{Algorithm}
-The scheduling algorithm is:
-\begin{itemize}
-\item For each module, rules and methods that overlap usage of state elements
-(\textit{read set} and \textit{write set}\cite[Sec.~10.1.2]{OV11} \cite{RosenkrantzSternsLewis})
-are greedily gathered into \textit{schedule sets}.
-Since there can be no execution interactions between sets,
-each set will be independently scheduled.
-\item A \textit{constraint graph} is a partially-ordered digraph modeling
-the schedule sequencing dependencies within a \textit{schedule set}:
-\begin{itemize}
-\item \textit{nodes} in a constraint graph represent atomic rule and method instances,
-\item \textit{edges} represent \textbf{write-after-read (WAR)} ordering dependency
-for a specific storage element\cite[Sec.~3]{Cain2003}.
-
-In addition, each edge has a symbolic boolean \textit{edge condition} for when the
-the ordering dependency exists: the boolean
-condition when one rule/method actually reads a given state element
-and the other actually writes it.
-\end{itemize}
-
-\item The transitive closure of these orders on the constraint graph nodes
-dictate the \textbf{schedule} in which each rule must \textit{appear} to execute in
-order to be considered SC
-\cite[Sec.~11.1]{OV11}.
-Of course, since all rules execute in a single cycle, "schedule" does not
-refer to an actual time sequenced evolution of state,
-but to a \textit{conceptual} "sub-cycle" ordering.
-
-\item For each pair of nodes in the constraint digraph, we define the \textit{node condition}
-between 2 nodes as the conjunction of the \textit{edge conditions} of all the edges between
-them (i.e., the condition that \textit{any} of the edges causes a dependency).
-For each cycle in the digraph, we define the \textit{path condition}
-as the disjunction of the \textit{node conditions} for all sequential pairs of nodes
-in the cycle (i.e., the condition that \textit{all} the edges, hence the cycle exists).
-
-\item Since potential conflicts between methods (called from rules outside the module)
-and module rules are quite common,
-if cycle has some method $M$ \& some rule $R$, then the compiler can
-rewrite the term $valid(R)$ to add a disjunction with the term $\neg valid(M)$, breaking
-the cycle.
-
-\item When the \textit{path condition} is not identically false, a total ordering of
-the digraph can not be guaranteed and the \textit{schedule set} is not SC.
-In this case, the compiler or linker reports an error,
-requiring resolution by the user.
-\end{itemize}
-
-A simple example of a constraint graph is given in \ref{scheduleExample}, at the end of this document.
-
-Since AtomicC performs scheduling analysis independantly for each
-declared module, method invocation conflicts in rules cannot be validated.
-Schedule processing for rule method calls is delayed until the "module group binding"
-stage of linking, where separately compiled AtomicC output is combined and
-verified
-for SC scheduling.  Errors and conflicts detected at this stage must be repaired
-in the module source text and recompiled before proceeding.
-
-\rSec2[atomicc.schedprev]{Previous scheduling work}
-
-In Rule Composition\cite{Dave2007}, scheduling
-is reformulated in terms of rule composition, leading to a succinct discussion
-of issues involved, including a concise description of the Esposito and
-Performance Guarantees schedulers.  The resulting schedules are quite close
-to the user-specified scheduling in AtomicC.
-In contrast to AtomicC, the Bluespec kernel language they use
-for analysis also has a sequential composition operator, creating rules
-that execute for multiple clock cycles.
-
-The Esposito Scheduler\cite{Esposito:Patent,Dave2007},
-is the standard scheduler generation algorithm in the Bluespec Compiler.
-It uses a heuristic designed to produce a concrete total ordering of rules.
-
-The Performance Guarantees scheduler\cite{Rosenband:PerformanceGuarantees}
-was proposed to address issues with intra-cycle data passing.
-
-\newpage
-\rSec1[atomicc.modcomp]{Compilation}
-
-In traditional software, program startup at runtime allocates
-and populates data structures used during execution.  Although dynamic
-creation of state elements is not possible for hardware,
-we need the ability to create them programmatically, improving
-efficiency of the design creation process.
-The compilation of an AtomicC program is similar to that of C++, but adds
-an \textit{elaboration} phase \cite[Sec.~1]{Milner:1990}\cite{Gillenwater:2008,Memarian:2016,Pfenning},
-translating the source parse tree into a high-level
-intermediate \textit{abstract syntax}.
-This is quite similar to the approach suggested by Bluespec-2\cite{ArvindBS2}.
-
-During \textit{static elaboration},
-constructors are executed for statically declared data elements,
-allowing allocation of new instances of modules and parameterized rule creation.
-Any C++ constructs may be used, but
-the resulting netlist must only contain synthesizeable components.
-
-AtomicC execution consists of the following phases:
-\begin{itemize}
-\item \textit{compilation}
-\begin{itemize}
-\item {Parsing,semantic checks},
-\item {Static elaboration},
-\item {Translation to an intermediate representation (IR)},
-\item {Verilog netlist generation from the IR},
-\end{itemize}
-\item \textit{Linking}: Modules across the project are incrementally compiled
-and unit tested.  As modules are reused in varying contexts, it is necessary
-to validate if restrictions need to be added for concurrent calls to conflicting
-methods in the module interface.
-This checking is done by a \textit{linker},  ensuring that rule/method access
-across a set of Verilog output is free of inter-module schedule conflicts,
-\item \textit{Logic synthesis, physical backend processing}.  This is performed
-with existing backend tool flows
-\item \textit{Formal verification} using the Coq Proof Assistant, etc.
-\item \textit{Verification}: performed using existing backend tooling,
-\item \textit{Hardware execution}.
-\end{itemize}
-
-
 \rSec1[atomicc.modfuture]{Future work}
 
 Need to describe multi-cycle rules and pipelining.
+
+Need to describe joining rules
 
 Need to have a way to support sequencing of operations
 
 Need to have a way to support model checking (say 'module B is a behavioral description of module A')
 Show example with diff eqn solver from Sharp thesis.
 
-C block semantics do not correctly process the 2 statements: a = b; b = a;.
-(binding of read values should occur at beginning of block, so that it is clear the
-2nd assign refers to the 'previous' value).
-Thinking again: if we retain C semantics, we have: temp = a; a = b; b = temp;, which
-gives the correct value mapping.
-
 Multiple clock domains
-
-Need reference definition for 'static elaboration'.
-from Newton: 
-Static elaboration does not change the semantics (types, evaluation rules) of the
-Regiment language, it merely opportunistically pushes evaluation forward into compile time
 
 Coding FSMs as 'case' statements in Verilog (to integrate with verification tools).
 
