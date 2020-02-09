@@ -3,42 +3,91 @@
 
 \rSec1[atomicc.background]{Background}
 
-Moore's law has given us
-dramatic increases in hardware system capability,
-but the \textit{verification gap} in digital logic development process restricts wider,
-more diverse application.
-In software, testing costs are proportional to the amount of new code in a design;
-in hardware, verification costs are proportional to the size of the finished design (including
-all instances of reused libraries).
+Due to the benefits for Moore's Law, we are able to build increasingly
+larger systems at low cost.  Unfortunately the basic design techniques
+used for building digital systems remain rooted in the approach that
+a single design team designs and builds everything from scratch.
+This failure to cope effectively with the effects of design reuse
+and multiple, distributed teams has caused costs for producing
+verified designs to remain high.
+Is there anything we can do to revitalize the the incremental cost of
+hardware development, stimulating wider application of specialized products?
+
+Releasing new versions of hardware designs
+can be quite expensive and disruptive,
+placing extreme emphasis on gaining confidence of correct operation before
+production, causing the costs of testing to
+dominate product development costs.
+Before a new hardware product can be released, 
+it must be confirmed that the product correctly implements the specification.
+In addition to logic errors, physical variation of materials during manufacturing
+can also introduce errors in operation.
 How can we make the development of 
 \textit{verified} designs more efficient and predictable?
 
-Compilation has few compile checks for invalid concurrent access and proof checks of invariants.
+When tests are created manually, test creation is expensive and
+coverage is uneven: some areas are
+excessively tested while other features are undertested.
+By adding automated test creation (model checking) to the development process,
+test coverage becomes more uniform, complete and its extent explicit.
+
+Development stages:
+\begin{itemize}
+\item design
+\item HDL features for runtime safety
+\item experiment: simulate, emulate with FPGAs
+\item define invariants
+\item test: manual
+\item test: mechanized falsification exploration (model checking)
+\item verification: mechanized theorem checking
+\item runtime monitoring: tracing, scantest
+\end{itemize}
+
+model check -> exhaustive search of finite state space
+
 While module reuse simplifies design effort, it retains
-an expensive re-verification burden.  Using vendor tooling,
+an expensive re-verification burden.  
+Although in software, testing costs are proportional to the amount of new code in a design,
+in hardware, verification costs are proportional to the size of the finished design (including
+all instances of reused libraries).
+By improving the efficiency and agility of the design
+process, hardware design can move away from the problematic waterfall development
+process and more easily accomodate evolving application requirements.
+
+Peer review is effectively used in software development and can catch many errors
+or unreliable coding styles before testing occurs.  Unfortunately, since it is
+static, it is difficult to catch subtle errors such as concurrency and algorithm defects.
+In AtomicC, compilation checks prevent concurrency defects; source coding occurs at a
+higher level, so that algorithm defects are easier for the designer to recognize and fix.
+
+Using vendor tooling,
 the FPGA synthesis process is slow and unstable, preventing developers
 from lightweight, frequent testing of design changes during the
 authorship process.
 No standard debugging when doing on-device testing of interactions
 with external components.
 Pipelining of the design must be done manually.
-Runtime testing (verification) is relied upon as a key aspect
-of product delivery quality.
-
-All of the above issues are similar to those afflicting software development
-in the 1960's, leading to what has been described as "the software crisis".
-Although the underlying model is considerably different from software,
-analysis of hardware using modern frameworks
-leads to robust solutions for each of the above issues.
-All of these issues have a direct impact on both design development cost
-and on project schedule uncertainty.  By improving the agility of the design
-process, hardware design can move away from the problematic waterfall development
-process and more easily accomodate evolving application requirements.
 
 In this project, we try to solve many of the major
 productivity issues in producing validated digital logic designs,
 enabling wider and more efficient deployment of sophisticated
 hardware solutions.
+
+\rSec1[atomicc.zzz]{Notes}
+
+Interested in concurrent(not distributed) reactive systems: ongoing interaction
+with environment.
+
+Interested in "transition systems" instead of "given an input, compute result".
+Describe how system evolves from one state to another.
+
+\begin{itemize}
+\item state-based: causal dependency between events
+\item property-based: global
+\end{itemize}
+
+For NOC: allocate NOC like clock tree, after physical placement known.  Can do 
+method calls across NOC using credit.
 
 \rSec1[atomicc.approach]{Approach}
 
@@ -60,24 +109,28 @@ that there are no invalid combinations at runtime.
 \item By grouping signal assertions as atomic transactions, we can use proofs
 to check that user design specific variants are preserved at all times, rather
 than attempting to check through runtime testing.
-\item Refinement
+\item Automatically synthesizing strong fair arbitration between conflicting rules.
+\item PSA support for assertions: assert, assume, restrict, cover.
+\begin{itemize}
 \item Safety. A safety property asserts that nothing "bad" happens throughout execution
 \begin{itemize}
+\item Refinement checking
 \item Invariant:  Basis.  Inductive step.
 \item Deadlock freedom
+\item Reachability
 \end{itemize}
 \item Liveness. A liveness property asserts that something "good" eventually does happen.
 \begin{itemize}
 \item Termination
 \item Response
+\item Request-response properties
+\item Fairness
+\item real-time (system act "in time")
 \end{itemize}
+\item Trace equivalence
 \end{itemize}
-
-Example: declarations in Unity:
-\begin{itemize}
-\item Methods: \textit{requires} and \textit{ensures}
-\item Rules: \textit{Invariant} and \textit{Decrements}
-\item SystemVerilog: \textit{assume} and \textit{assert}.  \textit{restrict}
+\item Automated generation of test cases
+\item Abstract interpretation
 \end{itemize}
 
 Modularize -- reuse without reverification:
@@ -114,7 +167,8 @@ Richer debug environment:
 \item hardware/software interactions are facilitated by a NOC DMA to processor memory,
 smoothing interactions between high clock speed/narrow thread software and low clock
 speed/wide thread hardware.
-\item runtime support of 'printf' into logs for user logic simplifies the debugging for 'did we get here' type issues.
+\item runtime support of tracing and 'printf' into logs for user logic simplifies the debugging for 'did we get here' type issues.
+\item runtime support for scan-chain based testing
 \item distributed logging for signal tracing, supported by simple forwarding of traced signals to software host.
 \end{itemize}
 

@@ -925,18 +925,17 @@ static std::list<ModData> modLine;
     modNew.clear();
     condLines.clear();
     genvarMap.clear();
-    generateModuleSignature(IR, "", "", modLineTop, "");
     bool hasPrintf = false;
     enableList.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
     muxValueList.clear();
-
     modLine.clear();
-    printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
 
+    printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
     for (auto item: IR->interfaces)
         if (item.fldName == "printfp")
             hasPrintf = true;
+    generateModuleSignature(IR, "", "", modLineTop, "");
 
     iterField(IR, CBAct {
         int dimIndex = 0;
