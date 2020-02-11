@@ -45,6 +45,7 @@
 \usepackage{memhfixc}     % fix interactions between hyperref and memoir
 \usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnf,simplebnf}]{extract} % Grammar extraction
 \usepackage{amssymb}
+\usepackage{breqn}
 \newcommand{\atomicc}{\marginpar{\scriptsize \raggedright {\vspace{-1em} \textbf{ $\blacksquare \blacksquare$ }} } }
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows}
@@ -85,6 +86,9 @@
 %%--------------------------------------------------
 %% turn off all ligatures inside \texttt
 \DisableLigatures{encoding = T1, family = tt*}
+
+\DeclareMathOperator*{\ORop}{\mathlarger \bigvee}
+\DeclareMathOperator*{\ANDop}{\mathlarger \bigwedge}
 
 \begin{document}
 \chapterstyle{cppstd}

@@ -3,93 +3,73 @@
 
 \rSec1[atomicc.background]{Background}
 
-Due to the benefits for Moore's Law, we are able to build increasingly
-larger systems at low cost.  Unfortunately the basic design techniques
-used for building digital systems remain rooted in the approach that
-a single design team designs and builds everything from scratch.
-This failure to cope effectively with the effects of design reuse
-and multiple, distributed teams has caused costs for producing
-verified designs to remain high.
-Is there anything we can do to revitalize the the incremental cost of
-hardware development, stimulating wider application of specialized products?
+Moore's Law improvements in manufacturing
+costs of hardware have driven dramatic increases in the variety and complexity
+of hardware systems that can be economically manufactured.
+Unfortunately, high costs of producing verified hardware designs limit
+deployment to devices that
+can amortize development costs over very high manufacturing volumes.
+We have seen dramatic improvements in general purpose processors
+and memory devices, but much more limited improvements in application
+specific devices.
 
-Releasing new versions of hardware designs
-can be quite expensive and disruptive,
+Deploying new versions of hardware designs can be quite expensive,
 placing extreme emphasis on gaining confidence of correct operation before
-production, causing the costs of testing to
+manufacturing, causing the costs of testing to
 dominate product development costs.
-Before a new hardware product can be released, 
-it must be confirmed that the product correctly implements the specification.
-In addition to logic errors, physical variation of materials during manufacturing
-can also introduce errors in operation.
 How can we make the development of 
 \textit{verified} designs more efficient and predictable?
 
-When tests are created manually, test creation is expensive and
-coverage is uneven: some areas are
-excessively tested while other features are undertested.
-By adding automated test creation (model checking) to the development process,
-test coverage becomes more uniform, complete and its extent explicit.
-
-Development stages:
-\begin{itemize}
-\item design
-\item HDL features for runtime safety
-\item experiment: simulate, emulate with FPGAs
-\item define invariants
-\item test: manual
-\item test: mechanized falsification exploration (model checking)
-\item verification: mechanized theorem checking
-\item runtime monitoring: tracing, scantest
-\end{itemize}
-
-model check -> exhaustive search of finite state space
-
-While module reuse simplifies design effort, it retains
-an expensive re-verification burden.  
-Although in software, testing costs are proportional to the amount of new code in a design,
-in hardware, verification costs are proportional to the size of the finished design (including
-all instances of reused libraries).
-By improving the efficiency and agility of the design
-process, hardware design can move away from the problematic waterfall development
-process and more easily accomodate evolving application requirements.
-
-Peer review is effectively used in software development and can catch many errors
-or unreliable coding styles before testing occurs.  Unfortunately, since it is
-static, it is difficult to catch subtle errors such as concurrency and algorithm defects.
-In AtomicC, compilation checks prevent concurrency defects; source coding occurs at a
-higher level, so that algorithm defects are easier for the designer to recognize and fix.
-
-Using vendor tooling,
-the FPGA synthesis process is slow and unstable, preventing developers
-from lightweight, frequent testing of design changes during the
-authorship process.
-No standard debugging when doing on-device testing of interactions
-with external components.
-Pipelining of the design must be done manually.
-
-In this project, we try to solve many of the major
-productivity issues in producing validated digital logic designs,
-enabling wider and more efficient deployment of sophisticated
-hardware solutions.
-
-\rSec1[atomicc.zzz]{Notes}
-
-Interested in concurrent(not distributed) reactive systems: ongoing interaction
-with environment.
-
-Interested in "transition systems" instead of "given an input, compute result".
-Describe how system evolves from one state to another.
-
-\begin{itemize}
-\item state-based: causal dependency between events
-\item property-based: global
-\end{itemize}
-
-For NOC: allocate NOC like clock tree, after physical placement known.  Can do 
-method calls across NOC using credit.
-
 \rSec1[atomicc.approach]{Approach}
+
+To reduce verification costs, we propose:
+\begin{itemize}
+\item Compiler guarantees program runtime safety
+\begin{itemize}
+\item Through HDL structuring, guarantee the absence of dynamic concurrency interleaving errors in generated Verilog.
+\item When rules conflict, the compiler synthesizes fair arbitration.
+\item When assertions are used, the compiler attempts to verify them with model checking or proof tools.
+\end{itemize}
+\item Reuse modules without reverification.  Amortize module costs through reuse.
+\begin{itemize}
+\item A single Verilog module is generated for each defined AtomicC module.
+The generated Verilog is highly readable, giving designers confidence that
+intended operations are correctly realized.
+\item Module schedules calculated using only local information and are independent of module usage context.
+\item Parameterized generated code: propagation of module parameterization from
+source through to generated Verilog allows reuse without generation for each parameter instance.
+\item Source modules are independently compiled to re-usable Verilog modules.
+\item Stable generated Verilog: "local AtomicC source code changes (generally) should only cause local changes to generated Verilog".
+This minimizes the reverification effort for ECOs.
+
+In hardware design, the design phase is followed by significant validation effort
+to ensure manufacturability.  Since the number of system parameters is
+large, there is an extreme need to keep all unrelated areas of a design constant
+when implementing engineering change orders to fix problems descovered
+in the manufacturing process.
+By modular generation of Verilog code and by enforced runtime isolation
+of modules, ECOs are independant.
+
+\end{itemize}
+
+\item Standardized debug runtime
+\begin{itemize}
+\item Display and trace runtime support is provided, easing unit testing
+as modules are created.
+\item When not possible to statically verify asserts, a standard runtime exists for reporting errors.
+\item hardware/software interactions are facilitated by a NOC DMA to processor memory,
+smoothing interactions between high clock speed/narrow thread software and low clock
+speed/wide thread hardware.
+\item runtime support for scan-chain based testing
+\end{itemize}
+\item Integration with existing workflow
+\begin{itemize}
+\item Existing Verilog modules can be called from and can call AtomicC generated modules.
+\item Standard Verilog backend tools are used to synthesize the resulting ASIC or FPGA.
+\end{itemize}
+\end{itemize}
+
+\rSec1[atomicc.language]{AtomicC Overview}
 
 AtomicC is a timed, structural hardware description language for
 the high level specification of algorithms to be instantiated
@@ -100,16 +80,36 @@ with support for Guarded Atomic Actions
 Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
 
-Finding errors early -- compile time checks:
+
+The language is designed for
+the construction of \textbf{modules} that are \textit{correct-by-construction composable}:
+validated smaller modules can be aggregated to form
+a larger validated module:
 \begin{itemize}
-\item check that there are no dynamic concurrency interleaving errors.  By 
-conveying developer intent by grouping
-signal assertions into transactions with guards, we can verify at compile time
-that there are no invalid combinations at runtime.
-\item By grouping signal assertions as atomic transactions, we can use proofs
-to check that user design specific variants are preserved at all times, rather
-than attempting to check through runtime testing.
-\item Automatically synthesizing strong fair arbitration between conflicting rules.
+
+\item Module interactions are performed with
+latency insensitive
+\textbf{method} calls, allowing methods to enforce invocation pre-conditions
+and transitive support for stalling.
+
+\item An \textbf{interface} is a named collection of method signatures.
+Modules can declare
+multiple \textbf{interfaces}, giving each interface an explicit name,
+giving flexibility in coupling with other modules.
+Interfaces can be exported (defined in the module) or imported (used in
+the module, but defined externally), giving flexibility in algorithm
+representation.
+
+\item All state elements in the hardware
+netlist are explicit in the source code of the design.
+All module data is private, externally accessable only by interface method invocation.
+
+\item In AtomicC, user operations are written as SSA transactions, called \textbf{rules}.  Since the
+compiler can statically analyze the read and write sets of the rule as well as the
+invocation conditions, it can guarantee that the generated code always executes
+in a Sequentially Consistent (SC) manner: concurrent execution of transactions is
+guaranteed to be isolated.  For conflicts, a fair schedule is generated.
+
 \item PSA support for assertions: assert, assume, restrict, cover.
 \begin{itemize}
 \item Safety. A safety property asserts that nothing "bad" happens throughout execution
@@ -124,27 +124,47 @@ than attempting to check through runtime testing.
 \item Termination
 \item Response
 \item Request-response properties
-\item Fairness
-\item real-time (system act "in time")
+\item real-time (system acts "in time")
 \end{itemize}
 \item Trace equivalence
 \end{itemize}
-\item Automated generation of test cases
-\item Abstract interpretation
+
+\item As with Connectal\cite{king2015software}, AtomicC designs may include both hardware and
+software components, using interfaces to specify type safe communication.
+The AtomicC compiler generates the code and transactors to pass
+arguments between hardware and software.
+
 \end{itemize}
 
-Modularize -- reuse without reverification:
+\rSec1[atomicc.modfuture]{Future work}
+
+Multiple clock domains
+
+Need to describe multi-cycle rules and pipelining.
+
+Need to describe joining rules
+
+Need to have a way to support sequencing of operations
+
+For NOC: allocate NOC like clock tree, after physical placement known.  Can do 
+method calls across NOC using credit.
+
 \begin{itemize}
-\item contemporary systems contain many components,
-often designed by distributed teams of engineers.  To lower the burden
-of retesting, these components need to be able to guarantee that
-runtime operation requirements are preserved.
-\item By allowing modules to hold off invocations of callers, these module
-can guarantee that their operating environments are always consistent, hence
-yield consistent results
-\item Module reuse without resynthesis: generated Verilog code is reused without regeneration
-\item Parameterized generated code: propagation of module parameterization from
-source through to generated Verilog allows reuse without generation for each parameter instance.
+\item state-based: causal dependency between events
+\item property-based: global
+\end{itemize}
+
+Physical partitioning is used to separate design into separately synthesized pieces, connected using
+"long distance" signalling.  Parallel synthesis; bitstreams combined.
+
+Incremental place and route for changes:
+\begin{itemize}
+\item Automated physical partitioning of the design into locally clocked logic islands
+connected through delay tolerant network on chip
+\item Quick edit/compile/test cycles minimize the time between making a change and
+seeing the effect, allowing the developer to remain "in context"
+\item By physically partitioning the design into connected, placed regions, only the
+logic block that has been actually changed needs to be recompiled.  Modular reuse through pre-placed modules
 \end{itemize}
 
 Timing closure -- simplifying retiming:
@@ -156,113 +176,8 @@ By using self-timed interfaces intrablock, long timing closure paths can be elim
 fifo pipelined implementation of transactions.
 \end{itemize}
 
-Faster edit-compile-test cycles:
-\begin{itemize}
-\item By physically partitioning the design into connected, placed regions, only the
-logic block that has been actually changed needs to be recompiled.  Modular reuse through pre-placed modules
-\end{itemize}
-
-Richer debug environment:
-\begin{itemize}
-\item hardware/software interactions are facilitated by a NOC DMA to processor memory,
-smoothing interactions between high clock speed/narrow thread software and low clock
-speed/wide thread hardware.
-\item runtime support of tracing and 'printf' into logs for user logic simplifies the debugging for 'did we get here' type issues.
-\item runtime support for scan-chain based testing
-\item distributed logging for signal tracing, supported by simple forwarding of traced signals to software host.
-\end{itemize}
-
-
-%%The addition of compile time checks of invalid conditions
-%%allows proof that well-formed programs will not violate these conditions at runtime.
-
-%%Modularity is the most important technique for controlling the complexity
-%%of systems.  Systems can be decomposed into separate components with precisely
-%%specified, and tightly controlled, interactions.  Sharing of components
-%%across different systems and instances within a system amortizes the development
-%%cost and helps limit errors by limiting coding effort \cite{Harper_2016}.
-%%Separately compiled library reuse minimizes the amount of newly synthesized
-%%code, reducing verification needs.
-
-%%In hardware design, the design phase is followed by significant validation effort
-%%to ensure manufacturability.  Since the number of system parameters is
-%%large, there is an extreme need to keep all unrelated areas of a design constant
-%%when implementing engineering change orders to fix problems descovered
-%%in the manufacturing process.
-%%By modular generation of Verilog code and by enforced runtime isolation
-%%of modules, ECOs are independant.
-
-The language is designed for
-the construction of \textbf{modules}\cite{Parnas:1972} that are \textit{correct-by-construction composable}:
-validated smaller modules can be aggregated to form
-a larger validated module:
-\begin{itemize}
-
-\item All state elements in the hardware
-netlist are explicit in the source code of the design.
-All module data is private to the module, accessable externally only by method invocation.
-
-\item Module interactions are performed with
-latency insensitive\cite{Ng2010,AbbasB18}
-\textbf{method} calls, allowing methods to enforce invocation pre-conditions
-and transitive support for stalling.
-
-\item An \textbf{interface} is a named collection of method signatures, defining
-the behavior of an abstract data type(ADT).
-Modules can declare
-multiple \textbf{interfaces}, giving each interface an explicit name,
-giving flexibility in coupling with other modules.
-Interfaces can be exported (defined in the module) or imported (used in
-the module, but defined externally), giving flexibility in algorithm
-representation.
-
-\item In AtomicC, user operations are written as SSA transactions, called \textbf{rules}.  Since the
-compiler can statically analyze the read and write sets of the rule as well as the
-invocation conditions, it can guarantee that the generated code always executes
-in a Sequentially Correct (SC) manner: concurrent execution of transactions can be
-guaranteed to be isolated.
-
-\item Like Connectal\cite{king2015software}, AtomicC designs may include both hardware and
-software components, using interfaces to specify type safe communication.
-The AtomicC compiler generates the code and transactors to pass
-arguments between hardware and software.
-
-\end{itemize}
-
-The AtomicC compiler 
-generates a single Verilog module for each defined AtomicC module.
-Existing Verilog modules can be called from and can call AtomicC
-generated modules.
-Standard Verilog backend tools are used to synthesize
-the resulting ASIC or FPGA.
-Particular emphasis is put on making the Verilog output both readable
-and stable to incremental change.
-Incremental source code changes produce locally incremental generated
-code changes, easing the management of ECOs and version control
-on successive releases (for example, management of Verilog output
-files using git repositories).
-
-Of course, if the underlying algorithm is not designed to allow parallel
-execution of incremental computations, it will perform poorly and there
-is nothing the compiler can do to help.  AtomicC allows
-the user to focus solely on the algorithm itself,
-without the burden of the bare mechanics of orchestrating concurrent consistency,
-increasing quality and productivity.
-
-\rSec1[atomicc.modfuture]{Future work}
-
-Need to describe multi-cycle rules and pipelining.
-
-Need to describe joining rules
-
-Need to have a way to support sequencing of operations
-
 Need to have a way to support model checking (say 'module B is a behavioral description of module A')
 Show example with diff eqn solver from Sharp thesis.
 
-Multiple clock domains
-
 Coding FSMs as 'case' statements in Verilog (to integrate with verification tools).
 
-Physical partitioning is used to separate design into separately synthesized pieces, connected using
-"long distance" signalling.  Parallel synthesis; bitstreams combined.
