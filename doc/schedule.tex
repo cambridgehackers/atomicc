@@ -4,7 +4,7 @@
 
 All changes to state elements are grouped into atomic transactions;
 any execution trace is expressable as a linear sequence of isolated transaction invocations
-(sequential consistent (SC)).
+(sequentially consistent (SC)).
 To execute transactions
 concurrently within a single cycle,
 we need to prove that concurrent execution behaves as though the transactions were
@@ -31,15 +31,15 @@ V \equiv \{all rules, all methods\}
 {
 \left(
 \begin{split}
-guard(R1) \land guard(readSet(S, R1)) \\
-\land guard(R2) \land guard(writeSet(S, R2))
+guard(R1) \land readGuard(R1, S)) \\
+\land guard(R2) \land writeGuard(R2, S))
 \end{split}
 \right)
 }
 \end{dmath*}
 \end{dgroup*}
 
-If the arc condition is not identically false, then the
+If the arcCond is not identically false, then the
 ordering constraint is added, defining a directed graph.
 \[\forall R1, R2 \in V, \neg(arcCond(R1, R2) \rightarrow \perp): R1 < R2\]
 The set of concurrent transactions is SC iff this graph has no cycles
@@ -48,8 +48,8 @@ for any guard conditions.
 When detecting cycles in the graph, we calculate the boolean condition
 that the entire path of constraints actually occurs and that it is not
 identically false:
-  \[ pathCondition = \ANDop_{\forall arc(R1,R2) \in path} arcCond(R1, R2) \]
-If the pathCondition is not identically false, the compiler breaks cycles by one of the following:
+  \[ pathCond = \ANDop_{\forall arc(R1,R2) \in path} arcCond(R1, R2) \]
+If the pathCond is not identically false, the compiler breaks cycles by one of the following:
 \begin{itemize}
 \item Force rules to defer to methods.
 if cycle has some method $M$ \& some rule $R$, then the compiler can

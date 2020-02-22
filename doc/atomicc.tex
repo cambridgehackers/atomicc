@@ -27,7 +27,7 @@ To reduce verification costs, we propose:
 \item Compiler guarantees program runtime safety
 \begin{itemize}
 \item Through HDL structuring, guarantee the absence of dynamic concurrency interleaving errors in generated Verilog.
-\item When rules conflict, the compiler synthesizes fair arbitration.
+\item When rules conflict, the compiler synthesizes fair arbitration, guaranteeing liveness.
 \item When assertions are used, the compiler attempts to verify them with model checking or proof tools.
 \end{itemize}
 \item Reuse modules without reverification.  Amortize module costs through reuse.
@@ -92,7 +92,7 @@ latency insensitive
 \textbf{method} calls, allowing methods to enforce invocation pre-conditions
 and transitive support for stalling.
 
-\item An \textbf{interface} is a named collection of method signatures.
+\item An \textbf{interface} is a named collection of method signatures and/or interface instances.
 Modules can declare
 multiple \textbf{interfaces}, giving each interface an explicit name,
 giving flexibility in coupling with other modules.
@@ -114,6 +114,7 @@ guaranteed to be isolated.  For conflicts, a fair schedule is generated.
 \begin{itemize}
 \item Safety. A safety property asserts that nothing "bad" happens throughout execution
 \begin{itemize}
+\setlength\itemsep{-0.5em}
 \item Refinement checking
 \item Invariant:  Basis.  Inductive step.
 \item Deadlock freedom
@@ -121,6 +122,7 @@ guaranteed to be isolated.  For conflicts, a fair schedule is generated.
 \end{itemize}
 \item Liveness. A liveness property asserts that something "good" eventually does happen.
 \begin{itemize}
+\setlength\itemsep{-0.5em}
 \item Termination
 \item Response
 \item Request-response properties
