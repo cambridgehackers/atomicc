@@ -10,7 +10,7 @@ code blocks that have at most
 one enabled assignment to any state element.
 This form is called \textit{static single assignment} form,
 or SSA form\cite{Alpern:1988}.
-In the eventual runtime execution, these assignments are
+In runtime execution, these assignments are
 all made in a single clock cycle, when the rule or method
 is enabled.
 
@@ -25,7 +25,7 @@ Examples include:
 \item Non-constant bound "for" statements.  
 \item "do", "while" statements
 \item Usages of "goto" that result in a cyclic directed graph of execution blocks
-\item Method and function calls that are not inlinable at compilation time (for example, recursion is prohibited)
+\item Local method and function calls that are not inlinable at compilation time (for example, recursion is prohibited)
 \end{itemize}
 
 
@@ -38,10 +38,9 @@ is satisfied, then it is ready to fire.
 Module behaviorial statements are encapsulated into transactions (\textbf{rules})
 following ACID semantics
 \cite{NikhilSemantics,GrayR93};
-all rules executed during a given clock cycle are
+all rules concurrently executed during a given clock cycle are
 \textit{sequentially consistent} (SC) \cite{Lamport:1979:MMC:1311099.1311750},
-guaranteeing each rule executes
-independently of any other rules executing at the same time
+guaranteeing each rule's execution is isolated
 \cite[Sec.~7.1]{GrayR93}.
 
 \begin{bnf}
