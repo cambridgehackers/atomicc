@@ -20,9 +20,9 @@ dominate product development costs.
 How can we make the development of 
 \textit{verified} designs more efficient and predictable?
 
-The key to efficent production of designs is the ability to guarantee
+The key to production of correct designs is the ability to guarantee
 safety (nothing "bad" happens throughout execution)
-and liveness (something "good" eventually does happen).
+and liveness (something "good" eventually does happen) of the design.
 If we can guarantee each of these aspects at compile-time,
 we significantly reduce the dependency on runtime verification.
 
@@ -30,27 +30,16 @@ we significantly reduce the dependency on runtime verification.
 
 To reduce verification costs, we propose:
 \begin{itemize}
-\item Compiler guarantees program runtime safety and (where possible) liveness
-\begin{itemize}
-\item Through HDL structuring, guarantee the absence of dynamic concurrency interleaving errors in generated Verilog.
-\item When rules conflict, the compiler synthesizes fair arbitration, guaranteeing liveness between rules.
-\item To guarantee liveness of user code, assert statements must be written by the user.
-When possible the compiler attempts to verify them with model checking or proof tools.
-Since designing effective assert statements can be quite difficult, a standardized runtime
-is provided to allow access to assertion failures at runtime in synthesized logic as well
-as providing access to program trace information.
-\end{itemize}
-\item Reuse modules without reverification.  Amortize module costs through reuse.
+\item Module reuse without reverification.
 \begin{itemize}
 \item A single Verilog module is generated for each defined AtomicC module.
 The generated Verilog is highly readable, giving designers confidence that
 intended operations are correctly realized.
 \item Module schedules calculated using only local information and are independent of module usage context.
 \item Parameterized generated code: propagation of module parameterization from
-source through to generated Verilog allows reuse without generation for each parameter instance.
-\item Source modules are independently compiled to re-usable Verilog modules.
-\item Stable generated Verilog: "local AtomicC source code changes (generally) should only cause local changes to generated Verilog".
-This minimizes the reverification effort for ECOs.
+source through to generated Verilog allows reuse without regeneration for each parameter instance.
+\item Stable generated Verilog: To minimize the reverification effort for ECOs,
+"local AtomicC source code changes (generally) should only cause local changes to generated Verilog".
 
 In hardware design, the design phase is followed by significant validation effort
 to ensure manufacturability.  Since the number of system parameters is
@@ -58,8 +47,19 @@ large, there is an extreme need to keep all unrelated areas of a design constant
 when implementing engineering change orders to fix problems descovered
 in the manufacturing process.
 By modular generation of Verilog code and by enforced runtime isolation
-of modules, ECOs are independant.
+of modules, ECOs are independent.
 
+\end{itemize}
+
+\item Compiler guarantees program runtime safety and (where possible) liveness
+\begin{itemize}
+\item Through HDL structuring, guarantee the absence of dynamic concurrency interleaving errors in generated Verilog.
+\item When rules conflict, the compiler synthesizes fair arbitration, guaranteeing liveness between rules.
+\item To guarantee liveness of user code, assert statements must be written by the user.
+When possible, the compiler attempts to verify them with model checking or proof tools.
+Since designing effective assert statements can be difficult, a standardized runtime
+is provided allowing access to assertion failures in synthesized logic as well
+as providing access to program trace information.
 \end{itemize}
 
 \item Standardized debug runtime
@@ -121,6 +121,8 @@ in a Sequentially Consistent (SC) manner: concurrent execution of transactions i
 guaranteed to be isolated.  For conflicts, a fair schedule is generated.
 
 \item PSA support for assertions: assert, assume, restrict, cover.
+Assertions can be either state-based (causal dependency between events) or
+property-based (global).
 \begin{itemize}
 \item Safety. A safety property asserts that nothing "bad" happens throughout execution
 \begin{itemize}
@@ -160,11 +162,6 @@ Need to have a way to support sequencing of operations
 
 For NOC: allocate NOC like clock tree, after physical placement known.  Can do 
 method calls across NOC using credit.
-
-\begin{itemize}
-\item state-based: causal dependency between events
-\item property-based: global
-\end{itemize}
 
 Physical partitioning is used to separate design into separately synthesized pieces, connected using
 "long distance" signalling.  Parallel synthesis; bitstreams combined.

@@ -1,0 +1,48 @@
+%!TEX root = std.tex
+\rSec0[atomicc.modcomp]{Compilation}
+
+AtomicC execution consists of the following phases:
+\begin{itemize}
+\item \textit{compilation}
+\begin{itemize}
+\item {Parsing,semantic checks},
+\item {Static elaboration},
+
+During \textit{static elaboration},
+constructors are executed for statically declared data elements,
+allowing allocation of new instances of modules and parameterized rule creation.
+Any C++ constructs may be used, but
+the resulting netlist must only contain synthesizeable components.
+
+from Newton: 
+Static elaboration does not change the semantics (types, evaluation rules) of the
+Regiment language, it merely opportunistically pushes evaluation forward into compile time.
+
+We need the ability to create state elements programmatically, improving
+efficiency of the design creation process.
+\item {Translation to an intermediate representation (IR)},
+\item {Verilog netlist generation from the IR},
+\end{itemize}
+\item \textit{Linking}: Modules across the project are incrementally compiled
+and unit tested.  As modules are reused in varying contexts, it is necessary
+to validate if restrictions need to be added for concurrent calls to conflicting
+methods in the module interface.
+This checking is done by a \textit{linker},  ensuring that rule/method access
+across a set of Verilog output is free of inter-module schedule conflicts,
+\item \textit{Logic synthesis, physical backend processing}.  This is performed
+with existing backend tool flows
+\item \textit{Formal verification} using the Coq Proof Assistant, etc.
+\item \textit{Verification}: performed using existing backend tooling,
+\item \textit{Hardware execution}.
+\end{itemize}
+
+\begin{itemize}
+\item generate Verilog
+\item synthesize logic, get size
+\item pack blocks with sizes
+\item P \& R
+\end{itemize}
+
+\rSec1[atomicc.linker]{Linking of groups of modules}
+
+To verify that an instantiated group of modules has SC compliant execution characteristics, a linker is used to cross check information from the metadata files for each module.

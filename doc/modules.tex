@@ -48,7 +48,7 @@ other scheduled elements) are generated into a metadata file, allowing
 schedule consistency checks between modules to be verified by the linker.
 
 The design is separated into modules that can export and import interfaces to other modules.
-Each source language module compiles into a single verilog module.  Modules are independantly
+Each source language module compiles into a single verilog module.  Modules are independently
 compiled, depending only on the interface definitions for referenced modules.
 Referencing modules do not depend on the internal implementation of referenced modules,
 even if they textually exist in the same compilation unit.
@@ -130,6 +130,12 @@ guards on methods invoked within the rule are also true.
              ...
          }
 \end{codeblock}
+
+\rSec1[atomicc.poly]{Parametric Polymorphism}
+The generated verilog can be parameterized by datatype bitsizes and array lengths.
+To allow code generation independent of sizes,
+source 'for' statements are translated into
+Verilog generate 'for' loops.
 
 \rSec1[atomicc.connect]{Connecting exported interfaces to imported references}
 The __connect statement allows exported interface declarations to be connected
