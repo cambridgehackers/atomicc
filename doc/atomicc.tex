@@ -20,12 +20,6 @@ dominate product development costs.
 How can we make the development of 
 \textit{verified} designs more efficient and predictable?
 
-The key to production of correct designs is the ability to guarantee
-safety (nothing "bad" happens throughout execution)
-and liveness (something "good" eventually does happen) of the design.
-If we can guarantee each of these aspects at compile-time,
-we significantly reduce the dependency on runtime verification.
-
 \rSec1[atomicc.approach]{Approach}
 
 To reduce verification costs, we propose:
@@ -51,22 +45,27 @@ of modules, ECOs are independent.
 
 \end{itemize}
 
-\item Compiler guarantees program runtime safety and (where possible) liveness
+\item Compiler guarantees program runtime safety
 \begin{itemize}
 \item Through HDL structuring, guarantee the absence of dynamic concurrency interleaving errors in generated Verilog.
 \item When rules conflict, the compiler synthesizes fair arbitration, guaranteeing liveness between rules.
-\item To guarantee liveness of user code, assert statements must be written by the user.
+\end{itemize}
+
+\item Assert statements used to specify invariants and liveness.
 When possible, the compiler attempts to verify them with model checking or proof tools.
 Since designing effective assert statements can be difficult, a standardized runtime
 is provided allowing access to assertion failures in synthesized logic as well
 as providing access to program trace information.
-\end{itemize}
+
+By guaranteeing
+safety (nothing "bad" happens throughout execution)
+and liveness (something "good" eventually does happen) of the design at compile time.
+we significantly reduce the dependency on runtime verification.
 
 \item Standardized debug runtime
 \begin{itemize}
-\item Display and trace runtime support is provided, easing unit testing
+\item Display, trace and "assert" runtime support is provided, easing unit testing
 as modules are created.
-\item When not possible to statically verify asserts, a standard runtime exists for reporting errors.
 \item hardware/software interactions are facilitated by a NOC DMA to processor memory,
 smoothing interactions between high clock speed/narrow thread software and low clock
 speed/wide thread hardware.
@@ -79,7 +78,7 @@ speed/wide thread hardware.
 \end{itemize}
 \end{itemize}
 
-\rSec1[atomicc.language]{AtomicC Overview}
+\rSec1[atomicc.language]{AtomicC Language Overview}
 
 AtomicC is a timed, structural hardware description language for
 the high level specification of algorithms to be instantiated
@@ -124,7 +123,7 @@ guaranteed to be isolated.  For conflicts, a fair schedule is generated.
 Assertions can be either state-based (causal dependency between events) or
 property-based (global).
 \begin{itemize}
-\item Safety. A safety property asserts that nothing "bad" happens throughout execution
+\item Safety.
 \begin{itemize}
 \setlength\itemsep{-0.5em}
 \item Refinement checking
@@ -132,7 +131,7 @@ property-based (global).
 \item Deadlock freedom
 \item Reachability
 \end{itemize}
-\item Liveness. A liveness property asserts that something "good" eventually does happen.
+\item Liveness.
 \begin{itemize}
 \setlength\itemsep{-0.5em}
 \item Termination
