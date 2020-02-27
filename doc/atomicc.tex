@@ -20,6 +20,18 @@ dominate product development costs.
 How can we make the development of 
 \textit{verified} designs more efficient and predictable?
 
+An ideal toolchain would contain enough checking
+that error-free compilation would guarantee correct runtime execution.
+Additionally, to make overall development costs scale efficently (proportional
+to length of new code, independent of complexity of reused modules), we need a
+toolchain that guarantees correct operation is preserved
+for pre-tested, reused modules.
+
+Current practice is quite far from this ideal;
+this work describes an development methodology allowing
+us to incrementally approach this goal, gaining experience and intuition
+as we proceed.
+
 \rSec1[atomicc.approach]{Approach}
 
 To reduce verification costs, we propose:
