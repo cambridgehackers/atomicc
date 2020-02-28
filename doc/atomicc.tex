@@ -21,14 +21,17 @@ How can we make the development of
 \textit{verified} designs more efficient and predictable?
 
 An ideal toolchain would contain enough checking
-that error-free compilation would guarantee correct runtime execution.
+that error-free compilation would guarantee correct runtime execution
+(well-formed programs are well-behaved when executed).
 Additionally, to make overall development costs scale efficently (proportional
 to length of new code, independent of complexity of reused modules), we need a
 toolchain that guarantees correct operation is preserved
 for pre-tested, reused modules.
 
-Current practice is quite far from this ideal;
-this work describes an development methodology allowing
+Current practice is quite far from this ideal and learning to apply
+theorem provers to hardware designs can be confusing, difficult and
+often not complete enough to handle the design complexity.
+This work describes an development methodology allowing
 us to incrementally approach this goal, gaining experience and intuition
 as we proceed.
 
@@ -131,7 +134,7 @@ invocation conditions, it can guarantee that the generated code always executes
 in a Sequentially Consistent (SC) manner: concurrent execution of transactions is
 guaranteed to be isolated.  For conflicts, a fair schedule is generated.
 
-\item PSA support for assertions: assert, assume, restrict, cover.
+\item PSL \cite{PSL} support for assertions: assert, assume, restrict, cover.
 Assertions can be either state-based (causal dependency between events) or
 property-based (global).
 \begin{itemize}
