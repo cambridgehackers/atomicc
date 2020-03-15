@@ -152,6 +152,7 @@ typedef struct {
     std::string isParameter; // used for verilog interfaces (initial value)
     bool        isShared;    // used for __shared (common CSE) support
     bool        isLocalInterface; // interface declaration that is used to connect to local objects (does not appear in module signature)
+    bool        isExternal;  // used for non-heirarchical references
 } FieldElement;
 
 typedef struct ModuleIR {

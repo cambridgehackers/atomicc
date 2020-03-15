@@ -324,13 +324,14 @@ interface, isStruct, isSerialize, ext);
                 bool        isInout = checkItem("/inout");
                 bool        isParameter = checkItem("/parameter");
                 bool        isShared = checkItem("/shared");
+                bool        isExternal = checkItem("/external");
                 if (checkItem("/Count")) {
                     vecCount = tree2str(getExpression(' '));
                     IR->genvarCount = 1;
                 }
                 std::string type = getType();
                 std::string fldName = getToken();
-                IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter ? " " : "", isShared, false});
+                IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter ? " " : "", isShared, false, isExternal});
             }
             else if (checkItem("PARAMS")) {
                 std::string fldName = getToken();
@@ -346,7 +347,7 @@ interface, isStruct, isSerialize, ext);
                 std::string fldName = getToken();
                 if (fldName == "_")
                     fldName = "";
-                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, ""/*not param*/, false, false});
+                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, ""/*not param*/, false, false, false});
             }
             else if (checkItem("METHOD")) {
                 bool rule = false, action = false;

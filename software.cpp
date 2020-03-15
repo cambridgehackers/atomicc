@@ -119,7 +119,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         std::string muxName = "mux";
         std::string muxTypeName = "MuxPipe";
         std::string pipeName = "PipeIn";
-        IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false});
+        IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false, false});
         if (hasPrintf) {
 #if 0
             ModuleIR *muxDef = lookupIR(muxTypeName);
@@ -130,9 +130,9 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
                 muxDef = allocIR(muxTypeName);
                 muxDef->isInterface = false;
                 irSeq.push_back(muxDef);
-                muxDef->interfaces.push_back(FieldElement{"in", "", pipeName, false, false, false, false, ""/*not param*/, false, false});
-                muxDef->interfaces.push_back(FieldElement{"forward", "", pipeName, false, false, false, false, ""/*not param*/, false, false});
-                muxDef->interfaces.push_back(FieldElement{"out", "", pipeName, true, false, false, false, ""/*not param*/, false, false});
+                muxDef->interfaces.push_back(FieldElement{"in", "", pipeName, false, false, false, false, ""/*not param*/, false, false, false});
+                muxDef->interfaces.push_back(FieldElement{"forward", "", pipeName, false, false, false, false, ""/*not param*/, false, false, false});
+                muxDef->interfaces.push_back(FieldElement{"out", "", pipeName, true, false, false, false, ""/*not param*/, false, false, false});
                 auto makeEnq = [&](std::string methodName) -> void {
                     MethodInfo *MI = allocMethod(methodName);
                     addMethod(muxDef, MI);
@@ -152,7 +152,7 @@ printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
 dumpModule("MUX", muxDef);
             }
 #endif
-            IR->fields.push_back(FieldElement{muxName, "", muxTypeName, false, false, false, false, ""/*not param*/, false, false});
+            IR->fields.push_back(FieldElement{muxName, "", muxTypeName, false, false, false, false, ""/*not param*/, false, false, false});
         }
         localName += MODULE_SEPARATOR;
         muxName += MODULE_SEPARATOR;
@@ -167,10 +167,10 @@ dumpModule("MUX", muxDef);
             fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             ModuleIR *ifcIR = allocIR(fieldName);
             ifcIR->isInterface = false;
-            ifcIR->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false});
-            ifcIR->interfaces.push_back(FieldElement{"pipe", "", pName, outcall, false, false, false, ""/*not param*/, false, false});
-            IR->fields.push_back(FieldElement{fieldName, "", ifcIR->name, false, false, false, false, ""/*not param*/, false, false});
-            IR->interfaces.push_back(FieldElement{userInterface, "", pName, outcall, false, false, false, ""/*not param*/, false, false});
+            ifcIR->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
+            ifcIR->interfaces.push_back(FieldElement{"pipe", "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
+            IR->fields.push_back(FieldElement{fieldName, "", ifcIR->name, false, false, false, false, ""/*not param*/, false, false, false});
+            IR->interfaces.push_back(FieldElement{userInterface, "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 allocExpr(localName + userInterface),
                 allocExpr(fieldName + MODULE_SEPARATOR + "method"), userTypeName, true});
@@ -191,7 +191,7 @@ dumpModule("MUX", muxDef);
         }
         if (!hasIndication) {
             IR->interfaces.push_back(FieldElement{"indication", "", "PipeInH",
-                true/*outcall*/, false, false, false, ""/*not param*/, false, false});
+                true/*outcall*/, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
                 allocExpr(fieldName + MODULE_SEPARATOR + "returnInd"), "PipeInH", true});
         }
