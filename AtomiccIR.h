@@ -172,5 +172,7 @@ typedef struct ModuleIR {
     bool                              isStruct;
     bool                              isSerialize;
     bool                              transformGeneric;
+    std::string                       interfaceVecCount;
+    std::string                       interfaceName;
 } ModuleIR;
 #endif /* __ATOMICIR_H__ */

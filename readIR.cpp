@@ -296,7 +296,10 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
         if (trace_readIR)
             printf("[%s:%d] MODULE %s ifc %d struct %d ser %d ext %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), 
 interface, isStruct, isSerialize, ext);
-        ParseCheck(checkItem("{"), "Module '{' missing");
+        if (!checkItem("{")) {
+            IR->interfaceName = getToken();
+            ParseCheck(checkItem("{"), "Module '{' missing");
+        }
         while (readLine() && !checkItem("}")) {
             if (checkItem("SOFTWARE")) {
                 IR->softwareName.push_back(getToken());
@@ -372,7 +375,7 @@ interface, isStruct, isSerialize, ext);
                 ParseCheck(false, "unknown module item");
         }
         if (trace_readIR)
-            printf("[%s:%d] finishmoduleIR %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
+            dumpModule("finishread", IR);
     }
     if (trace_readIR)
         printf("[%s:%d] after readmoduleIR\n", __FUNCTION__, __LINE__);

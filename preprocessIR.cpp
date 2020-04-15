@@ -203,6 +203,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
 {
     IR->transformGeneric = true;
     ModuleIR *genericIR = allocIR(irName, isInterface);
+    genericIR->interfaceName = IR->interfaceName;
     genericIR->genvarCount = IR->genvarCount;
     genericIR->metaList = IR->metaList;
     genericIR->softwareName = IR->softwareName;

@@ -29,7 +29,8 @@ int trace_software;//= 1;
 static void processSerialize(ModuleIR *IR)
 {
     std::string prefix = "__" + IR->name + "_";
-    auto inter = IR->interfaces.front();
+    ModuleIR *implements = lookupInterface(IR->interfaceName);
+    auto inter = implements->interfaces.front();
     if (trace_software)
 printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     ModuleIR *IIR = lookupInterface(inter.type);
@@ -66,7 +67,9 @@ static void processM2P(ModuleIR *IR)
     ModuleIR *HIR = nullptr;
     std::string host, target;
     std::string pipeArgSize = "-1";
-    for (auto inter: IR->interfaces) {
+    ModuleIR *implements = lookupInterface(IR->interfaceName);
+    //dumpModule("PROCESSM2P", IR);
+    for (auto inter: implements->interfaces) {
         if (inter.isPtr) {
             target = inter.fldName;
             if (trace_software)
@@ -78,12 +81,15 @@ static void processM2P(ModuleIR *IR)
             std::string iname = inter.type;
             IR->name = "___M2P" + iname;
             std::string type = iname + "__Data";
+            std::string interfaceName = type + "___IFC";
             ModuleIR *II = lookupIR(type);
             if (!II) {
                 II = allocIR(type);
+                II->interfaceName = interfaceName;
                 II->isInterface = false;
                 II->isSerialize = true;
-                II->interfaces.push_back(FieldElement{"ifc", "", inter.type, false, false, false, false, ""/*not param*/, false, false, false});
+                ModuleIR *IIifc = allocIR(interfaceName, true);
+                IIifc->interfaces.push_back(FieldElement{"ifc", "", inter.type, false, false, false, false, ""/*not param*/, false, false, false});
             }
     if (trace_software)
 printf("[%s:%d] IIIIIIIIIII iname %s IRNAME %s type %s\n", __FUNCTION__, __LINE__, iname.c_str(), IR->name.c_str(), type.c_str());
@@ -133,7 +139,8 @@ static void processP2M(ModuleIR *IR)
     ModuleIR *IIR = nullptr, *HIR = nullptr;
     std::string host, target;
     bool addedReturnInd = false;
-    for (auto inter: IR->interfaces) {
+    ModuleIR *implements = lookupInterface(IR->interfaceName);
+    for (auto inter: implements->interfaces) {
         if (inter.isPtr) {
             IIR = lookupInterface(inter.type);
             target = inter.fldName;

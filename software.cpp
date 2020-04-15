@@ -87,8 +87,13 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
 {
     FILE *OStrJ = nullptr;
     for (auto IR: irSeq) {
-        for (auto interfaceName: IR->softwareName) {
-            for (auto iitem: IR->interfaces) {
+        ModuleIR *implements = lookupInterface(IR->interfaceName);
+        if (!implements) {
+printf("[%s:%d] interface defintion error: %s\n", __FUNCTION__, __LINE__, IR->interfaceName.c_str());
+dumpModule("SOFT", IR);
+        }
+        for (auto interfaceName: implements->softwareName) {
+            for (auto iitem: implements->interfaces) {
                 if (iitem.fldName == interfaceName) {
                     ModuleIR *inter = lookupInterface(iitem.type);
                     softwareNameList[CBEMangle(inter->name)] = SoftwareItem{iitem, IR, inter};
@@ -100,13 +105,16 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         int counter = 5;
         std::string enumList, sep;
         ModuleIR *IR = allocIR("l_top");
+        IR->interfaceName = "l_top___IFC";
+        ModuleIR *IRifc = allocIR(IR->interfaceName, true);
         IR->isInterface = false;
         irSeq.push_back(IR);
         std::string dutType;
         bool hasPrintf = false;
         for (auto item: softwareNameList) {
+            ModuleIR *implements = lookupInterface(item.second.IR->interfaceName);
             dutType = item.second.IR->name;
-            for (auto iitem: item.second.IR->interfaces)
+            for (auto iitem: implements->interfaces)
                 if (iitem.fldName == "printfp")
                     hasPrintf = true;
             std::string name = "IfcNames_" + item.first + (item.second.field.isPtr ? "H2S" : "S2H");
@@ -159,18 +167,22 @@ dumpModule("MUX", muxDef);
         bool hasIndication = false;
         std::string fieldName;
         for (auto item: softwareNameList) {
+            ModuleIR *implements = lookupInterface(item.second.IR->interfaceName);
             jsonGenerate(OStrJ, item.first, item.second);
             bool outcall = item.second.field.isPtr;
             std::string userTypeName = item.second.inter->name;
             std::string userInterface = item.second.field.fldName;
             std::string pName = pipeName + (outcall ? "H" : "");
             fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
+            std::string interfaceName = fieldName + "___IFC";
             ModuleIR *ifcIR = allocIR(fieldName);
+            ifcIR->interfaceName = interfaceName;
             ifcIR->isInterface = false;
-            ifcIR->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
-            ifcIR->interfaces.push_back(FieldElement{"pipe", "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
+            ModuleIR *ifcIRinterface = allocIR(interfaceName, true);
+            ifcIRinterface->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
+            ifcIRinterface->interfaces.push_back(FieldElement{"pipe", "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
             IR->fields.push_back(FieldElement{fieldName, "", ifcIR->name, false, false, false, false, ""/*not param*/, false, false, false});
-            IR->interfaces.push_back(FieldElement{userInterface, "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
+            IRifc->interfaces.push_back(FieldElement{userInterface, "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 allocExpr(localName + userInterface),
                 allocExpr(fieldName + MODULE_SEPARATOR + "method"), userTypeName, true});
@@ -190,7 +202,7 @@ dumpModule("MUX", muxDef);
             //dumpModule("SWIFC", ifcIR);
         }
         if (!hasIndication) {
-            IR->interfaces.push_back(FieldElement{"indication", "", "PipeInH",
+            IRifc->interfaces.push_back(FieldElement{"indication", "", "PipeInH",
                 true/*outcall*/, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
                 allocExpr(fieldName + MODULE_SEPARATOR + "returnInd"), "PipeInH", true});
