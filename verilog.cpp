@@ -192,18 +192,18 @@ typedef struct {
 } PinInfo;
 std::list<PinInfo> pinPorts, pinMethods, paramPorts;
 
-static void collectInterfacePinsLocal(ModuleIR *IIR, FieldElement &item, std::string interfaceName, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, MapNameValue &mapValue)
+static void collectInterfacePinsLocal(ModuleIR *IIR, std::string vecCount, std::string interfaceName, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, MapNameValue &mapValue, bool isPtr, std::string aitem_fldName)
 {
     for (auto MI: IIR->methods) {
         std::string name = methodPrefix + interfaceName + MI->name;
-        bool out = instance ^ item.isPtr;
+        bool out = instance ^ isPtr;
         std::list<ParamElement> params;
         for (auto pitem: MI->params)
             params.push_back(ParamElement{pitem.name, instantiateType(pitem.type, mapValue), pitem.init});
-        pinMethods.push_back(PinInfo{instantiateType(MI->type, mapValue), name, out, false, isLocal || item.isLocalInterface, params, ""/*not param*/, MI->action, item.vecCount});
+        pinMethods.push_back(PinInfo{instantiateType(MI->type, mapValue), name, out, false, isLocal, params, ""/*not param*/, MI->action, vecCount});
     }
     for (auto fld: IIR->fields) {
-        std::string name = pinPrefix + item.fldName + fld.fldName;
+        std::string name = pinPrefix + fld.fldName;
         std::string ftype = instantiateType(fld.type, mapValue);
         bool out = instance ^ fld.isOutput;
         if (fld.isParameter != "") {
@@ -217,16 +217,19 @@ static void collectInterfacePinsLocal(ModuleIR *IIR, FieldElement &item, std::st
                 else if (startswith(ftype, "Bit("))
                     init = "0";
             }
-            paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : ftype, name, out, fld.isInout, isLocal || item.isLocalInterface, {}, init, false, item.vecCount});
+            paramPorts.push_back(PinInfo{fld.isPtr ? "POINTER" : ftype, name, out, fld.isInout, isLocal, {}, init, false, vecCount});
         }
-        else
-            pinPorts.push_back(PinInfo{ftype, name, out, fld.isInout, isLocal || item.isLocalInterface, {}, ""/*not param*/, false, item.vecCount});
+        else {
+            //printf("[%s:%d] name %s type %s local %d\n", __FUNCTION__, __LINE__, name.c_str(), ftype.c_str(), isLocal);
+            pinPorts.push_back(PinInfo{ftype, name, out, fld.isInout, isLocal, {}, ""/*not param*/, false, vecCount});
+        }
     }
 }
 
-static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap)
+static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr)
 {
     assert(IR);
+    collectInterfacePinsLocal(IR, "", "", instance, pinPrefix, methodPrefix, isLocal, parentMap, parentMap, isPtr, "");
     for (FieldElement item : IR->interfaces) {
         MapNameValue mapValue = parentMap;
         extractParam(item.type, mapValue);
@@ -238,10 +241,9 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         }
         if (interfaceName != "")
             interfaceName += MODULE_SEPARATOR;
-        collectInterfacePinsLocal(IIR, item, interfaceName, instance, pinPrefix, methodPrefix, isLocal, parentMap, mapValue);
-printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
+//printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
-            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue);
+            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, item.isPtr);
     }
 }
 
@@ -296,9 +298,7 @@ exit(-1);
     pinMethods.clear();
     paramPorts.clear();
     ModuleIR *implements = lookupInterface(IR->interfaceName);
-//printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
-//dumpModule("PIN", IR);
-    collectInterfacePins(implements, instance != "", "", "", false, mapValue);
+    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false);
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
         std::string genericMName = genericName(IR->name);
