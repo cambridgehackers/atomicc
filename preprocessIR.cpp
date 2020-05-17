@@ -201,9 +201,15 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
 
 static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface = false)
 {
+    std::string iName = IR->interfaceName;
+    int iind = iName.find("(");
+    if (iind > 0)
+        iName = iName.substr(0, iind);
+    if (!isInterface)
+        buildGeneric(lookupInterface(IR->interfaceName), iName, paramMap, true);
     IR->transformGeneric = true;
     ModuleIR *genericIR = allocIR(irName, isInterface);
-    genericIR->interfaceName = IR->interfaceName;
+    genericIR->interfaceName = iName;
     genericIR->genvarCount = IR->genvarCount;
     genericIR->metaList = IR->metaList;
     genericIR->softwareName = IR->softwareName;
@@ -464,6 +470,7 @@ skipLab:;
             parg = parg.substr(0, parg.length() - 1);
             std::string pname;
             std::list<PARAM_MAP> paramMap;
+//printf("[%s:%d]START %s\n", __FUNCTION__, __LINE__, irName.c_str());
             while (parg != "") {
                 int indVal = parg.find("=");
                 if (indVal <= 0)
@@ -484,7 +491,7 @@ skipLab:;
             genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM", true);
             paramIR->isInterface = true;
-            genericIR->interfaces.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
+            genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
             for (auto item: paramMap)
                 paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", false, false, false, false, item.value, false, false, false});
             //dumpModule("GENERIC", genericIR);

@@ -167,7 +167,6 @@ dumpModule("MUX", muxDef);
         bool hasIndication = false;
         std::string fieldName;
         for (auto item: softwareNameList) {
-            ModuleIR *implements = lookupInterface(item.second.IR->interfaceName);
             jsonGenerate(OStrJ, item.first, item.second);
             bool outcall = item.second.field.isPtr;
             std::string userTypeName = item.second.inter->name;

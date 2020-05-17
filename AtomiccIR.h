@@ -166,6 +166,7 @@ typedef struct ModuleIR {
     std::map<std::string, std::string> params;
     std::list<UnionItem>              unionList;
     std::list<FieldElement>           interfaces;
+    std::list<FieldElement>           parameters;
     std::list<InterfaceConnectType>   interfaceConnect;
     int                               genvarCount;
     bool                              isInterface;
