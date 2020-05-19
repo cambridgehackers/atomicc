@@ -36,6 +36,7 @@ std::map<std::string, std::map<std::string, ACCExpr *>> enableList, muxValueList
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 static void traceZero(const char *label)
 {
+    if (trace_assign)
     for (auto aitem: assignList) {
         std::string temp = aitem.first;
         int ind = temp.find('[');
@@ -68,7 +69,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         }
     }
     if (trace_assign)
-        printf("[%s:%d] start [%s/%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tree2str(value).c_str(), type.c_str());
+        printf("[%s:%d] start [%s/%d]count[%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin && generateSection == "") {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
 if (0)
@@ -102,7 +103,10 @@ if (0)
         }
         int ind = target.find('[');
         if (ind != -1) {
-            refList[target.substr(0,ind)].count++;
+            std::string name = target.substr(0,ind);
+            refList[name].count++;
+            if (trace_assign)
+                printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, name.c_str(), refList[name].count);
             assignList[target].noRecursion = true;
         }
     }
@@ -204,7 +208,7 @@ typedef struct {
 std::list<PinInfo> pinPorts, pinMethods, paramPorts;
 
 
-static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount)
+static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface)
 {
 //dumpModule("COLLECT", IR);
     assert(IR);
@@ -212,6 +216,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
     extractParam(IR->name, mapValue);
 //for (auto item: mapValue)
 //printf("[%s:%d] [%s] = %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
+    if (!localInterface || methodPrefix != "")
     for (auto MI: IR->methods) {
         std::string name = methodPrefix + MI->name;
         bool out = instance ^ isPtr;
@@ -220,6 +225,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
             params.push_back(ParamElement{pitem.name, instantiateType(pitem.type, mapValue), pitem.init});
         pinMethods.push_back(PinInfo{instantiateType(MI->type, mapValue), name, out, false, isLocal, params, ""/*not param*/, MI->action, vecCount});
     }
+    if (!localInterface || pinPrefix != "")
     for (auto fld: IR->fields) {
         std::string name = pinPrefix + fld.fldName;
         std::string ftype = instantiateType(fld.type, mapValue);
@@ -256,7 +262,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
             interfaceName += MODULE_SEPARATOR;
 //printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
-            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, item.isPtr, item.vecCount);
+            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, item.isPtr, item.vecCount, localInterface);
     }
 }
 
@@ -311,7 +317,9 @@ exit(-1);
     pinMethods.clear();
     paramPorts.clear();
     ModuleIR *implements = lookupInterface(IR->interfaceName);
-    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "");
+    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "", false);
+    if (instance == "")
+        collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true);
     for (FieldElement item : IR->parameters) {
         //extractParam(item.type, mapValue);
         std::string interfaceName = item.fldName;
@@ -324,7 +332,7 @@ exit(-1);
             interfaceName += MODULE_SEPARATOR;
 printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
         collectInterfacePins(IIR, instance != "", item.fldName,
-            interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount);
+            interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false);
     }
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
@@ -444,6 +452,8 @@ item = base;
         }
         }
         refList[item].count++;
+        if (trace_assign)
+            printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].count);
         ACCExpr *temp = assignList[item].value;
         if (temp && refList[item].count == 1)
             walkRef(temp);
@@ -455,8 +465,11 @@ item = base;
 static void decRef(std::string name)
 {
 //return;
-    if (refList[name].count > 0 && refList[name].pin != PIN_MODULE)
+    if (refList[name].count > 0 && refList[name].pin != PIN_MODULE) {
         refList[name].count--;
+        if (trace_assign)
+            printf("[%s:%d] dec count[%s]=%d\n", __FUNCTION__, __LINE__, name.c_str(), refList[name].count);
+    }
 }
 
 static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "")
@@ -573,6 +586,7 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
 
 static void setAssignRefCount(ModuleIR *IR)
 {
+    traceZero("SETASSIGNREF");
     for (auto item: assignList) {
         //assignList[item.first].noRecursion = true;
 //printf("[%s:%d] ref[%s].norec %d value %s\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion, tree2str(item.second.value).c_str());
@@ -634,8 +648,11 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
     }
 
     for (auto item: assignList)
-        if (item.second.value && refList[item.first].pin == PIN_OBJECT)
+        if (item.second.value && refList[item.first].pin == PIN_OBJECT) {
             refList[item.first].count++;
+            if (trace_assign)
+                printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, item.first.c_str(), refList[item.first].count);
+        }
 
     // Now extend 'was referenced' from assignList items actually referenced
     for (auto aitem: assignList) {
@@ -673,6 +690,8 @@ printf("[%s:%d]MMMMMMMAAAAAAAAAAAATTTTTTTCCCCCCCCHHHHHHHH %s\n", __FUNCTION__, _
             expr->value = item.first;
             expr->operands.clear();
             refList[item.first].count++;
+            if (trace_assign)
+                printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, item.first.c_str(), refList[item.first].count);
         }
     }
     for (auto item: expr->operands)
@@ -1042,16 +1061,22 @@ static std::list<ModData> modLine;
             MethodInfo *MIb = IR->generateBody[item.body];
             assert(MIb);
             for (auto pitem: MIb->params) {
-                if (refList[pitem.name].pin)
+                if (refList[pitem.name].pin) {
                     refList[pitem.name].count++;
+                    if (trace_assign)
+                        printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, pitem.name.c_str(), refList[pitem.name].count);
+                }
             }
         }
         for (auto item: MI->instantiateFor) {
             MethodInfo *MIb = IR->generateBody[item.body];
             assert(MIb);
             for (auto pitem: MIb->params) {
-                if (refList[pitem.name].pin)
+                if (refList[pitem.name].pin) {
                     refList[pitem.name].count++;
+                    if (trace_assign)
+                        printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, pitem.name.c_str(), refList[pitem.name].count);
+                }
             }
         }
         // lift guards from called method interfaces
@@ -1086,6 +1111,7 @@ static std::list<ModData> modLine;
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
     connectInterfaces(IR);
+    traceZero("AFTCONNECT");
     for (auto MI : IR->methods)
         if (MI->generateSection == "")
         generateMethod(IR, MI->name, MI, hasPrintf);
