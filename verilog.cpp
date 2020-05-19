@@ -34,6 +34,17 @@ std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
 std::map<std::string, std::map<std::string, ACCExpr *>> enableList, muxValueList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
+static void traceZero(const char *label)
+{
+    for (auto aitem: assignList) {
+        std::string temp = aitem.first;
+        int ind = temp.find('[');
+        if (ind != -1)
+            temp = temp.substr(0,ind);
+        if (aitem.second.value && refList[aitem.first].count == 0)
+            printf("[%s:%d] %s: ASSIGN %s = %s size %d count %d[%d] pin %d type %s\n", __FUNCTION__, __LINE__, label, aitem.first.c_str(), tree2str(aitem.second.value).c_str(), walkCount(aitem.second.value), refList[aitem.first].count, refList[temp].count, refList[temp].pin, refList[temp].type.c_str());
+    }
+}
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
@@ -772,12 +783,14 @@ static void connectInterfaces(ModuleIR *IR)
             target->value += fld.fldName;
             source->value += fld.fldName;
             std::string tstr = tree2str(target), sstr = tree2str(source);
-            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
+            if (trace_assign || trace_connect || (!refList[tstr].out && !refList[sstr].out))
                 printf("%s: IFCCCfield '%s'/%d '%s'/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+#if 0
             if (!IC.isForward) {
                 refList[tstr].out = 1;   // for local connections, don't bias for 'output'
                 refList[sstr].out = 0;
             }
+#endif
             if (refList[sstr].out)
                 setAssign(sstr, allocExpr(tstr), fld.type);
             else
