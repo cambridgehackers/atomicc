@@ -6,7 +6,7 @@ Command line switches...
 
 \rSec1[atomicc.printf]{debugging with printf}
 
-To aid debugging with a simulator, "printf" statements in __module declarations are
+To aid debugging with a simulator, "printf" statements in module declarations are
 translated to "\$display" statements in the generated verilog.
 For debugging with synthesized hardware, "printf" statements are translated into
 indication packets sent through the NOC back to the software side host program.
@@ -21,7 +21,7 @@ parameter to the printf.
 
 To use the NOC printf:
 \begin{itemize}
-\item add the following line to the __module being tested:
+\item add the following line to the module being tested:
 \begin{codeblock}
      __printf;
 \end{codeblock}

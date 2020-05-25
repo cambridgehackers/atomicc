@@ -18,9 +18,12 @@ interface with the hardware
 
 \begin{example}
 \begin{codeblock}
-     __module Echo {
+     class EchoIfc {
          __software EchoRequest      request;               // exported interface
          __software EchoIndication   *indication;           // imported interface
+     };
+
+     class Echo __implements EchoIfc {
          bool busy;
          __int(32) itemSay;
          ...
@@ -64,19 +67,17 @@ int main(int argc, const char **argv)
 
 \rSec1[atomicc.verilog]{Interfacing with legacy Verilog modules}
 
-To reference a module in verilog, fields can be declared in __interface items.
+To reference a module in verilog, fields can be declared in interface items.
 
 \begin{example}
 \begin{codeblock}
-     __interface CNCONNECTNET2 {
+     class CNCONNECTNET2 {
          __input  __int(1)         IN1;
          __input  __int(1)         IN2;
          __output __int(1)         OUT1;
          __output __int(1)         OUT2;
      };
-     __emodule CONNECTNET2 {
-         CNCONNECTNET2 _;
-     };
+     class CONNECTNET2 __implements CNCONNECTNET2;
 \end{codeblock}
 \end{example}
 
@@ -89,16 +90,14 @@ Verilog modules that have module instantiation parameters can also be declared/r
 
 \begin{example}
 \begin{codeblock}
-     __interface Mmcme2MMCME2_ADV {
+     class Mmcme2MMCME2_ADV {
          __parameter const char *  BANDWIDTH;
          __parameter float         CLKFBOUT_MULT_F;
          __input  __uint(1)        CLKFBIN;
          __output __uint(1)        CLKFBOUT;
          __output __uint(1)        CLKFBOUTB;
      };
-     __emodule MMCME2_ADV {
-         Mmcme2MMCME2_ADV _;
-     };
+     class MMCME2_ADV __implements Mmcme2MMCME2_ADV;
 \end{codeblock}
 \end{example}
 
@@ -106,14 +105,16 @@ This example can be instantiated as:
 
 \begin{example}
 \begin{codeblock}
-     __module Test {
+     class TestIfc {
+         void startTest(void);
+     };
+
+     class Test __implements TestIfc {
          ...
          MMCME2_ADV#(BANDWIDTH="WIDE",CLKFBOUT_MULT_F=1.0) mmcm;
          ...
-         Test() {
-            __rule initRule {
-                mmcm._.CLKFBIN = mmcm._.CLKFBOUT;
-            }
+         __rule initRule {
+             mmcm._.CLKFBIN = mmcm._.CLKFBOUT;
          }
      }
 \end{codeblock}
@@ -136,7 +137,7 @@ This example can be instantiated as:
 
 \begin{example}
 \begin{codeblock}
-     __interface <interfaceName> {
+     class <interfaceName> {
           __input __uint(1) executeMethod;
           __input __uint(16) methodArgument;
           __output __uint(1) methodReady;

@@ -5,8 +5,8 @@
 
 The basic building block of AtomicC is the module declaration, made of 3 parts:
 \begin{itemize}
-\item Instantiation of state elements used by the module,
 \item Interface declarations for interacting with other modules,
+\item Instantiation of state elements used by the module,
 \item Rules, which group assignment statements and method invocations into atomic transactions.
 \end{itemize}
 
@@ -32,7 +32,7 @@ execution pre-conditions are statisfied.
 
 \begin{example}
 \begin{codeblock}
-     __interface EchoRequest {
+     class EchoRequest {
          void say(__int(32) v);
          void say2(__int(16) a, __int(16) b);
      };
@@ -63,9 +63,11 @@ Exported interfaces can be used in several ways:
 
 \begin{example}
 \begin{codeblock}
-     __module Echo {
+     class EchoIfc {
          EchoRequest      request;               // exported interface (defined by this module)
          EchoIndication   *indication;           // imported interface (defined by the instantiator of this module)
+     };
+     class Echo __implements EchoIfc {
          bool busy;
          __int(32) itemSay;
          ...
@@ -81,21 +83,17 @@ Exported interfaces can be used in several ways:
 \end{codeblock}
 \end{example}
 
-To reference a module from a separate compilation unit, use "__emodule".  External
-module definitions need only specify the exported/imported interfaces.
-
+To reference a module from a separate compilation unit, use a class forward declaration:
 \begin{example}
 \begin{codeblock}
-     __emodule EchoResponder {
-         EchoIndication   indication;           // exported interface
-     };
+     class EchoResponder __implements EchoIndication;
 \end{codeblock}
 \end{example}
 
 \rSec1[atomicc.guard]{Guard clauses on module interface methods}
 
 \pnum
-Method definitions in __module declarations have the form:
+Method definitions in module declarations have the form:
 
 \begin{bnf}
 \nontermdef{atomicc-method-definition}\br
@@ -150,19 +148,21 @@ with imported interface references between objects within a module declaration.
 \begin{multicols}{2}
 AtomicC example
 \begin{codeblock}
-     __interface ExampleRequest {
+     class ExampleRequest {
          void say(__int(32) v);
      };
 
-     __module A {
-          ExampleRequest callIn;
-     };
-
-     __module B {
+     class ExampleRequestOut {
          ExampleRequest *callOut;
      };
 
-     __module C {
+     class A implements ExampleRequest;
+
+     class B implements ExampleRequestOut;
+
+     class NullIfc;
+
+     class C __implements NullIfc {
          A consumer;
          B producer;
          __connect producer.callOut = consumer.callIn;
@@ -200,19 +200,35 @@ type and just 'assigning' the local object's interface to it.
 
 \begin{example}
 \begin{codeblock}
-     __module CWrapper {
+     class CWrapper __implements ExampleRequest {
          A consumer;
-         ExampleRequest request = A.callIn;
+         __connect request = A.callIn;
+      };
+\end{codeblock}
+\end{example}
+
+\rSec1[atomicc.export]{Exporting interfaces to contained objects}
+
+In a design, there are times when the engineer wishes to declare an object locally,
+but that object needs a 'call out' interface.
+
+These interfaces can be defined within the containing module and exported to
+the contained module which uses the interface.
+
+\begin{example}
+\begin{codeblock}
+     class CWrapper __implements NullIfc {
+         A consumer;
+         EchoRequest localRequest __implements A.callIn;
+         void localRequest.say(__int(32) v) if(!busy) {
+             itemSay = v;
+             ...
+         }
+         void localRequest.saw(__int(16) a, __int(16) b) if(!busy) {
+             ...
+         }
       };
 \end{codeblock}
 \end{example}
 
 CWrapper just forwards the interface 'request' down into the instance 'consumer'.
-
-\rSec1[atomicc.classsyn]{Syntax extension to C++}
-\begin{bnf}
-\nontermdef{atomicc-class-key}\br
-    \terminal{__interface} \br
-    \terminal{__emodule} \br
-    \terminal{__module}
-\end{bnf}
