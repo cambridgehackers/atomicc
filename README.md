@@ -38,6 +38,10 @@ To build
     cd ../../cudd
     ./configure
     make
+    cd ../verilator
+    autoconf
+    ./configure
+    make -j10
     cd ../atomicc
     make
 
