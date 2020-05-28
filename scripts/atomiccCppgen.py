@@ -30,6 +30,13 @@ if __name__=='__main__':
     if (len(sys.argv) > 1):
         filename = sys.argv[1];
     jsondata = json.loads(open(filename).read())
+    # for examples/gray
+    jsondata['globaldecls'].append(
+        { "dtype": "TypeDef",
+            "tdtype": { "type": "Type", "name": "10", "params": [ {"name": "32"} ] },
+            "tname": "width"
+        }
+     )
     cppgen.generateJson = False
     cppgen.generatePacketOnly = True
     cppgen.synchronousInvoke = True
