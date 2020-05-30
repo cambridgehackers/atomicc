@@ -1052,6 +1052,9 @@ static std::list<ModData> modLine;
             }
         }
         for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
+            if (refList[item.first].pin) {
+                printf("[%s:%d] error in alloca name '%s' pin %d type '%s'\n", __FUNCTION__, __LINE__, item.first.c_str(), refList[item.first].pin, item.second.type.c_str());
+            }
             assert (!refList[item.first].pin);
             refList[item.first] = RefItem{0, item.second.type, true, false, PIN_WIRE, false, false, convertType(item.second.type, 2), false};
             expandStruct(IR, item.first, item.second.type, 1, false, false, PIN_WIRE, true, "", false);
