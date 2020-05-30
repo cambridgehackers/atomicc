@@ -327,6 +327,11 @@ bool checkInteger(ACCExpr *expr, std::string pattern)
     return expr && checkIntegerString(expr->value, pattern);
 }
 
+static bool plainInteger(std::string val)
+{
+    return val.length() > 0 && isdigit(val[0]) && val.find("'") == std::string::npos;
+}
+
 ACCExpr *invertExpr(ACCExpr *expr)
 {
     if (!expr)
@@ -424,7 +429,7 @@ void updateWidth(ACCExpr *expr, std::string clen)
         printf("[%s:%d] len %d ilen %d tree %s\n", __FUNCTION__, __LINE__, len, ilen, tree2str(expr).c_str());
         exit(-1);
     }
-    if (isdigit(expr->value[0]) && len > 0 && expr->value.find("'") == std::string::npos)
+    if (len > 0 && plainInteger(expr->value))
         expr->value = autostr(len) + "'d" + expr->value;
     else if (isIdChar(expr->value[0])) {
         if (trace_expr)
@@ -480,7 +485,7 @@ ACCExpr *dupExpr(ACCExpr *expr)
     return ext;
 }
 
-void walkReplaceBuiltin(ACCExpr *expr)
+static void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault)
 {
     while(1) {
     if (expr->value == "__reduce") {
@@ -529,7 +534,7 @@ void walkReplaceBuiltin(ACCExpr *expr)
                 if (checkInteger(getRHS(item), "0"))
                     continue;    // default value is already '0'
                 item->value = "?"; // Change from ':' -> '?'
-                item->operands.push_back(allocExpr("0"));
+                item->operands.push_back(allocExpr(phiDefault));
                 updateWidth(item, exprWidth(getRHS(item)));
                 newe->operands.push_back(item);
                 if (trace_expr)
@@ -543,7 +548,7 @@ void walkReplaceBuiltin(ACCExpr *expr)
         break;
     }
     for (auto item: expr->operands)
-        walkReplaceBuiltin(item);
+        walkReplaceBuiltin(item, "0");
 }
 
 ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
@@ -587,11 +592,33 @@ static int level;
     level--;
     return ret;
 }
-ACCExpr *cleanupExprBuiltin(ACCExpr *expr)
+
+ACCExpr *cleanupInteger(ACCExpr *expr)
+{
+    ACCExpr *ret = cleanupExpr(expr);
+    std::string op = ret->value;
+    int64_t total = op == "*" ? 1 : 0;
+    if (op == "+" || op == "*") {
+        for (auto item: ret->operands) {
+            if (!plainInteger(item->value))
+                return ret;
+            int64_t val = atoi(item->value.c_str());
+            if (op == "+")
+                total += val;
+            else if (op == "*")
+                total *= val;
+        }
+        ret->value = autostr(total);
+        ret->operands.clear();
+    }
+    return ret;
+}
+
+ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault)
 {
     if (!expr)
         return expr;
-    walkReplaceBuiltin(expr);
+    walkReplaceBuiltin(expr, phiDefault);
     return cleanupExpr(expr);
 }
 
@@ -684,7 +711,7 @@ ACCExpr *cleanupBool(ACCExpr *expr)
     if (!expr)
         return expr;
     inBool++; // can be invoked recursively!
-    walkReplaceBuiltin(expr);
+    walkReplaceBuiltin(expr, "0");
     inBool--;
     int varIndex = 0;
     VarMap varMap;

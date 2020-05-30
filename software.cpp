@@ -171,7 +171,7 @@ dumpModule("MUX", muxDef);
             bool outcall = item.second.field.isPtr;
             std::string userTypeName = item.second.inter->name;
             std::string userInterface = item.second.field.fldName;
-            std::string pName = pipeName + (outcall ? "H" : "");
+            std::string pName = pipeName;
             fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             std::string interfaceName = fieldName + "___IFC";
             ModuleIR *ifcIR = allocIR(fieldName);
@@ -201,10 +201,10 @@ dumpModule("MUX", muxDef);
             //dumpModule("SWIFC", ifcIR);
         }
         if (!hasIndication) {
-            IRifc->interfaces.push_back(FieldElement{"indication", "", "PipeInH",
+            IRifc->interfaces.push_back(FieldElement{"indication", "", "PipeIn",
                 true/*outcall*/, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
-                allocExpr(fieldName + MODULE_SEPARATOR + "returnInd"), "PipeInH", true});
+                allocExpr(fieldName + MODULE_SEPARATOR + "returnInd"), "PipeIn", true});
         }
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);

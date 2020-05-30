@@ -32,7 +32,11 @@ std::map<std::string, std::map<std::string, CondGroup>> condLines;
 
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
-std::map<std::string, std::map<std::string, ACCExpr *>> enableList, muxValueList; // used for 'generate' items
+typedef struct {
+    ACCExpr *phi;
+    std::string defaultValue;
+} MuxValueElement;
+std::map<std::string, std::map<std::string, MuxValueElement>> enableList, muxValueList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 static void traceZero(const char *label)
 {
@@ -858,12 +862,13 @@ static void connectInterfaces(ModuleIR *IR)
     }
 }
 
-void appendMux(std::string name, ACCExpr *cond, ACCExpr *value)
+void appendMux(std::string name, ACCExpr *cond, ACCExpr *value, std::string defaultValue)
 {
-    ACCExpr *phi = muxValueList[generateSection][name];
+    ACCExpr *phi = muxValueList[generateSection][name].phi;
     if (!phi) {
         phi = allocExpr("__phi", allocExpr("("));
-        muxValueList[generateSection][name] = phi;
+        muxValueList[generateSection][name].phi = phi;
+        muxValueList[generateSection][name].defaultValue = defaultValue;
     }
     phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
 }
@@ -886,7 +891,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
         std::string dest = info->dest->value;
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
             ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond));
-            appendMux(dest, cond, info->value);
+            appendMux(dest, cond, info->value, "0");
         }
         else
             appendLine(methodName, info->cond, info->dest, info->value);
@@ -902,15 +907,15 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
         getFieldList(fieldList, dest, "", info->type, 1, true);
         if (fieldList.size() == 1) {
             std::string first = fieldList.front().name;
-            appendMux(dest, cond, value);
+            appendMux(dest, cond, value, "0");
             if (first != dest)
-                appendMux(first, cond, value);
+                appendMux(first, cond, value, "0");
         }
         else {
         std::string splitItem = tree2str(value);
         if ((value->operands.size() || !isIdChar(value->value[0]))) {
             splitItem = dest + "$lettemp";
-            appendMux(splitItem, cond, value);
+            appendMux(splitItem, cond, value, "0");
         }
         for (auto fitem : fieldList) {
             std::string offset = autostr(fitem.offset);
@@ -918,7 +923,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI,
             if (offset != "0")
                 upper += " + " + offset;
             appendMux(fitem.name, cond,
-                allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))));
+                allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))), "0");
         }
         }
     }
@@ -948,9 +953,11 @@ dumpExpr("READCALL", value);
             appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"));
             break;
         }
-        if (!enableList[generateSection][calledEna])
-            enableList[generateSection][calledEna] = allocExpr("|");
-        enableList[generateSection][calledEna]->operands.push_back(tempCond);
+        if (!enableList[generateSection][calledEna].phi) {
+            enableList[generateSection][calledEna].phi = allocExpr("|");
+            enableList[generateSection][calledEna].defaultValue = "1'd0";
+        }
+        enableList[generateSection][calledEna].phi->operands.push_back(tempCond);
         MethodInfo *CI = lookupQualName(IR, calledName);
         if (!CI) {
             printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
@@ -962,7 +969,8 @@ dumpExpr("READCALL", value);
         ACCExpr *param = value->operands.front();
         for (auto item: param->operands) {
             if(argCount-- > 0) {
-                appendMux(pname + AI->name, tempCond, item);
+                std::string size = tree2str(cleanupInteger(cleanupExpr(str2tree(convertType(AI->type)))));
+                appendMux(pname + AI->name, tempCond, item, size + "'d0");
                 AI++;
             }
         }
@@ -1139,14 +1147,14 @@ static std::list<ModData> modLine;
     for (auto top: muxValueList) {
         generateSection = top.first;
         for (auto item: top.second) {
-        setAssign(item.first, cleanupExprBuiltin(item.second), refList[item.first].type);
+        setAssign(item.first, cleanupExprBuiltin(item.second.phi, item.second.defaultValue), refList[item.first].type);
         assignList[item.first].noRecursion = true;
         }
     }
     for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY
         generateSection = top.first;
         for (auto item: top.second) {
-        setAssign(item.first, replaceAssign(simpleReplace(item.second), getRdyName(item.first)), "Bit(1)");
+        setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first)), "Bit(1)");
         }
     }
     generateSection = "";

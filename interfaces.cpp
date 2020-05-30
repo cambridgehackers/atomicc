@@ -126,8 +126,8 @@ assert(HIR);
             //call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
         MInew->callList.push_back(new CallListElement{
              allocExpr(target + "$enq__ENA", allocExpr(PARAMETER_MARKER,
-                 allocExpr("{ " + call + "16'd" + autostr(counter) + ", 16'd" + autostr(PORTALNUM) + "}"),
-                 allocExpr("16'd" + autostr(dataLength/32)))), nullptr, true});
+                 allocExpr("{ " + call + "16'd" + autostr(counter) + ", 16'd" + autostr(PORTALNUM)
+                       + ", 16'd" + autostr(dataLength/32) + "}"))), nullptr, true});
         counter++;
     }
     if (trace_software)
@@ -179,7 +179,7 @@ printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEP
 assert(MInew);
     int counter = 0;  // start method number at 0
     for (auto MI: IIR->methods) {
-        std::string offset = "32";
+        std::string offset = "32+16"; // length
         std::string methodName = MI->name;
         std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
         if (isRdyName(methodName))
@@ -196,11 +196,11 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
 //exit(-1);
             //continue;
         }
-        ACCExpr *cond = allocExpr("==", allocExpr(host + "$enq$v[31:16]"),
+        ACCExpr *cond = allocExpr("==", allocExpr(host + "$enq$v[31+16:16+16]"), // length
                  allocExpr("16'd" + autostr(counter)));
         if (!isEnaName(methodName)) {
             if (!addedReturnInd)
-                IR->interfaces.push_back(FieldElement{"returnInd", "", "PipeInH", true, false, false, false, ""/*not param*/, false, false, false});
+                IR->interfaces.push_back(FieldElement{"returnInd", "", "PipeIn", true, false, false, false, ""/*not param*/, false, false, false});
             addedReturnInd = true;
             if (MI->action) {
                 // when calling 'actionValue', guarded call needed
@@ -208,15 +208,17 @@ printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodNam
                 //MInew->callList.push_back(new CallListElement{call, cond, true});
             }
             // when calling 'value' or 'actionValue' method, enqueue return value
-            uint64_t dataLength = 48; // include length of tag
+            uint64_t dataLength = 48 + 16/*length*/; // include length of tag
             uint64_t thisLen = atoi(convertType(MI->type).c_str());
             dataLength += thisLen;
             call = allocExpr("returnInd$enq__ENA", allocExpr(PARAMETER_MARKER,
                 allocExpr("{ " + call->value
                                + ", 16'd" + autostr(thisLen) // bit len used
                                + ", 16'd" + autostr(counter) // which method had return
-                               + ", 16'd" + autostr(PORTALNUM) + "}"),
-                allocExpr("16'd" + autostr(dataLength/32))));
+                               + ", 16'd" + autostr(PORTALNUM)
+                               + ", 16'd" + autostr(dataLength/32) + "/* length */"
+                               + "}")));
+                
         }
         MInew->callList.push_back(new CallListElement{call, cond, true});
         counter++;
