@@ -38,7 +38,7 @@ if __name__=='__main__':
         }
      )
     cppgen.generateJson = False
-    cppgen.generatePacketOnly = True
+    #cppgen.generatePacketOnly = True
     cppgen.synchronousInvoke = True
     cppgen.generate_cpp(".", False, jsondata)
     open('jni/driver_signature_file.h', 'w')
