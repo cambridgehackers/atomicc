@@ -94,7 +94,7 @@ extern "C" void dpi_init()
 
 #define VALID_FLAG (1ll << 32)
 #define END_FLAG   (2ll << 32)
-extern "C" long long dpi_msgReceive_beat(void)
+extern "C" long long dpi_msgReceive_enq(void)
 {
 top:
     if (rxLength > 1) {
@@ -102,7 +102,7 @@ top:
         if (rxLength == 1)
             ret |= END_FLAG;
         if (trace_xsimtop)
-            fprintf(stdout, "dpi_msgReceive_beat: beat=%16llx\n", ret);
+            fprintf(stdout, "dpi_msgReceive_enq: v=%16llx\n", ret);
         return ret;
     }
     if (clientfd != -1) {
@@ -146,12 +146,12 @@ top:
   return 0xbadad7a;
 }
 
-extern "C" void dpi_msgSend_beat(int beat, int last)
+extern "C" void dpi_msgSend_enq(int v, int last)
 {
     if (trace_xsimtop)
-        fprintf(stdout, "dpi_msgSend_beat: beat=%08x last %x\n", beat, last);
-//printf("[%s:%d] index %x txBuffer[0] %x beat %x last %x\n", __FUNCTION__, __LINE__, txIndex, txBuffer[0], beat, last);
-    txBuffer[txIndex++] = beat;
+        fprintf(stdout, "dpi_msgSend_enq: v=%08x last %x\n", v, last);
+//printf("[%s:%d] index %x txBuffer[0] %x v %x last %x\n", __FUNCTION__, __LINE__, txIndex, txBuffer[0], v, last);
+    txBuffer[txIndex++] = v;
     if (last) {
         char bname[100];
         sprintf(bname,"SEND%d.%d", getpid(), masterfpga_fd);

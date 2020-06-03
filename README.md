@@ -10,7 +10,7 @@ To build
 
 0) prepare machine
     sudo apt-get install libffi-dev libblocksruntime-dev clang
-    sudo apt-get install gcc-multilib g++-multilib
+    sudo apt-get install gcc-multilib g++-multilib cmake verilator
 0) On OSX:
     git clone git://github.com/mackyle/blocksruntime.git
     cd blocksruntime

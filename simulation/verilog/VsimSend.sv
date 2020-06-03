@@ -21,15 +21,15 @@
 // SOFTWARE.
 
 module VsimSend #(parameter width = 32) (input CLK, input nRST,
-    input beat__ENA, output beat__RDY, input [width-1:0] beat$v, input beat$last);
+    input enq__ENA, output enq__RDY, input [width-1:0] enq$v, input enq$last);
 
-    import "DPI-C" function void dpi_msgSend_beat(input int beat, input int last);
-    assign beat__RDY = 1;
+    import "DPI-C" function void dpi_msgSend_enq(input int enq, input int last);
+    assign enq__RDY = 1;
     always @(posedge CLK) begin
         if (nRST != 0) begin
-            if (beat__ENA) begin
-                //$display("VSOURCE: outgoing data %x last %x", beat$v, beat$last);
-                dpi_msgSend_beat(beat$v, {31'b0, beat$last});
+            if (enq__ENA) begin
+                //$display("VSOURCE: outgoing data %x last %x", enq$v, enq$last);
+                dpi_msgSend_enq(enq$v, {31'b0, enq$last});
             end
         end
     end
