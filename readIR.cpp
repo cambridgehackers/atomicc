@@ -110,6 +110,10 @@ static bool readLine(void)
                 printf("[%s:%d] end of input file.  feof %d ferror %d\n", __FUNCTION__, __LINE__, feof(OStrGlobal), ferror(OStrGlobal));
             return false;
         }
+        if (strlen(buf) >= sizeof(buf) - 1) {
+            printf("%s: error: IR maximum file line length exceeded (%ld)\n", __FUNCTION__, strlen(buf));
+            exit(-1);
+        }
         do 
             buf[strlen(buf) - 1] = 0; // strip trailing ' '
         while (buf[strlen(buf) - 1] == ' ');
