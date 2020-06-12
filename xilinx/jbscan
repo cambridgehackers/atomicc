@@ -1,0 +1,5 @@
+#
+set -x
+set -e
+../atomiccImport -o VBscanE2.h -C BSCANE2 -P M BSCANE2.v
+

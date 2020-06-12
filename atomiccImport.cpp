@@ -351,7 +351,7 @@ printf("[%s:%d] calling '%s' returned %d\n", __FUNCTION__, __LINE__, commandLine
 }
 void generate_interface(std::string interfacename, std::string paramlist, PinList &ilist)
 {
-    fprintf(outfile, "__interface %s {\n", (options.ifprefix + interfacename + paramlist).c_str());
+    fprintf(outfile, "class %sIFC {\n", (options.ifprefix + interfacename + paramlist).c_str());
     for (auto item : ilist) {
         if (item.dir != "input" && item.dir != "output" && item.dir != "inout" && item.dir != "parameter" && item.dir != "interface")
             continue;
@@ -442,9 +442,7 @@ void generate_cpp()
             generate_interface(item.first, "", iitem.second);
         }
     generate_interface(options.cell, "", masterList);
-    fprintf(outfile, "__emodule %s {\n", options.cell.c_str());
-    fprintf(outfile, "    %s _;\n", (options.ifprefix + options.cell).c_str());
-    fprintf(outfile, "};\n");
+    fprintf(outfile, "class %s __implements %sIFC;\n", options.cell.c_str(), (options.ifprefix + options.cell).c_str());
 }
 
 int main(int argc, char **argv)
@@ -472,7 +470,15 @@ int main(int argc, char **argv)
             abort();
         }
     if (optind != argc-1 || options.filename == "" || argc == 0 || options.ifprefix == "") {;
-        printf("Missing \"--o\" option, missing input filenames, missing ifname or missing ifprefix.  Run \" importbvi.py -h \" to see available options\n");
+        printf("Missing \"-o\" option, missing input filenames, missing ifname or missing ifprefix.\n"
+               "atomiccImport [ -o <outputFile> ] [ -f <factorName> ] [ -n <notFactorName> ] [ -C <cellName> ] [ -P <prefixName> ] <inputFile>\n"
+               "Usage:\n"
+               "     -o <outputFile>\n"
+               "     -f <factorName>\n"
+               "     -n <notFactorName>\n"
+               "     -C <cellName>\n"
+               "     -P <prefixName>\n"
+              );
         exit(-1);
     }
     outfile = fopen(options.filename.c_str(), "w");
