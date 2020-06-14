@@ -199,12 +199,17 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
         newMI->params.push_back(ParamElement{item.name, updateType(item.type, paramMap), ""});
 }
 
-static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface = false)
+static std::string stripName(std::string iName)
 {
-    std::string iName = IR->interfaceName;
     int iind = iName.find("(");
     if (iind > 0)
         iName = iName.substr(0, iind);
+    return iName;
+}
+
+static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface = false)
+{
+    std::string iName = stripName(IR->interfaceName);
     if (!isInterface)
         buildGeneric(lookupInterface(IR->interfaceName), iName, paramMap, true);
     IR->transformGeneric = true;
@@ -231,7 +236,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
     for (auto MI : IR->methods)
         copyGenericMethod(genericIR, MI, paramMap);
     for (auto item : IR->interfaces) {
-        std::string iname = irName + MODULE_SEPARATOR + item.fldName;
+        std::string iname = stripName(item.type);
         buildGeneric(lookupInterface(item.type), iname, paramMap, true);
         genericIR->interfaces.push_back(FieldElement{item.fldName,
              updateCount(item.vecCount, paramMap), iname, item.isPtr, item.isInput,

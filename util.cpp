@@ -292,7 +292,6 @@ if (!implements) {
                 indnext++;
         }
         fieldName = searchStr.substr(0, ind);
-        searchStr = searchStr.substr(indnext);
         if (traceLookup)
             printf("[%s:%d] IR %s: ind %d indnext %d fieldName %s searchStr %s\n", __FUNCTION__, __LINE__, searchIR->name.c_str(), ind, indnext, fieldName.c_str(), searchStr.c_str());
         ModuleIR *nextIR = nullptr;
@@ -324,23 +323,44 @@ if (!implements) {
                 return lookupInterface(item.type);
             }
             return nullptr; });
+        if (!nextIR) {
+        nextIR = iterInterface(searchIR, CBAct {
+            std::string fldName = item.fldName;
+            if (traceLookup)
+                printf("[%s:%d] ind %d fldname %s fieldName %s type %s searchStr %s\n", __FUNCTION__, __LINE__, ind, fldName.c_str(), fieldName.c_str(), item.type.c_str(), searchStr.c_str());
+            if (fldName == "") {     //ind != -1 && 
+                if (traceLookup)
+                     printf("[%s:%d]found \n", __FUNCTION__, __LINE__);
+                return lookupInterface(item.type);
+            }
+            return nullptr; });
+            if (traceLookup)
+                printf("[%s:%d] NULL nextIR %p searchstr %s\n", __FUNCTION__, __LINE__, (void *)nextIR, searchStr.c_str());
+            if (nextIR) {
+                searchIR = nextIR;
+                continue;
+            }
+        }
         if (traceLookup)
             printf("[%s:%d] nextIR %p\n", __FUNCTION__, __LINE__, (void *)nextIR);
         if (nextIR && nextIR->interfaceName != "") { // lookup points to an interface
             if (traceLookup)
-                printf("[%s:%d] lokkingup %s\n", __FUNCTION__, __LINE__, nextIR->interfaceName.c_str());
+                printf("[%s:%d] lookingup %s\n", __FUNCTION__, __LINE__, nextIR->interfaceName.c_str());
             nextIR = lookupInterface(nextIR->interfaceName);
         }
         if (traceLookup)
             printf("[%s:%d]nextIR %p name %s implements %p\n", __FUNCTION__, __LINE__, (void *)nextIR, nextIR ? nextIR->name.c_str() : "", (void *)implements);
         ModuleIR *temp = implements;
         implements = nullptr;
+        if (traceLookup)
+            printf("[%s:%d] searchstr '%s' indnext %d nextIR %p temp %p\n", __FUNCTION__, __LINE__, searchStr.c_str(), indnext, (void *)nextIR, (void *)temp);
         if (!nextIR && temp) {
             searchIR = temp;
             continue;
         }
         break;
         };
+        searchStr = searchStr.substr(indnext);
         if (!nextIR)
             break;
         searchIR = nextIR;
@@ -536,7 +556,7 @@ void dumpModule(std::string name, ModuleIR *IR)
         dumpModule(name + "_INTERFACE_" + autostr(interfaceNumber++), lookupInterface(item.type));
     for (auto item: IR->parameters)
         dumpModule(name + "_PARAMETERS_" + autostr(interfaceNumber++), lookupInterface(item.type));
-printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s %s {\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str(), IR->interfaceName.c_str());
+    printf("%s: %s\nMODULE %s %s {\n", __FUNCTION__, name.c_str(), IR->name.c_str(), IR->interfaceName.c_str());
     for (auto item: IR->fields) {
         std::string ret = "    FIELD";
         if (item.isPtr)
@@ -544,7 +564,7 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s %s {\n", __FUNCTION__, __LINE_
         if (item.vecCount != "")
             ret += "/Count " + item.vecCount;
         ret += " ";
-        ret += item.type + " " + item.fldName;
+        ret += item.type + " '" + item.fldName + "'";
         printf("%s\n", ret.c_str());
     }
     for (auto item: IR->interfaces) {
@@ -556,7 +576,7 @@ printf("[%s:%d] DDDDDDDDDDDDDDDDDDD %s\nMODULE %s %s {\n", __FUNCTION__, __LINE_
         if (item.vecCount != "")
             ret += "/Count " + item.vecCount;
         ret += " ";
-        ret += item.type + " " + item.fldName;
+        ret += item.type + " '" + item.fldName + "'";
         printf("%s\n", ret.c_str());
     }
     for (auto item: IR->interfaceConnect)
