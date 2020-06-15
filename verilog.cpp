@@ -23,6 +23,7 @@
 
 int trace_assign;//= 1;
 int trace_declare;//= 1;
+int trace_ports;//= 1;
 int trace_connect;//= 1;
 int trace_skipped;//= 1;
 
@@ -310,7 +311,7 @@ exit(-1);
         }
         if (!isLocal && !dontDeclare)
         modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
-        if (trace_connect)
+        if (trace_ports)
             printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d dDecl %d vec '%s' dim %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, dontDeclare, vc.c_str(), dimIndex);
         if (isparam == "")
         expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE, true, vc, isArgument);
@@ -372,7 +373,7 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
         checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, ""/*not param*/, item.isLocal, false/*isArgument*/, item.vecCount);
         if (item.action && !isEnaName(item.name))
             checkWire(item.name + "__ENA", "", item.isOutput ^ (0), false, ""/*not param*/, item.isLocal, false/*isArgument*/, item.vecCount);
-        if (trace_connect)
+        if (trace_ports)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.name.c_str(), item.type.c_str());
         for (auto pitem: item.params) {
             checkWire(baseMethodName(item.name) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal, instance==""/*isArgument*/, item.vecCount);
@@ -776,88 +777,73 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
     condLines[generateSection][methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
-static void connectInterfaces(ModuleIR *IR)
+void showRef(const char *label, std::string name)
 {
-    for (auto IC : IR->interfaceConnect) {
-        std::string ICtarget = tree2str(IC.target);
-        std::string ICsource = tree2str(IC.source);
-        std::string iname = IC.type;
-        if (startswith(iname, "ARRAY_")) {
-            iname = iname.substr(6);
-            int ind = iname.find("_");
-            if (ind > 0)
-                iname = iname.substr(ind+1);
+    if (trace_connect)
+    printf("%s: %s count %d pin %d type %s out %d inout %d done %d isGenerated %d veccount %s isArgument %d\n",
+        label, name.c_str(), refList[name].count, refList[name].pin,
+        refList[name].type.c_str(), refList[name].out,
+        refList[name].inout, refList[name].done, refList[name].isGenerated,
+        refList[name].vecCount.c_str(), refList[name].isArgument);
+}
+
+static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bool isForward)
+{
+    std::string tstr = tree2str(target), sstr = tree2str(source);
+    if (trace_assign || trace_connect || (!refList[tstr].out && !refList[sstr].out))
+        printf("%s: IFCCC '%s'/%d '%s'/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+    showRef("target", target->value);
+    showRef("source", source->value);
+    if (refList[sstr].out) {
+        setAssign(sstr, target, type);
+        refList[target->value].done = true;
+    }
+    else {
+        setAssign(tstr, source, type);
+        refList[source->value].done = true;
+    }
+}
+
+static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
+{
+    std::string ICtarget = tree2str(targetTree);
+    std::string ICsource = tree2str(sourceTree);
+    if (trace_connect)
+        printf("%s: CONNECT target '%s' source '%s' forward %d\n", __FUNCTION__, ICtarget.c_str(), ICsource.c_str(), isForward);
+    for (auto fld : IIR->fields) {
+        ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
+        target->value += fld.fldName;
+        source->value += fld.fldName;
+        if (ModuleIR *IR = lookupIR(fld.type)) {
+            connectMethods(lookupInterface(IR->interfaceName), target, source, isForward);
+            continue;
         }
-        ModuleIR *IIR = lookupInterface(iname);
-        if (!IIR)
-            dumpModule("MISSINGCONNECT", IR);
-        assert(IIR && "interfaceConnect interface type");
-        bool targetLocal = false, sourceLocal = false;
-        for (auto item: IR->interfaces) {
-            if (item.fldName == IC.target->value)
-                targetLocal = true;
-            if (item.fldName == IC.source->value)
-                sourceLocal = true;
-        }
+        connectTarget(target, source, fld.type, isForward);
+    }
+    for (auto fld : IIR->interfaces) {
+        ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
+        target->value += fld.fldName;
+        source->value += fld.fldName;
+        connectMethods(lookupInterface(fld.type), target, source, isForward);
+    }
+    for (auto MI : IIR->methods) {
+        ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
         if (trace_connect)
-            printf("%s: CONNECT target '%s'/%d source '%s'/%d forward %d\n", __FUNCTION__, ICtarget.c_str(), targetLocal, ICsource.c_str(), sourceLocal, IC.isForward);
-        for (auto fld : IIR->fields) {
-            ACCExpr *target = dupExpr(IC.target), *source = dupExpr(IC.source);
-            target->value += fld.fldName;
-            source->value += fld.fldName;
-            std::string tstr = tree2str(target), sstr = tree2str(source);
-            if (trace_assign || trace_connect || (!refList[tstr].out && !refList[sstr].out))
-                printf("%s: IFCCCfield '%s'/%d '%s'/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
-#if 0
-            if (!IC.isForward) {
-                refList[tstr].out = 1;   // for local connections, don't bias for 'output'
-                refList[sstr].out = 0;
-            }
-#endif
-            if (refList[sstr].out)
-                setAssign(sstr, allocExpr(tstr), fld.type);
-            else
-                setAssign(tstr, allocExpr(sstr), fld.type);
-        }
-        for (auto MI : IIR->methods) {
-            ACCExpr *target = dupExpr(IC.target), *source = dupExpr(IC.source);
-            if (trace_connect)
-                printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICtarget.substr(ICtarget.length()-1).c_str(), ICsource.c_str());
-            if (target->value.substr(target->value.length()-1) == MODULE_SEPARATOR)
-                target->value = target->value.substr(0, target->value.length()-1);
-            if (source->value.substr(source->value.length()-1) == MODULE_SEPARATOR)
-                source->value = source->value.substr(0, source->value.length()-1);
-            target->value += MODULE_SEPARATOR + MI->name;
-            source->value += MODULE_SEPARATOR + MI->name;
-            std::string tstr = tree2str(target), sstr = tree2str(source);
-            if (!IC.isForward) {
-                refList[tstr].out ^= targetLocal;
-                refList[sstr].out ^= sourceLocal;
-            }
-            if (trace_connect || (!refList[tstr].out && !refList[sstr].out))
-                printf("%s: IFCCCmeth '%s'/%d '%s'/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
-            if (refList[sstr].out)
-                setAssign(sstr, target, MI->type);
-            else
-                setAssign(tstr, source, MI->type);
-            tstr = baseMethodName(target->value) + MODULE_SEPARATOR;
-            sstr = baseMethodName(source->value) + MODULE_SEPARATOR;
-            for (auto info: MI->params) {
-                ACCExpr *target = dupExpr(IC.target), *source = dupExpr(IC.source);
-                target->value = tstr + info.name;
-                source->value = sstr + info.name;
-                std::string tparm = tree2str(target), sparm = tree2str(source);
-                if (!IC.isForward) {
-                    refList[tparm].out ^= targetLocal;
-                    refList[sparm].out ^= sourceLocal;
-                }
-                if (trace_connect)
-                    printf("%s: IFCCCparam '%s'/%d '%s'/%d\n", __FUNCTION__, tparm.c_str(), refList[tparm].out, sparm.c_str(), refList[sparm].out);
-                if (refList[sparm].out)
-                    setAssign(sparm, target, info.type);
-                else
-                    setAssign(tparm, source, info.type);
-            }
+            printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICtarget.substr(ICtarget.length()-1).c_str(), ICsource.c_str());
+        if (target->value.substr(target->value.length()-1) == MODULE_SEPARATOR)
+            target->value = target->value.substr(0, target->value.length()-1);
+        if (source->value.substr(source->value.length()-1) == MODULE_SEPARATOR)
+            source->value = source->value.substr(0, source->value.length()-1);
+        target->value += MODULE_SEPARATOR + MI->name;
+        source->value += MODULE_SEPARATOR + MI->name;
+        connectTarget(target, source, MI->type, isForward);
+        std::string tstr = baseMethodName(target->value) + MODULE_SEPARATOR;
+        std::string sstr = baseMethodName(source->value) + MODULE_SEPARATOR;
+        for (auto info: MI->params) {
+            ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
+            target->value = tstr + info.name;
+            source->value = sstr + info.name;
+            connectTarget(target, source, info.type, isForward);
         }
     }
 }
@@ -1121,7 +1107,20 @@ static std::list<ModData> modLine;
 
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
-    connectInterfaces(IR);
+    for (auto IC : IR->interfaceConnect) {
+        std::string iname = IC.type;
+        if (startswith(iname, "ARRAY_")) {
+            iname = iname.substr(6);
+            int ind = iname.find("_");
+            if (ind > 0)
+                iname = iname.substr(ind+1);
+        }
+        ModuleIR *IIR = lookupInterface(iname);
+        if (!IIR)
+            dumpModule("MISSINGCONNECT", IR);
+        assert(IIR && "interfaceConnect interface type");
+        connectMethods(IIR, IC.target, IC.source, IC.isForward);
+    }
     traceZero("AFTCONNECT");
     for (auto MI : IR->methods)
         if (MI->generateSection == "")
