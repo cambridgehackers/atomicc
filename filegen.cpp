@@ -185,7 +185,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         if (ind != -1)
             temp = temp.substr(0,ind);
         if ((item.second.out || item.second.inout) && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL)) {
-            if (item.second.inout && !assignList[item.first].value)
+            if (!assignList[item.first].value)
                 for (auto alitem: assignList)
                     if (ACCExpr *val = alitem.second.value)
                     if (isIdChar(val->value[0]) && val->value == item.first)

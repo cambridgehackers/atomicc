@@ -267,7 +267,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
             interfaceName += MODULE_SEPARATOR;
 //printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
-            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, item.isPtr, item.vecCount, localInterface);
+            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, isPtr || item.isPtr, item.vecCount, localInterface);
     }
 }
 
