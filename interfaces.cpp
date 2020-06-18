@@ -122,12 +122,16 @@ assert(HIR);
             dataLength += atoi(convertType(param.type).c_str());
             call = paramPrefix + param.name + ", " + call;
         }
+        uint64_t vecLength = (dataLength + 31) / 32;
+        dataLength = vecLength * 32 - dataLength;
+        if (dataLength) // pad out to full word
+            call = call + autostr(dataLength) + "'d0, ";
         //if (pipeArgSize > dataLength)
             //call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
         MInew->callList.push_back(new CallListElement{
              allocExpr(target + "$enq__ENA", allocExpr(PARAMETER_MARKER,
                  allocExpr("{ " + call + "16'd" + autostr(counter) + ", 16'd" + autostr(PORTALNUM)
-                       + ", 16'd" + autostr(dataLength/32) + "}"))), nullptr, true});
+                       + ", 16'd" + autostr(vecLength) + "}"))), nullptr, true});
         counter++;
     }
     if (trace_software)
@@ -184,6 +188,15 @@ assert(MInew);
         std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
         if (isRdyName(methodName))
             continue;
+#if 0 // ?????
+        uint64_t totalLength = 0;
+        for (auto param: MI->params)
+            totalLength += atoi(convertType(param.type).c_str());
+        uint64_t vecLength = (totalLength + 31) / 32;
+        totalLength = vecLength * 32 - totalLength;
+        if (totalLength)
+            offset += "+" + autostr(totalLength);
+#endif
         ACCExpr *paramList = allocExpr(",");
         ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr(PARAMETER_MARKER, paramList));
         for (auto param: MI->params) {
