@@ -532,6 +532,8 @@ void dumpMethod(std::string name, MethodInfo *MI)
         printf("      STORE %s: %s=%s\n", tree2str(item->cond).c_str(), tree2str(item->dest).c_str(), tree2str(item->value).c_str());
     for (auto item: MI->callList)
         printf("      CALL%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
+    for (auto item: MI->printfList)
+        printf("      PRINTF%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
     for (auto item: MI->generateFor)
         printf("      GENERATE %s: %s, %s, %s, %s, %s\n", tree2str(item.cond).c_str(),
             item.var.c_str(), tree2str(item.init).c_str(),
