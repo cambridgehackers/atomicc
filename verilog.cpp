@@ -1036,11 +1036,13 @@ static std::list<ModData> modLine;
         }
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
+dumpExpr("PRINTFFFOFOF", value);
             value->value = "(";   // change from PARAMETER_MARKER
             if (hasPrintf)
                 MI->callList.push_back(new CallListElement{printfArgs(value), info->cond, true});
             else {
                 ACCExpr *listp = value->operands.front();
+                assert(listp);
                 if (endswith(listp->value, "\\n\""))
                     listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
             }
