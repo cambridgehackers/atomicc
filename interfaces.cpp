@@ -65,15 +65,18 @@ printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
 static void processM2P(ModuleIR *IR)
 {
     ModuleIR *HIR = nullptr;
-    std::string host, target;
+    std::string host, target, targetParam;
     std::string pipeArgSize = "-1";
     ModuleIR *implements = lookupInterface(IR->interfaceName);
     //dumpModule("PROCESSM2P", IR);
     for (auto inter: implements->interfaces) {
         if (inter.isPtr) {
-            target = inter.fldName;
+            auto IIR = lookupInterface(inter.type);
+            auto MI = IIR->methods.front();
+            target = inter.fldName + MODULE_SEPARATOR + MI->name;
+            targetParam = baseMethodName(target) + MODULE_SEPARATOR + MI->params.front().name;
             if (trace_software)
-                dumpModule("M2P/IIR :" + target, lookupInterface(inter.type));
+                dumpModule("M2P/IIR :" + inter.fldName, IIR);
         }
         else {
             HIR = lookupInterface(inter.type);
@@ -116,22 +119,29 @@ assert(HIR);
         //}
         std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
         std::string call;
-        uint64_t dataLength = 32; // include length of tag
+        int64_t dataLength = 32; // include length of tag
         for (auto param: MI->params) {
             MInew->params.push_back(param);
             dataLength += atoi(convertType(param.type).c_str());
-            call = paramPrefix + param.name + ", " + call;
+            call += ", " + paramPrefix + param.name;
         }
         uint64_t vecLength = (dataLength + 31) / 32;
         dataLength = vecLength * 32 - dataLength;
-        if (dataLength) // pad out to full word
-            call = call + autostr(dataLength) + "'d0, ";
-        //if (pipeArgSize > dataLength)
-            //call = autostr(pipeArgSize - dataLength) + "'d0, " + call;
+        if (dataLength)
+            call = ", " + autostr(dataLength) + "'d0" + call;
+        dataLength = 128 - vecLength * 32;
+        if (dataLength > 0)
+            call += ", " + autostr(dataLength) + "'d0";
+        std::string sourceParam = "{ 16'd" + autostr(counter) + ", 16'd"
+            + autostr(PORTALNUM)+ call + ", 16'd" + autostr(vecLength) + "}";
         MInew->callList.push_back(new CallListElement{
-             allocExpr(target + "$enq__ENA", allocExpr(PARAMETER_MARKER,
-                 allocExpr("{ " + call + "16'd" + autostr(counter) + ", 16'd" + autostr(PORTALNUM)
-                       + ", 16'd" + autostr(vecLength) + "}"))), nullptr, true});
+             allocExpr(target, allocExpr(PARAMETER_MARKER,
+                 allocExpr(sourceParam))), nullptr, true});
+        if (1) {
+            ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
+                allocExpr("\"DISPLAYM2P %x\""), allocExpr(sourceParam)));
+            MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
+        }
         counter++;
     }
     if (trace_software)
@@ -178,38 +188,43 @@ printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
         MInew->guard = MI->guard;
     }
     MethodInfo *MInew = lookupMethod(IR, host + MODULE_SEPARATOR + "enq");
+    std::string sourceParam = baseMethodName(MInew->name) + MODULE_SEPARATOR + MInew->params.front().name;
+    std::string paramLen = convertType(MInew->params.front().type);
+    if (1) {
+        ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
+            allocExpr("\"DISPLAYP2M %x\""), allocExpr(sourceParam)));
+        MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
+    }
     if (trace_software)
 printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEPARATOR + "enq__ENA").c_str(), (void *)MInew);
 assert(MInew);
     int counter = 0;  // start method number at 0
     for (auto MI: IIR->methods) {
-        std::string offset = "32+16"; // length
+        std::string offset = paramLen + " - 32"; // length
         std::string methodName = MI->name;
         std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
         if (isRdyName(methodName))
             continue;
-#if 0 // ?????
         uint64_t totalLength = 0;
         for (auto param: MI->params)
             totalLength += atoi(convertType(param.type).c_str());
         uint64_t vecLength = (totalLength + 31) / 32;
         totalLength = vecLength * 32 - totalLength;
         if (totalLength)
-            offset += "+" + autostr(totalLength);
-#endif
+            offset += "-" + autostr(totalLength);
         ACCExpr *paramList = allocExpr(",");
         ACCExpr *call = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr(PARAMETER_MARKER, paramList));
         for (auto param: MI->params) {
-            std::string upper = "(" + offset + " + " + convertType(param.type) + ")";
-            paramList->operands.push_back(allocExpr(host + "$enq$v[" + upper + " -1 :" + offset + "]"));
-            offset = upper;
+            std::string lower = "(" + offset + " - " + convertType(param.type) + ")";
+            paramList->operands.push_back(allocExpr(sourceParam + "[" + offset + " -1 :" + lower + "]"));
+            offset = lower;
         }
         if (!isEnaName(methodName)) {
 printf("[%s:%d] cannot serialize method %s\n", __FUNCTION__, __LINE__, methodName.c_str());
 //exit(-1);
             //continue;
         }
-        ACCExpr *cond = allocExpr("==", allocExpr(host + "$enq$v[31+16:16+16]"), // length
+        ACCExpr *cond = allocExpr("==", allocExpr(sourceParam + "[" + paramLen + " - 1: (" + paramLen + "- 16)]"), // length
                  allocExpr("16'd" + autostr(counter)));
         if (!isEnaName(methodName)) {
             if (!addedReturnInd)
