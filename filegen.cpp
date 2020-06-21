@@ -19,6 +19,30 @@
 #include "common.h"
 
 std::map<std::string, int> genvarMap;
+
+std::string finishString(std::string arg)
+{
+    if (syncPins.find(arg) != syncPins.end())
+        return syncPins[arg].name;
+    return arg;
+}
+
+ACCExpr *replacePins(ACCExpr *expr)
+{
+    if (expr) {
+        if (syncPins.find(expr->value) != syncPins.end())
+            expr->value = finishString(expr->value);
+        for (auto operand: expr->operands)
+            replacePins(operand);
+    }
+    return expr;
+}
+
+std::string finishExpr(ACCExpr *expr)
+{
+    return tree2str(replacePins(expr));
+}
+
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
 {
     std::string sep;
@@ -148,9 +172,11 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         }
         fprintf(OStr, ";\n");
     }
+    bool moduleSyncFF = false;
     for (auto mitem: modNew) {
         if (mitem.moduleStart) {
             flushOut();
+            moduleSyncFF = (mitem.value == "SyncFF");  // do not perform cleanupExpr on this instantiation (will replace syncPins)
             if (mitem.vecCount == "")
                 mitem.vecCount = convertType(mitem.type, 2);
             isGenerate = mitem.vecCount != "";
@@ -169,7 +195,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             sep = "";
         }
         else {
-            std::string val = tree2str(cleanupExpr(str2tree(mitem.value)));
+            std::string val = moduleSyncFF ? mitem.value : finishExpr(cleanupExpr(str2tree(mitem.value)));
             if (isGenerate)
                 fprintf(OStr, "      wire %s;\n", (sizeProcess(mitem.type) + val).c_str());
             tempOutput.push_back(sep + "\n        ." + mitem.argName + "(" + val + ")");
@@ -192,12 +218,12 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                         goto next;
             if (!refList[temp].done && refList[temp].count) {
                 if (assignList[item.first].value)
-                    fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str());
+                    fprintf(OStr, "    assign %s = %s;\n", finishString(item.first).c_str(), finishExpr(assignList[item.first].value).c_str());
                 else
-                    fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", item.first.c_str());
+                    fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", finishString(item.first).c_str());
             }
             else if (trace_skipped)
-                fprintf(OStr, "    //skippedassign %s = %s; //temp = '%s', count = %d, pin = %d done %d\n", item.first.c_str(), tree2str(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin, refList[temp].done);
+                fprintf(OStr, "    //skippedassign %s = %s; //temp = '%s', count = %d, pin = %d done %d\n", finishString(item.first).c_str(), finishExpr(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin, refList[temp].done);
 next:;
             refList[item.first].done = true; // mark that assigns have already been output
         }
@@ -212,14 +238,14 @@ next:;
             if (!seen)
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
             seen = true;
-            fprintf(OStr, "    assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
+            fprintf(OStr, "    assign %s = %s;\n", finishString(item.first).c_str(), finishExpr(item.second.value).c_str());
             refList[item.first].done = true; // mark that assigns have already been output
         }
     }
     for (auto ctop: condAssignList) {
-        fprintf(OStr, "%s\n", ctop.first.c_str());
+        fprintf(OStr, "%s\n", finishString(ctop.first).c_str());
         for (auto item: ctop.second) {
-            fprintf(OStr, "        assign %s = %s;\n", item.first.c_str(), tree2str(item.second.value).c_str());
+            fprintf(OStr, "        assign %s = %s;\n", finishString(item.first).c_str(), finishExpr(item.second.value).c_str());
         }
         fprintf(OStr, "    end;\n");
     }
@@ -230,7 +256,7 @@ next:;
     if (resetList.size() || ctop->second.size()) {
         std::string ctopLoop = ctop != ctopEnd ? ctop->first : "";
         if (ctopLoop != "")
-            fprintf(OStr, "\n    %s\n", ctopLoop.c_str());
+            fprintf(OStr, "\n    %s\n", finishString(ctopLoop).c_str());
         fprintf(OStr, "\n    always @( posedge CLK) begin\n      if (!nRST) begin\n");
         for (auto item: resetList)
             fprintf(OStr, "        %s <= 0;\n", item.c_str());
@@ -244,14 +270,14 @@ next:;
                 if (checkInteger(tcond.second.guard, "1"))
                     alwaysLines.push_back("// " + methodName);
                 else {
-                    alwaysLines.push_back("if (" + tree2str(tcond.second.guard) + ") begin // " + methodName);
+                    alwaysLines.push_back("if (" + finishExpr(tcond.second.guard) + ") begin // " + methodName);
                     endStr = "end; ";
                 }
                 for (auto item: tcond.second.info) {
                     std::string endStr;
                     std::string temp;
                     if (item.first) {
-                        temp = "    if (" + tree2str(item.first) + ")";
+                        temp = "    if (" + finishExpr(item.first) + ")";
                         if (item.second.size() > 1) {
                             temp += " begin";
                             endStr = "    end;";
@@ -260,11 +286,11 @@ next:;
                     }
                     for (auto citem: item.second) {
                         if (citem.dest)
-                            alwaysLines.push_back("    " + tree2str(citem.dest) + " <= " + tree2str(citem.value) + ";");
+                            alwaysLines.push_back("    " + finishExpr(citem.dest) + " <= " + finishExpr(citem.value) + ";");
                         else if (citem.value->value == "$finish;")
                             alwaysLines.push_back("    $finish;");
                         else
-                            alwaysLines.push_back("    $display" + tree2str(citem.value->operands.front()) + ";");
+                            alwaysLines.push_back("    $display" + finishExpr(citem.value->operands.front()) + ";");
                     }
                     if (endStr != "")
                         alwaysLines.push_back(endStr);

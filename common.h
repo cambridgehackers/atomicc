@@ -83,6 +83,12 @@ typedef struct {
     std::string format;
     std::list<int> width;
 } PrintfInfo;
+typedef struct {
+    std::string name;
+    bool        out;
+    bool        isPtr;
+    bool        instance;
+} SyncPinsInfo;
 
 typedef ModuleIR *(^CBFun)(FieldElement &item);
 #define CBAct ^ ModuleIR * (FieldElement &item)
@@ -184,3 +190,4 @@ extern std::list<PrintfInfo> printfFormat;
 extern std::map<std::string, int> genericModule;
 extern int globalExprCleanup;
 extern int flagErrorsCleanup;
+extern std::map<std::string, SyncPinsInfo> syncPins;    // SyncFF items needed for PipeInSync instances

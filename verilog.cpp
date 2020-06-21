@@ -30,6 +30,7 @@ int trace_skipped;//= 1;
 std::list<PrintfInfo> printfFormat;
 std::list<ModData> modNew;
 std::map<std::string, std::map<std::string, CondGroup>> condLines;
+std::map<std::string, SyncPinsInfo> syncPins;    // SyncFF items needed for PipeInSync instances
 
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
@@ -213,10 +214,11 @@ typedef struct {
 std::list<PinInfo> pinPorts, pinMethods, paramPorts;
 
 
-static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface)
+static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface, bool argIsSync)
 {
 //dumpModule("COLLECT", IR);
     assert(IR);
+    bool isSync = startswith(IR->name + ".", "PipeInSync.") || argIsSync;
     MapNameValue mapValue = parentMap;
     extractParam(IR->name, mapValue);
 //for (auto item: mapValue)
@@ -226,6 +228,11 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         std::string name = methodPrefix + MI->name;
         bool out = instance ^ isPtr;
         std::list<ParamElement> params;
+        if (isSync && endswith(name, "__RDY") == out && !isLocal)
+{
+printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LINE__, name.c_str(), out, isPtr, instance);
+            syncPins[name] = SyncPinsInfo{baseMethodName(name) + "S" + name.substr(name.length()-5), out, isPtr, instance};
+}
         for (auto pitem: MI->params)
             params.push_back(ParamElement{pitem.name, instantiateType(pitem.type, mapValue), pitem.init});
         pinMethods.push_back(PinInfo{instantiateType(MI->type, mapValue), name, out, false, isLocal, params, ""/*not param*/, MI->action, vecCount});
@@ -267,7 +274,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
             interfaceName += MODULE_SEPARATOR;
 //printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
-            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, isPtr || item.isPtr, item.vecCount, localInterface);
+            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, isPtr || item.isPtr, item.vecCount, localInterface, isSync);
     }
 }
 
@@ -322,9 +329,9 @@ exit(-1);
     pinMethods.clear();
     paramPorts.clear();
     ModuleIR *implements = lookupInterface(IR->interfaceName);
-    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "", false);
+    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "", false, false);
     if (instance == "")
-        collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true);
+        collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true, false);
     for (FieldElement item : IR->parameters) {
         //extractParam(item.type, mapValue);
         std::string interfaceName = item.fldName;
@@ -337,7 +344,7 @@ exit(-1);
             interfaceName += MODULE_SEPARATOR;
 printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
         collectInterfacePins(IIR, instance != "", item.fldName,
-            interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false);
+            interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, false);
     }
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
@@ -984,6 +991,7 @@ static std::list<ModData> modLine;
     // 'Mux' together parameter settings from all invocations of a method from this class
     muxValueList.clear();
     modLine.clear();
+    syncPins.clear();     // pins from PipeInSync
 
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
     for (auto item: IR->interfaces)
@@ -1028,6 +1036,20 @@ static std::list<ModData> modLine;
 //break;
         } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
         return nullptr; });
+    for (auto item: syncPins) {
+        if (item.second.name != "") {
+            //bool out = item.second.out;
+            //bool isPtr = item.second.isPtr;
+            bool instance = item.second.instance;
+            std::string sname = item.second.name;
+            refList[sname] = RefItem{4, "Bit(1)", false, false, PIN_LOCAL, false, false, "", false};
+            modLine.push_back(ModData{item.first + "SyncFF", "SyncFF", "", true, false, false, false, "", ""});
+            modLine.push_back(ModData{"out", instance ? item.first : sname, "Bit(1)", false, false, true/*out*/, false, "", ""});
+            modLine.push_back(ModData{"in", instance ? sname : item.first, "Bit(1)", false, false, false /*out*/, false, "", ""});
+            refList[item.first].count++;
+            refList[sname].count++;
+        }
+    }
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
         if (MI->rule) {    // both RDY and ENA must be allocated for rules
@@ -1180,7 +1202,7 @@ dumpExpr("PRINTFFFOFOF", value);
     for (auto mitem: modLine) {
         std::string val = mitem.value;
         if (mitem.moduleStart) {
-            skipReplace = mitem.vecCount != "";
+            skipReplace = mitem.vecCount != "" || mitem.value == "SyncFF";
         }
         else if (!skipReplace) {
 if (trace_assign)
