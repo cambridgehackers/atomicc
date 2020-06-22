@@ -91,6 +91,7 @@ int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::str
         if (!implements) {
 printf("[%s:%d] interface defintion error: %s\n", __FUNCTION__, __LINE__, IR->interfaceName.c_str());
 dumpModule("SOFT", IR);
+exit(-1);
         }
         for (auto interfaceName: implements->softwareName) {
             for (auto iitem: implements->interfaces) {
@@ -110,13 +111,9 @@ dumpModule("SOFT", IR);
         IR->isInterface = false;
         irSeq.push_back(IR);
         std::string dutType;
-        bool hasPrintf = false;
         for (auto item: softwareNameList) {
             ModuleIR *implements = lookupInterface(item.second.IR->interfaceName);
             dutType = item.second.IR->name;
-            for (auto iitem: implements->interfaces)
-                if (iitem.fldName == "printfp")
-                    hasPrintf = true;
             std::string name = "IfcNames_" + item.first + (item.second.field.isPtr ? "H2S" : "S2H");
             enumList += sep + "[ \"" + name + "\", \"" + autostr(counter++) + "\" ]";
             sep = ", ";
@@ -128,40 +125,6 @@ dumpModule("SOFT", IR);
         std::string muxTypeName = "MuxPipe";
         std::string pipeName = "PipeIn";
         IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false, false});
-        if (hasPrintf) {
-#if 0
-            ModuleIR *muxDef = lookupIR(muxTypeName);
-printf("[%s:%d] HASHSHSHSHSPRINTF %p\n", __FUNCTION__, __LINE__, muxDef);
-            if (muxDef)
-                irSeq.push_back(muxDef); // HACK FOR NOW!!!!!!!!!!!!!!!!!!!!!!
-            else {
-                muxDef = allocIR(muxTypeName);
-                muxDef->isInterface = false;
-                irSeq.push_back(muxDef);
-                muxDef->interfaces.push_back(FieldElement{"in", "", pipeName, false, false, false, false, ""/*not param*/, false, false, false});
-                muxDef->interfaces.push_back(FieldElement{"forward", "", pipeName, false, false, false, false, ""/*not param*/, false, false, false});
-                muxDef->interfaces.push_back(FieldElement{"out", "", pipeName, true, false, false, false, ""/*not param*/, false, false, false});
-                auto makeEnq = [&](std::string methodName) -> void {
-                    MethodInfo *MI = allocMethod(methodName);
-                    addMethod(muxDef, MI);
-                    MI->params.push_back(ParamElement{"v", "NOCData", ""});
-                    std::string call;
-                    MI->callList.push_back(new CallListElement{
-                        allocExpr("out$enq__ENA", allocExpr(PARAMETER_MARKER, allocExpr(
-                            baseMethodName(methodName) + MODULE_SEPARATOR + "v"))),
-                        nullptr, true});
-                    MethodInfo *MIRdy = allocMethod(getRdyName(methodName));
-                    addMethod(muxDef, MIRdy);
-                    MIRdy->type = "Bit(1)";
-                    MIRdy->guard = allocExpr("1");
-                };
-                makeEnq("forward$enq__ENA");
-                makeEnq("in$enq__ENA");
-dumpModule("MUX", muxDef);
-            }
-#endif
-            IR->fields.push_back(FieldElement{muxName, "", muxTypeName, false, false, false, false, ""/*not param*/, false, false, false});
-        }
         localName += MODULE_SEPARATOR;
         muxName += MODULE_SEPARATOR;
         bool hasIndication = false;
@@ -187,17 +150,8 @@ dumpModule("MUX", muxDef);
                 allocExpr(fieldName + MODULE_SEPARATOR + "method"), userTypeName, true});
             if (userInterface == "indication")
                 hasIndication = true;
-            if (outcall && hasPrintf) {
-                IR->interfaceConnect.push_back(InterfaceConnectType{
-                    allocExpr(muxName + "in"), allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pName, true});
-                IR->interfaceConnect.push_back(InterfaceConnectType{
-                    allocExpr(muxName + "forward"), allocExpr(localName + "printfp"), pName, true});
-                IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(userInterface),
-                    allocExpr(muxName + "out"), pName, true});
-            }
-            else
-                IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(userInterface),
-                    allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pName, true});
+            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(userInterface),
+                allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pName, true});
             //dumpModule("SWIFC", ifcIR);
         }
         if (!hasIndication) {

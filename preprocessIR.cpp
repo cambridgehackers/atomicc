@@ -25,6 +25,7 @@ typedef struct {
     std::string name;
     std::string value;
 } PARAM_MAP;
+int implementPrintf;//=1;
 std::map<std::string, int> genericModule;
 static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest = false);
 
@@ -534,7 +535,14 @@ skipLab:;
         else
             IR++;
     }
+    implementPrintf = (lookupIR("Printf") != nullptr);
     for (auto IR : irSeq) {
+        bool hasPrintf = false;
+        if (implementPrintf)
+        for (auto MI: IR->methods)
+            hasPrintf |= MI->printfList.size();
+        if (hasPrintf)
+            IR->fields.push_back(FieldElement{"printfp", "", "Printf", false/*isPtr*/, false, false, false, ""/*not param*/, false, false, false});
         std::map<std::string, int> localConnect;
         for (auto IC : IR->interfaceConnect) {
             walkSubscript(IR, IC.target, false);

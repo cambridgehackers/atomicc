@@ -866,7 +866,7 @@ void appendMux(std::string name, ACCExpr *cond, ACCExpr *value, std::string defa
     phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
 }
 
-static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI, bool hasPrintf)
+static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
 {
     if (MI->subscript)      // from instantiateFor
         methodName += "[" + tree2str(MI->subscript) + "]";
@@ -968,7 +968,7 @@ dumpExpr("READCALL", value);
             }
         }
     }
-    if (!hasPrintf)
+    if (!implementPrintf)
         for (auto info: MI->printfList)
             appendLine(methodName, info->cond, nullptr, info->value);
 }
@@ -986,7 +986,6 @@ static std::list<ModData> modLine;
     modNew.clear();
     condLines.clear();
     genvarMap.clear();
-    bool hasPrintf = false;
     enableList.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
     muxValueList.clear();
@@ -994,9 +993,6 @@ static std::list<ModData> modLine;
     syncPins.clear();     // pins from PipeInSync
 
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
-    for (auto item: IR->interfaces)
-        if (item.fldName == "printfp")
-            hasPrintf = true;
     generateModuleSignature(IR, "", "", modLineTop, "");
 
     iterField(IR, CBAct {
@@ -1025,6 +1021,9 @@ static std::list<ModData> modLine;
                 generateModuleSignature(itemIR, item.type, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != "", vecCount, dimIndex++);
             }
             else { // if (convertType(item.type) != 0)
+                if (refList[fldName].pin) {
+printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), refList[fldName].pin);
+                }
                 assert (!refList[fldName].pin);
                 refList[fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, vecCount, false};
                 if (trace_declare)
@@ -1058,9 +1057,8 @@ static std::list<ModData> modLine;
         }
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
-dumpExpr("PRINTFFFOFOF", value);
             value->value = "(";   // change from PARAMETER_MARKER
-            if (hasPrintf)
+            if (implementPrintf)
                 MI->callList.push_back(new CallListElement{printfArgs(value), info->cond, true});
             else {
                 ACCExpr *listp = value->operands.front();
@@ -1148,22 +1146,22 @@ dumpExpr("PRINTFFFOFOF", value);
     traceZero("AFTCONNECT");
     for (auto MI : IR->methods)
         if (MI->generateSection == "")
-        generateMethod(IR, MI->name, MI, hasPrintf);
+        generateMethod(IR, MI->name, MI);
     for (auto MI : IR->methods)
         if (MI->generateSection != "")
-        generateMethod(IR, MI->name, MI, hasPrintf);
+        generateMethod(IR, MI->name, MI);
     for (auto MI : IR->methods) {
     for (auto item: MI->generateFor) {
         genvarMap[item.var] = 1;
         MethodInfo *MIb = IR->generateBody[item.body];
         assert(MIb && "body item ");
-        generateMethod(IR, MI->name, MIb, hasPrintf);
+        generateMethod(IR, MI->name, MIb);
     }
     for (auto item: MI->instantiateFor) {
         genvarMap[item.var] = 1;
         MethodInfo *MIb = IR->generateBody[item.body];
         assert(MIb && "body item ");
-        generateMethod(IR, MI->name, MIb, hasPrintf);
+        generateMethod(IR, MI->name, MIb);
     }
     }
     // combine mux'ed assignments into a single 'assign' statement

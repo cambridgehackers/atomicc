@@ -285,7 +285,7 @@ next:;
                         alwaysLines.push_back(temp);
                     }
                     for (auto citem: item.second) {
-                        if (citem.dest)
+                        if (citem.dest) // dest non-null -> assignment statement, otherwise call statement
                             alwaysLines.push_back("    " + finishExpr(citem.dest) + " <= " + finishExpr(citem.value) + ";");
                         else if (citem.value->value == "$finish;")
                             alwaysLines.push_back("    $finish;");

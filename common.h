@@ -191,3 +191,4 @@ extern std::map<std::string, int> genericModule;
 extern int globalExprCleanup;
 extern int flagErrorsCleanup;
 extern std::map<std::string, SyncPinsInfo> syncPins;    // SyncFF items needed for PipeInSync instances
+extern int implementPrintf;

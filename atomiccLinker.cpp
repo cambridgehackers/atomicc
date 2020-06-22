@@ -26,6 +26,7 @@ static void dumpMap()
 {
     for (auto item: externMap) {
         std::string arg = item.first;
+printf("[%s:%d] map %s\n", __FUNCTION__, __LINE__, arg.c_str());
         size_t ind = arg.find("$");
         if (ind != std::string::npos)
             arg = MUX_PORT + arg.substr(ind);
@@ -56,10 +57,10 @@ static void recurseObject(std::string name, ModuleIR *IR, std::string vecCount)
 int main(int argc, char **argv)
 {
     std::list<ModuleIR *> irSeq;
-printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
+printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     int argIndex = 1;
     if (argc - 1 != argIndex) {
-        printf("[%s:%d] veriloggen <outputFileStem>\n", __FUNCTION__, __LINE__);
+        printf("[%s:%d] atomiccLinker <outputFileStem>\n", __FUNCTION__, __LINE__);
         exit(-1);
     }
     std::string myName = argv[argIndex];

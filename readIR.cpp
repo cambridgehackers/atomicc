@@ -236,7 +236,6 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *expr = str2tree(bufp);
-dumpExpr("PPPPPPPPPPPPPP", expr);
                 MI->printfList.push_back(new CallListElement{expr, cond, false});
             }
             else if (checkItem("GENERATE")) {
