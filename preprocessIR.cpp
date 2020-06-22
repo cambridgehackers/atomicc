@@ -40,10 +40,34 @@ std::string genericName(std::string name)
 }
 std::string genericModuleParam(std::string name)
 {
-    int ind = name.rfind("=");
-    if (ind > 0)
-        return name.substr(ind+1, name.length()-1 - (ind + 1));
-    return "";
+    std::string ret;
+    int ind = name.find("(");
+    if (ind > 0) {
+        name = name.substr(ind+1);
+        ind = name.rfind(")");
+        if (ind > 0)
+            name = name.substr(0, ind);
+        std::string sep;
+        while (name.length() > 0) {
+            ind = name.find("=");
+            if (ind == -1)
+                break;
+            ret += sep + "." + name.substr(0,ind) + "(";
+            name = name.substr(ind+1);
+            ind = name.find(",");
+            if (ind > 0) {
+                ret += name.substr(0,ind);
+                name = name.substr(ind+1);
+            }
+            else {
+                ret += name;
+                name = "";
+            }
+            ret += ")";
+            sep = ",";
+        }
+    }
+    return ret;
 }
 static void walkSubst (ModuleIR *IR, ACCExpr *expr)
 {
