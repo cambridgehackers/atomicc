@@ -18,26 +18,39 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-static std::map<std::string, std::list<std::string>> externMap;
+typedef struct {
+    std::string            type;
+    std::list<std::string> name;
+} MapInfo;
+static std::map<std::string, MapInfo> externMap;
 
-#define MUX_PORT "forward"
+//#define MUX_PORT "in"
 
 static void dumpMap()
 {
     for (auto item: externMap) {
-        std::string arg = item.first;
-printf("[%s:%d] map %s\n", __FUNCTION__, __LINE__, arg.c_str());
-        size_t ind = arg.find("$");
-        if (ind != std::string::npos)
-            arg = MUX_PORT + arg.substr(ind);
-        printf("    .%s({", arg.c_str());
-        std::string sep;
-        for (auto ref: item.second) {
-            ref = ref.substr(10);
-            printf("%s%s", sep.c_str(), (ref + item.first).c_str());
-            sep = ", ";
+        ModuleIR *temp = lookupIR(item.second.type);
+        assert(temp);
+        ModuleIR *IIR = lookupInterface(temp->interfaceName);
+        assert(IIR);
+        std::list<std::string> portName;
+        for (auto fitem: IIR->fields) {
+            if (fitem.fldName != "CLK" && fitem.fldName != "nRST") {
+                portName.push_back(fitem.fldName);
+                std::string size = convertType(fitem.type);
+                if (size != "1")
+                    printf("FunnelBase#(.funnelWidth(%d), .dataWidth(%s)) printFunnel (.CLK(CLK), .nRST(nRST),\n",
+                        (int)item.second.name.size() + 1, size.c_str());
+            }
         }
-        printf("}),\n");
+        for (auto arg: portName) {
+            printf("    .in$%s('{", arg.c_str());
+            for (auto ref: item.second.name) {
+                printf("%s, ", (ref + item.first + "." + arg).c_str());
+            }
+            printf("ind$%s}),\n", arg.c_str());
+        }
+        printf("    .out$enq__ENA(indication$enq__ENA),.out$enq$v(indication$enq$v),.out$enq__RDY(indication$enq__RDY)\n     );\n");
     }
 }
 
@@ -46,14 +59,25 @@ static void recurseObject(std::string name, ModuleIR *IR, std::string vecCount)
     if (name != "")
         name += ".";
     for (auto item: IR->fields) {
-        if (item.isExternal)
-            externMap[item.fldName].push_back(name);
+        if (item.type == "Printf") {
+printf("[%s:%d] NAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), item.fldName.c_str());
+            std::string fieldName = item.fldName;
+            //if (startswith(fieldName, "printfp"))
+                //fieldName = fieldName.substr(8);
+            externMap[fieldName].name.push_back(name);
+            //if (externMap[fieldName].type != "" && externMap[fieldName].type != item.type)
+                 //printf("[%s:%d] prevtype %s nexttype %s\n", __FUNCTION__, __LINE__, externMap[fieldName].type.c_str(), item.type.c_str());
+            externMap[fieldName].type = item.type;
+        }
         if (auto IIR = lookupIR(item.type)) {
+printf("[%s:%d] JNAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), item.fldName.c_str());
             recurseObject(name + item.fldName, IIR, item.vecCount);
         }
     }
 }
 
+#define MAX_FILENAME 1000
+static char filenameBuffer[MAX_FILENAME];
 int main(int argc, char **argv)
 {
     std::list<ModuleIR *> irSeq;
@@ -65,10 +89,23 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     }
     std::string myName = argv[argIndex];
     std::string OutputDir = myName + ".generated";
+    std::string dirName;
     int ind = myName.rfind('/');
-    if (ind > 0)
+    if (ind > 0) {
+        dirName = myName.substr(0, ind);
         myName = myName.substr(ind+1);
+    }
 
+    std::string commandLine = getExecutionFilename(filenameBuffer, sizeof(filenameBuffer));
+    ind = commandLine.rfind("/");
+    std::string atomiccDir = commandLine.substr(0, ind);
+    commandLine = atomiccDir + "/../verilator/verilator_bin";
+    commandLine += " -Mdir " + dirName + " ";
+    commandLine += " --atomicc -y " + dirName;
+    commandLine += " -y " + atomiccDir + "/../atomicc-examples/lib/generated/";
+    commandLine += " --top-module l_top l_top.v";
+    int ret = system(commandLine.c_str());
+    printf("[%s:%d] return %d from running '%s'\n", __FUNCTION__, __LINE__, ret, commandLine.c_str());
     readIR(irSeq, OutputDir);
     std::string baseDir = OutputDir;
     ind = baseDir.rfind('/');

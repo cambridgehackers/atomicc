@@ -119,6 +119,7 @@ void dumpMethod(std::string name, MethodInfo *MI);
 void dumpModule(std::string name, ModuleIR *IR);
 std::string findType(std::string name);
 std::string CBEMangle(const std::string &S);
+char *getExecutionFilename(char *buf, int buflen);
 
 // expr.cpp
 std::string tree2str(ACCExpr *expr);
