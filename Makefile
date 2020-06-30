@@ -15,6 +15,12 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+V?=0
+ifeq ($(V),0)
+  Q=@
+else
+  Q=
+endif
 SOURCES = main.cpp verilog.cpp util.cpp interfaces.cpp \
     expr.cpp filegen.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp kami.cpp
 KAMI_SOURCES = kmain.cpp kami.cpp util.cpp readIR.cpp expr.cpp preprocessIR.cpp
@@ -25,7 +31,7 @@ CUDDLIB = ../cudd/cudd/.libs/libcudd.a
 all: veriloggen kamigen atomiccImport atomiccLinker
 
 veriloggen: $(SOURCES) *.h
-	@clang++ -o veriloggen -g -std=c++11 \
+	$(Q)clang++ -o veriloggen -g -std=c++11 \
             -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
             -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
             -pedantic \
@@ -37,7 +43,7 @@ veriloggen: $(SOURCES) *.h
             -I. $(CUDDINC) $(SOURCES) -lBlocksRuntime $(CUDDLIB)
 
 kamigen: $(KAMI_SOURCES) *.h
-	@clang++ -o kamigen -g -std=c++11 \
+	$(Q)clang++ -o kamigen -g -std=c++11 \
             -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
             -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
             -pedantic \
@@ -49,7 +55,7 @@ kamigen: $(KAMI_SOURCES) *.h
             -I. $(CUDDINC) $(KAMI_SOURCES) -lBlocksRuntime $(CUDDLIB)
 
 atomiccLinker: $(LINKER_SOURCES) *.h
-	@clang++ -o atomiccLinker -g -std=c++11 \
+	$(Q)clang++ -o atomiccLinker -g -std=c++11 \
             -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
             -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
             -pedantic \
