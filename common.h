@@ -120,8 +120,12 @@ void dumpModule(std::string name, ModuleIR *IR);
 std::string findType(std::string name);
 std::string CBEMangle(const std::string &S);
 char *getExecutionFilename(char *buf, int buflen);
+void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault);
+std::string exprWidth(ACCExpr *expr, bool forceNumeric = false);
 
 // expr.cpp
+bool bitOp(std::string s);
+bool plainInteger(std::string val);
 std::string tree2str(ACCExpr *expr);
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
@@ -134,7 +138,6 @@ ACCExpr *cleanupBool(ACCExpr *expr);
 ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
 bool checkOperand(std::string s);
 ACCExpr *invertExpr(ACCExpr *expr);
-std::string exprWidth(ACCExpr *expr, bool forceNumeric = false);
 void updateWidth(ACCExpr *item, std::string clen);
 ACCExpr *getRHS(ACCExpr *expr, int match = 1);
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs);
@@ -146,6 +149,7 @@ bool booleanBinop(std::string s);
 bool arithOp(std::string s);
 bool relationalOp(std::string s);
 bool isConstExpr(ACCExpr *expr);
+extern int trace_expr;
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);

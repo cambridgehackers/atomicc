@@ -23,7 +23,7 @@
 #include "common.h"
 #define MAX_EXPR_DEPTH 20
 
-static int trace_expr;//=1;
+int trace_expr;//=1;
 static int trace_bool;//=1;
 static std::string lexString;
 static unsigned lexIndex;
@@ -67,7 +67,7 @@ static std::string treePost(std::string val)
     return "";
 }
 
-static bool bitOp(std::string s)
+bool bitOp(std::string s)
 {
     return s == "^" || s == "&" || s == "|";
 }
@@ -327,7 +327,7 @@ bool checkInteger(ACCExpr *expr, std::string pattern)
     return expr && checkIntegerString(expr->value, pattern);
 }
 
-static bool plainInteger(std::string val)
+bool plainInteger(std::string val)
 {
     return val.length() > 0 && isdigit(val[0]) && val.find("'") == std::string::npos;
 }
@@ -365,103 +365,6 @@ ACCExpr *invertExpr(ACCExpr *expr)
     return allocExpr("^", expr, allocExpr("1"));
 }
 
-std::string exprWidth(ACCExpr *expr, bool forceNumeric)
-{
-    if (!expr)
-        return "0";
-    std::string op = expr->value;
-    if (relationalOp(op))
-        return "1";
-    if (isdigit(op[0])) {
-        int ind = op.find("'");
-        if (ind > 0) {
-            return op.substr(0, ind);
-        }
-        else if (forceNumeric)
-            return "1";
-    }
-    if (isIdChar(op[0])) {
-        ACCExpr *lhs = getRHS(expr, 0);
-        if (lhs && lhs->value == "[" && lhs->operands.size() > 0) {
-            ACCExpr *first = getRHS(lhs, 0);
-            if (first->value == ":") {
-                ACCExpr *second = getRHS(first);
-                first = getRHS(first, 0);
-                if (!second)
-                    return "1";
-                if (isdigit(first->value[0]) && isdigit(second->value[0]))
-                    return "(" + first->value + " - " + second->value + " + 1)";
-            }
-            else if (isdigit(first->value[0]))
-                return "1";
-        }
-        return convertType(refList[op].type);
-    }
-    if (op == "?") {
-        std::string len = exprWidth(getRHS(expr, 1), forceNumeric);
-        if (len != "" && len != "0")
-            return len;
-        len = exprWidth(getRHS(expr, 2), forceNumeric);
-        if (len != "" && len != "0")
-            return len;
-    }
-    if (bitOp(op)) {
-        for (auto item: expr->operands)
-            if (exprWidth(item, forceNumeric) != "1")
-                goto nextand;
-        return "1";
-nextand:;
-    }
-    if (op == "!") {
-        return exprWidth(expr->operands.front(), forceNumeric);
-    }
-    return "0";
-}
-
-void updateWidth(ACCExpr *expr, std::string clen)
-{
-    if (clen == "" || !isdigit(clen[0]) || clen.find(" ") != std::string::npos)
-        return;
-    int len = atoi(clen.c_str());
-    std::string cilen = exprWidth(expr);
-    int ilen = atoi(cilen.c_str());
-    if (ilen < 0 || len < 0) {
-        printf("[%s:%d] len %d ilen %d tree %s\n", __FUNCTION__, __LINE__, len, ilen, tree2str(expr).c_str());
-        exit(-1);
-    }
-    if (len > 0 && plainInteger(expr->value))
-        expr->value = autostr(len) + "'d" + expr->value;
-    else if (isIdChar(expr->value[0])) {
-        if (trace_expr)
-            printf("[%s:%d] ID %s ilen %d len %d\n", __FUNCTION__, __LINE__, tree2str(expr).c_str(), ilen, len);
-        if (ilen > len && len > 0 && !expr->operands.size()) {
-printf("[%s:%d] expr %s clen %s conv %s\n", __FUNCTION__, __LINE__, tree2str(expr).c_str(), clen.c_str(), convertType(refList[expr->value].type).c_str());
-            ACCExpr *subexpr = allocExpr(":", allocExpr(autostr(len-1)));
-            if (len > 1)
-                subexpr->operands.push_back(allocExpr("0"));
-            expr->operands.push_back(allocExpr("[", subexpr));
-        }
-    }
-    else if (expr->value == ":") // for __phi
-        updateWidth(getRHS(expr), clen);
-    else if (expr->value == "?") {
-        updateWidth(getRHS(expr), clen);
-        updateWidth(getRHS(expr, 2), clen);
-    }
-    else if (arithOp(expr->value) || expr->value == "(" || expr->value == "@-") {
-        if (expr->value == "@-"
-            && isdigit(expr->operands.front()->value[0]) && len == 1) {
-            /* hack to update width on "~foo", which translates to "foo ^ -1" in the IR */
-            expr->value = expr->operands.front()->value;
-            expr->operands.clear();
-            updateWidth(expr, clen);
-        }
-        else
-        for (auto item: expr->operands)
-            updateWidth(item, clen);
-    }
-}
-
 bool matchExpr(ACCExpr *lhs, ACCExpr *rhs)
 {
     if (!lhs && !rhs)
@@ -483,72 +386,6 @@ ACCExpr *dupExpr(ACCExpr *expr)
     for (auto item: expr->operands)
         ext->operands.push_back(dupExpr(item));
     return ext;
-}
-
-static void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault)
-{
-    while(1) {
-    if (expr->value == "__reduce") {
-        ACCExpr *list = expr->operands.front();
-        std::string op = getRHS(list, 0)->value;
-        expr->value = "@" + op.substr(1, op.length() - 2);
-        expr->operands.clear();
-        expr->operands.push_back(getRHS(list, 1));
-    }
-    else if (expr->value == "__bitconcat") {
-        ACCExpr *list = expr->operands.front();
-        if (list->value == PARAMETER_MARKER)
-            list->value = "{";
-        expr->value = list->value;
-        expr->operands = list->operands;
-    }
-    else if (expr->value == "__bitsubstr") {
-        ACCExpr *list = expr->operands.front();
-        ACCExpr *bitem = list->operands.front();
-        if (!isIdChar(bitem->value[0])) {  // can only do bit select on net or reg (not expressions)
-            printf("[%s:%d] can only do __bitsubstr on elementary items '%s'\n", __FUNCTION__, __LINE__, bitem->value.c_str());
-            dumpExpr("BITSUB", expr);
-            exit(-1);
-        }
-        bitem->operands.push_back(allocExpr("[", allocExpr(":", getRHS(list), getRHS(list, 2))));
-        expr->value = bitem->value;
-        expr->operands = bitem->operands;
-    }
-    else if (expr->value == "__phi") {
-        ACCExpr *list = expr->operands.front(); // get "(" list of [":", cond, value] items
-        int size = list->operands.size();
-        ACCExpr *firstInList = getRHS(list, 0), *secondInList = getRHS(list);
-        ACCExpr *newe = nullptr;
-        if (size == 2 && matchExpr(getRHS(firstInList, 0), invertExpr(getRHS(secondInList, 0))))
-            newe = allocExpr("?", getRHS(firstInList, 0), getRHS(firstInList), getRHS(secondInList));
-        else if (size == 2 && getRHS(firstInList, 0)->value == "__default" && exprWidth(getRHS(secondInList)) == "1")
-            newe = allocExpr("&&", getRHS(secondInList, 0), getRHS(secondInList));
-        else if (size == 1)
-            newe = getRHS(firstInList);
-        else {
-            //dumpExpr("PHI", list);
-            newe = allocExpr("|");
-            for (auto item: list->operands) {
-                if (trace_expr)
-                    dumpExpr("PHIELEMENTBEF", item);
-                if (checkInteger(getRHS(item), "0"))
-                    continue;    // default value is already '0'
-                item->value = "?"; // Change from ':' -> '?'
-                item->operands.push_back(allocExpr(phiDefault));
-                updateWidth(item, exprWidth(getRHS(item)));
-                newe->operands.push_back(item);
-                if (trace_expr)
-                    dumpExpr("PHIELEMENT", item);
-            }
-        }
-        expr->value = newe->value;
-        expr->operands = newe->operands;
-    }
-    else
-        break;
-    }
-    for (auto item: expr->operands)
-        walkReplaceBuiltin(item, "0");
 }
 
 ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
@@ -612,14 +449,6 @@ ACCExpr *cleanupInteger(ACCExpr *expr)
         ret->operands.clear();
     }
     return ret;
-}
-
-ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault)
-{
-    if (!expr)
-        return expr;
-    walkReplaceBuiltin(expr, phiDefault);
-    return cleanupExpr(expr);
 }
 
 typedef struct {
