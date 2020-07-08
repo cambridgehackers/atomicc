@@ -218,7 +218,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
 {
 //dumpModule("COLLECT", IR);
     assert(IR);
-    bool isSync = startswith(IR->name + ".", "PipeInSync.") || argIsSync;
+    bool isSync = startswith(IR->name, "PipeInSync") || argIsSync;
     MapNameValue mapValue = parentMap;
     extractParam(IR->name, mapValue);
 //for (auto item: mapValue)
