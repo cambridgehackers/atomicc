@@ -81,6 +81,7 @@ static char filenameBuffer[MAX_FILENAME];
 int main(int argc, char **argv)
 {
     std::list<ModuleIR *> irSeq;
+    std::list<std::string> fileList;
 printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     int argIndex = 1;
     if (argc - 1 != argIndex) {
@@ -106,7 +107,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     commandLine += " --top-module l_top l_top.v";
     int ret = system(commandLine.c_str());
     printf("[%s:%d] return %d from running '%s'\n", __FUNCTION__, __LINE__, ret, commandLine.c_str());
-    readIR(irSeq, OutputDir);
+    readIR(irSeq, fileList, OutputDir);
     std::string baseDir = OutputDir;
     ind = baseDir.rfind('/');
     if (ind > 0)
@@ -116,5 +117,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
         break;
     }
     dumpMap();
+    for (auto item: fileList)
+        printf("[%s:%d] file '%s'\n", __FUNCTION__, __LINE__, item.c_str());
     return 0;
 }

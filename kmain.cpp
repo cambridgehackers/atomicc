@@ -21,6 +21,7 @@
 int main(int argc, char **argv)
 {
     std::list<ModuleIR *> irSeq;
+    std::list<std::string> fileList;
 printf("[%s:%d] KAMIGEN\n", __FUNCTION__, __LINE__);
     int argIndex = 1;
     if (argc - 1 != argIndex) {
@@ -33,7 +34,7 @@ printf("[%s:%d] KAMIGEN\n", __FUNCTION__, __LINE__);
     if (ind > 0)
         myName = myName.substr(ind+1);
 
-    readIR(irSeq, OutputDir);
+    readIR(irSeq, fileList, OutputDir);
     flagErrorsCleanup = 1;
     generateKami(irSeq, myName, OutputDir);
     return 0;

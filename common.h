@@ -152,7 +152,7 @@ bool isConstExpr(ACCExpr *expr);
 extern int trace_expr;
 
 // readIR.cpp
-void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir);
+void readIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &fileList, std::string OutputDir);
 
 // processInterfaces
 void processInterfaces(std::list<ModuleIR *> &irSeq);

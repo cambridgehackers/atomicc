@@ -276,7 +276,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
     }
 }
 
-static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
+static void readModuleIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &fileList, FILE *OStr)
 {
     OStrGlobal = OStr;
     while (readLine()) {
@@ -289,6 +289,14 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, FILE *OStr)
             isStruct = checkItem("STRUCT");
         if (!ext && !interface && !isStruct)
             isSerialize = checkItem("SERIALIZE");
+        if (!ext && !interface && !isStruct && !isSerialize) {
+            if (checkItem("FILE")) {
+                while (*bufp == ' ')
+                    bufp++;
+                fileList.push_back(bufp);
+                continue;
+            }
+        }
         ParseCheck(ext || interface || isStruct || isSerialize || checkItem("MODULE"), "Module header missing");
         std::string name = getToken();
         ModuleIR *IR = allocIR(name, interface);
@@ -385,13 +393,13 @@ interface, isStruct, isSerialize, ext);
         printf("[%s:%d] after readmoduleIR\n", __FUNCTION__, __LINE__);
 }
 
-void readIR(std::list<ModuleIR *> &irSeq, std::string OutputDir)
+void readIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &fileList, std::string OutputDir)
 {
     FILE *OStrIRread = fopen((OutputDir + ".IR").c_str(), "r");
     if (!OStrIRread) {
         printf("veriloggen: unable to open '%s'\n", (OutputDir + ".IR").c_str());
         exit(-1);
     }
-    readModuleIR(irSeq, OStrIRread);
+    readModuleIR(irSeq, fileList, OStrIRread);
     fclose(OStrIRread);
 }

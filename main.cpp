@@ -58,6 +58,7 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
 int main(int argc, char **argv)
 {
     std::list<ModuleIR *> irSeq;
+    std::list<std::string> fileList;
     bool noVerilator = false;
 noVerilator = true;
 printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
@@ -80,7 +81,7 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     if (ind > 0)
         myName = myName.substr(ind+1);
 
-    readIR(irSeq, OutputDir);
+    readIR(irSeq, fileList, OutputDir);
     cleanupIR(irSeq);
     flagErrorsCleanup = 1;
     if (int ret = generateSoftware(irSeq, argv[0], OutputDir))
