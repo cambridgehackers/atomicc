@@ -31,9 +31,9 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
         modLineTop.clear();
         generateModuleDef(IR, modLineTop);         // Collect/process verilog info
 
-        FILE *OStrV = fopen((baseDir + IR->name + ".v").c_str(), "w");
+        FILE *OStrV = fopen((baseDir + IR->name + ".sv").c_str(), "w");
         if (!OStrV) {
-            printf("veriloggen: unable to open '%s'\n", (baseDir + IR->name + ".v").c_str());
+            printf("veriloggen: unable to open '%s'\n", (baseDir + IR->name + ".sv").c_str());
             exit(-1);
         }
         fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
@@ -93,7 +93,7 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     generateKami(irSeq, myName, OutputDir);
 
     if (!noVerilator) {
-        std::string commandLine = "verilator --cc " + OutputDir + ".v";
+        std::string commandLine = "verilator --cc " + OutputDir + ".sv";
         int ret = system(commandLine.c_str());
         printf("[%s:%d] RETURN from '%s' %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), ret);
         if (ret)

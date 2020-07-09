@@ -292,7 +292,7 @@ default clock/reset signals for a module will always have these names)
 There is a tool to automate the creation of AtomicC header files from verilog source files.
 For example:
 >        atomiccImport -o MMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 zynq.lib
->        atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.v
+>        atomiccImport -o VMMCME2_ADV.h -C MMCME2_ADV -P Mmcme2 MMCME2_ADV.sv
 
 Command line switches...
 

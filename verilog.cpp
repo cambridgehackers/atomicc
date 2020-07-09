@@ -974,7 +974,7 @@ dumpExpr("READCALL", value);
 }
 
 /*
- * Generate *.v and *.vh for a Verilog module
+ * Generate *.sv and *.vh for a Verilog module
  */
 void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop)
 {

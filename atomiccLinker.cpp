@@ -104,7 +104,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     commandLine += " -Mdir " + dirName + " ";
     commandLine += " --atomicc -y " + dirName;
     commandLine += " -y " + atomiccDir + "/../atomicc-examples/lib/generated/";
-    commandLine += " --top-module l_top l_top.v";
+    commandLine += " --top-module l_top l_top.sv";
     int ret = system(commandLine.c_str());
     printf("[%s:%d] return %d from running '%s'\n", __FUNCTION__, __LINE__, ret, commandLine.c_str());
     readIR(irSeq, fileList, OutputDir);
