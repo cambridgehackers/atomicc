@@ -105,7 +105,8 @@ if (0)
          && !checkInteger(value, "1")
          && !isEnaName(value->value)
          && !isRdyName(value->value)) {   // preserve these for ease of reading verilog
-            assignList[target].noRecursion = true;
+            //assignList[target].noRecursion = true;
+            // we need to replace these in __ENA expressions so that we can remove __RDY expression elements for the __ENA method
         }
         int ind = target.find('[');
         if (ind != -1) {
