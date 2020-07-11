@@ -168,8 +168,7 @@ printf("[%s:%d] oldtype %s newtype %s\n", __FUNCTION__, __LINE__, arg.c_str(), n
     if (auto IR = lookupIR(bp)) {
         return mapReturn(bp);
     }
-    printf("[%s:%d] instantiateType FAILED '%s'\n", __FUNCTION__, __LINE__, bp);
-    exit(-1);
+    return mapReturn(bp);
 }
 
 std::string convertType(std::string arg, int arrayProcess)

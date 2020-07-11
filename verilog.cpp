@@ -222,6 +222,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
     bool isSync = startswith(IR->name, "PipeInSync") || argIsSync;
     MapNameValue mapValue = parentMap;
     extractParam(IR->name, mapValue);
+    vecCount = instantiateType(vecCount, mapValue);
 //for (auto item: mapValue)
 //printf("[%s:%d] [%s] = %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
     if (!localInterface || methodPrefix != "")
@@ -275,7 +276,7 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
             interfaceName += MODULE_SEPARATOR;
 //printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
         collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
-            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, isPtr || item.isPtr, item.vecCount, localInterface, isSync);
+            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, isPtr || item.isPtr, instantiateType(item.vecCount, mapValue), localInterface, isSync);
     }
 }
 
