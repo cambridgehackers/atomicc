@@ -305,15 +305,16 @@ exit(-1);
         if (vc != "") {
             if (dontDeclare && dimIndex != -1)
                 instName = minst + "[" + autostr(dimIndex) + "]." + name;
-            else
-                instName = name;
+            //else
+                //instName = name;
         }
         if (!isLocal || instance == "" || dontDeclare) {
         if (refList[instName].pin) {
             printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, instName.c_str(), refList[instName].pin, refPin);
         }
         //assert (!refList[instName].pin);
-        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare, type, dir != 0, inout, refPin, false, dontDeclare, "", isArgument};
+printf("[%s:%d] name %s type %s dir %d vecCount %s interfaceVecCount %s dontDeclare %d\n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), dir, vecCount.c_str(), interfaceVecCount.c_str(), dontDeclare);
+        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare || vc != "", type, dir != 0, inout, refPin, false, dontDeclare, vc, isArgument};
             if(instance == "" && interfaceVecCount != "")
                 refList[instName].done = true;  // prevent default blanket assignment generation
         }

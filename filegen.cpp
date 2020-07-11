@@ -219,7 +219,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             if (!refList[temp].done && refList[temp].count) {
                 if (assignList[item.first].value)
                     fprintf(OStr, "    assign %s = %s;\n", finishString(item.first).c_str(), finishExpr(assignList[item.first].value).c_str());
-                else
+                else if (refList[temp].vecCount == "")
                     fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", finishString(item.first).c_str());
             }
             else if (trace_skipped)
