@@ -449,18 +449,25 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
     // Check/replace dummy intermediate classes that are only present for typechecking
     // e.g., Fifo1 -> Fifo1Base
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
-        FieldElement field;
-        if ((*IR)->interfaceConnect.size()
-         || (*IR)->unionList.size()
+        if ((*IR)->unionList.size()
          || (*IR)->params.size()
          || (*IR)->priority.size()
          || (*IR)->softwareName.size()
          || (*IR)->metaList.size()
          || (*IR)->fields.size() != 1)
-            goto skipLab;
-        {
-        field = (*IR)->fields.front();
+            {} // skip
+        else {
+        FieldElement field = (*IR)->fields.front();
         ModuleIR *fieldIR = lookupIR(field.type);
+        if ((*IR)->interfaceConnect.size()) {
+            if ((*IR)->methods.size())
+                goto skipLab;
+dumpModule("MASTER", lookupInterface((*IR)->interfaceName));
+dumpModule("FIELD", lookupInterface(fieldIR->interfaceName));
+            for (auto item: (*IR)->interfaceConnect) {
+printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__, __LINE__, tree2str(item.target).c_str(), tree2str(item.source).c_str(), item.type.c_str(), item.isForward);
+            }
+        }
         if (!fieldIR || field.vecCount != "" || field.isPtr || field.isInput
           || field.isOutput || field.isInout || field.isParameter != "" || field.isLocalInterface)
             goto skipLab;

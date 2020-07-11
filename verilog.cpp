@@ -105,7 +105,7 @@ if (0)
          && !checkInteger(value, "1")
          && !isEnaName(value->value)
          && !isRdyName(value->value)) {   // preserve these for ease of reading verilog
-            //assignList[target].noRecursion = true;
+            assignList[target].noRecursion = true;
             // we need to replace these in __ENA expressions so that we can remove __RDY expression elements for the __ENA method
         }
         int ind = target.find('[');
@@ -485,7 +485,7 @@ static void decRef(std::string name)
     }
 }
 
-static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "")
+static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
 {
     if (!expr)
         return expr;
@@ -498,19 +498,19 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "")
             printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
             return allocExpr("1");
         }
-        if (!assignList[item].noRecursion)
+        if (!assignList[item].noRecursion || enableListProcessing)
         if (ACCExpr *assignValue = assignList[item].value)
         if (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
         decRef(item);
         walkRef(assignValue);
         if (trace_assign)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
-        return replaceAssign(assignValue, guardName);
+        return replaceAssign(assignValue, guardName, enableListProcessing);
         }
     }
     ACCExpr *newExpr = allocExpr(expr->value);
     for (auto item: expr->operands)
-        newExpr->operands.push_back(replaceAssign(item, guardName));
+        newExpr->operands.push_back(replaceAssign(item, guardName, enableListProcessing));
     newExpr = cleanupExpr(newExpr, true);
     if (trace_assign)
     printf("[%s:%d] end %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(newExpr).c_str());
@@ -1176,7 +1176,7 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
     for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY
         generateSection = top.first;
         for (auto item: top.second) {
-        setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first)), "Bit(1)");
+        setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first), true), "Bit(1)");
         }
     }
     generateSection = "";
