@@ -314,7 +314,8 @@ exit(-1);
             printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, instName.c_str(), refList[instName].pin, refPin);
         }
         //assert (!refList[instName].pin);
-printf("[%s:%d] name %s type %s dir %d vecCount %s interfaceVecCount %s dontDeclare %d\n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), dir, vecCount.c_str(), interfaceVecCount.c_str(), dontDeclare);
+        if (trace_ports)
+            printf("[%s:%d] name %s type %s dir %d vecCount %s interfaceVecCount %s dontDeclare %d\n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), dir, vecCount.c_str(), interfaceVecCount.c_str(), dontDeclare);
         refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare || vc != "", type, dir != 0, inout, refPin, false, dontDeclare, vc, isArgument};
             if(instance == "" && interfaceVecCount != "")
                 refList[instName].done = true;  // prevent default blanket assignment generation
