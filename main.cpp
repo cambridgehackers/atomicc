@@ -38,6 +38,18 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
         }
         fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
         fprintf(OStrV, "`default_nettype none\n");
+#if 0 // for future support of System Verilog structs
+        for (auto item: mapIndex) {
+            ModuleIR *IR = item.second;
+            if (IR->isStruct && IR->name != "NOCDataH") {
+                fprintf(OStrV, "typedef struct packed {\n");
+                for (auto fitem: IR->fields) {
+                    fprintf(OStrV, "    %s %s;\n", typeDeclaration(fitem.type).c_str(), fitem.fldName.c_str());
+                }
+                fprintf(OStrV, "} %s;\n", item.first.c_str());
+            }
+        }
+#endif
         generateModuleHeader(OStrV, modLineTop);
         generateVerilogOutput(OStrV);
         fprintf(OStrV, "endmodule \n\n`default_nettype wire    // set back to default value\n");

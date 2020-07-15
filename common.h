@@ -107,6 +107,7 @@ std::string convertType(std::string arg, int arrayProcess = 0);
 ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);
 std::string sizeProcess(std::string type);
+std::string typeDeclaration(std::string type);
 ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker);
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name);
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr);

@@ -235,6 +235,11 @@ std::string sizeProcess(std::string type)
     return "[" + val + " - 1:0]";
 }
 
+std::string typeDeclaration(std::string type)
+{
+    return "logic " + sizeProcess(type);
+}
+
 ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
 {
     for (auto item: IR->fields) {
