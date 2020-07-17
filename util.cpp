@@ -494,7 +494,7 @@ MethodInfo *allocMethod(std::string name)
         name/*name*/, false/*rule*/, false/*action*/,
         {}/*storeList*/, {}/*letList*/, {}/*callList*/, {}/*printfList*/,
         ""/*type*/, {}/*params*/, {}/*generateFor*/, {}/*instantiateFor*/,
-        {}/*alloca*/, {{}}/*meta*/};
+        {}/*alloca*/, {}/*interfaceConnect*/, {{}}/*meta*/};
     return MI;
 }
 
@@ -526,7 +526,7 @@ void dumpMethod(std::string name, MethodInfo *MI)
         printf(" %s = %s", retType.c_str(), retVal.c_str());
     printf(" {");
     if (MI->alloca.size() || MI->letList.size() || MI->storeList.size()
-        || MI->callList.size() || MI->generateFor.size() || MI->instantiateFor.size()) {
+        || MI->callList.size() || MI->generateFor.size() || MI->instantiateFor.size() || MI->interfaceConnect.size()) {
     printf("\n");
     for (auto item: MI->alloca)
         printf("      ALLOCA %s %s\n", item.second.type.c_str(), item.first.c_str());
@@ -547,6 +547,8 @@ void dumpMethod(std::string name, MethodInfo *MI)
             item.var.c_str(), tree2str(item.init).c_str(),
             tree2str(item.limit).c_str(), tree2str(item.incr).c_str(),
             tree2str(item.sub).c_str(), item.body.c_str());
+    for (auto IC: MI->interfaceConnect)
+         printf("      INTERFACECONNECT%s %s %s %s\n", (IC.isForward ? "/Forward" : ""), tree2str(IC.target).c_str(), tree2str(IC.source).c_str(), IC.type.c_str());
     }
     printf("    }\n");
 }

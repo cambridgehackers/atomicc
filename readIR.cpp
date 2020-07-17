@@ -270,6 +270,13 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 MI->instantiateFor.push_back(InstantiateForItem{cond, var->value, init, term, incr, sub, baseMethodName(body)});
                 IR->genvarCount = 1;
             }
+            else if (checkItem("INTERFACECONNECT")) {
+                bool        isForward = checkItem("/Forward");
+                ACCExpr *target = cleanInterface(getExpression(' '));
+                ACCExpr *source = cleanInterface(getExpression(' '));
+                std::string type = getType();
+                MI->interfaceConnect.push_back(InterfaceConnectType{target, source, type, isForward});
+            }
             else
                 ParseCheck(false, "unknown method item");
         }

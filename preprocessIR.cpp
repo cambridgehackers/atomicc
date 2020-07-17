@@ -183,6 +183,7 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
     newMI->generateSection = MI->generateSection;
     newMI->rule = MI->rule;
     newMI->action = MI->action;
+    newMI->interfaceConnect = MI->interfaceConnect;
     for (auto item : MI->storeList)
         newMI->storeList.push_back(new StoreListElement{
             walkToGeneric(item->dest, paramMap),
@@ -275,6 +276,7 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
 {
     static int bodyIndex = 99;
     std::string methodName = MI->name;
+    std::map<std::string, int> localConnect;
     walkSubscript(IR, MI->guard, isGenerate);
     for (auto item: MI->storeList) {
         walkSubscript(IR, item->dest, isGenerate);
@@ -290,6 +292,21 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
         walkSubscript(IR, item->cond, isGenerate);
     for (auto item: MI->printfList)
         walkSubscript(IR, item->cond, isGenerate);
+    for (auto IC : MI->interfaceConnect) {
+        walkSubscript(IR, IC.target, false);
+        walkSubscript(IR, IC.source, false);
+        //walkSubst(IR, info->target);
+        //walkSubst(IR, info->source);
+        //info->target = cleanupExprBuiltin(info->target);
+        //info->source = cleanupExprBuiltin(info->source);
+        if (!IC.isForward) {
+            localConnect[tree2str(IC.target)] = 1;
+            localConnect[tree2str(IC.source)] = 1;
+        }
+    }
+    for (auto item = IR->interfaces.begin(); item != IR->interfaces.end(); item++)
+        if (localConnect[item->fldName])
+            item->isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)
     // subscript processing requires that we defactor the entire statement,
     // not just add a condition expression into the tree
 //bool moved = false;

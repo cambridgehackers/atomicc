@@ -53,7 +53,6 @@ static bool isParen(char ch)
 
 static std::string treePost(std::string val)
 {
-    std::string space = " ";
     if (val == "[")
         return " ]";
     else if (val == "(")
@@ -61,9 +60,9 @@ static std::string treePost(std::string val)
     else if (val == "{")
         return " }";
     else if (val == SUBSCRIPT_MARKER)
-        return space + SUBSCRIPT_CLOSE;
+        return " " SUBSCRIPT_CLOSE;
     else if (val == PARAMETER_MARKER)
-        return space + PARAMETER_CLOSE;
+        return " " PARAMETER_CLOSE;
     return "";
 }
 
@@ -147,6 +146,7 @@ std::string tree2str(ACCExpr *expr)
     }
     else if (isIdChar(op[0])) {
         ret += op;
+        op = "";
     }
     else if (((op == "-")/*unary*/ && expr->operands.size() == 1))
         ret += op;

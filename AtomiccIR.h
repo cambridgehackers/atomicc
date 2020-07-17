@@ -138,6 +138,7 @@ typedef struct {
     std::list<GenerateForItem> generateFor;
     std::list<InstantiateForItem> instantiateFor;
     std::map<std::string, AllocaItem> alloca;
+    std::list<InterfaceConnectType>   interfaceConnect; // from __connectInterface() processing
     MetaRef                    meta[MetaMax];
 } MethodInfo;
 

@@ -1147,6 +1147,22 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
         assert(IIR && "interfaceConnect interface type");
         connectMethods(IIR, IC.target, IC.source, IC.isForward);
     }
+    for (auto MI : IR->methods)
+        for (auto IC : MI->interfaceConnect) {
+            std::string iname = IC.type;
+            if (startswith(iname, "ARRAY_")) {
+                iname = iname.substr(6);
+                int ind = iname.find("_");
+                if (ind > 0)
+                    iname = iname.substr(ind+1);
+            }
+printf("[%s:%d]CCCCCCCCCCCCCCCCCCCCCCCCC tar %s sou %s for %d type %s\n", __FUNCTION__, __LINE__, tree2str(IC.target).c_str(), tree2str(IC.source).c_str(), IC.isForward, IC.type.c_str());
+            ModuleIR *IIR = lookupInterface(iname);
+            if (!IIR)
+                dumpMethod("MISSINGCONNECT", MI);
+            assert(IIR && "interfaceConnect interface type");
+            connectMethods(IIR, IC.target, IC.source, IC.isForward);
+        }
     traceZero("AFTCONNECT");
     for (auto MI : IR->methods)
         if (MI->generateSection == "")
