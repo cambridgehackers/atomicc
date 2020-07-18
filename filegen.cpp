@@ -111,7 +111,6 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
 
 void generateVerilogOutput(FILE *OStr)
 {
-    bool isGenerate = false;
     std::list<std::string> resetList;
     // generate local state element declarations and wires
     for (auto item: refList) {
@@ -151,19 +150,11 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
     std::string endStr, sep;
     std::list<std::string> tempOutput;
     auto flushOut = [&](void) -> void {
-        if (isGenerate)
-            fprintf(OStr, "  ");
         for (auto item: tempOutput)
             fprintf(OStr, "%s", item.c_str());
         fprintf(OStr, "%s", endStr.c_str());
-        if (isGenerate) {
-            fprintf(OStr, "    end;\n");
-        }
         tempOutput.clear();
     };
-    for (auto mitem: modNew)
-        if (mitem.moduleStart && mitem.vecCount != "")
-            genvarMap[GENVAR_NAME + autostr(1)] = 1;
     if (genvarMap.size() > 0) {
         const char *sep = "    genvar ";
         for (auto gitem: genvarMap) {
@@ -179,25 +170,18 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             moduleSyncFF = (mitem.value == "SyncFF");  // do not perform cleanupExpr on this instantiation (will replace syncPins)
             if (mitem.vecCount == "")
                 mitem.vecCount = convertType(mitem.type, 2);
-            isGenerate = mitem.vecCount != "";
             std::string instName = mitem.argName;
             // HACK HACK HACK HACK
-            std::string vecCountStr = mitem.vecCount;
-            if (isGenerate) {
-                std::string g = GENVAR_NAME + autostr(1);
-                fprintf(OStr, "    for(%s = 0; %s < %s; %s = %s + 1) begin : %s\n",
-                    g.c_str(), g.c_str(), vecCountStr.c_str(), g.c_str(), g.c_str(), mitem.argName.c_str());
-                instName = "data";
-            }
-            tempOutput.push_back("    " + mitem.value + " " + instName + " (");
+            std::string vecCountStr;
+            if (mitem.vecCount != "")
+                vecCountStr = " [" + mitem.vecCount + " - 1:0]";
+            tempOutput.push_back("    " + mitem.value + " " + instName + vecCountStr + " (");
             if (!mitem.noDefaultClock)
                 tempOutput.push_back(".CLK(CLK), .nRST(nRST),");
             sep = "";
         }
         else {
             std::string val = moduleSyncFF ? mitem.value : finishExpr(cleanupExpr(str2tree(mitem.value)));
-            if (isGenerate)
-                fprintf(OStr, "      wire %s;\n", (sizeProcess(mitem.type) + val).c_str());
             tempOutput.push_back(sep + "\n        ." + mitem.argName + "(" + val + ")");
             sep = ",";
         }
