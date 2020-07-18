@@ -21,11 +21,10 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-int trace_expand;//= 1;
-std::map<std::string, ModuleIR *> mapIndex;
-std::map<std::string, ModuleIR *> interfaceIndex;
+int trace_expand;//=1;
+std::map<std::string, ModuleIR *> mapIndex, mapStripped, interfaceIndex, interfaceStripped;
 static int trace_iter;//=1;
-static int traceLookup;//= 1;
+static int traceLookup;//=1;
 
 std::string baseMethodName(std::string pname)
 {
@@ -96,27 +95,41 @@ void extractParam(std::string replaceList, MapNameValue &mapValue)
 ModuleIR *lookupIR(std::string name)
 {
     std::string ind = name;
-    //int i = ind.find("(");
-    //if (i > 0)
-        //ind = ind.substr(0,i);
-    if (ind == "" || mapIndex.find(ind) == mapIndex.end())
+    ModuleIR *IR = nullptr;
+    if (ind == "")
         return nullptr;
-    if (mapIndex[ind]->isInterface)
+    if (mapIndex.find(ind) != mapIndex.end())
+        IR = mapIndex[ind];
+    else {
+        int i = ind.find("(");
+        if (i > 0)   // now try without parameter instantiation
+            ind = ind.substr(0,i);
+        if (mapStripped.find(ind) != mapStripped.end())
+            IR = mapStripped[ind];
+    }
+    if (IR && IR->isInterface)
         printf("[%s:%d] was interface %s\n", __FUNCTION__, __LINE__, ind.c_str());
-    return mapIndex[ind];
+    return IR;
 }
 
 ModuleIR *lookupInterface(std::string name)
 {
     std::string ind = name;
-    //int i = ind.find("(");
-    //if (i > 0)
-        //ind = ind.substr(0,i);
-    if (ind == "" || interfaceIndex.find(ind) == interfaceIndex.end())
+    ModuleIR *IR = nullptr;
+    if (ind == "")
         return nullptr;
-    if (!interfaceIndex[ind]->isInterface)
+    if (interfaceIndex.find(ind) != interfaceIndex.end())
+        IR = interfaceIndex[ind];
+    else {
+        int i = ind.find("(");
+        if (i > 0)   // now try without parameter instantiation
+            ind = ind.substr(0,i);
+        if (interfaceStripped.find(ind) != interfaceStripped.end())
+            IR = interfaceStripped[ind];
+    }
+    if (IR && !IR->isInterface)
         printf("[%s:%d] not interface %s\n", __FUNCTION__, __LINE__, ind.c_str());
-    return interfaceIndex[ind];
+    return IR;
 }
 
 std::string instantiateType(std::string arg, MapNameValue &mapValue)
@@ -484,6 +497,14 @@ ModuleIR *allocIR(std::string name, bool isInterface)
         interfaceIndex[iname] = IR;
     else
         mapIndex[iname] = IR;
+    int i = iname.find("(");
+    if (i > 0) {        // also insert without parameter instantiation
+        iname = iname.substr(0,i);
+        if (isInterface)
+            interfaceStripped[iname] = IR;
+        else
+            mapStripped[iname] = IR;
+    }
     return IR;
 }
 

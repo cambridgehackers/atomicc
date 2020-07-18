@@ -229,8 +229,19 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 bool isAction = checkItem("/Action");
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
-                ACCExpr *expr = str2tree(bufp);
-                MI->callList.push_back(new CallListElement{expr, cond, isAction});
+                ACCExpr *value = str2tree(bufp);
+                // TODO: make this processing more general
+                if (value->value == ".") {     // handle qualified expr case
+                    ACCExpr *newValue = allocExpr("");
+                    std::string sep;
+                    for (auto sub: value->operands) {
+                        newValue->value += sep + sub->value;
+                        sep = "$";           // ??????
+                        newValue->operands = sub->operands; // last one has the call params
+                    }
+                    value = newValue;
+                }
+                MI->callList.push_back(new CallListElement{value, cond, isAction});
             }
             else if (checkItem("PRINTF")) {
                 ACCExpr *cond = getExpression(':');

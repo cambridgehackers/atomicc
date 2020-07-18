@@ -90,7 +90,7 @@ bool relationalOp(std::string s)
 
 static bool checkOperator(std::string s)
 {
-    return booleanBinop(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == "," || s == "!" || s == ".";
+    return booleanBinop(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == "," || s == "!" || s == "." || s == "=";
 }
 
 bool checkOperand(std::string s)
@@ -130,18 +130,20 @@ ACCExpr *getRHS(ACCExpr *expr, int match)
      return nullptr;
 }
 
-std::string tree2str(ACCExpr *expr)
+std::string tree2str(ACCExpr *expr, bool addSpaces)
 {
     if (!expr)
         return "";
-    std::string ret, sep, orig = expr->value;
+    std::string ret, sep, orig = expr->value, space;
+    if (addSpaces)
+        space = " ";
     if (orig[0] == '@')
         orig = orig.substr(1);
     std::string op = orig;
     if (isParen(op)) {
         ret += op;
         if (expr->operands.size())
-            ret += " ";
+            ret += space;
         op = ",";
     }
     else if (isIdChar(op[0])) {
@@ -160,8 +162,8 @@ std::string tree2str(ACCExpr *expr)
             ret += "( ";
         ret += tree2str(item);
         if (addParen)
-            ret += " )";
-        sep = " " + op + " ";
+            ret += space + ")";
+        sep = space + op + space;
         if (op == "?")
             op = ":";
     }
@@ -605,7 +607,7 @@ printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                     exit(-1);
                 }
                 while (tnext && (isParen(tnext->value) || isIdChar(tnext->value[0]))) {
-                    assert(isIdChar(tok->value[0]));
+                    assert(isIdChar(tok->value[0]) || tok->value[0] == '.'); // hack for fifo[i].out
                     tok->operands.push_back(tnext);
                     tnext = get1Token();
                 }

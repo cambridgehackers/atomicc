@@ -29,47 +29,6 @@ int implementPrintf;//=1;
 std::map<std::string, int> genericModule;
 static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest = false);
 
-std::string genericName(std::string name)
-{
-    int ind = name.find("(");
-    if (ind > 0) {
-        name = name.substr(0, ind);
-        //if (genericModule[name])   // actual body could be declared externally
-            return name;
-    }
-    return "";
-}
-std::string genericModuleParam(std::string name)
-{
-    std::string ret;
-    int ind = name.find("(");
-    if (ind > 0) {
-        name = name.substr(ind+1);
-        ind = name.rfind(")");
-        if (ind > 0)
-            name = name.substr(0, ind);
-        std::string sep;
-        while (name.length() > 0) {
-            ind = name.find("=");
-            if (ind == -1)
-                break;
-            ret += sep + "." + name.substr(0,ind) + "(";
-            name = name.substr(ind+1);
-            ind = name.find(",");
-            if (ind > 0) {
-                ret += name.substr(0,ind);
-                name = name.substr(ind+1);
-            }
-            else {
-                ret += name;
-                name = "";
-            }
-            ret += ")";
-            sep = ",";
-        }
-    }
-    return ret;
-}
 static void walkSubst (ModuleIR *IR, ACCExpr *expr)
 {
     if (!expr)
@@ -162,14 +121,14 @@ static ACCExpr *walkToGeneric (ACCExpr *expr, std::list<PARAM_MAP> &paramMap)
 
 static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
 {
-    if (type.find(" ") != std::string::npos && startswith(type, "Bit(") && endswith(type, ")")) {
-        // perform substitution on bit length expressions
-        ACCExpr *expr = walkToGeneric(str2tree(type.substr(4, type.length() - 5)), paramMap); // Bit()
-        type = "Bit(" + tree2str(expr) + ")";
+    int ind = type.find("(");
+    if (ind > 0 && type[type.length()-1] == ')') {
+        std::string base = type.substr(0, ind+1);
+        type = type.substr(ind+1);
+        type = type.substr(0, type.length()-1);
+        // over
+        type = base + tree2str(walkToGeneric(str2tree(type), paramMap), false) + ")";
     }
-    for (auto item: paramMap)
-        if (startswith(type, "Bit(") && endswith(type, ")") && checkIntegerString(type.substr(4, type.length() - 5), item.value))
-            return "Bit(" + item.name + ")";
     return type;
 };
 
@@ -479,8 +438,8 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
         if ((*IR)->interfaceConnect.size()) {
             if ((*IR)->methods.size())
                 goto skipLab;
-dumpModule("MASTER", lookupInterface((*IR)->interfaceName));
-dumpModule("FIELD", lookupInterface(fieldIR->interfaceName));
+//dumpModule("MASTER", lookupInterface((*IR)->interfaceName));
+//dumpModule("FIELD", lookupInterface(fieldIR->interfaceName));
             for (auto item: (*IR)->interfaceConnect) {
 printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__, __LINE__, tree2str(item.target).c_str(), tree2str(item.source).c_str(), item.type.c_str(), item.isForward);
             }

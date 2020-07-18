@@ -136,14 +136,14 @@ exit(-1);
             std::string userInterface = item.second.field.fldName;
             std::string pName = pipeName;
             fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
+            std::string type = (outcall ? "___M2P" : "___P2M") + userTypeName;
             std::string interfaceName = fieldName + "___IFC";
-            ModuleIR *ifcIR = allocIR(fieldName);
+            ModuleIR *ifcIR = allocIR(type);
             ifcIR->interfaceName = interfaceName;
-            ifcIR->isInterface = false;
             ModuleIR *ifcIRinterface = allocIR(interfaceName, true);
             ifcIRinterface->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
             ifcIRinterface->interfaces.push_back(FieldElement{"pipe", "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
-            IR->fields.push_back(FieldElement{fieldName, "", ifcIR->name, false, false, false, false, ""/*not param*/, false, false, false});
+            IR->fields.push_back(FieldElement{fieldName, "", type, false, false, false, false, ""/*not param*/, false, false, false});
             IRifc->interfaces.push_back(FieldElement{userInterface, "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 allocExpr(localName + userInterface),

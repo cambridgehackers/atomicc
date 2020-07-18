@@ -127,7 +127,7 @@ std::string exprWidth(ACCExpr *expr, bool forceNumeric = false);
 // expr.cpp
 bool bitOp(std::string s);
 bool plainInteger(std::string val);
-std::string tree2str(ACCExpr *expr);
+std::string tree2str(ACCExpr *expr, bool addSpaces = true);
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
 bool isParen(std::string ch);
@@ -166,8 +166,6 @@ void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string 
 
 // preprocessIR.cpp
 void preprocessIR(std::list<ModuleIR *> &irSeq);
-std::string genericName(std::string name);
-std::string genericModuleParam(std::string name);
 void cleanupIR(std::list<ModuleIR *> &irSeq);
 
 // verilog.cpp

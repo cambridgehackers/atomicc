@@ -38,7 +38,6 @@ printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
     IR->fields.push_back(FieldElement{"len", "", "Bit(16)", false, false, false, false, ""/*not param*/, false, false, false});
     IR->fields.push_back(FieldElement{"tag", "", "Bit(16)", false, false, false, false, ""/*not param*/, false, false, false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
-    unionIR->isInterface = false;
     IR->fields.push_back(FieldElement{"data", "", unionIR->name, false, false, false, false, ""/*not param*/, false, false, false});
     int counter = 0;  // start method number at 0
     uint64_t maxDataLength = 0;
@@ -48,7 +47,6 @@ printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
             continue;
         methodName = baseMethodName(methodName);
         ModuleIR *variant = allocIR(prefix + "VARIANT_" + methodName);
-        variant->isInterface = false;
         unionIR->unionList.push_back(UnionItem{methodName, variant->name});
         uint64_t dataLength = 0;
         for (auto param: MI->params) {
@@ -85,15 +83,10 @@ static void processM2P(ModuleIR *IR)
             IR->name = "___M2P" + iname;
             std::string type = iname + "__Data";
             std::string interfaceName = type + "___IFC";
-            ModuleIR *II = lookupIR(type);
-            if (!II) {
-                II = allocIR(type);
-                II->interfaceName = interfaceName;
-                II->isInterface = false;
-                II->isSerialize = true;
-                ModuleIR *IIifc = allocIR(interfaceName, true);
-                IIifc->interfaces.push_back(FieldElement{"ifc", "", inter.type, false, false, false, false, ""/*not param*/, false, false, false});
-            }
+            ModuleIR *II = allocIR(type);
+            II->interfaceName = interfaceName;
+            ModuleIR *IIifc = allocIR(interfaceName, true);
+            IIifc->interfaces.push_back(FieldElement{"ifc", "", inter.type, false, false, false, false, ""/*not param*/, false, false, false});
     if (trace_software)
 printf("[%s:%d] IIIIIIIIIII iname %s IRNAME %s type %s\n", __FUNCTION__, __LINE__, iname.c_str(), IR->name.c_str(), type.c_str());
             processSerialize(II);
@@ -264,13 +257,13 @@ printf("[%s:%d] module pointer missing %s\n", __FUNCTION__, __LINE__, mapp.first
         }
         if (IR->isSerialize)
             processSerialize(IR);
-        if (startswith(IR->name, "P2M")) {
+        if (startswith(IR->name, "___P2M")) {
     if (trace_software)
 dumpModule("P2Morig", IR);
             irSeq.push_back(IR);
             processP2M(IR);
         }
-        if (startswith(IR->name, "M2P")) {
+        if (startswith(IR->name, "___M2P")) {
             irSeq.push_back(IR);
             std::list<FieldElement> temp;
     if (trace_software)
@@ -281,7 +274,7 @@ dumpModule("M2Porig", IR);
             }
             IR->interfaces = temp;
     if (trace_software)
-dumpModule("M2P", IR);
+dumpModule("M2Paft", IR);
             processM2P(IR);
         }
     }

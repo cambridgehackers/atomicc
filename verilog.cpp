@@ -40,6 +40,41 @@ typedef struct {
 } MuxValueElement;
 std::map<std::string, std::map<std::string, MuxValueElement>> enableList, muxValueList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
+
+static std::string genericModuleParam(std::string name)
+{
+    std::string ret = name;
+    int ind = name.find("(");
+    if (ind > 0) {
+        ret = name.substr(0, ind) + "#(";
+        name = name.substr(ind+1);
+        ind = name.rfind(")");
+        if (ind > 0)
+            name = name.substr(0, ind);
+        std::string sep;
+        while (name.length() > 0) {
+            ind = name.find("=");
+            if (ind == -1)
+                break;
+            ret += sep + "." + name.substr(0,ind) + "(";
+            name = name.substr(ind+1);
+            ind = name.find(",");
+            if (ind > 0) {
+                ret += name.substr(0,ind);
+                name = name.substr(ind+1);
+            }
+            else {
+                ret += name;
+                name = "";
+            }
+            ret += ")";
+            sep = ",";
+        }
+        ret += ")";
+    }
+    return ret;
+}
+
 static void traceZero(const char *label)
 {
     if (trace_assign)
@@ -352,9 +387,7 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
     }
     std::string moduleInstantiation = IR->name;
     if (instance != "") {
-        std::string genericMName = genericName(IR->name);
-        if (genericMName != "")
-            moduleInstantiation = genericMName + "#(" + genericModuleParam(IR->name) + ")";
+        moduleInstantiation = genericModuleParam(instanceType);
 //printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.substr(0,instance.length()-1).c_str(), params.c_str());
         if (params != "") {
             std::string actual, sep;
@@ -882,6 +915,20 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             setAssign(getEnaName(methodName), allocExpr(getRdyName(methodName)), "Bit(1)");
     }
     setAssign(methodName, MI->guard, MI->type); // collect the text of the return value into a single 'assign'
+    for (auto IC : MI->interfaceConnect) {
+        std::string iname = IC.type;
+        if (startswith(iname, "ARRAY_")) {
+            iname = iname.substr(6);
+            int ind = iname.find("_");
+            if (ind > 0)
+                iname = iname.substr(ind+1);
+        }
+        ModuleIR *IIR = lookupInterface(iname);
+        if (!IIR)
+            dumpMethod("MISSINGCONNECT", MI);
+        assert(IIR && "interfaceConnect interface type");
+        connectMethods(IIR, IC.target, IC.source, IC.isForward);
+    }
     for (auto info: MI->storeList) {
         walkRead(MI, info->cond, nullptr);
         walkRead(MI, info->value, info->cond);
@@ -1147,22 +1194,6 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
         assert(IIR && "interfaceConnect interface type");
         connectMethods(IIR, IC.target, IC.source, IC.isForward);
     }
-    for (auto MI : IR->methods)
-        for (auto IC : MI->interfaceConnect) {
-            std::string iname = IC.type;
-            if (startswith(iname, "ARRAY_")) {
-                iname = iname.substr(6);
-                int ind = iname.find("_");
-                if (ind > 0)
-                    iname = iname.substr(ind+1);
-            }
-printf("[%s:%d]CCCCCCCCCCCCCCCCCCCCCCCCC tar %s sou %s for %d type %s\n", __FUNCTION__, __LINE__, tree2str(IC.target).c_str(), tree2str(IC.source).c_str(), IC.isForward, IC.type.c_str());
-            ModuleIR *IIR = lookupInterface(iname);
-            if (!IIR)
-                dumpMethod("MISSINGCONNECT", MI);
-            assert(IIR && "interfaceConnect interface type");
-            connectMethods(IIR, IC.target, IC.source, IC.isForward);
-        }
     traceZero("AFTCONNECT");
     for (auto MI : IR->methods)
         if (MI->generateSection == "")
