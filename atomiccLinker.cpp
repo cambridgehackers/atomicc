@@ -84,10 +84,11 @@ int main(int argc, char **argv)
     std::list<std::string> fileList;
 printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     int argIndex = 1;
-    if (argc - 1 != argIndex) {
-        printf("[%s:%d] atomiccLinker <outputFileStem>\n", __FUNCTION__, __LINE__);
+    if (argc - 1 != 2) {
+        printf("[%s:%d] atomiccLinker <moduleName> <outputFileStem>\n", __FUNCTION__, __LINE__);
         exit(-1);
     }
+    std::string topModule = argv[argIndex++];
     std::string myName = argv[argIndex];
     std::string OutputDir = myName + ".generated";
     std::string dirName;
@@ -104,7 +105,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     commandLine += " -Mdir " + dirName + " ";
     commandLine += " --atomicc -y " + dirName;
     commandLine += " -y " + atomiccDir + "/../atomicc-examples/lib/generated/";
-    commandLine += " --top-module l_top l_top.sv";
+    commandLine += " --top-module " + topModule + " " + topModule + ".sv";
     int ret = system(commandLine.c_str());
     printf("[%s:%d] return %d from running '%s'\n", __FUNCTION__, __LINE__, ret, commandLine.c_str());
     readIR(irSeq, fileList, OutputDir);
