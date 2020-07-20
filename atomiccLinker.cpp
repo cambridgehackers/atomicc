@@ -15,14 +15,18 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 #include <stdio.h>
+#include <unistd.h>
 #include "AtomiccIR.h"
 #include "common.h"
+
+#define MAX_FILENAME 1000
 
 typedef struct {
     std::string            type;
     std::list<std::string> name;
 } MapInfo;
 static std::map<std::string, MapInfo> externMap;
+static char filenameBuffer[MAX_FILENAME];
 
 //#define MUX_PORT "in"
 
@@ -76,8 +80,28 @@ printf("[%s:%d] JNAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), i
     }
 }
 
-#define MAX_FILENAME 1000
-static char filenameBuffer[MAX_FILENAME];
+std::string getRelativePath(std::string path)
+{
+    std::string cwd = getcwd(filenameBuffer, sizeof(filenameBuffer));
+    cwd = realpath(cwd.c_str(), filenameBuffer);
+    path = realpath(path.c_str(), filenameBuffer);
+    unsigned ind = 0, lastslash = 0;
+    while (ind < cwd.length() && ind < path.length() && cwd[ind] == path[ind]) {
+        if (cwd[ind] == '/')
+            lastslash = ind;
+        ind++;
+    }
+    if (!lastslash)
+        return path;
+    path = ".." + path.substr(lastslash);
+    while (cwd[ind]) {
+        if (cwd[ind] == '/')
+            path = "../" + path;
+        ind++;
+    }
+    return path;
+}
+
 int main(int argc, char **argv)
 {
     std::list<ModuleIR *> irSeq;
@@ -104,7 +128,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     commandLine = atomiccDir + "/../verilator/verilator_bin";
     commandLine += " -Mdir " + dirName + " ";
     commandLine += " --atomicc -y " + dirName;
-    commandLine += " -y " + atomiccDir + "/../atomicc-examples/lib/generated/";
+    commandLine += " -y " + getRelativePath(atomiccDir + "/../atomicc-examples/lib/generated/");
     commandLine += " --top-module " + topModule + " " + topModule + ".sv";
     int ret = system(commandLine.c_str());
     printf("[%s:%d] return %d from running '%s'\n", __FUNCTION__, __LINE__, ret, commandLine.c_str());
