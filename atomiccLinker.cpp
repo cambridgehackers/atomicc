@@ -102,6 +102,30 @@ std::string getRelativePath(std::string path)
     return path;
 }
 
+static void generateYosys(std::string dirName, std::list<std::string> &fileList)
+{
+static const char *yosys_template = 
+    "[options]\n"
+    "mode bmc\n"
+    "\n"
+    "[engines]\n"
+    "smtbmc\n"
+    "\n"
+    "[script]\n"
+    "read_verilog -formal AxiTop.sv UserTop.sv Fifo1Base.sv l_top.sv \\\n"
+    "    AdapterFromBus.sv AdapterToBus.sv \\\n"
+    "    ___M2PEchoIndication.sv ___P2MEchoRequest.sv Echo.sv\n"
+    "prep -top AxiTop\n"
+    "\n"
+    "[files]\n";
+
+    FILE *ofile = fopen((dirName + "/" + "yosys.sby").c_str(), "w");
+    fprintf(ofile, "%s", yosys_template);
+    for (auto item: fileList)
+        fprintf(ofile, "%s\n", item.c_str());
+    fclose(ofile);
+}
+
 int main(int argc, char **argv)
 {
     std::list<ModuleIR *> irSeq;
@@ -142,6 +166,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
         break;
     }
     dumpMap();
+    generateYosys(dirName, fileList);
     for (auto item: fileList)
         printf("[%s:%d] file '%s'\n", __FUNCTION__, __LINE__, item.c_str());
     return 0;
