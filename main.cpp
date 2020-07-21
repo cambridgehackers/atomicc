@@ -52,7 +52,7 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
 #endif
         generateModuleHeader(OStrV, modLineTop);
         generateVerilogOutput(OStrV);
-        fprintf(OStrV, "endmodule \n\n`default_nettype wire    // set back to default value\n");
+        fprintf(OStrV, "endmodule\n\n`default_nettype wire    // set back to default value\n");
         fclose(OStrV);
     }
     if (printfFormat.size()) {

@@ -973,7 +973,12 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
     }
     for (auto info: MI->assertList) {
         condLines[generateSection].assert.push_back("always @(*)");
-        condLines[generateSection].assert.push_back("    " + tree2str(info->value));
+        std::string indent;
+        if (info->cond) {
+            condLines[generateSection].assert.push_back("    if (" + tree2str(info->cond) + ")");
+            indent = "    ";
+        }
+        condLines[generateSection].assert.push_back("    " + indent + tree2str(info->value) + ";");
     }
     for (auto info: MI->callList) {
         ACCExpr *cond = info->cond;

@@ -27,6 +27,7 @@ typedef struct {
 } MapInfo;
 static std::map<std::string, MapInfo> externMap;
 static char filenameBuffer[MAX_FILENAME];
+static std::string topModule;
 
 //#define MUX_PORT "in"
 
@@ -112,15 +113,20 @@ static const char *yosys_template =
     "smtbmc\n"
     "\n"
     "[script]\n"
-    "read_verilog -formal AxiTop.sv UserTop.sv Fifo1Base.sv l_top.sv \\\n"
-    "    AdapterFromBus.sv AdapterToBus.sv \\\n"
-    "    ___M2PEchoIndication.sv ___P2MEchoRequest.sv Echo.sv\n"
-    "prep -top AxiTop\n"
-    "\n"
-    "[files]\n";
+    "read_verilog -formal ";
+static const char *yosys_template2 = "\n\nprep -top ";
+static const char *yosys_template3 = "\n\n[files]\n";
 
     FILE *ofile = fopen((dirName + "/" + "yosys.sby").c_str(), "w");
     fprintf(ofile, "%s", yosys_template);
+    for (auto item: fileList) {
+        int ind = item.rfind("/");
+        if (ind != -1)
+            item = item.substr(ind+1);
+        if (endswith(item, ".v") || endswith(item, ".sv"))
+            fprintf(ofile, "%s ", item.c_str());
+    }
+    fprintf(ofile, "%s", (yosys_template2 + topModule + yosys_template3).c_str());
     for (auto item: fileList)
         fprintf(ofile, "%s\n", item.c_str());
     fclose(ofile);
@@ -136,7 +142,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
         printf("[%s:%d] atomiccLinker <moduleName> <outputFileStem>\n", __FUNCTION__, __LINE__);
         exit(-1);
     }
-    std::string topModule = argv[argIndex++];
+    topModule = argv[argIndex++];
     std::string myName = argv[argIndex];
     std::string OutputDir = myName + ".generated";
     std::string dirName;
