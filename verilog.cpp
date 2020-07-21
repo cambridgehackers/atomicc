@@ -29,7 +29,7 @@ int trace_skipped;//= 1;
 
 std::list<PrintfInfo> printfFormat;
 std::list<ModData> modNew;
-std::map<std::string, std::map<std::string, CondGroup>> condLines;
+std::map<std::string, CondLineType> condLines;
 std::map<std::string, SyncPinsInfo> syncPins;    // SyncFF items needed for PipeInSync instances
 
 std::map<std::string, AssignItem> assignList;
@@ -673,7 +673,7 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
         }
     }
     for (auto ctop = condLines.begin(), ctopEnd = condLines.end(); ctop != ctopEnd; ctop++) { // process all generate sections
-    for (auto tcond = ctop->second.begin(), tend = ctop->second.end(); tcond != tend; tcond++) {
+    for (auto tcond = ctop->second.always.begin(), tend = ctop->second.always.end(); tcond != tend; tcond++) {
         std::string methodName = tcond->first;
         walkRef(tcond->second.guard);
         tcond->second.guard = cleanupBool(replaceAssign(tcond->second.guard));
@@ -812,13 +812,13 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
 {
     dest = replaceAssign(dest);
     value = replaceAssign(value);
-    for (auto CI = condLines[generateSection][methodName].info.begin(), CE = condLines[generateSection][methodName].info.end(); CI != CE; CI++)
+    for (auto CI = condLines[generateSection].always[methodName].info.begin(), CE = condLines[generateSection].always[methodName].info.end(); CI != CE; CI++)
         if (matchExpr(cond, CI->first)) {
             CI->second.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[generateSection][methodName].guard = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
-    condLines[generateSection][methodName].info[cond].push_back(CondInfo{dest, value});
+    condLines[generateSection].always[methodName].guard = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
+    condLines[generateSection].always[methodName].info[cond].push_back(CondInfo{dest, value});
 }
 
 void showRef(const char *label, std::string name)
@@ -970,6 +970,10 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
                 allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))), "0");
         }
         }
+    }
+    for (auto info: MI->assertList) {
+        condLines[generateSection].assert.push_back("always @(*)");
+        condLines[generateSection].assert.push_back("    " + tree2str(info->value));
     }
     for (auto info: MI->callList) {
         ACCExpr *cond = info->cond;

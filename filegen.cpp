@@ -237,7 +237,7 @@ next:;
     // generate clocked updates to state elements
     auto ctop = condLines.begin(), ctopEnd = condLines.end();
     for (; ctop != ctopEnd || resetList.size(); ctop++) { // process all generate sections
-    if (resetList.size() || ctop->second.size()) {
+    if (resetList.size() || ctop->second.always.size()) {
         std::string ctopLoop = ctop != ctopEnd ? ctop->first : "";
         if (ctopLoop != "")
             fprintf(OStr, "\n    %s\n", finishString(ctopLoop).c_str());
@@ -246,10 +246,10 @@ next:;
             fprintf(OStr, "        %s <= 0;\n", item.c_str());
         resetList.clear();
         fprintf(OStr, "      end // nRST\n");
-        if (ctop != ctopEnd && ctop->second.size() > 0) {
+        if (ctop != ctopEnd && ctop->second.always.size() > 0) {
             fprintf(OStr, "      else begin\n");
             std::list<std::string> alwaysLines;
-            for (auto tcond: ctop->second) {
+            for (auto tcond: ctop->second.always) {
                 std::string methodName = tcond.first, endStr;
                 if (checkInteger(tcond.second.guard, "1"))
                     alwaysLines.push_back("// " + methodName);
@@ -291,5 +291,11 @@ next:;
         if (ctop == ctopEnd)
             break;
     }
+    if (ctop->second.assert.size())
+        fprintf(OStr, "`ifdef	FORMAL\n");
+    for (auto item: ctop->second.assert)
+        fprintf(OStr, "    %s\n", item.c_str());
+    if (ctop->second.assert.size())
+        fprintf(OStr, "`endif\n");
     }
 }

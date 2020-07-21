@@ -513,7 +513,7 @@ MethodInfo *allocMethod(std::string name)
     MethodInfo *MI = new MethodInfo{nullptr/*guard*/,
         nullptr/*subscript*/, ""/*generateSection*/,
         name/*name*/, false/*rule*/, false/*action*/,
-        {}/*storeList*/, {}/*letList*/, {}/*callList*/, {}/*printfList*/,
+        {}/*storeList*/, {}/*letList*/, {}/*assertList*/, {}/*callList*/, {}/*printfList*/,
         ""/*type*/, {}/*params*/, {}/*generateFor*/, {}/*instantiateFor*/,
         {}/*alloca*/, {}/*interfaceConnect*/, {{}}/*meta*/};
     return MI;

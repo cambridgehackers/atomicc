@@ -225,6 +225,12 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ACCExpr *expr = str2tree(bufp);
                 MI->letList.push_back(new LetListElement{dest, expr, cond, type});
             }
+            else if (checkItem("ASSERT")) {
+                ACCExpr *cond = getExpression(':');
+                ParseCheck(checkItem(":"), "':' missing");
+                ACCExpr *expr = str2tree(bufp);
+                MI->assertList.push_back(new AssertListElement{expr, cond});
+            }
             else if (checkItem("CALL")) {
                 bool isAction = checkItem("/Action");
                 ACCExpr *cond = getExpression(':');

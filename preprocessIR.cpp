@@ -143,6 +143,7 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
     newMI->rule = MI->rule;
     newMI->action = MI->action;
     newMI->interfaceConnect = MI->interfaceConnect;
+    newMI->assertList = MI->assertList;
     for (auto item : MI->storeList)
         newMI->storeList.push_back(new StoreListElement{
             walkToGeneric(item->dest, paramMap),
@@ -250,6 +251,8 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
     for (auto item: MI->callList)
         walkSubscript(IR, item->cond, isGenerate);
     for (auto item: MI->printfList)
+        walkSubscript(IR, item->cond, isGenerate);
+    for (auto item: MI->assertList)
         walkSubscript(IR, item->cond, isGenerate);
     for (auto IC : MI->interfaceConnect) {
         walkSubscript(IR, IC.target, false);

@@ -90,6 +90,11 @@ typedef struct {
     bool        instance;
 } SyncPinsInfo;
 
+typedef struct {
+    std::map<std::string, CondGroup> always;
+    std::list<std::string>           assert;
+} CondLineType;
+
 typedef ModuleIR *(^CBFun)(FieldElement &item);
 #define CBAct ^ ModuleIR * (FieldElement &item)
 
@@ -189,7 +194,7 @@ extern std::map<std::string, ModuleIR *> mapIndex;
 extern std::map<std::string, ModuleIR *> interfaceIndex;
 extern std::map<std::string, int> replaceBlock;
 extern std::list<ModData> modNew;
-extern std::map<std::string, std::map<std::string, CondGroup>> condLines;
+extern std::map<std::string, CondLineType> condLines;
 extern std::list<PrintfInfo> printfFormat;
 extern std::map<std::string, int> genericModule;
 extern int globalExprCleanup;
