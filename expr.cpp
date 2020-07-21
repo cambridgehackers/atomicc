@@ -266,7 +266,7 @@ static ACCExpr *get1Token(void)
         do {
             getNext();
         } while (isdigit(lexChar) || lexChar == '.' || lexChar == '\'' || lexChar == 'b'
-            || lexChar == 'h' || lexChar == 'd' || lexChar == 'o');
+            || lexChar == 'h' || lexChar == 'd' || lexChar == 'o' || lexChar == 'x' || (lexChar >= 'a' && lexChar <= 'f'));
         if (lexChar == 'U') // unsigned
             lexChar = lexString[lexIndex++]; // skip 'U'
     }
@@ -607,6 +607,7 @@ printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                     exit(-1);
                 }
                 while (tnext && (isParen(tnext->value) || isIdChar(tnext->value[0]))) {
+printf("[%s:%d] token %s next %s\n", __FUNCTION__, __LINE__, tok->value.c_str(), tnext->value.c_str());
                     assert(isIdChar(tok->value[0]) || tok->value[0] == '.'); // hack for fifo[i].out
                     tok->operands.push_back(tnext);
                     tnext = get1Token();
