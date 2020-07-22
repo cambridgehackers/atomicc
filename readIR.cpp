@@ -168,6 +168,16 @@ static ACCExpr *cleanInterface(ACCExpr *expr)
     return expr;
 }
 
+static void walkRemoveParameterMarker (ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    if (expr->value == "{")
+        expr->value = "(";   // change from PARAMETER_MARKER
+    for (auto item: expr->operands)
+        walkRemoveParameterMarker(item);
+}
+
 static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
 {
     if (checkItem("(")) {
@@ -229,6 +239,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *expr = str2tree(bufp);
+                walkRemoveParameterMarker (cond);
                 MI->assertList.push_back(new AssertListElement{expr, cond});
             }
             else if (checkItem("CALL")) {

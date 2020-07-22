@@ -972,13 +972,24 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         }
     }
     for (auto info: MI->assertList) {
+        ACCExpr *cond = info->cond;
+        ACCExpr *value = info->value;
+        walkRead(MI, cond, nullptr);
+        walkRead(MI, value, cond);
+        ACCExpr *guard = nullptr;
+        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
+            guard = cleanupBool(MIRdy->guard);
+        ACCExpr *tempCond = guard ? allocExpr("&&", guard, cond) : cond;
+        tempCond = cleanupBool(tempCond);
+        std::string calledName = value->value, calledEna = getEnaName(calledName);
         condLines[generateSection].assert.push_back("always @(*)");
         std::string indent;
-        if (info->cond) {
-            condLines[generateSection].assert.push_back("    if (" + tree2str(info->cond) + ")");
+        std::string condStr = tree2str(tempCond);
+        if (condStr != "" && condStr != "1") {
+            condLines[generateSection].assert.push_back("    if (" + condStr + ")");
             indent = "    ";
         }
-        condLines[generateSection].assert.push_back("    " + indent + tree2str(info->value) + ";");
+        condLines[generateSection].assert.push_back("    " + indent + tree2str(value) + ";");
     }
     for (auto info: MI->callList) {
         ACCExpr *cond = info->cond;

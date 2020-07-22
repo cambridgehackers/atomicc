@@ -546,7 +546,7 @@ void dumpMethod(std::string name, MethodInfo *MI)
     if (retType != "" || retVal != "")
         printf(" %s = %s", retType.c_str(), retVal.c_str());
     printf(" {");
-    if (MI->alloca.size() || MI->letList.size() || MI->storeList.size()
+    if (MI->alloca.size() || MI->letList.size() || MI->storeList.size() || MI->assertList.size()
         || MI->callList.size() || MI->generateFor.size() || MI->instantiateFor.size() || MI->interfaceConnect.size()) {
     printf("\n");
     for (auto item: MI->alloca)
@@ -555,6 +555,8 @@ void dumpMethod(std::string name, MethodInfo *MI)
         printf("      LET %s %s: %s=%s\n", item->type.c_str(), tree2str(item->cond).c_str(), tree2str(item->dest).c_str(), tree2str(item->value).c_str());
     for (auto item: MI->storeList)
         printf("      STORE %s: %s=%s\n", tree2str(item->cond).c_str(), tree2str(item->dest).c_str(), tree2str(item->value).c_str());
+    for (auto item: MI->assertList)
+        printf("      ASSERT %s: %s\n", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
     for (auto item: MI->callList)
         printf("      CALL%s %s: %s\n", item->isAction ? "/Action" : "", tree2str(item->cond).c_str(), tree2str(item->value).c_str());
     for (auto item: MI->printfList)

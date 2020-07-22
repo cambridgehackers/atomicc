@@ -143,7 +143,6 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
     newMI->rule = MI->rule;
     newMI->action = MI->action;
     newMI->interfaceConnect = MI->interfaceConnect;
-    newMI->assertList = MI->assertList;
     for (auto item : MI->storeList)
         newMI->storeList.push_back(new StoreListElement{
             walkToGeneric(item->dest, paramMap),
@@ -155,6 +154,10 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
             walkToGeneric(item->value, paramMap),
             walkToGeneric(item->cond, paramMap),
             updateType(item->type, paramMap)});
+    for (auto item : MI->assertList)
+        newMI->assertList.push_back(new AssertListElement{
+            walkToGeneric(item->value, paramMap),
+            walkToGeneric(item->cond, paramMap)});
     for (auto item : MI->callList)
         newMI->callList.push_back(new CallListElement{
             walkToGeneric(item->value, paramMap),
@@ -248,11 +251,11 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
         walkSubscript(IR, item->cond, isGenerate);
         walkSubscript(IR, item->value, isGenerate);
     }
+    for (auto item: MI->assertList)
+        walkSubscript(IR, item->cond, isGenerate);
     for (auto item: MI->callList)
         walkSubscript(IR, item->cond, isGenerate);
     for (auto item: MI->printfList)
-        walkSubscript(IR, item->cond, isGenerate);
-    for (auto item: MI->assertList)
         walkSubscript(IR, item->cond, isGenerate);
     for (auto IC : MI->interfaceConnect) {
         walkSubscript(IR, IC.target, false);
@@ -360,6 +363,12 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
         info->value = cleanupExprBuiltin(info->value);
     }
     for (auto info: MI->printfList) {
+        walkSubst(IR, info->cond);
+        walkSubst(IR, info->value);
+        info->cond = cleanupBool(info->cond);
+        info->value = cleanupExprBuiltin(info->value);
+    }
+    for (auto info: MI->assertList) {
         walkSubst(IR, info->cond);
         walkSubst(IR, info->value);
         info->cond = cleanupBool(info->cond);
@@ -606,6 +615,10 @@ static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replace
         item->value = walkReplaceExpr(item->value, pattern, replacement);
         item->cond = walkReplaceExpr(item->cond, pattern, replacement);
     }
+    for (auto item: MI->assertList) {
+        item->value = walkReplaceExpr(item->value, pattern, replacement);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
+    }
     for (auto item: MI->callList) {
         item->value = walkReplaceExpr(item->value, pattern, replacement);
         item->cond = walkReplaceExpr(item->cond, pattern, replacement);
@@ -644,6 +657,7 @@ void copyInterface(std::string oldName, std::string newName, MapNameValue &mapVa
         nMI->action = MI->action;
         nMI->storeList = MI->storeList;
         nMI->letList = MI->letList;
+        nMI->assertList = MI->assertList;
         nMI->callList = MI->callList;
         nMI->printfList = MI->printfList;
         nMI->type = instantiateType(MI->type, mapValue);
@@ -668,6 +682,10 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
         rewriteExpr(MI, item->value);
         rewriteExpr(MI, item->cond);
         updateWidth(item->value, convertType(item->type));
+    }
+    for (auto item: MI->assertList) {
+        rewriteExpr(MI, item->value);
+        rewriteExpr(MI, item->cond);
     }
     for (auto item: MI->callList) {
         rewriteExpr(MI, item->value);
