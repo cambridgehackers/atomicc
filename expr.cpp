@@ -266,7 +266,18 @@ static ACCExpr *get1Token(void)
         do {
             getNext();
         } while (isdigit(lexChar) || lexChar == '.' || lexChar == '\'' || lexChar == 'b'
-            || lexChar == 'h' || lexChar == 'd' || lexChar == 'o' || lexChar == 'x' || (lexChar >= 'a' && lexChar <= 'f'));
+            || lexChar == 'h' || lexChar == 'd' || lexChar == 'o');
+        if (lexChar == 'x') {
+            do {
+                getNext();
+            } while (isdigit(lexChar) || (lexChar >= 'a' && lexChar <= 'f'));
+            if (!startswith(lexToken, "0x")) {
+                printf("[%s:%d] error: invalid characters in hex string '%s'\n", __FUNCTION__, __LINE__, lexToken.c_str());
+                exit(-1);
+            }
+            lexToken = lexToken.substr(2);
+            lexToken = autostr(4 * lexToken.length()) + "'h" + lexToken;
+        }
         if (lexChar == 'U') // unsigned
             lexChar = lexString[lexIndex++]; // skip 'U'
     }

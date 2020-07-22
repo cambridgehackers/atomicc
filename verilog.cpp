@@ -239,6 +239,18 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
         addRead(MI->meta[MetaRead][fieldName], cond);
 }
 
+static bool walkSearch (ACCExpr *expr, std::string search)
+{
+    if (!expr)
+        return false;
+    if (expr->value == search)
+        return true;
+    for (auto item: expr->operands)
+        if (walkSearch(item, search))
+            return true;
+    return false;
+}
+
 typedef struct {
     std::string type, name;
     bool        isOutput, isInout, isLocal;
@@ -977,12 +989,16 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         ACCExpr *guard = nullptr;
-        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName)))
+        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName))) {
             guard = cleanupBool(MIRdy->guard);
+        }
         ACCExpr *tempCond = guard ? allocExpr("&&", guard, cond) : cond;
         tempCond = cleanupBool(tempCond);
         std::string calledName = value->value, calledEna = getEnaName(calledName);
-        condLines[generateSection].assert.push_back("always @(*)");
+        std::string sensitivity = "*";
+        if (walkSearch(tempCond, "$past"))
+            sensitivity = " posedge CLK";
+        condLines[generateSection].assert.push_back("always @(" + sensitivity + ")");
         std::string indent;
         std::string condStr = tree2str(tempCond);
         if (condStr != "" && condStr != "1") {
@@ -1173,7 +1189,8 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
         if (!isRdyName(methodName))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName))) {
         auto appendGuard = [&] (CallListElement *item) -> void {
-            if (item->value->value == "__finish")
+            if (item->value->value == "__finish"
+             || item->value->value == "$past")
                 return;
             ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
             if (item->cond)
