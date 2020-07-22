@@ -477,10 +477,17 @@ static bool boolPossible(ACCExpr *expr)
     return expr && (isdigit(expr->value[0]) || exprWidth(expr, true) == "1");
 }
 
+int traceBDD;//=1;
 static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
 {
-    std::string op = expr->value;
     DdNode *ret = nullptr;
+    if (traceBDD)
+        dumpExpr("ENTERTREE2BDD", expr);
+    if (expr->value == "?" && checkInteger(getRHS(expr,2), "0")) {
+        expr->value = "&";
+        expr->operands.pop_back();
+    }
+    std::string op = expr->value;
     if (op == "&&")
         op = "&";
     else if (op == "||")
@@ -491,8 +498,10 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
         ret = Cudd_ReadLogicZero(mgr);
     else if (op == "!")
         return Cudd_Not(tree2BDD(mgr, expr->operands.front(), varMap)); // Not passes through ref count
-    else if (op != "&" && op != "|" && op != "^") {
-        if ((op == "!=" || op == "==")) {
+    else if (op == "&" || op == "|" || op == "^") {
+    }
+    else if (op == "!=" || op == "==") {
+        if (op == "!=" || op == "==") {
             ACCExpr *lhs = getRHS(expr, 0);
             if (boolPossible(lhs) && boolPossible(getRHS(expr,1)))
                 goto next; // we can analyze relops on booleans
@@ -516,6 +525,17 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
             expr->value = op; // restore
             ret = Cudd_Not(ret);
         }
+    }
+    else {
+        std::string name = "( " + tree2str(expr) + " )";
+        if (!isIdChar(op[0]))
+            printf("[%s:%d] ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ unknown OP %s namd %s\n", __FUNCTION__, __LINE__, op.c_str(), name.c_str());
+        if (!varMap[name]) {
+            varMap[name] = new MapItem;
+            varMap[name]->index = varMap.size();
+            varMap[name]->node = Cudd_bddIthVar(mgr, varMap[name]->index);
+        }
+        ret = varMap[name]->node;
     }
     if (ret) {
         Cudd_Ref(ret);
