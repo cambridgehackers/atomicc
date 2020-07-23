@@ -132,7 +132,7 @@ ModuleIR *lookupInterface(std::string name)
     return IR;
 }
 
-std::string instantiateType(std::string arg, MapNameValue &mapValue)
+std::string instantiateType(std::string arg, MapNameValue &mapValue) // also check updateCount()
 {
     const char *bp = arg.c_str();
     auto checkT = [&] (const char *val) -> bool {
@@ -147,7 +147,7 @@ std::string instantiateType(std::string arg, MapNameValue &mapValue)
         if (hasAtSign)
             rets = rets.substr(1);
         std::string newval = mapValue[rets];
-        if (newval != "") {
+        if (rets != "0" && rets != "1" && newval != "") { // don't translate trivial values
 printf("[%s:%d] INSTTTANTIATEEEEEEEEEEEEEEEEEEEEEEEEEEE %s -> %s\n", __FUNCTION__, __LINE__, arg.c_str(), newval.c_str());
             rets = newval;
         }

@@ -97,9 +97,10 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, s
     return nullptr;
 }
 
-static std::string updateCount(std::string count, std::list<PARAM_MAP> &paramMap)
+static std::string updateCount(std::string count, std::list<PARAM_MAP> &paramMap) // also check instantiateType()
 {
     for (auto item: paramMap)
+         if (!checkIntegerString(count, "0") && !checkIntegerString(count, "1")) // prohibit silly replacement
          if (checkIntegerString(count, item.value)) {
              count = item.name;
              break;
