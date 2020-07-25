@@ -528,6 +528,7 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
     }
     else {
         std::string name = "( " + tree2str(expr) + " )";
+        if (0)
         if (!isIdChar(op[0]))
             printf("[%s:%d] ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ unknown OP %s namd %s\n", __FUNCTION__, __LINE__, op.c_str(), name.c_str());
         if (!varMap[name]) {
