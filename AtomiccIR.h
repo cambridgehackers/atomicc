@@ -24,7 +24,7 @@
 
 #define MODULE_SEPARATOR "$"
 
-#define MAX_READ_LINE 100000
+#define MAX_READ_LINE 10000000
 
 static inline std::string autostr(uint64_t X, bool isNeg = false) {
   char Buffer[21];
