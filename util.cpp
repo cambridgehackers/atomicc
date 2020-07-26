@@ -748,7 +748,7 @@ nextand:;
 
 void updateWidth(ACCExpr *expr, std::string clen)
 {
-    if (clen == "" || !isdigit(clen[0]) || clen.find(" ") != std::string::npos)
+    if (!expr || clen == "" || !isdigit(clen[0]) || clen.find(" ") != std::string::npos)
         return;
     int len = atoi(clen.c_str());
     std::string cilen = exprWidth(expr);
