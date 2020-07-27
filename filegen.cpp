@@ -40,7 +40,7 @@ ACCExpr *replacePins(ACCExpr *expr)
 
 std::string finishExpr(ACCExpr *expr)
 {
-    return tree2str(replacePins(expr));
+    return tree2str(cleanupExpr(replacePins(expr)));
 }
 
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)

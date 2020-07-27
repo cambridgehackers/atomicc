@@ -440,6 +440,8 @@ static int level;
          }
     }
     level--;
+    if (ret->value == "?" && checkInteger(getRHS(ret, 0), "1"))
+        return getRHS(ret, 1);
     return ret;
 }
 

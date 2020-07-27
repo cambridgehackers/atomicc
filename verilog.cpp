@@ -133,9 +133,9 @@ if (0)
         exit(-1);
     }
     if (generateSection != "")
-        condAssignList[generateSection][target] = AssignItem{value, type, false};
+        condAssignList[generateSection][target] = AssignItem{value, type, false, 0};
     else {
-        assignList[target] = AssignItem{value, type, false};
+        assignList[target] = AssignItem{value, type, false, 0};
         if ((isEnaName(target) || isRdyName(target))
          && !checkInteger(value, "1")
          && !isEnaName(value->value)
@@ -498,7 +498,7 @@ static void walkRef (ACCExpr *expr)
         int ind = base.find("[");
         if (ind > 0)
             base = base.substr(0, ind);
-        if (!startswith(item, "__inst$Genvar")) {
+        if (!startswith(item, "__inst$Genvar") && item != "$past") {
         if (!refList[item].pin)
             printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
         if (base != item)
@@ -633,7 +633,8 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
         if (!assignList[item].noRecursion)
         if (ACCExpr *assignValue = assignList[item].value)
         if (refList[item].pin != PIN_MODULE
-             && (checkOperand(assignValue->value) || isRdyName(item) || isEnaName(item))) {
+             && (checkOperand(assignValue->value) || isRdyName(item) || isEnaName(item)
+                || (startswith(item, BLOCK_NAME) && assignList[item].size < COUNT_LIMIT))) {
             if (trace_assign)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
             decRef(item);
@@ -648,6 +649,13 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
 static void setAssignRefCount(ModuleIR *IR)
 {
     traceZero("SETASSIGNREF");
+    // before doing the rest, clean up block guards
+    for (auto item = assignList.begin(), itemEnd = assignList.end(); item != itemEnd; item++) {
+        if (item->second.type == "Bit(1)" && startswith(item->first, BLOCK_NAME)) {
+            item->second.value = cleanupBool(simpleReplace(item->second.value));
+            item->second.size = walkCount(item->second.value);
+        }
+    }
     for (auto item: assignList) {
         //assignList[item.first].noRecursion = true;
 //printf("[%s:%d] ref[%s].norec %d value %s\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion, tree2str(item.second.value).c_str());
@@ -691,12 +699,15 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
         tcond->second.guard = cleanupBool(replaceAssign(tcond->second.guard));
         if (trace_assign)
             printf("[%s:%d] %s: guard %s\n", __FUNCTION__, __LINE__, methodName.c_str(), tree2str(tcond->second.guard).c_str());
-        for (auto item: tcond->second.info) {
-            walkRef(item.first);
-            for (auto citem: item.second) {
+        auto info = tcond->second.info;
+        tcond->second.info.clear();
+        for (auto item = info.begin(), itemEnd = info.end(); item != itemEnd; item++) {
+            tcond->second.info[cleanupBool(replaceAssign(item->first))] = info[item->first];
+            walkRef(item->first);
+            for (auto citem: item->second) {
                 if (trace_assign)
                     printf("[%s:%d] %s: %s dest %s value %s\n", __FUNCTION__, __LINE__, methodName.c_str(),
- tree2str(item.first).c_str(), tree2str(citem.dest).c_str(), tree2str(citem.value).c_str());
+ tree2str(item->first).c_str(), tree2str(citem.dest).c_str(), tree2str(citem.value).c_str());
                 if (citem.dest) {
                     walkRef(citem.value);
                     walkRef(citem.dest);
@@ -986,6 +997,10 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
     for (auto info: MI->assertList) {
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
+        auto par = value->operands.front()->operands;
+        ACCExpr *param = cleanupBool(par.front());
+        par.clear();
+        par.push_back(param);
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         ACCExpr *guard = nullptr;
@@ -1257,7 +1272,10 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
         generateSection = top.first;
         for (auto item: top.second) {
         setAssign(item.first, cleanupExprBuiltin(item.second.phi, item.second.defaultValue), refList[item.first].type);
-        assignList[item.first].noRecursion = true;
+        if (startswith(item.first, BLOCK_NAME))
+            assignList[item.first].size = walkCount(assignList[item.first].value);
+        else
+            assignList[item.first].noRecursion = true;
         }
     }
     for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY

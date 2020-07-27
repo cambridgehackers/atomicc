@@ -26,6 +26,8 @@
 #define PARAMETER_CLOSE "@}"
 #define ASSIGN_SIZE_LIMIT 6
 #define GENVAR_NAME "__inst$Genvar"
+#define BLOCK_NAME "BasicBlockCond_"
+#define COUNT_LIMIT             10
 
 #define GENERIC_INT_TEMPLATE_FLAG         999999
 #define GENERIC_INT_TEMPLATE_FLAG_STRING "999999"
@@ -53,6 +55,7 @@ typedef struct {
     ACCExpr    *value;
     std::string type;
     bool        noRecursion;
+    int         size;
 } AssignItem;
 enum {PIN_NONE, PIN_MODULE, PIN_OBJECT, PIN_REG, PIN_WIRE, PIN_ALIAS, PIN_LOCAL};
 typedef struct {
