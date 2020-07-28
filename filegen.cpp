@@ -40,7 +40,7 @@ ACCExpr *replacePins(ACCExpr *expr)
 
 std::string finishExpr(ACCExpr *expr)
 {
-    return tree2str(cleanupExpr(replacePins(expr)));
+    return tree2str(cleanupExprBuiltin(replacePins(expr), "0", true));
 }
 
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
@@ -260,7 +260,7 @@ next:;
                 for (auto item: tcond.second.info) {
                     std::string endStr;
                     std::string temp;
-                    if (item.first) {
+                    if (item.first && !checkInteger(item.first, "1")) {
                         temp = "    if (" + finishExpr(item.first) + ")";
                         if (item.second.size() > 1) {
                             temp += " begin";

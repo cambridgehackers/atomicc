@@ -931,7 +931,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
     if (MI->subscript)      // from instantiateFor
         methodName += "[" + tree2str(MI->subscript) + "]";
     generateSection = MI->generateSection;
-    MI->guard = cleanupBool(MI->guard);
+    MI->guard = cleanupExpr(MI->guard);
     if (!isRdyName(methodName)) {
         walkRead(MI, MI->guard, nullptr);
         if (MI->rule)

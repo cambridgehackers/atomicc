@@ -442,6 +442,12 @@ static int level;
     level--;
     if (ret->value == "?" && checkInteger(getRHS(ret, 0), "1"))
         return getRHS(ret, 1);
+    if (ret->value == "&&" && checkInteger(getRHS(ret, 0), "1")) {
+        if (ret->operands.size() > 2)
+            ret->operands.pop_front();
+        else
+            return getRHS(ret, 1);
+    }
     return ret;
 }
 
@@ -482,7 +488,7 @@ static bool boolPossible(ACCExpr *expr)
 int traceBDD;//=1;
 static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
 {
-    DdNode *ret = nullptr;
+    DdNode *ret = nullptr, *trueOperand = nullptr;
     if (traceBDD)
         dumpExpr("ENTERTREE2BDD", expr);
     if (expr->value == "?" && checkInteger(getRHS(expr,2), "0")) {
@@ -494,19 +500,21 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
         op = "&";
     else if (op == "||")
         op = "|";
+    if (op == "?" && expr->operands.size() != 3) {
+        printf("[%s:%d]ERROR in '?' operand '%s'\n", __FUNCTION__, __LINE__, tree2str(expr).c_str());
+        exit(-1);
+    }
     if (checkInteger(expr, "1"))
         ret = Cudd_ReadOne(mgr);
     else if (checkInteger(expr, "0"))
-        ret = Cudd_ReadLogicZero(mgr);
+        ret = Cudd_ReadLogicZero(mgr);  // logic 0 != arithmetic 0
     else if (op == "!")
         return Cudd_Not(tree2BDD(mgr, expr->operands.front(), varMap)); // Not passes through ref count
-    else if (op == "&" || op == "|" || op == "^") {
+    else if (op == "&" || op == "|" || op == "^" || op == "?") { // handled below
     }
-    else if (op == "!=" || op == "==") {
+    else {
         if (op == "!=" || op == "==") {
             ACCExpr *lhs = getRHS(expr, 0);
-            if (boolPossible(lhs) && boolPossible(getRHS(expr,1)))
-                goto next; // we can analyze relops on booleans
             if (trace_bool)
                 printf("[%s:%d] boolnot %d %d = %s\n", __FUNCTION__, __LINE__, boolPossible(getRHS(expr,0)), boolPossible(getRHS(expr,1)), tree2str(expr).c_str());
             if (lhs && isIdChar(lhs->value[0])) {
@@ -516,7 +524,9 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
         }
         if (op == "!=")    // normalize comparison strings
             expr->value = "==";
-        std::string name = "( " + tree2str(expr) + " )";
+        std::string name = tree2str(expr);
+        if (!isIdChar(expr->value[0]))
+            name = "( " + name + " )";
         if (!varMap[name]) {
             varMap[name] = new MapItem;
             varMap[name]->index = varMap.size();
@@ -528,23 +538,10 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
             ret = Cudd_Not(ret);
         }
     }
-    else {
-        std::string name = "( " + tree2str(expr) + " )";
-        if (0)
-        if (!isIdChar(op[0]))
-            printf("[%s:%d] ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ unknown OP %s namd %s\n", __FUNCTION__, __LINE__, op.c_str(), name.c_str());
-        if (!varMap[name]) {
-            varMap[name] = new MapItem;
-            varMap[name]->index = varMap.size();
-            varMap[name]->node = Cudd_bddIthVar(mgr, varMap[name]->index);
-        }
-        ret = varMap[name]->node;
-    }
     if (ret) {
         Cudd_Ref(ret);
         return ret;
     }
-next:;
     for (auto item: expr->operands) {
          DdNode *operand = tree2BDD(mgr, item, varMap), *next;
          if (!ret)
@@ -558,6 +555,14 @@ next:;
                  next = Cudd_bddXor(mgr, ret, operand);
              else if (op == "==")
                  next = Cudd_bddXnor(mgr, ret, operand);
+             else if (op == "?") { // in BDD, called 'Ite' -> 'if-then-else' operator.  In cpp, called 'trinary'
+                 if (!trueOperand) {
+                     trueOperand = operand;
+                     continue;
+                 }
+                 next = Cudd_bddIte(mgr, ret, trueOperand, operand); // "?" operator
+                 Cudd_RecursiveDeref(mgr, trueOperand);
+             }
              else {
                  printf("[%s:%d] unknown operator\n", __FUNCTION__, __LINE__);
                  exit(-1);

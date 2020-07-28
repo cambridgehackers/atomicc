@@ -856,10 +856,10 @@ void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault)
         walkReplaceBuiltin(item, "0");
 }
 
-ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault)
+ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault, bool preserveParen)
 {
     if (!expr)
         return expr;
     walkReplaceBuiltin(expr, phiDefault);
-    return cleanupExpr(expr);
+    return cleanupExpr(expr, preserveParen);
 }

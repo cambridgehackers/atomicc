@@ -354,7 +354,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
 //if (moved) dumpMethod("PREVMETH", MI);
 
     // now replace __bitconcat, __bitsubstr, __phi
-    MI->guard = cleanupBool(MI->guard);
+    MI->guard = cleanupExpr(MI->guard);
     for (auto info: MI->storeList) {
         walkSubst(IR, info->dest);
         walkSubst(IR, info->cond);

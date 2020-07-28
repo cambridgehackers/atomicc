@@ -27,7 +27,7 @@
 #define ASSIGN_SIZE_LIMIT 6
 #define GENVAR_NAME "__inst$Genvar"
 #define BLOCK_NAME "BasicBlockCond_"
-#define COUNT_LIMIT             10
+#define COUNT_LIMIT             0//10
 
 #define GENERIC_INT_TEMPLATE_FLAG         999999
 #define GENERIC_INT_TEMPLATE_FLAG_STRING "999999"
@@ -141,7 +141,7 @@ bool isIdChar(char ch);
 bool isParen(std::string ch);
 void dumpExpr(std::string tag, ACCExpr *next);
 ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen = false);
-ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault = "0");
+ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault = "0", bool preserveParen = false);
 ACCExpr *cleanupInteger(ACCExpr *expr);
 ACCExpr *cleanupBool(ACCExpr *expr);
 ACCExpr *str2tree(std::string arg, bool allowRangeParam = false);
