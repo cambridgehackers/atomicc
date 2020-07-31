@@ -150,7 +150,7 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
         ret += op;
         op = "";
     }
-    else if (((op == "-")/*unary*/ && expr->operands.size() == 1))
+    else if (((op == "-" || op == "<<" || expr->value[0] == '@')/*unary*/ && expr->operands.size() == 1))
         ret += op;
     else if (op == "!" || !expr->operands.size())
         ret += op;
@@ -409,6 +409,7 @@ static int level;
     level++;
     if (expr->operands.size() == 1 && expr->operands.front()->value != "," && (!preserveParen && expr->value == "("))
         expr = expr->operands.front();
+#if 0
     if (expr->value == ".") {
         // fold member specifier into base name
         ACCExpr *lhs = getRHS(expr, 0), *rhs = getRHS(expr, 1);
@@ -420,6 +421,7 @@ static int level;
             expr->value += MODULE_SEPARATOR + rhs->value;
         }
     }
+#endif
     if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
     ACCExpr *ret = allocExpr(expr->value);
@@ -632,7 +634,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
 printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA '%s'\n", __FUNCTION__, __LINE__, val.c_str());
                     val = val.substr(1);
                 }
-                if ((val == "-" || val == "!" || bitOp(val)) && !tok->operands.size()) { // unary '-'
+                if ((val == "-" || val == "!" || bitOp(val) || val == "<<") && !tok->operands.size()) { // unary '-'
                     if (val != "!")
                         tok->value = "@" + tok->value;
                     unary = tok;
@@ -646,7 +648,11 @@ printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                     exit(-1);
                 }
                 while (tnext && (isParen(tnext->value) || isIdChar(tnext->value[0]))) {
-                    assert(isIdChar(tok->value[0]) || tok->value[0] == '.'); // hack for fifo[i].out
+                    if(!isIdChar(tok->value[0]) && tok->value[0] != '.') {
+                        printf("[%s:%d] ERROR: operand %s\n", __FUNCTION__, __LINE__, tok->value.c_str());
+                        exit(-1);
+                    }
+                    //assert(isIdChar(tok->value[0]) || tok->value[0] == '.'); // hack for fifo[i].out
                     tok->operands.push_back(tnext);
                     tnext = get1Token();
                 }

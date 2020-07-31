@@ -118,7 +118,7 @@ std::string sizeProcess(std::string type);
 std::string typeDeclaration(std::string type);
 ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker);
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name);
-MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr);
+MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount);
 std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr);
 void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force = true, uint64_t offset = 0, bool alias = false, bool init = true);
 ModuleIR *allocIR(std::string name, bool isInterface = false);
@@ -131,6 +131,7 @@ std::string CBEMangle(const std::string &S);
 char *getExecutionFilename(char *buf, int buflen);
 void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault);
 std::string exprWidth(ACCExpr *expr, bool forceNumeric = false);
+std::string makeSection(std::string var, ACCExpr *init, ACCExpr *limit, ACCExpr *incr);
 
 // expr.cpp
 bool bitOp(std::string s);

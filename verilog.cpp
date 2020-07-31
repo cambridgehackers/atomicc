@@ -93,8 +93,9 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     bool tDir = refList[target].out;
     if (!value)
         return;
-    if (type == "Bit(1)")
+    if (type == "Bit(1)") {
         value = cleanupBool(value);
+    }
     int ind = target.find("[");
     if (ind > 0) {
         std::string base = target.substr(0, ind);
@@ -540,14 +541,15 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool e
     if (trace_assign)
     printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     std::string item = expr->value;
+    if (guardName != "" && (startswith(item, guardName) || (item == "." && startswith(expr->operands.front()->value, guardName)))) {
+        if (trace_assign)
+        printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
+        return allocExpr("1");
+    }
     if (isIdChar(item[0]) && !expr->operands.size()) {
-        if (item == guardName) {
-            if (trace_assign)
-            printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
-            return allocExpr("1");
-        }
         if (!assignList[item].noRecursion || enableListProcessing)
         if (ACCExpr *assignValue = assignList[item].value)
+        if (assignValue->value[0] != '@')    // hack to prevent propagation of __reduce operators
         if (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
         decRef(item);
         walkRef(assignValue);
@@ -915,18 +917,18 @@ static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTr
     }
 }
 
-void appendMux(std::string name, ACCExpr *cond, ACCExpr *value, std::string defaultValue)
+void appendMux(std::string section, std::string name, ACCExpr *cond, ACCExpr *value, std::string defaultValue)
 {
-    ACCExpr *phi = muxValueList[generateSection][name].phi;
+    ACCExpr *phi = muxValueList[section][name].phi;
     if (!phi) {
         phi = allocExpr("__phi", allocExpr("("));
-        muxValueList[generateSection][name].phi = phi;
-        muxValueList[generateSection][name].defaultValue = defaultValue;
+        muxValueList[section][name].phi = phi;
+        muxValueList[section][name].defaultValue = defaultValue;
     }
     phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
 }
 
-static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
+static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo *MI)
 {
     if (MI->subscript)      // from instantiateFor
         methodName += "[" + tree2str(MI->subscript) + "]";
@@ -952,13 +954,19 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         assert(IIR && "interfaceConnect interface type");
         connectMethods(IIR, IC.target, IC.source, IC.isForward);
     }
+}
+static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
+{
+    if (MI->subscript)      // from instantiateFor
+        methodName += "[" + tree2str(MI->subscript) + "]";
+    generateSection = MI->generateSection;
     for (auto info: MI->storeList) {
         walkRead(MI, info->cond, nullptr);
         walkRead(MI, info->value, info->cond);
         std::string dest = info->dest->value;
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
             ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond));
-            appendMux(dest, cond, info->value, "0");
+            appendMux(generateSection, dest, cond, info->value, "0");
         }
         else
             appendLine(methodName, info->cond, info->dest, info->value);
@@ -974,22 +982,22 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         getFieldList(fieldList, dest, "", info->type, 1, true);
         if (fieldList.size() == 1) {
             std::string first = fieldList.front().name;
-            appendMux(dest, cond, value, "0");
+            appendMux(generateSection, dest, cond, value, "0");
             if (first != dest)
-                appendMux(first, cond, value, "0");
+                appendMux(generateSection, first, cond, value, "0");
         }
         else {
         std::string splitItem = tree2str(value);
         if ((value->operands.size() || !isIdChar(value->value[0]))) {
             splitItem = dest + "$lettemp";
-            appendMux(splitItem, cond, value, "0");
+            appendMux(generateSection, splitItem, cond, value, "0");
         }
         for (auto fitem : fieldList) {
             std::string offset = autostr(fitem.offset);
             std::string upper = convertType(fitem.type) + " - 1";
             if (offset != "0")
                 upper += " + " + offset;
-            appendMux(fitem.name, cond,
+            appendMux(generateSection, fitem.name, cond,
                 allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))), "0");
         }
         }
@@ -1023,49 +1031,61 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         condLines[generateSection].assert.push_back("    " + indent + tree2str(value) + ";");
     }
     for (auto info: MI->callList) {
+        std::string section = generateSection;
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
-        if (isIdChar(value->value[0]) && value->operands.size() && value->operands.front()->value == PARAMETER_MARKER)
-            MI->meta[MetaInvoke][value->value].insert(tree2str(cond));
-        else {
-            printf("[%s:%d] called method name not found %s\n", __FUNCTION__, __LINE__, tree2str(value).c_str());
-dumpExpr("READCALL", value);
-                exit(-1);
+        ACCExpr *param = nullptr;
+        if (!(isIdChar(value->value[0]) && value->operands.size()
+         && (param = value->operands.back()) && param->value == PARAMETER_MARKER)) {
+            printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
+            dumpExpr("READCALL", value);
+            exit(-1);
         }
+        std::string calledName = value->value, calledEna = getEnaName(calledName);
+        std::string vecCount;
+        MethodInfo *CI = lookupQualName(IR, calledName, vecCount);
+        if (!CI) {
+            printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
+            dumpExpr("CALL", value);
+            exit(-1);
+        }
+        MI->meta[MetaInvoke][calledName].insert(tree2str(cond));
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         if (!info->isAction)
             continue;
         ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName)), cond));
-        std::string calledName = value->value, calledEna = getEnaName(calledName);
+        ACCExpr *subscript = nullptr;
+        std::string sub;
+        if (value->operands.size() > 1) {
+            tempCond = simpleReplace(tempCond);
+            tempCond = replaceAssign(tempCond, getRdyName(calledEna), true); // remove __RDY before adding subscript!
+            subscript = value->operands.front()->operands.front();
+            ACCExpr *var = allocExpr(GENVAR_NAME "1");
+            section = makeSection(var->value, allocExpr("0"),
+                allocExpr("<", var, allocExpr(vecCount)), allocExpr("+", var, allocExpr("1")));
+            sub = "[" + var->value + "]";
+            calledEna += sub;
+            tempCond = allocExpr("&&", tempCond, allocExpr("==", subscript, var));
+        }
 //printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
 //dumpExpr("CALLCOND", tempCond);
-        if (!value->operands.size() || value->operands.front()->value != PARAMETER_MARKER) {
-            printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
-            exit(-1);
-        }
         if (calledName == "__finish") {
             appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"));
             break;
         }
-        if (!enableList[generateSection][calledEna].phi) {
-            enableList[generateSection][calledEna].phi = allocExpr("|");
-            enableList[generateSection][calledEna].defaultValue = "1'd0";
+        if (!enableList[section][calledEna].phi) {
+            enableList[section][calledEna].phi = allocExpr("|");
+            enableList[section][calledEna].defaultValue = "1'd0";
         }
-        enableList[generateSection][calledEna].phi->operands.push_back(tempCond);
-        MethodInfo *CI = lookupQualName(IR, calledName);
-        if (!CI) {
-            printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
-            exit(-1);
-        }
+        enableList[section][calledEna].phi->operands.push_back(tempCond);
         auto AI = CI->params.begin();
         std::string pname = baseMethodName(calledName) + MODULE_SEPARATOR;
         int argCount = CI->params.size();
-        ACCExpr *param = value->operands.front();
         for (auto item: param->operands) {
             if(argCount-- > 0) {
                 std::string size = tree2str(cleanupInteger(cleanupExpr(str2tree(convertType(AI->type)))));
-                appendMux(pname + AI->name, tempCond, item, size + "'d0");
+                appendMux(section, pname + AI->name + sub, tempCond, item, size + "'d0");
                 AI++;
             }
         }
@@ -1073,6 +1093,30 @@ dumpExpr("READCALL", value);
     if (!implementPrintf)
         for (auto info: MI->printfList)
             appendLine(methodName, info->cond, nullptr, info->value);
+}
+
+void generateMethodGroup(ModuleIR *IR, void (*generateMethod)(ModuleIR *IR, std::string methodName, MethodInfo *MI))
+{
+    for (auto MI : IR->methods)
+        if (MI->generateSection == "")
+        generateMethod(IR, MI->name, MI);
+    for (auto MI : IR->methods)
+        if (MI->generateSection != "")
+        generateMethod(IR, MI->name, MI);
+    for (auto MI : IR->methods) {
+    for (auto item: MI->generateFor) {
+        genvarMap[item.var] = 1;
+        MethodInfo *MIb = IR->generateBody[item.body];
+        assert(MIb && "body item ");
+        generateMethod(IR, MI->name, MIb);
+    }
+    for (auto item: MI->instantiateFor) {
+        genvarMap[item.var] = 1;
+        MethodInfo *MIb = IR->generateBody[item.body];
+        assert(MIb && "body item ");
+        generateMethod(IR, MI->name, MIb);
+    }
+    }
 }
 
 /*
@@ -1204,10 +1248,29 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
         if (!isRdyName(methodName))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName))) {
         auto appendGuard = [&] (CallListElement *item) -> void {
-            if (item->value->value == "__finish"
-             || item->value->value == "$past")
+            std::string name = item->value->value;
+            if (name == "__finish" || name == "$past")
                 return;
-            ACCExpr *tempCond = allocExpr(getRdyName(item->value->value));
+            name = getRdyName(name);
+            std::string nameVec = refList[name].vecCount;
+            if (isIdChar(name[0]) && nameVec != "") {
+                std::string name_or = name + "_or";       // convert unpacked array to vector
+                std::string name_or1 = name_or + "1";
+                if (!refList[name_or].pin) {
+                    refList[name_or] = RefItem{99, "Bit(" + nameVec + ")", false, false, PIN_WIRE, false, false, "", false};
+                    refList[name_or1] = RefItem{99, "Bit(1)", false, false, PIN_WIRE, false, false, "", false};
+                    setAssign(name_or1, allocExpr("@|", allocExpr(name_or)), "Bit(1)");
+                    assignList[name_or1].noRecursion = true;
+                    ACCExpr *var = allocExpr(GENVAR_NAME "1");
+                    generateSection = makeSection(var->value, allocExpr("0"),
+                        allocExpr("<", var, allocExpr(nameVec)), allocExpr("+", var, allocExpr("1")));
+                    std::string sub = "[" + var->value + "]";
+                    setAssign(name_or + sub, allocExpr(name + sub), "Bit(1)");
+                    generateSection = "";
+                }
+                name = name_or1;
+            }
+            ACCExpr *tempCond = allocExpr(name);
             if (item->cond)
                 tempCond = allocExpr("|", walkRemoveParam(invertExpr(item->cond)), tempCond);
             MIRdy->guard = cleanupBool(allocExpr("&&", MIRdy->guard, tempCond));
@@ -1247,26 +1310,8 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
         connectMethods(IIR, IC.target, IC.source, IC.isForward);
     }
     traceZero("AFTCONNECT");
-    for (auto MI : IR->methods)
-        if (MI->generateSection == "")
-        generateMethod(IR, MI->name, MI);
-    for (auto MI : IR->methods)
-        if (MI->generateSection != "")
-        generateMethod(IR, MI->name, MI);
-    for (auto MI : IR->methods) {
-    for (auto item: MI->generateFor) {
-        genvarMap[item.var] = 1;
-        MethodInfo *MIb = IR->generateBody[item.body];
-        assert(MIb && "body item ");
-        generateMethod(IR, MI->name, MIb);
-    }
-    for (auto item: MI->instantiateFor) {
-        genvarMap[item.var] = 1;
-        MethodInfo *MIb = IR->generateBody[item.body];
-        assert(MIb && "body item ");
-        generateMethod(IR, MI->name, MIb);
-    }
-    }
+    generateMethodGroup(IR, generateMethodGuard);
+    generateMethodGroup(IR, generateMethod);
     // combine mux'ed assignments into a single 'assign' statement
     for (auto top: muxValueList) {
         generateSection = top.first;

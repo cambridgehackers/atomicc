@@ -288,14 +288,14 @@ MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
     return nullptr;
 }
 
-MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr)
+MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount)
 {
     std::string fieldName;
-ModuleIR *implements = lookupInterface(searchIR->interfaceName);
-if (!implements) {
-    printf("[%s:%d] module %s missing interfaceName %s\n", __FUNCTION__, __LINE__, searchIR->name.c_str(), searchIR->interfaceName.c_str());
-    exit(-1);
-}
+    ModuleIR *implements = lookupInterface(searchIR->interfaceName);
+    if (!implements) {
+        printf("[%s:%d] module %s missing interfaceName %s\n", __FUNCTION__, __LINE__, searchIR->name.c_str(), searchIR->interfaceName.c_str());
+        exit(-1);
+    }
     if (traceLookup)
         printf("%s: START searchIR %p %s ifc %s searchStr %s implements %p\n", __FUNCTION__, (void *)searchIR, searchIR->name.c_str(), searchIR->interfaceName.c_str(), searchStr.c_str(), (void *)implements);
     while (1) {
@@ -322,8 +322,10 @@ if (!implements) {
             if (traceLookup)
                 printf("[%s:%d] ind %d fldname %s fieldName %s type %s\n", __FUNCTION__, __LINE__, ind, fldName.c_str(), fieldName.c_str(), item.type.c_str());
             if (fldName == fieldName) { //ind != -1 && 
+                if (item.vecCount != "")
+                    vecCount = item.vecCount;  // tell caller we were a vector
                 if (traceLookup)
-                     printf("[%s:%d]found \n", __FUNCTION__, __LINE__);
+                     printf("[%s:%d]found name %s vecCount %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
                 return lookupIR(item.type);
             }
             return nullptr; });
@@ -335,8 +337,10 @@ if (!implements) {
             if (traceLookup)
                 printf("[%s:%d] ind %d fldname %s fieldName %s type %s searchStr %s\n", __FUNCTION__, __LINE__, ind, fldName.c_str(), fieldName.c_str(), item.type.c_str(), searchStr.c_str());
             if (fldName == fieldName) {     //ind != -1 && 
+                if (item.vecCount != "")
+                    vecCount = item.vecCount;  // tell caller we were a vector
                 if (traceLookup)
-                     printf("[%s:%d]found \n", __FUNCTION__, __LINE__);
+                     printf("[%s:%d]found name %s vecCount %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
                 return lookupInterface(item.type);
             }
             return nullptr; });
@@ -862,4 +866,12 @@ ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault, bool preserve
         return expr;
     walkReplaceBuiltin(expr, phiDefault);
     return cleanupExpr(expr, preserveParen);
+}
+
+std::string makeSection(std::string var, ACCExpr *init, ACCExpr *limit, ACCExpr *incr)
+{
+    char tempBuf[1000];
+    snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin",
+        var.c_str(), tree2str(init).c_str(), tree2str(limit).c_str(), var.c_str(), tree2str(incr).c_str());
+    return tempBuf;
 }

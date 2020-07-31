@@ -70,12 +70,40 @@ static std::string getExpressionString(char terminator = 0)
         printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
     return ret;
 }
+
+static void walkFixup(ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    if (expr->value == ".") {
+        // fold member specifier into base name
+        ACCExpr *lhs = getRHS(expr, 0), *rhs = getRHS(expr, 1);
+        if (expr->operands.size() != 2) {
+            dumpExpr("BADFIELDSPEC", expr);
+        }
+        else if (isIdChar(lhs->value[0]) && isIdChar(rhs->value[0])) {
+            expr->value = lhs->value + MODULE_SEPARATOR + rhs->value;
+            expr->operands = lhs->operands;
+            for (auto item: rhs->operands)
+                expr->operands.push_back(item);
+        }
+    }
+    for (auto item: expr->operands)
+        walkFixup(item);
+}
+static ACCExpr *inputExpression(std::string inStr)
+{
+    ACCExpr *expr = str2tree(inStr);
+    walkFixup(expr);
+    return expr;
+}
+
 static ACCExpr *getExpression(char terminator = 0)
 {
     std::string ret = getExpressionString(terminator);
     while (*bufp == ' ')
         bufp++;
-    return str2tree(ret);
+    return inputExpression(ret);
 }
 
 static bool checkItem(const char *val)
@@ -223,7 +251,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *dest = getExpression('=');
                 ParseCheck(checkItem("="), "store = missing");
-                ACCExpr *expr = str2tree(bufp);
+                ACCExpr *expr = inputExpression(bufp);
                 MI->storeList.push_back(new StoreListElement{dest, expr, cond});
             }
             else if (checkItem("LET")) {
@@ -232,13 +260,13 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *dest = getExpression('=');
                 ParseCheck(checkItem("="), "store = missing");
-                ACCExpr *expr = str2tree(bufp);
+                ACCExpr *expr = inputExpression(bufp);
                 MI->letList.push_back(new LetListElement{dest, expr, cond, type});
             }
             else if (checkItem("ASSERT")) {
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
-                ACCExpr *expr = str2tree(bufp);
+                ACCExpr *expr = inputExpression(bufp);
                 walkRemoveParameterMarker (cond);
                 MI->assertList.push_back(new AssertListElement{expr, cond});
             }
@@ -246,24 +274,41 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 bool isAction = checkItem("/Action");
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
-                ACCExpr *value = str2tree(bufp);
+                ACCExpr *value = inputExpression(bufp), *subscript = nullptr, *param = nullptr;
                 // TODO: make this processing more general
                 if (value->value == ".") {     // handle qualified expr case
-                    ACCExpr *newValue = allocExpr("");
-                    std::string sep;
-                    for (auto sub: value->operands) {
-                        newValue->value += sep + sub->value;
-                        sep = "$";           // ??????
-                        newValue->operands = sub->operands; // last one has the call params
+                    ACCExpr *newValue = value->operands.front();
+                    value->operands.pop_front();
+                    for (auto item: value->operands) {
+                        newValue->value += "$" + item->value;
+                        newValue->operands.push_back(item->operands.front());
                     }
                     value = newValue;
                 }
+                for (auto item: value->operands) {
+                     if (item->value == "[")
+                         subscript = item;
+                     else if (item->value == "{")
+                         param = item;
+                     else if (isIdChar(item->value[0]) && item->operands.size() == 0)
+                         value->value += "$" + item->value;
+                     else {
+                         printf("%s: ERROR: unknown member of call expression\n", __FUNCTION__);
+                         dumpExpr("ITEM", item);
+                         exit(-1);
+                     }
+                }
+                value->operands.clear();
+                if (subscript)
+                    value->operands.push_back(subscript);
+                if (param)
+                    value->operands.push_back(param);
                 MI->callList.push_back(new CallListElement{value, cond, isAction});
             }
             else if (checkItem("PRINTF")) {
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
-                ACCExpr *expr = str2tree(bufp);
+                ACCExpr *expr = inputExpression(bufp);
                 MI->printfList.push_back(new CallListElement{expr, cond, false});
             }
             else if (checkItem("GENERATE")) {

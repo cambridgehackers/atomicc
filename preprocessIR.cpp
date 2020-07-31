@@ -61,7 +61,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr, bool inGenerate)
     }
     expr->value += "[" + tree2str(subscript) + "]" + post;
 }
-
+#if 0
 static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
 {
     if (isIdChar(expr->value[0]) && expr->operands.size() && expr->operands.front()->value == SUBSCRIPT_MARKER) {
@@ -96,7 +96,7 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, s
             return ret;
     return nullptr;
 }
-
+#endif
 static std::string updateCount(std::string count, std::list<PARAM_MAP> &paramMap) // also check instantiateType()
 {
     for (auto item: paramMap)
@@ -238,9 +238,10 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
 
 void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
 {
-    static int bodyIndex = 99;
     std::string methodName = MI->name;
     std::map<std::string, int> localConnect;
+#if 0
+    static int bodyIndex = 99;
     walkSubscript(IR, MI->guard, isGenerate);
     for (auto item: MI->storeList) {
         walkSubscript(IR, item->dest, isGenerate);
@@ -270,12 +271,14 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
             localConnect[tree2str(IC.source)] = 1;
         }
     }
+#endif
     for (auto item = IR->interfaces.begin(); item != IR->interfaces.end(); item++)
         if (localConnect[item->fldName])
             item->isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)
     // subscript processing requires that we defactor the entire statement,
     // not just add a condition expression into the tree
 //bool moved = false;
+#if 0
     auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> bool {
         std::string size;
         ACCExpr *cond = *condp, *subscript = nullptr;
@@ -352,6 +355,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
             item++;
     }
 //if (moved) dumpMethod("PREVMETH", MI);
+#endif
 
     // now replace __bitconcat, __bitsubstr, __phi
     MI->guard = cleanupExpr(MI->guard);
@@ -396,9 +400,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
             if (MI->alloca.find(pitem.name) != MI->alloca.end())
                 MI->alloca[pitem.name].noReplace = true;
         }
-        char tempBuf[1000];
-        snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
-        MIb->generateSection = tempBuf;
+        MIb->generateSection = makeSection(item.var, item.init, item.limit, item.incr);
     }
     for (auto item: MI->instantiateFor) {
         MethodInfo *MIb = IR->generateBody[item.body];
@@ -406,12 +408,10 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
         assert(MIb);
         MethodInfo *MIRdy = lookupMethod(IR, getRdyName(MI->name));
         assert(MIRdy);
-        char tempBuf[1000];
-        snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin", item.var.c_str(), tree2str(item.init).c_str(), tree2str(item.limit).c_str(), item.var.c_str(), tree2str(item.incr).c_str());
         MIb->subscript = item.sub;     // make sure enable line is subscripted(body is in separate function!)
-        MIb->generateSection = tempBuf;
+        MIb->generateSection = makeSection(item.var, item.init, item.limit, item.incr);
         MIRdy->subscript = item.sub;   // make sure ready line is subscripted
-        MIRdy->generateSection = tempBuf;
+        MIRdy->generateSection = MIb->generateSection;
         for (auto pitem: MIb->params) {
             if (MI->alloca.find(pitem.name) != MI->alloca.end())
                 MI->alloca[pitem.name].noReplace = true;
