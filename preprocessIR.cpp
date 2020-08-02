@@ -448,13 +448,23 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
         else {
         FieldElement field = (*IR)->fields.front();
         ModuleIR *fieldIR = lookupIR(field.type);
+        if (fieldIR)
+        if (ModuleIR *fieldInterface = lookupInterface(fieldIR->interfaceName))
         if ((*IR)->interfaceConnect.size()) {
+            if ((*IR)->interfaceConnect.size() != fieldInterface->interfaces.size())
+                goto skipLab;
             if ((*IR)->methods.size())
                 goto skipLab;
 //dumpModule("MASTER", lookupInterface((*IR)->interfaceName));
 //dumpModule("FIELD", lookupInterface(fieldIR->interfaceName));
             for (auto item: (*IR)->interfaceConnect) {
-printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__, __LINE__, tree2str(item.target).c_str(), tree2str(item.source).c_str(), item.type.c_str(), item.isForward);
+                std::string target = tree2str(item.target);
+                std::string source = tree2str(item.source);
+printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__, __LINE__, target.c_str(), source.c_str(), item.type.c_str(), item.isForward);
+                 if ((target != field.fldName + MODULE_SEPARATOR + source)
+                  && (source != field.fldName + MODULE_SEPARATOR + target)) {
+                     goto skipLab;
+                 }
             }
         }
         if (!fieldIR || field.vecCount != "" || field.isPtr || field.isInput
