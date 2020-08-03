@@ -39,6 +39,8 @@
 #endif
 
 #define MAX_REQUEST_LENGTH 1000
+
+int trace_sim_socket;//=1;
 static void memdump(unsigned char *p, int len, const char *title)
 {
 int i;
@@ -128,9 +130,11 @@ top:
             rxLength = rxBuffer[0] & 0xffff;
             int rc = portalRecvFd(clientfd, (void *)&rxBuffer[1], (rxLength-1) * sizeof(uint32_t), &sendFd);
             if (rc > 0) {
+                if (trace_sim_socket) {
                 char bname[100];
                 sprintf(bname,"RECV%d.%d", getpid(), clientfd);
                 memdump((uint8_t*)rxBuffer, rxLength * sizeof(uint32_t), bname);
+                }
                 rxBuffer[1] = ((rxBuffer[1] & 0xffff0000) | (rxBuffer[0] >> 16)); //combine methodNumber and portalNumber
                 goto top;
             }
@@ -153,11 +157,13 @@ extern "C" void dpi_msgSend_enq(int v, int last)
 //printf("[%s:%d] index %x txBuffer[0] %x v %x last %x\n", __FUNCTION__, __LINE__, txIndex, txBuffer[0], v, last);
     txBuffer[txIndex++] = v;
     if (last) {
-        char bname[100];
-        sprintf(bname,"SEND%d.%d", getpid(), masterfpga_fd);
         txBuffer[0] = (txBuffer[1] << 16) | txIndex;
         txBuffer[1] = (txBuffer[1] & 0xffff0000) | (txIndex - 1);
+        if (trace_sim_socket) {
+        char bname[100];
+        sprintf(bname,"SEND%d.%d", getpid(), masterfpga_fd);
         memdump((uint8_t*)txBuffer, txIndex * sizeof(uint32_t), bname);
+        }
         portalSendFd(clientfd, (void *)txBuffer, (txBuffer[0] & 0xffff) * sizeof(uint32_t), -1);
         txIndex = 1;
     }
