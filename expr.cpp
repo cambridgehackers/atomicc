@@ -205,6 +205,8 @@ static struct {
 
     {"," , 2},
 
+    {"=" , 7},
+
     {"?", 10}, {":", 10},
 
     {"&", 12}, {"|", 12},
@@ -721,6 +723,8 @@ lll:;
 
 ACCExpr *str2tree(std::string arg, bool allowRangeParam)
 {
+    if (trace_expr)
+        printf("[%s:%d] arg '%s' allowRangeParam '%d'\n", __FUNCTION__, __LINE__, arg.c_str(), allowRangeParam);
     lexString = arg;
     lexIndex = 0;
     lexChar = lexString[lexIndex++];

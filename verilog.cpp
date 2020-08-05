@@ -97,9 +97,10 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         value = cleanupBool(value);
     }
     int ind = target.find("[");
+    std::string base, sub;
     if (ind > 0) {
-        std::string base = target.substr(0, ind);
-        std::string sub = target.substr(ind);
+        base = target.substr(0, ind);
+        sub = target.substr(ind);
         ind = sub.rfind("]");
         if (ind > 0) {
             std::string after = sub.substr(ind+1);
@@ -860,10 +861,10 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
 {
     std::string tstr = tree2str(target), sstr = tree2str(source);
     if (trace_assign || trace_connect || (!refList[tstr].out && !refList[sstr].out))
-        printf("%s: IFCCC '%s'/%d '%s'/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, sstr.c_str(), refList[sstr].out);
+        printf("%s: IFCCC '%s'/%d/%d '%s'/%d/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, refList[target->value].out, sstr.c_str(), refList[sstr].out, refList[source->value].out);
     showRef("target", target->value);
     showRef("source", source->value);
-    if (refList[sstr].out) {
+    if (refList[source->value].out) {
         setAssign(sstr, target, type);
         refList[target->value].done = true;
     }

@@ -93,14 +93,10 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 dirs = "inout wire";
             if (mitem.vecCount == "")
                 mitem.vecCount = convertType(mitem.type, 2);
-            std::string array;
             std::string sizeStr = sizeProcess(mitem.type);
-            if (mitem.vecCount != "") {
-                if (sizeStr == "")
-                    array = "[" + mitem.vecCount + " - 1:0]";
-                else
-                    sizeStr = "[" + mitem.vecCount + " * " + sizeStr.substr(1);
-            }
+            std::string array;
+            if (mitem.vecCount != "")
+                array = "[" + mitem.vecCount + " - 1:0]";
             fprintf(OStr, "%s %s%s%s", dirs.c_str(), sizeStr.c_str(), mitem.value.c_str(), array.c_str());
         }
     }

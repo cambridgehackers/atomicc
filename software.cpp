@@ -144,13 +144,14 @@ exit(-1);
             ifcIRinterface->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
             ifcIRinterface->interfaces.push_back(FieldElement{"pipe", "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
             IR->fields.push_back(FieldElement{fieldName, "", type, false, false, false, false, ""/*not param*/, false, false, false});
-            IRifc->interfaces.push_back(FieldElement{userInterface, "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
+            std::string topName = outcall ? "indication" : "request";
+            IRifc->interfaces.push_back(FieldElement{topName, "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 allocExpr(localName + userInterface),
                 allocExpr(fieldName + MODULE_SEPARATOR + "method"), userTypeName, true});
-            if (userInterface == "indication")
+            if (topName == "indication")
                 hasIndication = true;
-            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(userInterface),
+            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(topName),
                 allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pName, true});
             //dumpModule("SWIFC", ifcIR);
         }
