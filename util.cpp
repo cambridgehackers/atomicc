@@ -22,7 +22,7 @@
 #include "common.h"
 
 int trace_expand;//=1;
-int trace_parameters=1;
+int trace_parameters;//=1;
 std::map<std::string, ModuleIR *> mapIndex, mapStripped, interfaceIndex, interfaceStripped;
 static int trace_iter;//=1;
 static int traceLookup;//=1;
