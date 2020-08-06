@@ -737,7 +737,7 @@ void cleanupIR(std::list<ModuleIR *> &irSeq)
     for (auto IR: irSeq) {
         for (auto items = IR->interfaces.begin(), iteme = IR->interfaces.end(); items != iteme; items++) {
             MapNameValue mapValue;
-            extractParam(items->type, mapValue);
+            extractParam("CLEANUP_" + items->fldName, items->type, mapValue);
             if (mapValue.size() > 0) {
                 std::string newName = CBEMangle(items->type);
                 copyInterface(items->type, newName, mapValue);

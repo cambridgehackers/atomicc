@@ -109,7 +109,7 @@ std::string getRdyName(std::string basename);
 std::string getEnaName(std::string basename);
 bool isRdyName(std::string name);
 bool isEnaName(std::string name);
-void extractParam(std::string replaceList, MapNameValue &mapValue);
+void extractParam(std::string debugName, std::string replaceList, MapNameValue &mapValue);
 std::string instantiateType(std::string arg, MapNameValue &mapValue);
 std::string convertType(std::string arg, int arrayProcess = 0);
 ModuleIR *lookupIR(std::string ind);

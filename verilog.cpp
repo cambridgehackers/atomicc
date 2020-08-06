@@ -270,7 +270,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
     assert(IR);
     bool isSync = startswith(IR->name, "PipeInSync") || argIsSync;
     MapNameValue mapValue = parentMap;
-    extractParam(IR->name, mapValue);
+    extractParam("COLLECT", IR->name, mapValue);
     vecCount = instantiateType(vecCount, mapValue);
 //for (auto item: mapValue)
 //printf("[%s:%d] [%s] = %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
@@ -314,7 +314,7 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
     }
     for (FieldElement item : IR->interfaces) {
         //MapNameValue mapValue = parentMap;
-        extractParam(item.type, mapValue);
+        extractParam("FIELD_" + item.fldName, item.type, mapValue);
         std::string interfaceName = item.fldName;
         ModuleIR *IIR = lookupInterface(item.type);
         if (!IIR) {
@@ -336,7 +336,7 @@ static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std:
 bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
 {
     MapNameValue mapValue;
-    extractParam(instanceType, mapValue);
+    extractParam("SIGN_" + IR->name, instanceType, mapValue);
     std::string minst;
     if (instance != "")
         minst = instance.substr(0, instance.length()-1);
@@ -386,7 +386,7 @@ exit(-1);
     if (instance == "")
         collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true, false);
     for (FieldElement item : IR->parameters) {
-        //extractParam(item.type, mapValue);
+        //extractParam("PARAM_" + item.name, item.type, mapValue);
         std::string interfaceName = item.fldName;
         ModuleIR *IIR = lookupInterface(item.type);
         if (!IIR) {
@@ -1258,7 +1258,12 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
                 std::string name_or = name + "_or";       // convert unpacked array to vector
                 std::string name_or1 = name_or + "1";
                 if (!refList[name_or].pin) {
-                    refList[name_or] = RefItem{99, "Bit(" + nameVec + ")", false, false, PIN_WIRE, false, false, "", false};
+                    // adding a space to the 'name_or' declaration forces the
+                    // code generator to emit bitvector dimensions explicitly,
+                    // to that the subscripted 'setAssign' below compiles correctly
+                    // (you can use 'foo[0]' if the declaration is 'wire [0:0] foo',
+                    // but not if the declaration is 'wire foo').  Hmm...
+                    refList[name_or] = RefItem{99, "Bit( " + nameVec + ")", false, false, PIN_WIRE, false, false, "", false};
                     refList[name_or1] = RefItem{99, "Bit(1)", false, false, PIN_WIRE, false, false, "", false};
                     setAssign(name_or1, allocExpr("@|", allocExpr(name_or)), "Bit(1)");
                     assignList[name_or1].noRecursion = true;

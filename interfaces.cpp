@@ -30,7 +30,7 @@ int generateTrace;//=1;
 static void processSerialize(ModuleIR *IR)
 {
     MapNameValue mapValue;
-    extractParam(IR->name, mapValue);
+    extractParam("SERIAL", IR->name, mapValue);
     std::string prefix = "__" + IR->name + "_";
     ModuleIR *implements = lookupInterface(IR->interfaceName);
     auto inter = implements->interfaces.front();
@@ -66,7 +66,7 @@ printf("[%s:%d] serialize %s\n", __FUNCTION__, __LINE__, inter.type.c_str());
 static void processM2P(ModuleIR *IR)
 {
     MapNameValue mapValue;
-    extractParam(IR->name, mapValue);
+    extractParam("M2P", IR->name, mapValue);
     ModuleIR *HIR = nullptr;
     std::string host, target, targetParam;
     std::string pipeArgSize = "-1";
@@ -149,7 +149,7 @@ assert(HIR);
 static void processP2M(ModuleIR *IR)
 {
     MapNameValue mapValue;
-    extractParam(IR->name, mapValue);
+    extractParam("P2M", IR->name, mapValue);
     ModuleIR *IIR = nullptr, *HIR = nullptr;
     std::string host, target;
     bool addedReturnInd = false;

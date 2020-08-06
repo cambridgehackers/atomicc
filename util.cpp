@@ -22,6 +22,7 @@
 #include "common.h"
 
 int trace_expand;//=1;
+int trace_parameters=1;
 std::map<std::string, ModuleIR *> mapIndex, mapStripped, interfaceIndex, interfaceStripped;
 static int trace_iter;//=1;
 static int traceLookup;//=1;
@@ -71,14 +72,26 @@ bool isEnaName(std::string name)
     return name == rname;
 }
 
-void extractParam(std::string replaceList, MapNameValue &mapValue)
+std::string trimSpace(std::string arg)
 {
+    int beg = 0, end = arg.length();
+    while (arg[beg] == ' ')
+        beg++;
+    while (arg[end-1] == ' ')
+        end--;
+    return arg.substr(beg, end);
+}
+
+void extractParam(std::string debugName, std::string replaceList, MapNameValue &mapValue)
+{
+    int count = 0;
+    std::string origList = replaceList;
     int ind = replaceList.find("(");
     if (ind > 0) {
         replaceList = replaceList.substr(ind+1);
         replaceList = replaceList.substr(0, replaceList.length()-1); // remove ')'
         while ((ind = replaceList.find("=")) > 0) {
-            std::string name = replaceList.substr(0, ind);
+            std::string name = trimSpace(replaceList.substr(0, ind));
             replaceList = replaceList.substr(ind+1);
             ind = replaceList.find(",");
             std::string value = replaceList;
@@ -87,9 +100,13 @@ void extractParam(std::string replaceList, MapNameValue &mapValue)
                 replaceList = value.substr(ind+1);
                 value = value.substr(0, ind);
             }
-            mapValue[name] = value;
+            if (mapValue.find(name) == mapValue.end())
+                mapValue[name] = trimSpace(value);
         }
     }
+    if (trace_parameters)
+        for (auto item: mapValue)
+            printf("[%s:%d] %s[%s]: %d: %s = %s\n", __FUNCTION__, __LINE__, debugName.c_str(), origList.c_str(), count++, item.first.c_str(), item.second.c_str());
 }
 
 ModuleIR *lookupIR(std::string name)
@@ -146,7 +163,10 @@ std::string instantiateType(std::string arg, MapNameValue &mapValue) // also che
         bool hasAtSign = rets[0] == '@';
         if (hasAtSign)
             rets = rets.substr(1);
-        std::string newval = mapValue[rets];
+        std::string newval;
+        auto val = mapValue.find(rets);
+        if (val != mapValue.end())
+            newval = val->second;
         if (rets != "0" && rets != "1" && newval != "") { // don't translate trivial values
 printf("[%s:%d] INSTTTANTIATEEEEEEEEEEEEEEEEEEEEEEEEEEE %s -> %s\n", __FUNCTION__, __LINE__, arg.c_str(), newval.c_str());
             rets = newval;
@@ -582,9 +602,13 @@ void dumpMethod(std::string name, MethodInfo *MI)
 
 void dumpModule(std::string name, ModuleIR *IR)
 {
+static int traceFields;//=1;
     int interfaceNumber = 0;
     if (!IR)
         return;
+    if (traceFields)
+        for (auto item: IR->fields)
+             dumpModule(name + "_field", lookupIR(item.type));
     if (ModuleIR *implements = lookupInterface(IR->interfaceName))
         dumpModule(name + "__interface", implements);
     for (auto item: IR->interfaces)
@@ -614,6 +638,8 @@ void dumpModule(std::string name, ModuleIR *IR)
         ret += item.type + " '" + item.fldName + "'";
         printf("%s\n", ret.c_str());
     }
+    for (auto item: IR->parameters)
+        printf("    PARAMETERS %s %s\n", item.type.c_str(), item.fldName.c_str());
     for (auto item: IR->interfaceConnect)
         printf("    INTERFACECONNECT %s %s %s\n", tree2str(item.target).c_str(), tree2str(item.source).c_str(), item.type.c_str());
     for (auto MI: IR->methods)
