@@ -213,6 +213,7 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
     genericIR->unionList = IR->unionList;
     genericIR->interfaceConnect = IR->interfaceConnect;
     genericIR->genvarCount = IR->genvarCount;
+    genericIR->isExt = IR->isExt;
     genericIR->isInterface = isInterface;
     genericIR->isStruct = IR->isStruct;
     genericIR->isSerialize = IR->isSerialize;
@@ -493,7 +494,10 @@ printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name
 skipLab:;
         IR++;
     }
-    for (auto IR : irSeq) {
+    // even convert 'EMODULE' items
+    for (auto mapItem : mapIndex//irSeq
+) {
+        ModuleIR *IR = mapItem.second;
         std::string modName = IR->name;
         int ind = modName.find("(");
         if (ind > 0) {
@@ -523,7 +527,8 @@ skipLab:;
                 paramMap.push_back(PARAM_MAP{pname, pvalue});
             }
             ModuleIR *genericIR = buildGeneric(IR, irName, paramMap);
-            irSeq.push_back(genericIR);
+            if (!IR->isExt && !IR->isInterface && !IR->isStruct)
+                irSeq.push_back(genericIR);
             genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM", true);
             paramIR->isInterface = true;

@@ -380,6 +380,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &f
         ParseCheck(ext || interface || isStruct || isSerialize || checkItem("MODULE"), "Module header missing");
         std::string name = getToken();
         ModuleIR *IR = allocIR(name, interface);
+        IR->isExt = ext;
         IR->isInterface = interface;
         IR->isStruct = isStruct;
         IR->isSerialize = isSerialize;

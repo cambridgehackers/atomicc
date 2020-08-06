@@ -176,6 +176,7 @@ typedef struct ModuleIR {
     std::list<FieldElement>           parameters;
     std::list<InterfaceConnectType>   interfaceConnect;
     int                               genvarCount;
+    bool                              isExt;
     bool                              isInterface;
     bool                              isStruct;
     bool                              isSerialize;
