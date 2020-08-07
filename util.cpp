@@ -23,9 +23,10 @@
 
 int trace_expand;//=1;
 int trace_parameters;//=1;
-std::map<std::string, ModuleIR *> mapIndex, mapStripped, interfaceIndex, interfaceStripped;
+int trace_IR;//=1;
 static int trace_iter;//=1;
 static int traceLookup;//=1;
+std::map<std::string, ModuleIR *> mapIndex, mapStripped, interfaceIndex, interfaceStripped;
 
 std::string baseMethodName(std::string pname)
 {
@@ -124,6 +125,8 @@ ModuleIR *lookupIR(std::string name)
         if (mapStripped.find(ind) != mapStripped.end())
             IR = mapStripped[ind];
     }
+    if (trace_IR)
+        printf("[%s:%d]lookup %p name %s alt %s\n", __FUNCTION__, __LINE__, (void *)IR, name.c_str(), ind.c_str());
     if (IR && IR->isInterface)
         printf("[%s:%d] was interface %s\n", __FUNCTION__, __LINE__, ind.c_str());
     return IR;
@@ -168,7 +171,8 @@ std::string instantiateType(std::string arg, MapNameValue &mapValue) // also che
         if (val != mapValue.end())
             newval = val->second;
         if (rets != "0" && rets != "1" && newval != "") { // don't translate trivial values
-printf("[%s:%d] INSTTTANTIATEEEEEEEEEEEEEEEEEEEEEEEEEEE %s -> %s\n", __FUNCTION__, __LINE__, arg.c_str(), newval.c_str());
+            if (trace_parameters)
+                printf("[%s:%d] INSTTTANTIATE %s -> %s\n", __FUNCTION__, __LINE__, arg.c_str(), newval.c_str());
             rets = newval;
         }
         if (hasAtSign)
@@ -531,6 +535,8 @@ ModuleIR *allocIR(std::string name, bool isInterface)
         else
             mapStripped[iname] = IR;
     }
+    if (trace_IR)
+        printf("[%s:%d] allocIR %s alt %s\n", __FUNCTION__, __LINE__, name.c_str(), iname.c_str());
     return IR;
 }
 
