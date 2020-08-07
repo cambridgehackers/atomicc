@@ -256,6 +256,8 @@ std::string convertType(std::string arg, int arrayProcess)
     }
     if (lookupInterface(bp))
         return "0";
+    if (*bp == '(')
+        return bp;
     printf("[%s:%d] convertType FAILED '%s'\n", __FUNCTION__, __LINE__, bp);
     exit(-1);
 }

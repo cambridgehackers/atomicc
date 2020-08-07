@@ -487,7 +487,8 @@ printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name
                  if (item->type == (*IR)->name)
                      item->type = field.type;
         }
-// Why?
+        // Since we replace all usages, no need to emit module definition
+        mapIndex.erase(mapIndex.find((*IR)->name));
         IR = irSeq.erase(IR);
         continue;
         }
@@ -495,9 +496,12 @@ skipLab:;
         IR++;
     }
     // even convert 'EMODULE' items
-    for (auto mapItem : mapIndex//irSeq
-) {
+#if 1
+    for (auto mapItem : mapIndex) {
         ModuleIR *IR = mapItem.second;
+#else
+    for (auto IR : irSeq) {
+#endif
         std::string modName = IR->name;
         int ind = modName.find("(");
         if (ind > 0) {

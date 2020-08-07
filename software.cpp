@@ -127,14 +127,16 @@ exit(-1);
         IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false, false});
         localName += MODULE_SEPARATOR;
         muxName += MODULE_SEPARATOR;
-        bool hasIndication = false;
         std::string fieldName;
+        IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
+        IRifc->interfaces.push_back(FieldElement{"request", "", pipeName, false/*in*/, false, false, false, ""/*not param*/, false, false, false});
+        int indicationCount = 0;
+        std::string pipeUser;
         for (auto item: softwareNameList) {
             jsonGenerate(OStrJ, item.first, item.second);
             bool outcall = item.second.field.isPtr;
             std::string userTypeName = item.second.inter->name;
             std::string userInterface = item.second.field.fldName;
-            std::string pName = pipeName;
             fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             std::string type = (outcall ? "___M2P" : "___P2M") + userTypeName;
             std::string interfaceName = fieldName + "___IFC";
@@ -142,28 +144,38 @@ exit(-1);
             ifcIR->interfaceName = interfaceName;
             ModuleIR *ifcIRinterface = allocIR(interfaceName, true);
             ifcIRinterface->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
-            ifcIRinterface->interfaces.push_back(FieldElement{"pipe", "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
+            ifcIRinterface->interfaces.push_back(FieldElement{"pipe", "", pipeName, outcall, false, false, false, ""/*not param*/, false, false, false});
             IR->fields.push_back(FieldElement{fieldName, "", type, false, false, false, false, ""/*not param*/, false, false, false});
-            std::string topName = outcall ? "indication" : "request";
-            IRifc->interfaces.push_back(FieldElement{topName, "", pName, outcall, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 allocExpr(localName + userInterface),
                 allocExpr(fieldName + MODULE_SEPARATOR + "method"), userTypeName, true});
-            if (topName == "indication")
-                hasIndication = true;
-            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(topName),
-                allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pName, true});
+            if (outcall) {
+                pipeUser = fieldName + MODULE_SEPARATOR + "pipe";
+                indicationCount++;
+            }
+            else
+                IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("request"),
+                    allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pipeName, true});
             //dumpModule("SWIFC", ifcIR);
         }
+        std::string indVec = autostr(indicationCount);
+        IR->fields.push_back(FieldElement{"funnel", "", "FunnelBufferedBase(funnelWidth="
+           + autostr(indicationCount) + ",dataWidth=" + convertType("NOCDataH") + ")", false, false, false, false, ""/*not param*/, false, false, false});
+        IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(pipeUser),
+            str2tree("funnel$in[0]"), pipeName, true});
+        IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
+            allocExpr("funnel$out"), "PipeIn", true});
+#if 0
         if (!hasIndication) {
             IRifc->interfaces.push_back(FieldElement{"indication", "", "PipeIn",
                 true/*outcall*/, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
                 allocExpr(fieldName + MODULE_SEPARATOR + "returnInd"), "PipeIn", true});
         }
+#endif
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
-        //dumpModule("TOP", IR);
+        dumpModule("TOP", IR);
         std::string commandLine(exename);
         int ind = commandLine.rfind("/");
         if (ind == -1)
