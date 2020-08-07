@@ -84,8 +84,18 @@ printf("[%s:%d] JNAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), i
 std::string getRelativePath(std::string path)
 {
     std::string cwd = getcwd(filenameBuffer, sizeof(filenameBuffer));
-    cwd = realpath(cwd.c_str(), filenameBuffer);
-    path = realpath(path.c_str(), filenameBuffer);
+    char *ccwd = realpath(cwd.c_str(), filenameBuffer);
+    char *cpath = realpath(path.c_str(), filenameBuffer);
+    if (!ccwd) {
+        printf("%s: ERROR: path does not exist '%s' or '%s' errno %d\n", __FUNCTION__, cwd.c_str(), filenameBuffer, errno);
+        exit(-1);
+    }
+    if (!cpath) {
+        printf("%s: ERROR: path does not exist '%s' or '%s' errno %d\n", __FUNCTION__, path.c_str(), filenameBuffer, errno);
+        exit(-1);
+    }
+    cwd = ccwd;
+    path = cpath;
     unsigned ind = 0, lastslash = 0;
     while (ind < cwd.length() && ind < path.length() && cwd[ind] == path[ind]) {
         if (cwd[ind] == '/')
