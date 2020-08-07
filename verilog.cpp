@@ -899,10 +899,10 @@ static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTr
     for (auto MI : IIR->methods) {
         ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
         if (trace_connect)
-            printf("[%s:%d] ICtarget %s '%s' ICsource %s\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICtarget.substr(ICtarget.length()-1).c_str(), ICsource.c_str());
-        if (target->value.substr(target->value.length()-1) == MODULE_SEPARATOR)
+            printf("[%s:%d] ICtarget '%s' ICsource '%s'\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICsource.c_str());
+        if (target->value.length() && target->value.substr(target->value.length()-1) == MODULE_SEPARATOR)
             target->value = target->value.substr(0, target->value.length()-1);
-        if (source->value.substr(source->value.length()-1) == MODULE_SEPARATOR)
+        if (source->value.length() && source->value.substr(source->value.length()-1) == MODULE_SEPARATOR)
             source->value = source->value.substr(0, source->value.length()-1);
         target->value += MODULE_SEPARATOR + MI->name;
         source->value += MODULE_SEPARATOR + MI->name;
