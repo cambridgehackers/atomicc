@@ -128,10 +128,8 @@ exit(-1);
         localName += MODULE_SEPARATOR;
         muxName += MODULE_SEPARATOR;
         std::string fieldName;
-        IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
         IRifc->interfaces.push_back(FieldElement{"request", "", pipeName, false/*in*/, false, false, false, ""/*not param*/, false, false, false});
-        int indicationCount = 0;
-        std::string pipeUser;
+        std::list<std::string> pipeUser;
         for (auto item: softwareNameList) {
             jsonGenerate(OStrJ, item.first, item.second);
             bool outcall = item.second.field.isPtr;
@@ -149,22 +147,40 @@ exit(-1);
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 allocExpr(localName + userInterface),
                 allocExpr(fieldName + MODULE_SEPARATOR + "method"), userTypeName, true});
+            if (!outcall) // see if the request deserialization can generate an indication
+            if (auto userIR = lookupInterface(userTypeName)) {
+                for (auto MI: userIR->methods) {
+                    std::string methodName = MI->name;
+                    if (!isRdyName(methodName) && !isEnaName(methodName)) {
+                        // actionValue methods get a callback for value
+                        ifcIRinterface->interfaces.push_back(FieldElement{"returnInd", "", "PipeIn", true, false, false, false, ""/*not param*/, false, false, false});
+                        pipeUser.push_back(fieldName + MODULE_SEPARATOR + "returnInd");
+                        break;
+                    }
+                }
+            }
+printf("[%s:%d] outcall %d usertypename %s userinterf %s fieldname %s type %s\n", __FUNCTION__, __LINE__, outcall, userTypeName.c_str(), userInterface.c_str(), fieldName.c_str(), type.c_str());
             if (outcall) {
-                pipeUser = fieldName + MODULE_SEPARATOR + "pipe";
-                indicationCount++;
+                pipeUser.push_back(fieldName + MODULE_SEPARATOR + "pipe");
             }
             else
                 IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("request"),
                     allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pipeName, true});
             //dumpModule("SWIFC", ifcIR);
         }
-        std::string indVec = autostr(indicationCount);
+        if (pipeUser.size()) {
         IR->fields.push_back(FieldElement{"funnel", "", "FunnelBufferedBase(funnelWidth="
-           + autostr(indicationCount) + ",dataWidth=" + convertType("NOCDataH") + ")", false, false, false, false, ""/*not param*/, false, false, false});
-        IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(pipeUser),
-            str2tree("funnel$in[0]"), pipeName, true});
+           + autostr(pipeUser.size()) + ",dataWidth=" + convertType("NOCDataH") + ")", false, false, false, false, ""/*not param*/, false, false, false});
+        int ind = 0;
+        for (auto inter: pipeUser) {
+            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(inter),
+                str2tree("funnel$in[" + autostr(ind) + "]"), pipeName, true});
+            ind++;
+        }
         IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
             allocExpr("funnel$out"), "PipeIn", true});
+        IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
+        }
 #if 0
         if (!hasIndication) {
             IRifc->interfaces.push_back(FieldElement{"indication", "", "PipeIn",

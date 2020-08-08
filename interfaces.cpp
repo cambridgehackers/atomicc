@@ -152,10 +152,9 @@ static void processP2M(ModuleIR *IR)
     extractParam("P2M", IR->name, mapValue);
     ModuleIR *IIR = nullptr, *HIR = nullptr;
     std::string host, target;
-    bool addedReturnInd = false;
     ModuleIR *implements = lookupInterface(IR->interfaceName);
     for (auto inter: implements->interfaces) {
-        if (inter.isPtr) {
+        if (inter.fldName == "method") {
             IIR = lookupInterface(inter.type);
             target = inter.fldName;
             std::string iname = inter.type;
@@ -164,7 +163,7 @@ static void processP2M(ModuleIR *IR)
     if (trace_software)
 dumpModule("P2M/IIR :" + target, IIR);
         }
-        else {
+        else if (inter.fldName == "pipe") {
             HIR = lookupInterface(inter.type);
     if (trace_software)
 printf("[%s:%d] HIR type %s IR %p\n", __FUNCTION__, __LINE__, inter.type.c_str(), (void *)HIR);
@@ -222,9 +221,6 @@ assert(MInew);
         ACCExpr *cond = allocExpr("==", allocExpr(sourceParam + "[" + paramLen + " - 1: (" + paramLen + "- 16)]"), // length
                  allocExpr("16'd" + autostr(counter)));
         if (!isEnaName(methodName)) {
-            if (!addedReturnInd)
-                implements->interfaces.push_back(FieldElement{"returnInd", "", "PipeIn", true, false, false, false, ""/*not param*/, false, false, false});
-            addedReturnInd = true;
             if (MI->action) {
                 // when calling 'actionValue', guarded call needed
                 // need to call xxx__ENA function here!

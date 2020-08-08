@@ -35,6 +35,8 @@ static void dumpMap()
 {
     for (auto item: externMap) {
         ModuleIR *temp = lookupIR(item.second.type);
+        if (!temp && item.second.type == "Printf")
+            continue;     // ignore this 'fake' module
         assert(temp);
         ModuleIR *IIR = lookupInterface(temp->interfaceName);
         assert(IIR);
