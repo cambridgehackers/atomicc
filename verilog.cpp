@@ -1044,7 +1044,8 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         }
         std::string calledName = value->value, calledEna = getEnaName(calledName);
         std::string vecCount;
-        MethodInfo *CI = lookupQualName(IR, calledName, vecCount);
+        MapNameValue mapValue;
+        MethodInfo *CI = lookupQualName(IR, calledName, vecCount, mapValue);
         if (!CI) {
             printf("[%s:%d] method %s not found\n", __FUNCTION__, __LINE__, calledName.c_str());
             dumpExpr("CALL", value);
@@ -1085,7 +1086,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         int argCount = CI->params.size();
         for (auto item: param->operands) {
             if(argCount-- > 0) {
-                std::string size = tree2str(cleanupInteger(cleanupExpr(str2tree(convertType(AI->type)))));
+                std::string size = tree2str(cleanupInteger(cleanupExpr(str2tree(convertType(instantiateType(AI->type, mapValue))))));
                 appendMux(section, pname + AI->name + sub, tempCond, item, size + "'d0");
                 AI++;
             }

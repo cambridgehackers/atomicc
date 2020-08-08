@@ -314,7 +314,7 @@ MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
     return nullptr;
 }
 
-MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount)
+MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount, MapNameValue &mapValue)
 {
     std::string fieldName;
     ModuleIR *implements = lookupInterface(searchIR->interfaceName);
@@ -352,6 +352,7 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
                     vecCount = item.vecCount;  // tell caller we were a vector
                 if (traceLookup)
                      printf("[%s:%d]found name %s vecCount %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
+                extractParam("CALL_" + item.fldName, item.type, mapValue);
                 return lookupIR(item.type);
             }
             return nullptr; });
