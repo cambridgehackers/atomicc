@@ -87,16 +87,16 @@ std::string getRelativePath(std::string path)
 {
     std::string cwd = getcwd(filenameBuffer, sizeof(filenameBuffer));
     char *ccwd = realpath(cwd.c_str(), filenameBuffer);
-    char *cpath = realpath(path.c_str(), filenameBuffer);
     if (!ccwd) {
         printf("%s: ERROR: path does not exist '%s' or '%s' errno %d\n", __FUNCTION__, cwd.c_str(), filenameBuffer, errno);
         exit(-1);
     }
+    cwd = ccwd;
+    char *cpath = realpath(path.c_str(), filenameBuffer);
     if (!cpath) {
         printf("%s: ERROR: path does not exist '%s' or '%s' errno %d\n", __FUNCTION__, path.c_str(), filenameBuffer, errno);
         exit(-1);
     }
-    cwd = ccwd;
     path = cpath;
     unsigned ind = 0, lastslash = 0;
     while (ind < cwd.length() && ind < path.length() && cwd[ind] == path[ind]) {
@@ -125,7 +125,7 @@ static const char *yosys_template =
     "smtbmc\n"
     "\n"
     "[script]\n"
-    "read_verilog -formal ";
+    "read_verilog -sv -formal ";
 static const char *yosys_template2 = "\n\nprep -top ";
 static const char *yosys_template3 = "\n\n[files]\n";
 
@@ -167,10 +167,11 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     std::string commandLine = getExecutionFilename(filenameBuffer, sizeof(filenameBuffer));
     ind = commandLine.rfind("/");
     std::string atomiccDir = commandLine.substr(0, ind);
-    commandLine = atomiccDir + "/../verilator/verilator_bin";
+    commandLine = atomiccDir + "/../verilator/bin/verilator_bin";
     commandLine += " -Mdir " + dirName + " ";
     commandLine += " --atomicc -y " + dirName;
     commandLine += " -y " + getRelativePath(atomiccDir + "/../atomicc-examples/lib/generated/");
+    commandLine += " -y " + getRelativePath(atomiccDir + "/../atomicc-examples/lib/verilog/");
     commandLine += " --top-module " + topModule + " " + topModule + ".sv";
     int ret = system(commandLine.c_str());
     printf("[%s:%d] return %d from running '%s'\n", __FUNCTION__, __LINE__, ret, commandLine.c_str());
