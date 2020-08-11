@@ -155,6 +155,9 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
     else if (op == "!" || !expr->operands.size())
         ret += op;
     bool topOp = checkOperand(expr->value) || expr->value == "," || expr->value == "[" || expr->value == PARAMETER_MARKER;
+    if (expr->value == "$past" && expr->operands.size()) { // runtime functions actually 'called' in generated code
+        expr->operands.front()->value = "(";
+    }
     for (auto item: expr->operands) {
         ret += sep;
         bool addParen = !topOp && !checkOperand(item->value) && item->value != ",";
