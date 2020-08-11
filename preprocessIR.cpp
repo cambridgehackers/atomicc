@@ -505,7 +505,7 @@ skipLab:;
         std::string modName = IR->name;
         int ind = modName.find("(");
         if (ind > 0) {
-            std::string irName = modName.substr(0, ind);
+            std::string irName = modName;//.substr(0, ind);
             std::string parg = modName.substr(ind + 1);
             if(parg.substr(parg.length()-1) != ")") {
                 printf("[%s:%d] Error: argument without ')' modname '%s' irname '%s' parg '%s'\n", __FUNCTION__, __LINE__, modName.c_str(), irName.c_str(), parg.c_str());

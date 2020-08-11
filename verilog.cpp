@@ -400,6 +400,9 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
             interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, false);
     }
     std::string moduleInstantiation = IR->name;
+    int ind = moduleInstantiation.find("(");
+    if (ind > 0)
+        moduleInstantiation = moduleInstantiation.substr(0, ind);
     if (instance != "") {
         moduleInstantiation = genericModuleParam(instanceType);
 //printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.substr(0,instance.length()-1).c_str(), params.c_str());
@@ -423,7 +426,7 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
         }
     }
     if (!dontDeclare)
-        modParam.push_back(ModData{minst, moduleInstantiation, "", true, pinPorts.size() > 0, 0, false, ""/*not param*/, vecCount});
+        modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, pinPorts.size() > 0, 0, false, ""/*not param*/, vecCount});
     if (instance == "")
         for (auto item: paramPorts)
             checkWire(item.name, item.type, item.isOutput, item.isInout, item.init, item.isLocal, true/*isArgument*/, item.vecCount);
@@ -1190,7 +1193,7 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
             bool instance = item.second.instance;
             std::string sname = item.second.name;
             refList[sname] = RefItem{4, "Bit(1)", false, false, PIN_LOCAL, false, false, "", false};
-            modLine.push_back(ModData{item.first + "SyncFF", "SyncFF", "", true, false, false, false, "", ""});
+            modLine.push_back(ModData{item.first + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
             modLine.push_back(ModData{"out", instance ? item.first : sname, "Bit(1)", false, false, true/*out*/, false, "", ""});
             modLine.push_back(ModData{"in", instance ? sname : item.first, "Bit(1)", false, false, false /*out*/, false, "", ""});
             refList[item.first].count++;

@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 module VsimReceive #(parameter width = 32) (input CLK, input nRST,
-    output enq__ENA, input enq__RDY, output [width-1:0] enq$v, output enq$last);
+    output reg enq__ENA, input enq__RDY, output reg [width-1:0] enq$v, output reg enq$last);
 
     import "DPI-C" function longint dpi_msgReceive_enq();
     always @(posedge CLK) begin

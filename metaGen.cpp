@@ -21,12 +21,16 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-static void metaGenerateModule(ModuleIR *IR, FILE *OStr)
+void metaGenerateModule(ModuleIR *IR, FILE *OStr)
 {
     std::map<std::string, int> exclusiveSeen;
     std::list<std::string>     metaList;
     // write out metadata comments at end of the file
-    metaList.push_front("//METASTART; " + IR->name);
+    std::string name = IR->name;
+    int ind = name.find("(");
+    if (ind > 0)
+        name = name.substr(0, ind);
+    metaList.push_front("//METASTART; " + name);
     for (auto item: IR->interfaces)
         if (item.isPtr)
         metaList.push_back("//METAEXTERNAL; " + item.fldName + "; " + lookupInterface(item.type)->name + ";");
@@ -146,15 +150,4 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
         metaList.push_back("//METAPRIORITY; " + item.first + "; " + item.second);
     for (auto item : metaList)
         fprintf(OStr, "%s\n", item.c_str());
-}
-
-void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
-{
-    myName += "_GENERATED_";
-    FILE *OStrVH = fopen((OutputDir + ".vh").c_str(), "w");
-    fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n\n", myName.c_str(), myName.c_str());
-    for (auto IR : irSeq)
-        metaGenerateModule(IR, OStrVH); // now generate the verilog header file '.vh'
-    fprintf(OStrVH, "`endif\n");
-    fclose(OStrVH);
 }

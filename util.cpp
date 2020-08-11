@@ -122,9 +122,11 @@ ModuleIR *lookupIR(std::string name)
         int i = ind.find("(");
         if (i > 0)   // now try without parameter instantiation
             ind = ind.substr(0,i);
-        if (mapStripped.find(ind) != mapStripped.end())
-            IR = mapStripped[ind];
     }
+    if (!IR && mapIndex.find(ind) != mapIndex.end())
+        IR = mapIndex[ind];
+    if (!IR && mapStripped.find(ind) != mapStripped.end())
+        IR = mapStripped[ind];
     if (trace_IR)
         printf("[%s:%d]lookup %p name %s alt %s\n", __FUNCTION__, __LINE__, (void *)IR, name.c_str(), ind.c_str());
     if (IR && IR->isInterface)
@@ -144,9 +146,11 @@ ModuleIR *lookupInterface(std::string name)
         int i = ind.find("(");
         if (i > 0)   // now try without parameter instantiation
             ind = ind.substr(0,i);
-        if (interfaceStripped.find(ind) != interfaceStripped.end())
-            IR = interfaceStripped[ind];
     }
+    if (!IR && interfaceIndex.find(ind) != interfaceIndex.end())
+        IR = interfaceIndex[ind];
+    if (!IR && interfaceStripped.find(ind) != interfaceStripped.end())
+        IR = interfaceStripped[ind];
     if (IR && !IR->isInterface)
         printf("[%s:%d] not interface %s\n", __FUNCTION__, __LINE__, ind.c_str());
     return IR;

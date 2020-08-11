@@ -171,7 +171,7 @@ void processInterfaces(std::list<ModuleIR *> &irSeq);
 int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName);
 
 // metaGen.cpp
-void generateMeta(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir);
+void metaGenerateModule(ModuleIR *IR, FILE *OStr);
 
 // preprocessIR.cpp
 void preprocessIR(std::list<ModuleIR *> &irSeq);

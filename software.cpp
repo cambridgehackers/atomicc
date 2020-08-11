@@ -168,7 +168,13 @@ printf("[%s:%d] outcall %d usertypename %s userinterf %s fieldname %s type %s\n"
                     allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pipeName, true});
             //dumpModule("SWIFC", ifcIR);
         }
-        if (pipeUser.size()) {
+        if (int size = pipeUser.size()) {
+        IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
+        if (size == 1) {
+            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
+                allocExpr(pipeUser.front()), "PipeIn", true});
+        }
+        else {
         IR->fields.push_back(FieldElement{"funnel", "", "FunnelBufferedBase(funnelWidth="
            + autostr(pipeUser.size()) + ",dataWidth=" + convertType("NOCDataH") + ")", false, false, false, false, ""/*not param*/, false, false, false});
         int ind = 0;
@@ -179,7 +185,7 @@ printf("[%s:%d] outcall %d usertypename %s userinterf %s fieldname %s type %s\n"
         }
         IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
             allocExpr("funnel$out"), "PipeIn", true});
-        IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
+        }
         }
 #if 0
         if (!hasIndication) {

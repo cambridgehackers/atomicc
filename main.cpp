@@ -31,25 +31,17 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
         modLineTop.clear();
         generateModuleDef(IR, modLineTop);         // Collect/process verilog info
 
-        FILE *OStrV = fopen((baseDir + IR->name + ".sv").c_str(), "w");
+        std::string name = IR->name;
+        int ind = name.find("(");
+        if (ind > 0)
+            name = name.substr(0, ind);
+        FILE *OStrV = fopen((baseDir + name + ".sv").c_str(), "w");
         if (!OStrV) {
-            printf("veriloggen: unable to open '%s'\n", (baseDir + IR->name + ".sv").c_str());
+            printf("veriloggen: unable to open '%s'\n", (baseDir + name + ".sv").c_str());
             exit(-1);
         }
         fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
         fprintf(OStrV, "`default_nettype none\n");
-#if 0 // for future support of System Verilog structs
-        for (auto item: mapIndex) {
-            ModuleIR *IR = item.second;
-            if (IR->isStruct && IR->name != "NOCDataH") {
-                fprintf(OStrV, "typedef struct packed {\n");
-                for (auto fitem: IR->fields) {
-                    fprintf(OStrV, "    %s %s;\n", typeDeclaration(fitem.type).c_str(), fitem.fldName.c_str());
-                }
-                fprintf(OStrV, "} %s;\n", item.first.c_str());
-            }
-        }
-#endif
         generateModuleHeader(OStrV, modLineTop);
         generateVerilogOutput(OStrV);
         fprintf(OStrV, "endmodule\n\n`default_nettype wire    // set back to default value\n");
@@ -65,6 +57,120 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
     }
     fclose(OStrP);
     }
+}
+
+typedef std::list<std::string> StrList;
+static StrList interfaceList;
+static std::map<std::string, bool> interfaceSeen;
+
+static std::string modportNames(std::string first, StrList &inname, std::string second, StrList &outname, StrList &inoutname)
+{
+    std::string ret, sep;
+    if (inname.size())
+        ret += first + " ";
+    for (auto item: inname) {
+        ret += sep + item;
+        sep = ", ";
+    }
+    if (sep != "")
+        sep = ",\n                    ";
+    if (outname.size()) {
+        ret += sep + second + " ";
+        sep = "";
+    }
+    for (auto item: outname) {
+        ret += sep + item;
+        sep = ", ";
+    }
+    if (inoutname.size()) {
+        ret += sep + "inout ";
+        sep = "";
+    }
+    for (auto item: inoutname) {
+        ret += sep + item;
+        sep = ", ";
+    }
+    return ret;
+}
+static void generateVerilogInterface(std::string name, FILE *OStrVH)
+{
+    StrList inname, outname, inoutname, fields;
+    ModuleIR *IR = lookupInterface(name);
+    for (auto fitem: IR->fields) {
+        if (fitem.isParameter != "") {
+            continue;
+        }
+        fields.push_back(typeDeclaration(fitem.type) + " " + fitem.fldName);
+        if (fitem.fldName == "CLK" || fitem.fldName == "nRST")
+            continue;
+        if (fitem.isInput)
+            inname.push_back(fitem.fldName);
+        if (fitem.isOutput)
+            outname.push_back(fitem.fldName);
+        if (fitem.isInout)
+            inoutname.push_back(fitem.fldName);
+    }
+    for (auto MI: IR->methods) {
+         std::string methodName = MI->name;
+         std::string rdyMethodName = getRdyName(methodName);
+         if (methodName == rdyMethodName)
+             continue;
+        fields.push_back("logic " + methodName);
+        inname.push_back(methodName);
+        for (auto pitem: MI->params) {
+            std::string pname = baseMethodName(methodName) + MODULE_SEPARATOR + pitem.name;
+            fields.push_back(typeDeclaration(pitem.type) + " " + pname);
+            inname.push_back(pname);
+        }
+        fields.push_back("logic " + rdyMethodName);
+        outname.push_back(rdyMethodName);
+    }
+    if (fields.size()) {
+        MapNameValue mapValue;
+        extractParam("INTERFACE__" + name, name, mapValue);
+        int ind = name.find("(");
+        if (ind > 0)
+            name = name.substr(0, ind);
+        std::string defname = "__" + name + "_DEF__";
+        if (mapValue.size()) {
+            name += "#(";
+            std::string sep;
+            for (auto item: mapValue) {
+                name += sep + item.first;
+                if (item.second != "")
+                    name += " = " + item.second;
+                sep = ", ";
+            }
+            //dumpModule("paramet", IR);
+            name += ")";
+        }
+        fprintf(OStrVH, "`ifndef %s\n`define %s\ninterface %s;\n", defname.c_str(), defname.c_str(), name.c_str());
+        for (auto item: fields)
+            fprintf(OStrVH, "    %s;\n", item.c_str());
+#if 1 // yosys can't handle modport/inout
+        inoutname.clear();
+#endif
+        if (inname.size() + outname.size() + inoutname.size()) {
+        fprintf(OStrVH, "    modport server (%s);\n", modportNames("input ", inname, "output", outname, inoutname).c_str());
+        fprintf(OStrVH, "    modport client (%s);\n", modportNames("output", inname, "input ", outname, inoutname).c_str());
+        }
+        fprintf(OStrVH, "endinterface\n`endif\n");
+    }
+}
+
+static void appendInterface(std::string name, std::string params)
+{
+    if (name.find("(") == std::string::npos)  // if we inherit parameters, use them (unless we already had some)
+        name += params;
+    if (interfaceSeen[name])
+        return;
+    interfaceSeen[name] = true;
+    ModuleIR *IR = lookupInterface(name);
+    assert(IR);
+    for (auto item: IR->interfaces) {
+        appendInterface(item.type, params);
+    }
+    interfaceList.push_back(name);
 }
 
 int main(int argc, char **argv)
@@ -101,7 +207,45 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     processInterfaces(irSeq);
     preprocessIR(irSeq);
     generateVerilog(irSeq, myName, OutputDir);
-    generateMeta(irSeq, myName, OutputDir);
+
+    FILE *OStrVH = fopen((OutputDir + ".vh").c_str(), "w");
+    std::string defname = myName + "_GENERATED_";
+    fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n", defname.c_str(), defname.c_str());
+    fprintf(OStrVH, "`include \"atomicclib.vh\"\n\n");
+    for (auto item: mapIndex) {
+        ModuleIR *IR = item.second;
+        if (IR->isStruct) {
+            if (IR->name != "NOCDataH") {
+                std::string defname = "__" + item.first + "_DEF__";
+                fprintf(OStrVH, "`ifndef %s\n`define %s\ntypedef struct packed {\n", defname.c_str(), defname.c_str());
+                for (auto fitem: IR->fields)
+                    fprintf(OStrVH, "    %s %s;\n", typeDeclaration(fitem.type).c_str(), fitem.fldName.c_str());
+                fprintf(OStrVH, "} %s;\n`endif\n", item.first.c_str());
+            }
+        }
+        else if (!IR->isInterface
+         && !endswith(IR->name, "_UNION") && IR->name.find("_VARIANT_") == std::string::npos) {
+            if (IR->interfaceName == "") {
+                dumpModule("Missing interfaceName", IR);
+                exit(-1);
+            }
+            std::string params;
+            int ind = IR->name.find("(");
+            if (ind > 0)
+                params = IR->name.substr(ind);
+//printf("[%s:%d]////////////////////////////////////////////////////////////////////////////////////// %s params %s\n", __FUNCTION__, __LINE__, IR->interfaceName.c_str(), params.c_str());
+//dumpModule("INTERFACE", IR);
+            appendInterface(IR->interfaceName, params);
+        }
+    }
+#if 1 // support of System Verilog structs
+    for (auto item: interfaceList)
+        generateVerilogInterface(item, OStrVH);
+#endif
+    for (auto IR : irSeq)
+        metaGenerateModule(IR, OStrVH); // now generate the verilog header file '.vh'
+    fprintf(OStrVH, "`endif\n");
+    fclose(OStrVH);
     generateKami(irSeq, myName, OutputDir);
 
     if (!noVerilator) {
