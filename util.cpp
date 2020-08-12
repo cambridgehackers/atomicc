@@ -478,43 +478,41 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
     return origName;
 }
 
-void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool out, bool force, uint64_t aoffset, bool alias, bool init)
+void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool force, uint64_t aoffset, bool alias)
 {
     if (trace_expand)
-        printf("[%s:%d] entry %s type %s force %d init %d\n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), force, init);
+        printf("[%s:%d] entry %s type %s force %d \n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), force);
     __block uint64_t offset = aoffset;
     std::string sname = name + MODULE_SEPARATOR;
-    if (init)
-        fieldList.clear();
+#if 1
     if (ModuleIR *IR = lookupIR(type)) {
+#if 0
         for (auto item: IR->unionList) {
             uint64_t toff = offset;
             std::string tname;
+printf("[%s:%d]\n", __FUNCTION__, __LINE__);
+exit(-1);
             if (out) {
                 toff = 0;
                 tname = name;
             }
-            getFieldList(fieldList, sname + item.name, tname, item.type, out, true, toff, true, false);
+            getFieldList(fieldList, sname + item.name, tname, item.type, true, toff, true);
         }
+#endif
         iterField(IR, CBAct {
-                std::string fldName = item.fldName;
-                if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
                 if (item.isParameter == "") {
-                    getFieldList(fieldList, sname + fldName, base, item.type, out, true, offset, alias, false);
+                    getFieldList(fieldList, sname + item.fldName, base, item.type, true, offset, alias);
                     offset += atoi(convertType(item.type).c_str());
                 }
             return nullptr; });
     }
-    else if (force) {
+    else 
+#endif
+    if (force) {
         if (trace_expand)
             printf("[%s:%d] getadd %s\n", __FUNCTION__, __LINE__, name.c_str());
         fieldList.push_back(FieldItem{name, base, type, alias, offset});
     }
-    if (trace_expand && init)
-        for (auto fitem: fieldList) {
-printf("%s: name %s base %s type %s %s offset %d\n", __FUNCTION__, fitem.name.c_str(), fitem.base.c_str(), fitem.type.c_str(), fitem.alias ? "ALIAS" : "", (int)fitem.offset);
-        }
 }
 
 ModuleIR *allocIR(std::string name, bool isInterface)

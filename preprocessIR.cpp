@@ -727,18 +727,20 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
         }
         item++;
     }
+#if 0
     for (auto item: MI->alloca) {
         if (!item.second.noReplace)
             continue;
         ACCExpr *itemList = allocExpr("{"); // }
         std::list<FieldItem> fieldList;
-        getFieldList(fieldList, item.first, "", item.second.type, true, true);
+        getFieldList(fieldList, item.first, "", item.second.type, true, 0, false);
         for (auto fitem : fieldList)
             if (!fitem.alias)
                 itemList->operands.push_front(allocExpr(fitem.name));
         if (itemList->operands.size() > 1)
             replaceMethodExpr(MI, allocExpr(item.first), itemList);
     }
+#endif
 }
 
 void cleanupIR(std::list<ModuleIR *> &irSeq)

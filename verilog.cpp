@@ -28,7 +28,8 @@ int trace_connect;//= 1;
 int trace_skipped;//= 1;
 
 std::list<PrintfInfo> printfFormat;
-std::list<ModData> modNew;
+typedef std::list<ModData> ModList;
+ModList modNew;
 std::map<std::string, CondLineType> condLines;
 std::map<std::string, SyncPinsInfo> syncPins;    // SyncFF items needed for PipeInSync instances
 
@@ -156,13 +157,13 @@ if (0)
     }
 }
 
-static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, int out, bool inout, bool force, int pin, bool assign, std::string vecCount, bool isArgument)
+static void expandStruct(ModuleIR *IR, std::string fldName, std::string type)
 {
     ACCExpr *itemList = allocExpr("{");
     std::list<FieldItem> fieldList;
-    getFieldList(fieldList, fldName, "", type, out != 0, force);
+    getFieldList(fieldList, fldName, "", type, false, 0, false);
     for (auto fitem : fieldList) {
-        std::string lvecCount = vecCount;
+        std::string lvecCount;
         std::string tempType = fitem.type;
         if (startswith(fitem.type, "ARRAY_")) {
             tempType = fitem.type.substr(6);
@@ -193,32 +194,34 @@ static void expandStruct(ModuleIR *IR, std::string fldName, std::string type, in
         std::string fnew = base + "[" + upper + ":" + autostr(offset) + "]";
         ACCExpr *fexpr = allocExpr(base, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(autostr(offset)))));
 if (trace_expand || refList[fitem.name].pin)
-printf("[%s:%d] set %s = %s out %d alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), tempType.c_str(), out, fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
-        assert (!refList[fitem.name].pin);
-        refList[fitem.name] = RefItem{0, tempType, out != 0, false, fitem.alias ? PIN_WIRE : pin, false, false, lvecCount, isArgument};
+printf("[%s:%d] set %s = %s alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), tempType.c_str(), fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
+        assert (!refList[fitem.name].pin || (refList[fitem.name].pin == PIN_WIRE));
+        refList[fitem.name] = RefItem{0, tempType, true, false, PIN_WIRE, false, false, lvecCount, false};
         if (refList[fnew].pin) {
             printf("[%s:%d] %s pin exists %d PIN_ALIAS\n", __FUNCTION__, __LINE__, fnew.c_str(), refList[fnew].pin);
         }
         //assert (!refList[fnew].pin);
-        refList[fnew] = RefItem{0, tempType, out != 0, false, PIN_ALIAS, false, false, lvecCount, isArgument};
+        refList[fnew] = RefItem{0, tempType, true, false, PIN_ALIAS, false, false, lvecCount, false};
         if (trace_declare)
             printf("[%s:%d]NEWREF %s %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fnew.c_str(), tempType.c_str());
-        if (!fitem.alias && out)
+        if (!fitem.alias)
             itemList->operands.push_front(allocExpr(fitem.name));
-        else if (assign) {
+        else {
 //printf("[%s:%d]AAAAAAAA name %s fexpr %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), tree2str(fexpr).c_str(), fitem.type.c_str());
             setAssign(fitem.name, fexpr, fitem.type);
 //refList[fitem.name + " "].count++;
 //refList[fitem.name].count++;
         }
     }
+#if 0
     if (force) {
         assert (!refList[fldName].pin);
-        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false, vecCount, isArgument};
+        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false, "", false};
         if (trace_declare)
             printf("[%s:%d]NEWREF2 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), type.c_str());
     }
-    if (itemList->operands.size() > 0 && assign)
+#endif
+    if (itemList->operands.size() > 0)
         setAssign(fldName, itemList, type);
 }
 
@@ -324,16 +327,17 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
         if (interfaceName != "")
             interfaceName += MODULE_SEPARATOR;
 //printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
-        collectInterfacePins(IIR, instance, pinPrefix + item.fldName,
-            methodPrefix + interfaceName, isLocal || item.isLocalInterface, mapValue, isPtr || item.isPtr, instantiateType(item.vecCount, mapValue), localInterface, isSync);
+        std::string updatedType = instantiateType(item.vecCount, mapValue);
+        bool localFlag = isLocal || item.isLocalInterface;
+        bool ptrFlag = isPtr || item.isPtr;
+        collectInterfacePins(IIR, instance, pinPrefix + item.fldName, methodPrefix + interfaceName, localFlag, mapValue, ptrFlag, updatedType, localInterface, isSync);
     }
 }
 
 /*
  * Generate verilog module header for class definition or reference
  */
-static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std::string instance, std::list<ModData> &modParam, std::string params,
-bool dontDeclare = false, std::string vecCount = "", int dimIndex = 0)
+static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std::string instance, ModList &modParam, std::string params, std::string vecCount)
 {
     MapNameValue mapValue;
     extractParam("SIGN_" + IR->name, instanceType, mapValue);
@@ -352,29 +356,23 @@ exit(-1);
             vc = interfaceVecCount;   // HACKHACKHACK
         int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
         std::string instName = instance + name;
-        if (vc != "") {
-            if (dontDeclare && dimIndex != -1)
-                instName = minst + "[" + autostr(dimIndex) + "]." + name;
-            //else
-                //instName = name;
-        }
-        if (!isLocal || instance == "" || dontDeclare) {
+        if (!isLocal || instance == "") {
         if (refList[instName].pin) {
             printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, instName.c_str(), refList[instName].pin, refPin);
         }
-        //assert (!refList[instName].pin);
+        assert (!refList[instName].pin);
         if (trace_ports)
-            printf("[%s:%d] name %s type %s dir %d vecCount %s interfaceVecCount %s dontDeclare %d\n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), dir, vecCount.c_str(), interfaceVecCount.c_str(), dontDeclare);
-        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || dontDeclare || vc != "", type, dir != 0, inout, refPin, false, dontDeclare, vc, isArgument};
+            printf("[%s:%d] name %s type %s dir %d vecCount %s interfaceVecCount %s\n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), dir, vecCount.c_str(), interfaceVecCount.c_str());
+        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || vc != "", type, dir != 0, inout, refPin, false, false, vc, isArgument};
             if(instance == "" && interfaceVecCount != "")
                 refList[instName].done = true;  // prevent default blanket assignment generation
         }
-        if (!isLocal && !dontDeclare)
+        if (!isLocal)
         modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
         if (trace_ports)
-            printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d dDecl %d vec '%s' dim %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, dontDeclare, vc.c_str(), dimIndex);
-        if (isparam == "")
-        expandStruct(IR, instName, type, dir, inout, false, PIN_WIRE, true, vc, isArgument);
+            printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s'\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str());
+        //if (isparam == "")
+        //xpandStruct(IR, instName, type, dir, false, PIN_WIRE, vc, isArgument);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
 //dumpModule("PINS", IR);
@@ -396,8 +394,7 @@ exit(-1);
         if (interfaceName != "")
             interfaceName += MODULE_SEPARATOR;
 printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
-        collectInterfacePins(IIR, instance != "", item.fldName,
-            interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, false);
+        collectInterfacePins(IIR, instance != "", item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, false);
     }
     std::string moduleInstantiation = IR->name;
     int ind = moduleInstantiation.find("(");
@@ -425,8 +422,7 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
             moduleInstantiation += "#(" + actual + ")";
         }
     }
-    if (!dontDeclare)
-        modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, pinPorts.size() > 0, 0, false, ""/*not param*/, vecCount});
+    modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, pinPorts.size() > 0, 0, false, ""/*not param*/, vecCount});
     if (instance == "")
         for (auto item: paramPorts)
             checkWire(item.name, item.type, item.isOutput, item.isInout, item.init, item.isLocal, true/*isArgument*/, item.vecCount);
@@ -459,9 +455,9 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
                 hasnRST = true;
         }
     if (!handleCLK && !hasCLK && vecCount == "")
-        refList["CLK"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, dontDeclare, "", false};
+        refList["CLK"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, false, "", false};
     if (!handleCLK && !hasnRST && vecCount == "")
-        refList["nRST"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, dontDeclare, "", false};
+        refList["nRST"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, false, "", false};
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -983,7 +979,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         walkRead(MI, value, cond);
         std::string dest = tree2str(info->dest);
         std::list<FieldItem> fieldList;
-        getFieldList(fieldList, dest, "", info->type, 1, true);
+        getFieldList(fieldList, dest, "", info->type, true, 0, false);
         if (fieldList.size() == 1) {
             std::string first = fieldList.front().name;
             appendMux(generateSection, dest, cond, value, "0");
@@ -1127,9 +1123,9 @@ void generateMethodGroup(ModuleIR *IR, void (*generateMethod)(ModuleIR *IR, std:
 /*
  * Generate *.sv and *.vh for a Verilog module
  */
-void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop)
+void generateModuleDef(ModuleIR *IR, ModList &modLineTop)
 {
-static std::list<ModData> modLine;
+static ModList modLine;
     generateSection = "";
     condAssignList.clear();
     refList.clear();
@@ -1144,47 +1140,19 @@ static std::list<ModData> modLine;
     syncPins.clear();     // pins from PipeInSync
 
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
-    generateModuleSignature(IR, "", "", modLineTop, "");
+    generateModuleSignature(IR, "", "", modLineTop, "", "");
 
     iterField(IR, CBAct {
-        int dimIndex = 0;
-        std::string vecCount = item.vecCount;
-        if (vecCount != "") {
-            std::string fldName = item.fldName;
-            ModuleIR *itemIR = lookupIR(item.type);
-            if (itemIR && !item.isPtr) {
-            if (itemIR->isStruct)
-                expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount, false);
-            else
-                generateModuleSignature(itemIR, item.type, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], false, vecCount, -1);
+        ModuleIR *itemIR = lookupIR(item.type);
+        if (!itemIR || item.isPtr || itemIR->isStruct) {
+            if (refList[item.fldName].pin) {
+                printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, item.fldName.c_str(), refList[item.fldName].pin);
             }
+            assert (!refList[item.fldName].pin);
+            refList[item.fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, item.vecCount, false};
         }
-        std::string pvec;
-        do {
-            std::string fldName = item.fldName;
-            ModuleIR *itemIR = lookupIR(item.type);
-            if (itemIR && !item.isPtr) {
-            if (itemIR->isStruct) {
-                if (vecCount == "")
-                    expandStruct(IR, fldName, item.type, 1, false, true, item.isShared ? PIN_WIRE : PIN_REG, true, vecCount, false);
-            }
-            else
-                generateModuleSignature(itemIR, item.type, fldName + MODULE_SEPARATOR, modLine, IR->params[fldName], vecCount != "", vecCount, dimIndex++);
-            }
-            else { // if (convertType(item.type) != 0)
-                if (refList[fldName].pin) {
-printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), refList[fldName].pin);
-                }
-                assert (!refList[fldName].pin);
-                refList[fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, vecCount, false};
-                if (trace_declare)
-                    printf("[%s:%d]NEWFLD3 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.type.c_str());
-            }
-            pvec = autostr(atoi(vecCount.c_str()) - 1);
-            if (vecCount == "" || pvec == "0" || !isdigit(vecCount[0])) pvec = "";
-            if(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING) vecCount = pvec;
-//break;
-        } while(vecCount != GENERIC_INT_TEMPLATE_FLAG_STRING && pvec != "");
+        else
+            generateModuleSignature(itemIR, item.type, item.fldName + MODULE_SEPARATOR, modLine, IR->params[item.fldName], item.vecCount);
         return nullptr; });
     for (auto item: syncPins) {
         if (item.second.name != "") {
@@ -1224,8 +1192,7 @@ printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, fldName.c_str(), re
             }
             assert (!refList[item.first].pin);
             refList[item.first] = RefItem{0, item.second.type, true, false, PIN_WIRE, false, false, convertType(item.second.type, 2), false};
-            expandStruct(IR, item.first, item.second.type, 1, false, false, PIN_WIRE, true, "", false);
-            //refList[item.first].count++;
+            expandStruct(IR, item.first, item.second.type);
         }
         for (auto item: MI->generateFor) {
             MethodInfo *MIb = IR->generateBody[item.body];

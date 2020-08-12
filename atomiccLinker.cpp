@@ -186,7 +186,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     }
     dumpMap();
     generateYosys(dirName, fileList);
-    for (auto item: fileList)
-        printf("[%s:%d] file '%s'\n", __FUNCTION__, __LINE__, item.c_str());
+    //for (auto item: fileList)
+        //printf("[%s:%d] file '%s'\n", __FUNCTION__, __LINE__, item.c_str());
     return 0;
 }
