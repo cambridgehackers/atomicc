@@ -21,6 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+std::string myGlobalName;       // imported from main.cpp
 static int trace_readIR;//= 1;
 static char buf[MAX_READ_LINE];
 static char *bufp;
@@ -71,26 +72,27 @@ static std::string getExpressionString(char terminator = 0)
     return ret;
 }
 
+static std::string changeSeparator(std::string value)
+{
+    int ind = value.find("$");
+    if (value.length() && isIdChar(value[0]) && ind > 0
+     && !startswith(value, "__inst$Genvar")
+     && !startswith(value, "FOR$")
+     && !startswith(value, "RULE$"))
+        value = value.substr(0, ind) + "." + value.substr(ind+1);
+    return value;
+}
+
 static void walkFixup(ACCExpr *expr)
 {
     if (!expr)
         return;
-    if (expr->value == ".") {
-        // fold member specifier into base name
-        ACCExpr *lhs = getRHS(expr, 0), *rhs = getRHS(expr, 1);
-        if (expr->operands.size() != 2) {
-            dumpExpr("BADFIELDSPEC", expr);
-        }
-        else if (isIdChar(lhs->value[0]) && isIdChar(rhs->value[0])) {
-            expr->value = lhs->value + MODULE_SEPARATOR + rhs->value;
-            expr->operands = lhs->operands;
-            for (auto item: rhs->operands)
-                expr->operands.push_back(item);
-        }
-    }
+    expr->value = changeSeparator(expr->value);
+    foldMember(expr);
     for (auto item: expr->operands)
         walkFixup(item);
 }
+
 static ACCExpr *inputExpression(std::string inStr)
 {
     ACCExpr *expr = str2tree(inStr);
@@ -168,6 +170,15 @@ static std::string getToken()
         printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
     return ret;
 }
+
+static std::string specializeTypename(std::string ret)
+{
+    int ind = ret.find("_OC_"); // look for 'compilation specific' template instantiations
+    if (ind > 0 && myGlobalName != "")
+        ret = ret.substr(0, ind+1) + myGlobalName + ret.substr(ind+3);
+    return ret;
+}
+
 static std::string getType()
 {
     char *startp = bufp;
@@ -182,7 +193,7 @@ static std::string getType()
         bufp++;
     if (trace_readIR)
         printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
-    return ret;
+    return specializeTypename(ret);
 }
 
 static ACCExpr *cleanInterface(ACCExpr *expr)
@@ -378,7 +389,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &f
             }
         }
         ParseCheck(ext || interface || isStruct || isSerialize || checkItem("MODULE"), "Module header missing");
-        std::string name = getToken();
+        std::string name = specializeTypename(getToken());
         ModuleIR *IR = allocIR(name, interface);
         IR->isExt = ext;
         IR->isInterface = interface;
@@ -390,7 +401,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &f
             printf("[%s:%d] MODULE %s ifc %d struct %d ser %d ext %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), 
 interface, isStruct, isSerialize, ext);
         if (!checkItem("{")) {
-            IR->interfaceName = getToken();
+            IR->interfaceName = specializeTypename(getToken());
             ParseCheck(checkItem("{"), "Module '{' missing");
         }
         while (readLine() && !checkItem("}")) {
@@ -451,7 +462,7 @@ interface, isStruct, isSerialize, ext);
                     rule = true;
                 if (checkItem("/Action"))
                     action = true;
-                std::string methodName = getToken();
+                std::string methodName = changeSeparator(getToken());
                 MethodInfo *MI = allocMethod(methodName), *MIRdy = nullptr;
                 MI->rule = rule;
                 MI->action = action;

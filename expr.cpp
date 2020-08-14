@@ -130,6 +130,34 @@ ACCExpr *getRHS(ACCExpr *expr, int match)
      return nullptr;
 }
 
+void foldMember(ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    if (expr->value == ".") {
+        if (expr->operands.size() < 2) {
+            dumpExpr("BADFIELDSPEC", expr);
+            return;
+        }
+        expr->value = "";
+        auto oplist = expr->operands;
+        expr->operands.clear();
+        std::string sep;
+        for (auto item: oplist) {
+            if (!isIdChar(item->value[0])) {
+                dumpExpr("BADFIELDSPEC", expr);
+                return;
+            }
+            expr->value += sep + item->value; // fold member specifier into base name
+            for (auto op: item->operands)
+                expr->operands.push_back(op);
+            sep = ".";
+        }
+    }
+    for (auto item: expr->operands)
+        foldMember(item);
+}
+
 std::string tree2str(ACCExpr *expr, bool addSpaces)
 {
     if (!expr)
@@ -160,7 +188,7 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
     }
     for (auto item: expr->operands) {
         ret += sep;
-        bool addParen = !topOp && !checkOperand(item->value) && item->value != ",";
+        bool addParen = !topOp && !checkOperand(item->value) && item->value != "," && item->value != ".";
         if (addParen)
             ret += "( ";
         ret += tree2str(item);
@@ -414,19 +442,6 @@ static int level;
     level++;
     if (expr->operands.size() == 1 && expr->operands.front()->value != "," && (!preserveParen && expr->value == "("))
         expr = expr->operands.front();
-#if 0
-    if (expr->value == ".") {
-        // fold member specifier into base name
-        ACCExpr *lhs = getRHS(expr, 0), *rhs = getRHS(expr, 1);
-        if (expr->operands.size() != 2) {
-            dumpExpr("BADFIELDSPEC", expr);
-        }
-        else if (isIdChar(lhs->value[0]) && isIdChar(rhs->value[0]) && !rhs->operands.size()) {
-            expr = lhs;
-            expr->value += MODULE_SEPARATOR + rhs->value;
-        }
-    }
-#endif
     if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
     ACCExpr *ret = allocExpr(expr->value);
@@ -648,9 +663,22 @@ printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                     if (trace_expr)
                         printf("[%s:%d] unary '-' unary %p tok %p tnext %p\n", __FUNCTION__, __LINE__, (void *)unary, (void *)tok, (void *)tnext);
                 }
+                ACCExpr *dotExpr = nullptr;
                 if (!checkOperand(tok->value) && !checkOperator(tok->value)) {
                     printf("[%s:%d] OPERAND CHECKFAILLLLLLLLLLLLLLL %s from %s\n", __FUNCTION__, __LINE__, tree2str(tok).c_str(), lexString.c_str());
                     exit(-1);
+                }
+                while (tnext && tnext->value == ".") {
+                    if (!dotExpr)
+                        dotExpr = tnext;
+                    dotExpr->operands.push_back(tok);
+                    tok = get1Token();
+                    tnext = get1Token();
+                }
+                if (dotExpr) {
+                    if (tok)
+                        dotExpr->operands.push_back(tok);
+                    tok = dotExpr;
                 }
                 while (tnext && (isParen(tnext->value) || isIdChar(tnext->value[0]))) {
                     if(!isIdChar(tok->value[0]) && tok->value[0] != '.') {
@@ -720,6 +748,7 @@ lll:;
                 head = TOP;
         }
     }
+    foldMember(head);
     head = cleanupExpr(head, preserveParen);
     return head;
 }

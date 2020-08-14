@@ -115,10 +115,13 @@ static void generateVerilogInterface(std::string name, FILE *OStrVH)
          std::string rdyMethodName = getRdyName(methodName);
          if (methodName == rdyMethodName)
              continue;
-        fields.push_back("logic " + methodName);
+        std::string type = "logic";
+        if (MI->type != "")
+            type = typeDeclaration(MI->type);
+        fields.push_back(type + " " + methodName);
         inname.push_back(methodName);
         for (auto pitem: MI->params) {
-            std::string pname = baseMethodName(methodName) + MODULE_SEPARATOR + pitem.name;
+            std::string pname = baseMethodName(methodName) + "$" + pitem.name;
             fields.push_back(typeDeclaration(pitem.type) + " " + pname);
             inname.push_back(pname);
         }
@@ -198,6 +201,7 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     int ind = myName.rfind('/');
     if (ind > 0)
         myName = myName.substr(ind+1);
+    myGlobalName = myName;
 
     readIR(irSeq, fileList, OutputDir);
     cleanupIR(irSeq);
@@ -215,13 +219,14 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     for (auto item: mapIndex) {
         ModuleIR *IR = item.second;
         if (IR->isStruct) {
-            if (IR->name != "NOCDataH") {
-                std::string defname = "__" + item.first + "_DEF__";
-                fprintf(OStrVH, "`ifndef %s\n`define %s\ntypedef struct packed {\n", defname.c_str(), defname.c_str());
-                for (auto fitem: IR->fields)
-                    fprintf(OStrVH, "    %s %s;\n", typeDeclaration(fitem.type).c_str(), fitem.fldName.c_str());
-                fprintf(OStrVH, "} %s;\n`endif\n", item.first.c_str());
-            }
+            std::string defname = "__" + item.first + "_DEF__";
+            fprintf(OStrVH, "`ifndef %s\n`define %s\ntypedef struct packed {\n", defname.c_str(), defname.c_str());
+            std::list<std::string> lineList;
+            for (auto fitem: IR->fields) // reverse order of fields
+                lineList.push_front(typeDeclaration(fitem.type) + " " + fitem.fldName);
+            for (auto item: lineList)
+                fprintf(OStrVH, "    %s;\n", item.c_str());
+            fprintf(OStrVH, "} %s;\n`endif\n", item.first.c_str());
         }
         else if (!IR->isInterface
          && !endswith(IR->name, "_UNION") && IR->name.find("_VARIANT_") == std::string::npos) {

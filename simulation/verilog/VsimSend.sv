@@ -20,16 +20,27 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-module VsimSend #(parameter width = 32) (input CLK, input nRST,
-    input enq__ENA, output enq__RDY, input [width-1:0] enq$v, input enq$last);
-
+`ifndef __PipeInB_DEF__
+`define __PipeInB_DEF__
+interface PipeInB#(width = 32);
+    logic enq__ENA;
+    logic [width - 1:0] enq$v;
+    logic  enq$last;
+    logic enq__RDY;
+    modport server (input  enq__ENA, enq$v, enq$last,
+                    output enq__RDY);
+    modport client (output enq__ENA, enq$v, enq$last,
+                    input  enq__RDY);
+endinterface
+`endif
+module VsimSend #(parameter width = 32) (input CLK, input nRST, PipeInB.server port);
     import "DPI-C" function void dpi_msgSend_enq(input int enq, input int last);
-    assign enq__RDY = 1;
+    assign port.enq__RDY = 1;
     always @(posedge CLK) begin
         if (nRST != 0) begin
-            if (enq__ENA) begin
-                //$display("VSOURCE: outgoing data %x last %x", enq$v, enq$last);
-                dpi_msgSend_enq(enq$v, {31'b0, enq$last});
+            if (port.enq__ENA) begin
+                //$display("VSOURCE: outgoing data %x last %x", port.enq$v, port.enq$last);
+                dpi_msgSend_enq(port.enq$v, {31'b0, port.enq$last});
             end
         end
     end

@@ -280,6 +280,8 @@ std::string sizeProcess(std::string type)
 
 std::string typeDeclaration(std::string type)
 {
+    if (lookupIR(type) || lookupInterface(type))
+        return type;
     return "logic " + sizeProcess(type);
 }
 
@@ -329,7 +331,9 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
     if (traceLookup)
         printf("%s: START searchIR %p %s ifc %s searchStr %s implements %p\n", __FUNCTION__, (void *)searchIR, searchIR->name.c_str(), searchIR->interfaceName.c_str(), searchStr.c_str(), (void *)implements);
     while (1) {
-        int ind = searchStr.find(MODULE_SEPARATOR);
+        int ind = searchStr.find(".");
+        if (ind == -1)
+            ind = searchStr.find("$");
         int ind2 = searchStr.find("[");
         int indnext = ind + 1;
         if (ind2 != -1 && (ind == -1 || ind2 < ind)) { // handle subscript

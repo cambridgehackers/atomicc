@@ -20,28 +20,41 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-module VsimReceive #(parameter width = 32) (input CLK, input nRST,
-    output reg enq__ENA, input enq__RDY, output reg [width-1:0] enq$v, output reg enq$last);
+`ifndef __PipeInB_DEF__
+`define __PipeInB_DEF__
+interface PipeInB#(width = 32);
+    logic enq__ENA;
+    logic [width - 1:0] enq$v;
+    logic  enq$last;
+    logic enq__RDY;
+    modport server (input  enq__ENA, enq$v, enq$last,
+                    output enq__RDY);
+    modport client (output enq__ENA, enq$v, enq$last,
+                    input  enq__RDY);
+endinterface
+`endif
+module VsimReceive #(parameter width = 32) (input CLK, input nRST, PipeInB.client port);
+    //output reg enq__ENA, input enq__RDY, output reg [width-1:0] enq$v, output reg enq$last);
 
     import "DPI-C" function longint dpi_msgReceive_enq();
     always @(posedge CLK) begin
         if (nRST != 0) begin
-            if (enq__RDY) begin
+            if (port.enq__RDY) begin
 `ifndef BOARD_cvc
 	        automatic longint v = dpi_msgReceive_enq();
-	        enq$last = v[33];
-	        enq__ENA = v[32];
-	        enq$v = v[31:0];
+	        port.enq$last = v[33];
+	        port.enq__ENA = v[32];
+	        port.enq$v = v[31:0];
                 //if (v[32])
                     //$display("VsimReceive: last %x enq %x", v[33], v[31:0]);
 `else
-	        { enq$last, enq__ENA, enq$v } = dpi_msgReceive_enq();
+	        { port.enq$last, port.enq__ENA, port.enq$v } = dpi_msgReceive_enq();
 `endif
             end
             else begin
-	        enq$last = 0;
-	        enq__ENA = 0;
-	        enq$v = 0;
+	        port.enq$last = 0;
+	        port.enq__ENA = 0;
+	        port.enq$v = 0;
             end
         end
     end

@@ -43,6 +43,13 @@ std::string finishExpr(ACCExpr *expr)
     return tree2str(cleanupExprBuiltin(replacePins(expr), "0", true));
 }
 
+std::string stripModuleParam(std::string value)
+{
+    int ind = value.find("(");
+    if (ind > 0)
+        return value.substr(0, ind);
+    return value;
+}
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
 {
     std::string sep;
@@ -88,6 +95,16 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 fprintf(OStr, "input wire CLK, input wire nRST,\n    ");
                 handleCLK = false;
             }
+            ModuleIR *IIR = lookupInterface(mitem.type);
+            if (IIR) {
+                std::string vtype = stripModuleParam(mitem.type);
+                if (mitem.out)
+                    vtype += ".client";
+                else
+                    vtype += ".server";
+                fprintf(OStr, "%s %s", vtype.c_str(), mitem.value.c_str());
+            }
+            else {
             std::string dirs = dirStr[mitem.out];
             if (mitem.inout)
                 dirs = "inout wire";
@@ -98,6 +115,7 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
             if (mitem.vecCount != "")
                 array = "[" + mitem.vecCount + " - 1:0]";
             fprintf(OStr, "%s %s%s%s", dirs.c_str(), sizeStr.c_str(), mitem.value.c_str(), array.c_str());
+            }
         }
     }
     if (handleCLK)
@@ -121,6 +139,13 @@ void generateVerilogOutput(FILE *OStr)
                 vecCountStr = "";
                 resetList.push_back(item.first);
             }
+            if (auto IR = lookupIR(item.second.type)) {
+                fprintf(OStr, "    %s %s;\n", stripModuleParam(item.second.type).c_str(), item.first.c_str());
+            }
+            else if (auto IR = lookupInterface(item.second.type)) {
+                fprintf(OStr, "    %s %s();\n", stripModuleParam(item.second.type).c_str(), item.first.c_str());
+            }
+            else
             fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());
         }
     }
@@ -133,6 +158,13 @@ void generateVerilogOutput(FILE *OStr)
             std::string vecCountStr = " [" + item.second.vecCount + " - 1:0]";
             if (item.second.vecCount == "")
                 vecCountStr = "";
+            if (auto IR = lookupIR(item.second.type)) {
+                fprintf(OStr, "    %s %s;\n", stripModuleParam(item.second.type).c_str(), item.first.c_str());
+            }
+            else if (auto IR = lookupInterface(item.second.type)) {
+                fprintf(OStr, "    %s %s();\n", stripModuleParam(item.second.type).c_str(), item.first.c_str());
+            }
+            else
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());
 if (trace_assign && item.second.out) {
 printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
@@ -199,8 +231,10 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             if (!refList[temp].done && refList[temp].count) {
                 if (assignList[item.first].value)
                     fprintf(OStr, "    assign %s = %s;\n", finishString(item.first).c_str(), finishExpr(assignList[item.first].value).c_str());
-                else if (refList[temp].vecCount == "")
+                else if (refList[temp].vecCount == "") {
+                    if (!lookupInterface(refList[temp].type) && !lookupIR(refList[temp].type))
                     fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", finishString(item.first).c_str());
+                }
             }
             else if (trace_skipped)
                 fprintf(OStr, "    //skippedassign %s = %s; //temp = '%s', count = %d, pin = %d done %d\n", finishString(item.first).c_str(), finishExpr(assignList[item.first].value).c_str(), temp.c_str(), refList[temp].count, item.second.pin, refList[temp].done);
@@ -214,7 +248,7 @@ next:;
         int ind = temp.find('[');
         if (ind != -1)
             temp = temp.substr(0,ind);
-        if (item.second.value && refList[temp].count && !refList[item.first].done) {
+        if (item.second.value && (refList[temp].count || !refList[temp].pin) && !refList[item.first].done) {
             if (!seen)
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
             seen = true;

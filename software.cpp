@@ -164,8 +164,9 @@ printf("[%s:%d] outcall %d usertypename %s userinterf %s fieldname %s type %s\n"
                 pipeUser.push_back(fieldName + MODULE_SEPARATOR + "pipe");
             }
             else
-                IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("request"),
-                    allocExpr(fieldName + MODULE_SEPARATOR + "pipe"), pipeName, true});
+                IR->interfaceConnect.push_back(InterfaceConnectType{
+                    allocExpr(fieldName + MODULE_SEPARATOR + "pipe"),
+                    allocExpr("request"), pipeName, true});
             //dumpModule("SWIFC", ifcIR);
         }
         if (int size = pipeUser.size()) {

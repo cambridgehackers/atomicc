@@ -22,7 +22,7 @@
 #include <set>
 #include <map>
 
-#define MODULE_SEPARATOR "$"
+#define MODULE_SEPARATOR "."
 
 #define MAX_READ_LINE 10000000
 

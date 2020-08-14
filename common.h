@@ -136,6 +136,7 @@ std::string makeSection(std::string var, ACCExpr *init, ACCExpr *limit, ACCExpr 
 // expr.cpp
 bool bitOp(std::string s);
 bool plainInteger(std::string val);
+void foldMember(ACCExpr *expr);
 std::string tree2str(ACCExpr *expr, bool addSpaces = true);
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
@@ -205,3 +206,4 @@ extern int globalExprCleanup;
 extern int flagErrorsCleanup;
 extern std::map<std::string, SyncPinsInfo> syncPins;    // SyncFF items needed for PipeInSync instances
 extern int implementPrintf;
+extern std::string myGlobalName;
