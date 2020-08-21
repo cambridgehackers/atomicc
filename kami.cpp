@@ -64,7 +64,7 @@ static std::string kamiCall(ACCExpr *expr, MethodInfo *MI)
 {
     //dumpExpr("KCALL", expr);
     std::string ret;
-    if (expr->value == ".") {
+    if (expr->value == PERIOD) {
         ret = getRHS(expr, 0)->value + "'";
         expr = getRHS(expr, 1);
     }
@@ -192,7 +192,7 @@ static void generateModule(FILE *OStrV, ModuleIR *IR)
          int unusedNumber = 1;
          for (auto citem: MI->callList) {
               MethodInfo *callMI = nullptr;
-              if (citem->value->value == ".") {
+              if (citem->value->value == PERIOD) {
                   for (auto fitem: IR->fields)
                       if (fitem.fldName == getRHS(citem->value, 0)->value) {
                           ModuleIR *CIR = lookupIR(fitem.type);

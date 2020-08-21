@@ -76,8 +76,8 @@ static void processM2P(ModuleIR *IR)
         if (inter.isPtr) {
             auto IIR = lookupInterface(inter.type);
             auto MI = IIR->methods.front();
-            target = inter.fldName + MODULE_SEPARATOR + MI->name;
-            targetParam = baseMethodName(target) + MODULE_SEPARATOR + MI->params.front().name;
+            target = inter.fldName + PERIOD + MI->name;
+            targetParam = baseMethodName(target) + PERIOD + MI->params.front().name;
             if (trace_software)
                 dumpModule("M2P/IIR :" + inter.fldName, IIR);
         }
@@ -103,7 +103,7 @@ dumpModule("M2P/HIR :" + host, HIR);
     int counter = 0;  // start method number at 0
 assert(HIR);
     for (auto MI: HIR->methods) {
-        std::string methodName = host + MODULE_SEPARATOR + MI->name;
+        std::string methodName = host + PERIOD + MI->name;
         MethodInfo *MInew = allocMethod(methodName);
         addMethod(IR, MInew);
         MInew->type = MI->type;
@@ -115,7 +115,7 @@ assert(HIR);
 //exit(-1);
             //continue;
         //}
-        std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
+        std::string paramPrefix = baseMethodName(methodName) + PERIOD;
         std::string call;
         int64_t dataLength = 32; // include length of tag
         for (auto param: MI->params) {
@@ -177,7 +177,7 @@ assert(HIR);
         std::string methodName = MI->name;
     if (trace_software)
 printf("[%s:%d] P2Mhifmethod %s\n", __FUNCTION__, __LINE__, methodName.c_str());
-        MethodInfo *MInew = allocMethod(host + MODULE_SEPARATOR + methodName);
+        MethodInfo *MInew = allocMethod(host + PERIOD + methodName);
         addMethod(IR, MInew);
     if (trace_software)
 printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
@@ -186,8 +186,8 @@ printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
         MInew->type = instantiateType(MI->type, mapValue);
         MInew->guard = MI->guard;
     }
-    MethodInfo *MInew = lookupMethod(IR, host + MODULE_SEPARATOR + "enq");
-    std::string sourceParam = baseMethodName(MInew->name) + MODULE_SEPARATOR + MInew->params.front().name;
+    MethodInfo *MInew = lookupMethod(IR, host + PERIOD + "enq");
+    std::string sourceParam = baseMethodName(MInew->name) + PERIOD + MInew->params.front().name;
     std::string paramLen = convertType(instantiateType(MInew->params.front().type, mapValue));
     if (generateTrace) {
         ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
@@ -195,13 +195,13 @@ printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
         MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
     }
     if (trace_software)
-printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + MODULE_SEPARATOR + "enq__ENA").c_str(), (void *)MInew);
+printf("[%s:%d] lookup '%s' -> %p\n", __FUNCTION__, __LINE__, (host + PERIOD + "enq__ENA").c_str(), (void *)MInew);
 assert(MInew);
     int counter = 0;  // start method number at 0
     for (auto MI: IIR->methods) {
         std::string offset = paramLen + " - 32"; // length
         std::string methodName = MI->name;
-        std::string paramPrefix = baseMethodName(methodName) + MODULE_SEPARATOR;
+        std::string paramPrefix = baseMethodName(methodName) + PERIOD;
         if (isRdyName(methodName))
             continue;
         uint64_t totalLength = 0;
@@ -212,7 +212,7 @@ assert(MInew);
         if (totalLength)
             offset += "-" + autostr(totalLength);
         ACCExpr *paramList = allocExpr(",");
-        ACCExpr *callExpr = allocExpr(target + MODULE_SEPARATOR + methodName, allocExpr(PARAMETER_MARKER, paramList));
+        ACCExpr *callExpr = allocExpr(target + PERIOD + methodName, allocExpr(PARAMETER_MARKER, paramList));
         for (auto param: MI->params) {
             std::string lower = "(" + offset + " - " + convertType(instantiateType(param.type, mapValue)) + ")";
             paramList->operands.push_back(allocExpr(sourceParam + "[" + offset + " -1 :" + lower + "]"));

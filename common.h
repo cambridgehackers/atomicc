@@ -29,6 +29,9 @@
 #define BLOCK_NAME "BasicBlockCond_"
 #define COUNT_LIMIT             0//10
 
+#define DOLLAR           "$"
+#define PERIOD           "."
+
 #define GENERIC_INT_TEMPLATE_FLAG         999999
 #define GENERIC_INT_TEMPLATE_FLAG_STRING "999999"
 

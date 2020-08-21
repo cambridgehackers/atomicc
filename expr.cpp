@@ -134,7 +134,7 @@ void foldMember(ACCExpr *expr)
 {
     if (!expr)
         return;
-    if (expr->value == ".") {
+    if (expr->value == PERIOD) {
         if (expr->operands.size() < 2) {
             dumpExpr("BADFIELDSPEC", expr);
             return;
@@ -151,7 +151,7 @@ void foldMember(ACCExpr *expr)
             expr->value += sep + item->value; // fold member specifier into base name
             for (auto op: item->operands)
                 expr->operands.push_back(op);
-            sep = ".";
+            sep = PERIOD;
         }
     }
     for (auto item: expr->operands)
@@ -188,7 +188,7 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
     }
     for (auto item: expr->operands) {
         ret += sep;
-        bool addParen = !topOp && !checkOperand(item->value) && item->value != "," && item->value != ".";
+        bool addParen = !topOp && !checkOperand(item->value) && item->value != "," && item->value != PERIOD;
         if (addParen)
             ret += "( ";
         ret += tree2str(item);
@@ -668,7 +668,7 @@ printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                     printf("[%s:%d] OPERAND CHECKFAILLLLLLLLLLLLLLL %s from %s\n", __FUNCTION__, __LINE__, tree2str(tok).c_str(), lexString.c_str());
                     exit(-1);
                 }
-                while (tnext && tnext->value == ".") {
+                while (tnext && tnext->value == PERIOD) {
                     if (!dotExpr)
                         dotExpr = tnext;
                     dotExpr->operands.push_back(tok);

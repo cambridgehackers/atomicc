@@ -20,6 +20,10 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+typedef std::list<std::string> StrList;
+static StrList interfaceList;
+static std::map<std::string, bool> interfaceSeen;
+
 static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
 {
     std::string baseDir = OutputDir;
@@ -58,10 +62,6 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
     fclose(OStrP);
     }
 }
-
-typedef std::list<std::string> StrList;
-static StrList interfaceList;
-static std::map<std::string, bool> interfaceSeen;
 
 static std::string modportNames(std::string first, StrList &inname, std::string second, StrList &outname, StrList &inoutname)
 {
@@ -121,7 +121,7 @@ static void generateVerilogInterface(std::string name, FILE *OStrVH)
         fields.push_back(type + " " + methodName);
         inname.push_back(methodName);
         for (auto pitem: MI->params) {
-            std::string pname = baseMethodName(methodName) + "$" + pitem.name;
+            std::string pname = baseMethodName(methodName) + DOLLAR + pitem.name;
             fields.push_back(typeDeclaration(pitem.type) + " " + pname);
             inname.push_back(pname);
         }
@@ -168,6 +168,9 @@ static void appendInterface(std::string name, std::string params)
     if (interfaceSeen[name])
         return;
     interfaceSeen[name] = true;
+#define VARIANT "_OC_"
+    if (startswith(name + VARIANT, "PipeIn" VARIANT) || startswith(name + VARIANT, "PipeOut" VARIANT))
+        return;
     ModuleIR *IR = lookupInterface(name);
     assert(IR);
     for (auto item: IR->interfaces) {
@@ -216,17 +219,18 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     std::string defname = myName + "_GENERATED_";
     fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n", defname.c_str(), defname.c_str());
     fprintf(OStrVH, "`include \"atomicclib.vh\"\n\n");
-    for (auto item: mapIndex) {
-        ModuleIR *IR = item.second;
+    for (auto IR: irSeq//mapIndex
+) { // only generate typedefs and interfaces for items declared in this source module
+        //ModuleIR *IR = item.second;
         if (IR->isStruct) {
-            std::string defname = "__" + item.first + "_DEF__";
+            std::string defname = "__" + IR->name + "_DEF__";
             fprintf(OStrVH, "`ifndef %s\n`define %s\ntypedef struct packed {\n", defname.c_str(), defname.c_str());
             std::list<std::string> lineList;
             for (auto fitem: IR->fields) // reverse order of fields
                 lineList.push_front(typeDeclaration(fitem.type) + " " + fitem.fldName);
             for (auto item: lineList)
                 fprintf(OStrVH, "    %s;\n", item.c_str());
-            fprintf(OStrVH, "} %s;\n`endif\n", item.first.c_str());
+            fprintf(OStrVH, "} %s;\n`endif\n", IR->name.c_str());
         }
         else if (!IR->isInterface
          && !endswith(IR->name, "_UNION") && IR->name.find("_VARIANT_") == std::string::npos) {
@@ -238,7 +242,7 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
             int ind = IR->name.find("(");
             if (ind > 0)
                 params = IR->name.substr(ind);
-//printf("[%s:%d]////////////////////////////////////////////////////////////////////////////////////// %s params %s\n", __FUNCTION__, __LINE__, IR->interfaceName.c_str(), params.c_str());
+printf("[%s:%d]////////////////////////////////////////////////////////////////////////////////////// %s params %s\n", __FUNCTION__, __LINE__, IR->interfaceName.c_str(), params.c_str());
 //dumpModule("INTERFACE", IR);
             appendInterface(IR->interfaceName, params);
         }

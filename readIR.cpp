@@ -74,12 +74,12 @@ static std::string getExpressionString(char terminator = 0)
 
 static std::string changeSeparator(std::string value)
 {
-    int ind = value.find("$");
+    int ind = value.find(DOLLAR);
     if (value.length() && isIdChar(value[0]) && ind > 0
      && !startswith(value, "__inst$Genvar")
      && !startswith(value, "FOR$")
      && !startswith(value, "RULE$"))
-        value = value.substr(0, ind) + "." + value.substr(ind+1);
+        value = value.substr(0, ind) + PERIOD + value.substr(ind+1);
     return value;
 }
 
@@ -173,9 +173,9 @@ static std::string getToken()
 
 static std::string specializeTypename(std::string ret)
 {
-    int ind = ret.find("_OC_"); // look for 'compilation specific' template instantiations
-    if (ind > 0 && myGlobalName != "")
-        ret = ret.substr(0, ind+1) + myGlobalName + ret.substr(ind+3);
+    //int ind = ret.find("_OC_"); // look for 'compilation specific' template instantiations
+    //if (ind > 0 && myGlobalName != "")
+        //ret = ret.substr(0, ind+1) + myGlobalName + ret.substr(ind+3);
     return ret;
 }
 
@@ -287,11 +287,11 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *value = inputExpression(bufp), *subscript = nullptr, *param = nullptr;
                 // TODO: make this processing more general
-                if (value->value == ".") {     // handle qualified expr case
+                if (value->value == PERIOD) {     // handle qualified expr case
                     ACCExpr *newValue = value->operands.front();
                     value->operands.pop_front();
                     for (auto item: value->operands) {
-                        newValue->value += "$" + item->value;
+                        newValue->value += DOLLAR + item->value;
                         newValue->operands.push_back(item->operands.front());
                     }
                     value = newValue;
@@ -302,7 +302,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                      else if (item->value == "{")
                          param = item;
                      else if (isIdChar(item->value[0]) && item->operands.size() == 0)
-                         value->value += "$" + item->value;
+                         value->value += DOLLAR + item->value;
                      else {
                          printf("%s: ERROR: unknown member of call expression\n", __FUNCTION__);
                          dumpExpr("ITEM", item);

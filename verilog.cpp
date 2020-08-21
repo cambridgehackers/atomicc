@@ -57,7 +57,7 @@ static std::string genericModuleParam(std::string name)
             ind = name.find("=");
             if (ind == -1)
                 break;
-            ret += sep + "." + name.substr(0,ind) + "(";
+            ret += sep + PERIOD + name.substr(0,ind) + "(";
             name = name.substr(ind+1);
             ind = name.find(",");
             if (ind > 0) {
@@ -107,7 +107,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
             std::string after = sub.substr(ind+1);
             sub = sub.substr(0, ind+1);
             if (after != "" && after[0] == '.')
-                base += MODULE_SEPARATOR + after.substr(1);
+                base += PERIOD + after.substr(1);
             if (refList[base].pin == PIN_MODULE) // normalize subscript location for module pin refs
                 target = base + sub;
         }
@@ -407,7 +407,7 @@ exit(-1);
             exit(-1);
         }
         if (interfaceName != "")
-            interfaceName += MODULE_SEPARATOR;
+            interfaceName += PERIOD;
 printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
         collectInterfacePins(IIR, instance != "", item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, false);
     }
@@ -431,7 +431,7 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
                 start = p;
                 while ((ch = *p++) && ch != ';' && ch != '>')
                     ;
-                actual += sep + "." + name + "(" + std::string(start, p-1) + ")";
+                actual += sep + PERIOD + name + "(" + std::string(start, p-1) + ")";
                 sep = ",";
             }
             moduleInstantiation += "#(" + actual + ")";
@@ -457,7 +457,7 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
         if (trace_ports)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.name.c_str(), item.type.c_str());
         for (auto pitem: item.params) {
-            checkWire(baseMethodName(item.name) + MODULE_SEPARATOR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal, instance==""/*isArgument*/, item.vecCount);
+            checkWire(baseMethodName(item.name) + PERIOD + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal, instance==""/*isArgument*/, item.vecCount);
         }
         break;
     case PINI_PORT:
@@ -566,7 +566,7 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool e
     if (trace_assign)
     printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     std::string item = expr->value;
-    if (guardName != "" && (startswith(item, guardName) || (item == "." && startswith(expr->operands.front()->value, guardName)))) {
+    if (guardName != "" && (startswith(item, guardName) || (item == PERIOD && startswith(expr->operands.front()->value, guardName)))) {
         if (trace_assign)
         printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
         return allocExpr("1");
@@ -901,8 +901,8 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
 std::string replacePeriod(std::string value)
 {
     int ind;
-    while ((ind = value.find(".")) > 0)
-        value = value.substr(0, ind) + "$" + value.substr(ind+1);
+    while ((ind = value.find(PERIOD)) > 0)
+        value = value.substr(0, ind) + DOLLAR + value.substr(ind+1);
     return value;
 }
 
@@ -935,15 +935,15 @@ static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTr
         ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
         if (trace_connect)
             printf("[%s:%d] ICtarget '%s' ICsource '%s'\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICsource.c_str());
-        if (target->value.length() && target->value.substr(target->value.length()-1) == MODULE_SEPARATOR)
+        if (target->value.length() && target->value.substr(target->value.length()-1) == PERIOD)
             target->value = target->value.substr(0, target->value.length()-1);
-        if (source->value.length() && source->value.substr(source->value.length()-1) == MODULE_SEPARATOR)
+        if (source->value.length() && source->value.substr(source->value.length()-1) == PERIOD)
             source->value = source->value.substr(0, source->value.length()-1);
-        target->value += MODULE_SEPARATOR + MI->name;
-        source->value += MODULE_SEPARATOR + MI->name;
+        target->value += PERIOD + MI->name;
+        source->value += PERIOD + MI->name;
         connectTarget(target, source, MI->type, isForward);
-        std::string tstr = baseMethodName(target->value) + "$";
-        std::string sstr = baseMethodName(source->value) + "$";
+        std::string tstr = baseMethodName(target->value) + DOLLAR;
+        std::string sstr = baseMethodName(source->value) + DOLLAR;
         for (auto info: MI->params) {
             ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
             target->value = tstr + info.name;
@@ -1120,7 +1120,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         }
         enableList[section][calledEna].phi->operands.push_back(tempCond);
         auto AI = CI->params.begin();
-        std::string pname = baseMethodName(calledName) + "$";
+        std::string pname = baseMethodName(calledName) + DOLLAR;
         int argCount = CI->params.size();
         for (auto item: param->operands) {
             if(argCount-- > 0) {
@@ -1191,7 +1191,7 @@ static ModList modLine;
             refList[item.fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, item.vecCount, false};
         }
         else
-            generateModuleSignature(itemIR, item.type, item.fldName + "$", modLine, IR->params[item.fldName], item.vecCount);
+            generateModuleSignature(itemIR, item.type, item.fldName + DOLLAR, modLine, IR->params[item.fldName], item.vecCount);
         return nullptr; });
     for (auto item: syncPins) {
         if (item.second.name != "") {

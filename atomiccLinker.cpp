@@ -53,7 +53,7 @@ static void dumpMap()
         for (auto arg: portName) {
             printf("    .in$%s('{", arg.c_str());
             for (auto ref: item.second.name) {
-                printf("%s, ", (ref + item.first + "." + arg).c_str());
+                printf("%s, ", (ref + item.first + PERIOD + arg).c_str());
             }
             printf("ind$%s}),\n", arg.c_str());
         }
@@ -64,7 +64,7 @@ static void dumpMap()
 static void recurseObject(std::string name, ModuleIR *IR, std::string vecCount)
 {
     if (name != "")
-        name += ".";
+        name += PERIOD;
     for (auto item: IR->fields) {
         if (item.type == "Printf") {
 printf("[%s:%d] NAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), item.fldName.c_str());

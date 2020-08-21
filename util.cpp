@@ -331,9 +331,9 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
     if (traceLookup)
         printf("%s: START searchIR %p %s ifc %s searchStr %s implements %p\n", __FUNCTION__, (void *)searchIR, searchIR->name.c_str(), searchIR->interfaceName.c_str(), searchStr.c_str(), (void *)implements);
     while (1) {
-        int ind = searchStr.find(".");
+        int ind = searchStr.find(PERIOD);
         if (ind == -1)
-            ind = searchStr.find("$");
+            ind = searchStr.find(DOLLAR);
         int ind2 = searchStr.find("[");
         int indnext = ind + 1;
         if (ind2 != -1 && (ind == -1 || ind2 < ind)) { // handle subscript
@@ -437,7 +437,7 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
     bool found = false;
     //printf("[%s:%d] start %s\n", __FUNCTION__, __LINE__, searchStr.c_str());
     while (1) {
-        int ind = searchStr.find(MODULE_SEPARATOR);
+        int ind = searchStr.find(PERIOD);
         fieldName = searchStr.substr(0, ind);
         searchStr = searchStr.substr(ind+1);
         ModuleIR *nextIR = iterField(searchIR, CBAct {
@@ -449,13 +449,13 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
             return nullptr; });
         if (!nextIR)
             break;
-        outName += fieldName + MODULE_SEPARATOR;
+        outName += fieldName + PERIOD;
         searchIR = nextIR;
     };
     //printf("[%s:%d] out %s field %s search %s\n", __FUNCTION__, __LINE__, outName.c_str(), fieldName.c_str(), searchStr.c_str());
     while (1) {
         if (found) {
-            int ind = searchStr.find(MODULE_SEPARATOR);
+            int ind = searchStr.find(PERIOD);
             fieldName = searchStr.substr(0, ind);
             searchStr = searchStr.substr(ind+1);
         }
@@ -487,7 +487,7 @@ void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string
     if (trace_expand)
         printf("[%s:%d] entry %s type %s force %d \n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), force);
     __block uint64_t offset = aoffset;
-    std::string sname = name + MODULE_SEPARATOR;
+    std::string sname = name + PERIOD;
 #if 1
     if (ModuleIR *IR = lookupIR(type)) {
 #if 0

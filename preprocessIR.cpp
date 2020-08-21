@@ -57,7 +57,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr, bool inGenerate)
         post = expr->operands.front()->value;
         expr->operands.pop_front();
         if (post[0] == '$')
-            post = "." + post.substr(1);
+            post = PERIOD + post.substr(1);
     }
     expr->value += "[" + tree2str(subscript) + "]" + post;
 }
@@ -72,7 +72,7 @@ static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, s
             post = expr->operands.front()->value;
             expr->operands.pop_front();
             if (post[0] == '$')
-                post = "." + post.substr(1);
+                post = PERIOD + post.substr(1);
         }
         if (isConstExpr(sub)) {
             expr->value += "[" + tree2str(sub) + "]" + post;
@@ -405,7 +405,7 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
     }
     for (auto item: MI->instantiateFor) {
         MethodInfo *MIb = IR->generateBody[item.body];
-        std::string methodName = baseMethodName(MI->name) + MODULE_SEPARATOR;
+        std::string methodName = baseMethodName(MI->name) + PERIOD;
         assert(MIb);
         MethodInfo *MIRdy = lookupMethod(IR, getRdyName(MI->name));
         assert(MIRdy);
@@ -462,8 +462,8 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
                 std::string target = tree2str(item.target);
                 std::string source = tree2str(item.source);
 printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__, __LINE__, target.c_str(), source.c_str(), item.type.c_str(), item.isForward);
-                 if ((target != field.fldName + MODULE_SEPARATOR + source)
-                  && (source != field.fldName + MODULE_SEPARATOR + target)) {
+                 if ((target != field.fldName + PERIOD + source)
+                  && (source != field.fldName + PERIOD + target)) {
                      goto skipLab;
                  }
             }
@@ -478,7 +478,7 @@ printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__,
              || MI->alloca.size() || MI->letList.size() || MI->printfList.size())
                 goto skipLab;
             CallListElement *call = MI->callList.front();
-            if (call->cond || call->value->value != (field.fldName + MODULE_SEPARATOR + MI->name))
+            if (call->cond || call->value->value != (field.fldName + PERIOD + MI->name))
                 goto skipLab;
         }
 printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), field.fldName.c_str(), field.type.c_str());
@@ -534,7 +534,7 @@ skipLab:;
             if (!IR->isExt && !IR->isInterface && !IR->isStruct)
                 irSeq.push_back(genericIR);
             genericModule[irName] = 1;
-            ModuleIR *paramIR = allocIR(irName+MODULE_SEPARATOR+"PARAM", true);
+            ModuleIR *paramIR = allocIR(irName+PERIOD+"PARAM", true);
             paramIR->isInterface = true;
             genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
             for (auto item: paramMap)

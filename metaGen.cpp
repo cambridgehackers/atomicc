@@ -142,8 +142,8 @@ printf("[%s:%d] innermethodName %s before conflict '%s' innerunc %s methodName %
 //printf("[%s:%d] METACONNECT %s %s\n", __FUNCTION__, __LINE__, tname.c_str(), sname.c_str());
         for (auto MI: lookupInterface(iname)->methods) {
             std::string methodName = MI->name;
-            metaList.push_back("//METACONNECT; " + tname + MODULE_SEPARATOR + MI->name
-                                              + "; " + sname + MODULE_SEPARATOR + MI->name);
+            metaList.push_back("//METACONNECT; " + tname + PERIOD + MI->name
+                                              + "; " + sname + PERIOD + MI->name);
         }
     }
     for (auto item : IR->priority)
