@@ -72,6 +72,20 @@ std::string findRewrite(std::string item)
     return prefix;
 }
 
+static void walkRewrite (ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    if (isIdChar(expr->value[0])) {
+        std::string prefix = findRewrite(expr->value);
+        if (prefix != "") { // interface reference
+            expr->value = prefix;
+        }
+    }
+    for (auto item: expr->operands)
+        walkRewrite(item);
+}
+
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
     if (!refList[target].pin) {
@@ -100,6 +114,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
                 target = base + sub;
         }
     }
+    walkRewrite(value);
     if (trace_assign)
         printf("[%s:%d] start [%s/%d]count[%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin && generateSection == "") {
@@ -507,21 +522,13 @@ static void walkRef (ACCExpr *expr)
     if (!expr)
         return;
     std::string item = expr->value;
-    auto checkPrefix = [&]() -> bool {
-        std::string prefix = findRewrite(item);
-        if (prefix != "") { // interface reference
-            item = prefix;
-            expr->value = prefix;
-        }
-        return prefix != "";
-    };
     if (isIdChar(item[0])) {
         std::string base = item;
         int ind = base.find("[");
         if (ind > 0)
             base = base.substr(0, ind);
         if (!startswith(item, "__inst$Genvar") && item != "$past") {
-        if (!refList[item].pin && !checkPrefix())
+        if (!refList[item].pin)
             printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
         if (base != item)
 {
@@ -529,7 +536,7 @@ if (trace_assign)
 printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
 item = base;
 }
-        if(!refList[item].pin && !checkPrefix()) {
+        if(!refList[item].pin) {
             printf("[%s:%d] pin not found '%s'\n", __FUNCTION__, __LINE__, item.c_str());
             //exit(-1);
         }
@@ -998,6 +1005,8 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
     for (auto info: MI->storeList) {
         walkRead(MI, info->cond, nullptr);
         walkRead(MI, info->value, info->cond);
+        walkRewrite(info->cond);
+        walkRewrite(info->value);
         std::string dest = info->dest->value;
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
             ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond));
@@ -1007,6 +1016,8 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             appendLine(methodName, info->cond, info->dest, info->value);
     }
     for (auto info: MI->letList) {
+        walkRewrite(info->cond);
+        walkRewrite(info->value);
         ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getRdyName(methodName)), info->cond));
         ACCExpr *value = info->value;
         updateWidth(value, convertType(info->type));
@@ -1038,6 +1049,8 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         }
     }
     for (auto info: MI->assertList) {
+        walkRewrite(info->cond);
+        walkRewrite(info->value);
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
         auto par = value->operands.front()->operands;
@@ -1066,6 +1079,8 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         condLines[generateSection].assert.push_back("    " + indent + tree2str(value) + ";");
     }
     for (auto info: MI->callList) {
+        walkRewrite(info->cond);
+        walkRewrite(info->value);
         std::string section = generateSection;
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
