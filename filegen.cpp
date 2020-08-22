@@ -139,14 +139,15 @@ void generateVerilogOutput(FILE *OStr)
                 vecCountStr = "";
                 resetList.push_back(item.first);
             }
+            vecCountStr = item.first + vecCountStr;
             if (auto IR = lookupIR(item.second.type)) {
-                fprintf(OStr, "    %s %s;\n", genericModuleParam(item.second.type).c_str(), item.first.c_str());
+                fprintf(OStr, "    %s %s;\n", genericModuleParam(item.second.type).c_str(), vecCountStr.c_str());
             }
             else if (auto IR = lookupInterface(item.second.type)) {
-                fprintf(OStr, "    %s %s();\n", genericModuleParam(item.second.type).c_str(), item.first.c_str());
+                fprintf(OStr, "    %s %s();\n", genericModuleParam(item.second.type).c_str(), vecCountStr.c_str());
             }
             else
-            fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());
+            fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + vecCountStr).c_str());
         }
     }
     for (auto item: refList) {
@@ -158,14 +159,15 @@ void generateVerilogOutput(FILE *OStr)
             std::string vecCountStr = " [" + item.second.vecCount + " - 1:0]";
             if (item.second.vecCount == "")
                 vecCountStr = "";
+            vecCountStr = item.first + vecCountStr;
             if (auto IR = lookupIR(item.second.type)) {
-                fprintf(OStr, "    %s %s;\n", genericModuleParam(item.second.type).c_str(), item.first.c_str());
+                fprintf(OStr, "    %s %s;\n", genericModuleParam(item.second.type).c_str(), vecCountStr.c_str());
             }
             else if (auto IR = lookupInterface(item.second.type)) {
-                fprintf(OStr, "    %s %s();\n", genericModuleParam(item.second.type).c_str(), item.first.c_str());
+                fprintf(OStr, "    %s %s();\n", genericModuleParam(item.second.type).c_str(), vecCountStr.c_str());
             }
             else
-            fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());
+            fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + vecCountStr).c_str());
 if (trace_assign && item.second.out) {
 printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
 //exit(-1);
