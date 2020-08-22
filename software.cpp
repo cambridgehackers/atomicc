@@ -126,8 +126,8 @@ exit(-1);
         std::string muxTypeName = "MuxPipe";
         std::string pipeName = "PipeIn";
         IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false, false});
-        localName += PERIOD;
-        muxName += PERIOD;
+        localName += DOLLAR;
+        muxName += DOLLAR;
         std::string fieldName;
         IRifc->interfaces.push_back(FieldElement{"request", "", pipeName, false/*in*/, false, false, false, ""/*not param*/, false, false, false});
         std::list<std::string> pipeUser;
@@ -147,7 +147,7 @@ exit(-1);
             IR->fields.push_back(FieldElement{fieldName, "", type, false, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 allocExpr(localName + userInterface),
-                allocExpr(fieldName + PERIOD + "method"), userTypeName, true});
+                allocExpr(fieldName + DOLLAR + "method"), userTypeName, true});
             if (!outcall) // see if the request deserialization can generate an indication
             if (auto userIR = lookupInterface(userTypeName)) {
                 for (auto MI: userIR->methods) {
@@ -155,18 +155,18 @@ exit(-1);
                     if (!isRdyName(methodName) && !isEnaName(methodName)) {
                         // actionValue methods get a callback for value
                         ifcIRinterface->interfaces.push_back(FieldElement{"returnInd", "", "PipeIn", true, false, false, false, ""/*not param*/, false, false, false});
-                        pipeUser.push_back(fieldName + PERIOD + "returnInd");
+                        pipeUser.push_back(fieldName + DOLLAR + "returnInd");
                         break;
                     }
                 }
             }
 printf("[%s:%d] outcall %d usertypename %s userinterf %s fieldname %s type %s\n", __FUNCTION__, __LINE__, outcall, userTypeName.c_str(), userInterface.c_str(), fieldName.c_str(), type.c_str());
             if (outcall) {
-                pipeUser.push_back(fieldName + PERIOD + "pipe");
+                pipeUser.push_back(fieldName + DOLLAR + "pipe");
             }
             else
                 IR->interfaceConnect.push_back(InterfaceConnectType{
-                    allocExpr(fieldName + PERIOD + "pipe"),
+                    allocExpr(fieldName + DOLLAR + "pipe"),
                     allocExpr("request"), pipeName, true});
             //dumpModule("SWIFC", ifcIR);
         }
@@ -194,7 +194,7 @@ printf("[%s:%d] outcall %d usertypename %s userinterf %s fieldname %s type %s\n"
             IRifc->interfaces.push_back(FieldElement{"indication", "", "PipeIn",
                 true/*outcall*/, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
-                allocExpr(fieldName + PERIOD + "returnInd"), "PipeIn", true});
+                allocExpr(fieldName + DOLLAR + "returnInd"), "PipeIn", true});
         }
 #endif
         fprintf(OStrJ, "\n    ]\n}\n");

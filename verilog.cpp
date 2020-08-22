@@ -55,8 +55,30 @@ static void traceZero(const char *label)
     }
 }
 
+std::string findRewrite(std::string item)
+{
+    std::string prefix;
+    if (!refList[item].pin) {
+        for (auto ritem: refList) {
+            if ((startswith(item, ritem.first + DOLLAR) || startswith(item, ritem.first + PERIOD))
+             && ritem.first.length() > prefix.length())
+                prefix = ritem.first;
+        }
+        if (prefix != "") { // interface reference
+            refList[prefix].count++;
+            prefix += PERIOD + item.substr(prefix.length() + 1);
+        }
+    }
+    return prefix;
+}
+
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
+    if (!refList[target].pin) {
+        std::string rewrite = findRewrite(target);
+        if (rewrite != "")
+            target = rewrite;
+    }
     bool tDir = refList[target].out;
     if (!value)
         return;
@@ -485,13 +507,21 @@ static void walkRef (ACCExpr *expr)
     if (!expr)
         return;
     std::string item = expr->value;
+    auto checkPrefix = [&]() -> bool {
+        std::string prefix = findRewrite(item);
+        if (prefix != "") { // interface reference
+            item = prefix;
+            expr->value = prefix;
+        }
+        return prefix != "";
+    };
     if (isIdChar(item[0])) {
         std::string base = item;
         int ind = base.find("[");
         if (ind > 0)
             base = base.substr(0, ind);
         if (!startswith(item, "__inst$Genvar") && item != "$past") {
-        if (!refList[item].pin)
+        if (!refList[item].pin && !checkPrefix())
             printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
         if (base != item)
 {
@@ -499,7 +529,7 @@ if (trace_assign)
 printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
 item = base;
 }
-        if(!refList[item].pin) {
+        if(!refList[item].pin && !checkPrefix()) {
             printf("[%s:%d] pin not found '%s'\n", __FUNCTION__, __LINE__, item.c_str());
             //exit(-1);
         }
@@ -864,7 +894,7 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
     }
 }
 
-std::string replacePeriod(std::string value)
+std::string zzreplacePeriod(std::string value)
 {
     int ind;
     while ((ind = value.find(PERIOD)) > 0)
@@ -874,8 +904,8 @@ std::string replacePeriod(std::string value)
 
 static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
 {
-    targetTree->value = replacePeriod(targetTree->value);
-    sourceTree->value = replacePeriod(sourceTree->value);
+    //targetTree->value = replacePeriod(targetTree->value);
+    //sourceTree->value = replacePeriod(sourceTree->value);
     std::string ICtarget = tree2str(targetTree);
     std::string ICsource = tree2str(sourceTree);
     if (trace_connect)
@@ -1055,15 +1085,14 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             dumpExpr("CALL", value);
             exit(-1);
         }
-        MI->meta[MetaInvoke][calledName].insert(tree2str(cond));
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         if (!info->isAction)
             continue;
         ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName)), cond));
-        ACCExpr *subscript = nullptr;
-        std::string sub;
         if (value->operands.size() > 1) {
+            ACCExpr *subscript = nullptr;
+            std::string sub;
             tempCond = simpleReplace(tempCond);
             tempCond = replaceAssign(tempCond, getRdyName(calledEna), true); // remove __RDY before adding subscript!
             subscript = value->operands.front()->operands.front();
@@ -1071,7 +1100,12 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             section = makeSection(var->value, allocExpr("0"),
                 allocExpr("<", var, allocExpr(vecCount)), allocExpr("+", var, allocExpr("1")));
             sub = "[" + var->value + "]";
-            calledEna += sub;
+            int ind = calledEna.find_last_of(DOLLAR PERIOD);
+            if (ind > 0) {
+                calledEna = calledEna.substr(0, ind) + sub + calledEna.substr(ind);
+            }
+            else
+                calledEna += sub;
             tempCond = allocExpr("&&", tempCond, allocExpr("==", subscript, var));
         }
 //printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
@@ -1086,15 +1120,16 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         }
         enableList[section][calledEna].phi->operands.push_back(tempCond);
         auto AI = CI->params.begin();
-        std::string pname = baseMethodName(calledName) + DOLLAR;
+        std::string pname = baseMethodName(calledEna) + DOLLAR;
         int argCount = CI->params.size();
         for (auto item: param->operands) {
             if(argCount-- > 0) {
                 std::string size = tree2str(cleanupInteger(cleanupExpr(str2tree(convertType(instantiateType(AI->type, mapValue))))));
-                appendMux(section, pname + AI->name + sub, tempCond, item, size + "'d0");
+                appendMux(section, pname + AI->name, tempCond, item, size + "'d0");
                 AI++;
             }
         }
+        MI->meta[MetaInvoke][calledEna].insert(tree2str(cond));
     }
     if (!implementPrintf)
         for (auto info: MI->printfList)

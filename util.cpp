@@ -398,15 +398,13 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
     if (traceLookup)
         printf("%s: START searchIR %p %s ifc %s searchStr %s implements %p\n", __FUNCTION__, (void *)searchIR, searchIR->name.c_str(), searchIR->interfaceName.c_str(), searchStr.c_str(), (void *)implements);
     while (1) {
-        int ind = searchStr.find(PERIOD);
-        if (ind == -1)
-            ind = searchStr.find(DOLLAR);
+        int ind = searchStr.find_first_of(PERIOD DOLLAR);
         int ind2 = searchStr.find("[");
         int indnext = ind + 1;
         if (ind2 != -1 && (ind == -1 || ind2 < ind)) { // handle subscript
             ind = ind2;
             indnext = searchStr.find("]") + 1;
-            if (searchStr[indnext] == '.')
+            if (searchStr[indnext] == PERIOD[0] || searchStr[indnext] == DOLLAR[0])
                 indnext++;
         }
         fieldName = searchStr.substr(0, ind);
