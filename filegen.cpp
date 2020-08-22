@@ -140,10 +140,10 @@ void generateVerilogOutput(FILE *OStr)
                 resetList.push_back(item.first);
             }
             if (auto IR = lookupIR(item.second.type)) {
-                fprintf(OStr, "    %s %s;\n", stripModuleParam(item.second.type).c_str(), item.first.c_str());
+                fprintf(OStr, "    %s %s;\n", genericModuleParam(item.second.type).c_str(), item.first.c_str());
             }
             else if (auto IR = lookupInterface(item.second.type)) {
-                fprintf(OStr, "    %s %s();\n", stripModuleParam(item.second.type).c_str(), item.first.c_str());
+                fprintf(OStr, "    %s %s();\n", genericModuleParam(item.second.type).c_str(), item.first.c_str());
             }
             else
             fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());
@@ -159,10 +159,10 @@ void generateVerilogOutput(FILE *OStr)
             if (item.second.vecCount == "")
                 vecCountStr = "";
             if (auto IR = lookupIR(item.second.type)) {
-                fprintf(OStr, "    %s %s;\n", stripModuleParam(item.second.type).c_str(), item.first.c_str());
+                fprintf(OStr, "    %s %s;\n", genericModuleParam(item.second.type).c_str(), item.first.c_str());
             }
             else if (auto IR = lookupInterface(item.second.type)) {
-                fprintf(OStr, "    %s %s();\n", stripModuleParam(item.second.type).c_str(), item.first.c_str());
+                fprintf(OStr, "    %s %s();\n", genericModuleParam(item.second.type).c_str(), item.first.c_str());
             }
             else
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + item.first + vecCountStr).c_str());

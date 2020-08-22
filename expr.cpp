@@ -145,8 +145,8 @@ void foldMember(ACCExpr *expr)
         std::string sep;
         for (auto item: oplist) {
             if (!isIdChar(item->value[0])) {
-                dumpExpr("BADFIELDSPEC", expr);
-                return;
+                expr->operands.push_back(item);    // hack for now!!!! (subscript tree attached to '.' operator)
+                continue;
             }
             expr->value += sep + item->value; // fold member specifier into base name
             for (auto op: item->operands)

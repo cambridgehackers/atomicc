@@ -113,6 +113,7 @@ exit(-1);
         std::string dutType;
         for (auto item: softwareNameList) {
             ModuleIR *implements = lookupInterface(item.second.IR->interfaceName);
+            assert(implements);
             dutType = item.second.IR->name;
             std::string name = "IfcNames_" + item.first + (item.second.field.isPtr ? "H2S" : "S2H");
             enumList += sep + "[ \"" + name + "\", \"" + autostr(counter++) + "\" ]";
@@ -198,7 +199,7 @@ printf("[%s:%d] outcall %d usertypename %s userinterf %s fieldname %s type %s\n"
 #endif
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
-        dumpModule("TOP", IR);
+        //dumpModule("TOP", IR);
         std::string commandLine(exename);
         int ind = commandLine.rfind("/");
         if (ind == -1)

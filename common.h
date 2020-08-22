@@ -114,6 +114,7 @@ bool isRdyName(std::string name);
 bool isEnaName(std::string name);
 void extractParam(std::string debugName, std::string replaceList, MapNameValue &mapValue);
 std::string instantiateType(std::string arg, MapNameValue &mapValue);
+std::string genericModuleParam(std::string name, MapNameValue *mapValue = nullptr);
 std::string convertType(std::string arg, int arrayProcess = 0);
 ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);

@@ -42,40 +42,6 @@ typedef struct {
 std::map<std::string, std::map<std::string, MuxValueElement>> enableList, muxValueList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 
-static std::string genericModuleParam(std::string name)
-{
-    std::string ret = name;
-    int ind = name.find("(");
-    if (ind > 0) {
-        ret = name.substr(0, ind) + "#(";
-        name = name.substr(ind+1);
-        ind = name.rfind(")");
-        if (ind > 0)
-            name = name.substr(0, ind);
-        std::string sep;
-        while (name.length() > 0) {
-            ind = name.find("=");
-            if (ind == -1)
-                break;
-            ret += sep + PERIOD + name.substr(0,ind) + "(";
-            name = name.substr(ind+1);
-            ind = name.find(",");
-            if (ind > 0) {
-                ret += name.substr(0,ind);
-                name = name.substr(ind+1);
-            }
-            else {
-                ret += name;
-                name = "";
-            }
-            ret += ")";
-            sep = ",";
-        }
-        ret += ")";
-    }
-    return ret;
-}
-
 static void traceZero(const char *label)
 {
     if (trace_assign)
@@ -364,7 +330,7 @@ static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std:
         std::string newtype = instantiateType(type, mapValue);
 if (newtype != type) {
 printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LINE__, instance.c_str(), instanceType.c_str(), type.c_str(), newtype.c_str());
-exit(-1);
+//exit(-1);
         type = newtype;
 }
         std::string vc = vecCount;

@@ -434,6 +434,58 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
     }
 }
 
+static void typeCleanIR(ModuleIR *IR);
+static std::string typeClean(std::string type)
+{
+    if (auto ftype = lookupIR(type))
+        typeCleanIR(ftype);
+    if (auto interface = lookupInterface(type))
+        typeCleanIR(interface);
+#define VARIANT "_OC_"
+    if (startswith(type + VARIANT, "PipeIn" VARIANT)) {
+        auto IR = lookupInterface(type);
+        auto argType = IR->methods.front()->params.front().type; // enq(Bit(x) v);
+        return "PipeIn(width=" + convertType(argType) + ")";
+    }
+    if (startswith(type + VARIANT, "PipeOut" VARIANT)) {
+        auto IR = lookupInterface(type);
+        for (auto MI: IR->methods)
+            if (MI->type != "")
+                return "PipeOut(width=" + convertType(MI->type) + ")"; // Bit(x) first();
+    }
+    return type;
+}
+
+static void typeCleanMethod(MethodInfo *MI)
+{
+    MI->type = typeClean(MI->type);
+    for (auto itemi = MI->params.begin(), iteme = MI->params.end(); itemi != iteme; itemi++)
+        itemi->type = typeClean(itemi->type);
+    for (auto itemi = MI->alloca.begin(), iteme = MI->alloca.end(); itemi != iteme; itemi++)
+        itemi->second.type = typeClean(itemi->second.type);
+    for (auto item: MI->letList)
+        item->type = typeClean(item->type);
+    for (auto itemi = MI->interfaceConnect.begin(), iteme = MI->interfaceConnect.end(); itemi != iteme; itemi++)
+        itemi->type = typeClean(itemi->type);
+}
+
+static void typeCleanIR(ModuleIR *IR)
+{
+    if (auto interface = lookupInterface(IR->interfaceName))
+        typeCleanIR(interface);
+    for (auto itemi = IR->interfaceConnect.begin(), iteme = IR->interfaceConnect.end(); itemi != iteme; itemi++)
+        itemi->type = typeClean(itemi->type);
+    for (auto itemi = IR->unionList.begin(), iteme = IR->unionList.end(); itemi != iteme; itemi++)
+        itemi->type = typeClean(itemi->type);
+    for (auto itemi = IR->fields.begin(), iteme = IR->fields.end(); itemi != iteme; itemi++)
+        itemi->type = typeClean(itemi->type);
+    for (auto itemi = IR->interfaces.begin(), iteme = IR->interfaces.end(); itemi != iteme; itemi++) {
+        itemi->type = typeClean(itemi->type);
+    }
+    for (auto MI: IR->methods)
+        typeCleanMethod(MI);
+}
+
 void preprocessIR(std::list<ModuleIR *> &irSeq)
 {
     // Check/replace dummy intermediate classes that are only present for typechecking
@@ -579,6 +631,7 @@ skipLab:;
             preprocessMethod(IR, MI, false);
         for (auto item: IR->generateBody)
             preprocessMethod(IR, item.second, true);
+        typeCleanIR(IR);   // normalize all 'PipeIn_xxx' and 'PipeOut_xxx'
     }
 }
 

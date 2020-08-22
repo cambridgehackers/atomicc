@@ -207,9 +207,76 @@ printf("[%s:%d] oldtype %s newtype %s\n", __FUNCTION__, __LINE__, arg.c_str(), n
         return mapReturn(arg);
     }
     if (auto IR = lookupIR(bp)) {
-        return mapReturn(bp);
+        return mapReturn(genericModuleParam(bp, &mapValue));
+    }
+    if (auto IR = lookupInterface(bp)) {
+        return mapReturn(genericModuleParam(bp, &mapValue));
     }
     return mapReturn(bp);
+}
+
+typedef struct {
+    std::string name;
+    ACCExpr    *value;
+} ParamMapType;
+std::string genericModuleParam(std::string name, MapNameValue *mapValue)
+{
+    std::string orig = name;
+    std::list<ParamMapType> pmap;
+    std::string ret = name;
+    int ind = name.find("(");
+    if (ind > 0) {
+        ret = name.substr(0, ind);
+        name = name.substr(ind+1);
+        ind = name.rfind(")");
+        if (ind > 0)
+            name = name.substr(0, ind);
+        std::string sep;
+        while (name.length() > 0) {
+            ind = name.find("=");
+            if (ind == -1)
+                break;
+            std::string pname = name.substr(0, ind);
+            name = name.substr(ind+1);
+            ind = name.find(",");
+            if (ind > 0) {
+                pmap.push_back({pname, str2tree(name.substr(0, ind))});
+                name = name.substr(ind+1);
+            }
+            else {
+                pmap.push_back({pname, str2tree(name)});
+                name = "";
+            }
+        }
+        if (mapValue) {
+            ret += "(";
+            for (auto item: pmap) {
+                ret += sep + item.name + "=";
+                std::string oldVal = tree2str(item.value);
+                std::string newval;
+                auto val = mapValue->find(oldVal);
+                if (val != mapValue->end())
+                    newval = val->second;
+                if (oldVal != "0" && oldVal != "1" && newval != "") { // don't translate trivial values
+                    oldVal = newval;
+                }
+                ret += oldVal;
+                sep = ",";
+            }
+            ret += ")";
+        }
+        else {
+            ret += "#(";
+            for (auto item: pmap) {
+                ret += sep + PERIOD + item.name + "(";
+                ret += tree2str(item.value);
+                ret += ")";
+                sep = ",";
+            }
+            ret += ")";
+        }
+    }
+    return ret;
 }
 
 std::string convertType(std::string arg, int arrayProcess)

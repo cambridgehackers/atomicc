@@ -77,7 +77,7 @@ static void processM2P(ModuleIR *IR)
             auto IIR = lookupInterface(inter.type);
             auto MI = IIR->methods.front();
             target = inter.fldName + PERIOD + MI->name;
-            targetParam = baseMethodName(target) + PERIOD + MI->params.front().name;
+            targetParam = baseMethodName(target) + DOLLAR + MI->params.front().name;
             if (trace_software)
                 dumpModule("M2P/IIR :" + inter.fldName, IIR);
         }
@@ -115,7 +115,7 @@ assert(HIR);
 //exit(-1);
             //continue;
         //}
-        std::string paramPrefix = baseMethodName(methodName) + PERIOD;
+        std::string paramPrefix = baseMethodName(methodName) + DOLLAR;
         std::string call;
         int64_t dataLength = 32; // include length of tag
         for (auto param: MI->params) {
@@ -146,6 +146,11 @@ assert(HIR);
     dumpModule("M2P", IR);
 }
 
+ACCExpr *allocBitsubstr(std::string name, std::string left, std::string right)
+{
+     ACCExpr *ret = allocExpr("__bitsubstr", allocExpr(PARAMETER_MARKER, allocExpr(name), allocExpr(left), allocExpr(right)));
+     return ret;
+}
 static void processP2M(ModuleIR *IR)
 {
     MapNameValue mapValue;
@@ -187,7 +192,7 @@ printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
         MInew->guard = MI->guard;
     }
     MethodInfo *MInew = lookupMethod(IR, host + PERIOD + "enq");
-    std::string sourceParam = baseMethodName(MInew->name) + PERIOD + MInew->params.front().name;
+    std::string sourceParam = baseMethodName(MInew->name) + DOLLAR + MInew->params.front().name;
     std::string paramLen = convertType(instantiateType(MInew->params.front().type, mapValue));
     if (generateTrace) {
         ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
@@ -201,7 +206,7 @@ assert(MInew);
     for (auto MI: IIR->methods) {
         std::string offset = paramLen + " - 32"; // length
         std::string methodName = MI->name;
-        std::string paramPrefix = baseMethodName(methodName) + PERIOD;
+        std::string paramPrefix = baseMethodName(methodName) + DOLLAR;
         if (isRdyName(methodName))
             continue;
         uint64_t totalLength = 0;
@@ -215,10 +220,10 @@ assert(MInew);
         ACCExpr *callExpr = allocExpr(target + PERIOD + methodName, allocExpr(PARAMETER_MARKER, paramList));
         for (auto param: MI->params) {
             std::string lower = "(" + offset + " - " + convertType(instantiateType(param.type, mapValue)) + ")";
-            paramList->operands.push_back(allocExpr(sourceParam + "[" + offset + " -1 :" + lower + "]"));
+            paramList->operands.push_back(allocBitsubstr(sourceParam, offset + "-1", lower));
             offset = lower;
         }
-        ACCExpr *cond = allocExpr("==", allocExpr(sourceParam + "[" + paramLen + " - 1: (" + paramLen + "- 16)]"), // length
+        ACCExpr *cond = allocExpr("==", allocBitsubstr(sourceParam, paramLen + " - 1", paramLen + "- 16"), // length
                  allocExpr("16'd" + autostr(counter)));
         if (!isEnaName(methodName)) {
             if (MI->action) {
