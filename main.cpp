@@ -168,8 +168,7 @@ static void appendInterface(std::string name, std::string params)
     if (interfaceSeen[name])
         return;
     interfaceSeen[name] = true;
-#define VARIANT "_OC_"
-    if (startswith(name + VARIANT, "PipeIn" VARIANT) || startswith(name + VARIANT, "PipeOut" VARIANT))
+    if (startswith(name, "PipeIn(") || startswith(name, "PipeOut("))
         return;
     ModuleIR *IR = lookupInterface(name);
     assert(IR);
