@@ -188,13 +188,19 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
     }
     for (auto item: expr->operands) {
         ret += sep;
-        bool addParen = !topOp && !checkOperand(item->value) && item->value != "," && item->value != PERIOD;
+        bool addParen = !topOp && !checkOperand(item->value) && item->value != "," && item->value != PERIOD && !isParen(item->value);
         if (addParen)
             ret += "( ";
-        ret += tree2str(item);
+        std::string val = tree2str(item);
+        if (ret.length() && val.length() && ret.substr(ret.length()-1) == PERIOD && val[0] == '[')
+            ret = ret.substr(0, ret.length()-1);
+        ret += val;
         if (addParen)
             ret += space + ")";
-        sep = space + op + space;
+        if (op == PERIOD)
+            sep = op;
+        else
+            sep = space + op + space;
         if (op == "?")
             op = ":";
     }
@@ -210,6 +216,14 @@ int walkCount (ACCExpr *expr)
     for (auto item: expr->operands)
         count += walkCount(item);
     return count;
+}
+
+std::string replacePeriod(std::string value)
+{
+    int ind;
+    while ((ind = value.find(PERIOD)) > 0)
+        value = value.substr(0, ind) + DOLLAR + value.substr(ind+1);
+    return value;
 }
 
 ACCExpr *allocExpr(std::string value, ACCExpr *argl, ACCExpr *argr, ACCExpr *argt)
@@ -438,8 +452,6 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
 {
     if (!expr)
         return expr;
-static int level;
-    level++;
     if (expr->operands.size() == 1 && expr->operands.front()->value != "," && (!preserveParen && expr->value == "("))
         expr = expr->operands.front();
     if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
@@ -461,7 +473,6 @@ static int level;
                  ret->operands.push_back(oitem);
          }
     }
-    level--;
     if (ret->value == "?" && checkInteger(getRHS(ret, 0), "1"))
         return getRHS(ret, 1);
     if (ret->value == "&&" && checkInteger(getRHS(ret, 0), "1")) {
@@ -668,17 +679,13 @@ printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                     printf("[%s:%d] OPERAND CHECKFAILLLLLLLLLLLLLLL %s from %s\n", __FUNCTION__, __LINE__, tree2str(tok).c_str(), lexString.c_str());
                     exit(-1);
                 }
+                while (tnext && (tnext->value == PERIOD || isParen(tnext->value) || isIdChar(tnext->value[0]))) {
                 while (tnext && tnext->value == PERIOD) {
                     if (!dotExpr)
                         dotExpr = tnext;
                     dotExpr->operands.push_back(tok);
                     tok = get1Token();
                     tnext = get1Token();
-                }
-                if (dotExpr) {
-                    if (tok)
-                        dotExpr->operands.push_back(tok);
-                    tok = dotExpr;
                 }
                 while (tnext && (isParen(tnext->value) || isIdChar(tnext->value[0]))) {
                     if(!isIdChar(tok->value[0]) && tok->value[0] != '.') {
@@ -688,6 +695,12 @@ printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                     //assert(isIdChar(tok->value[0]) || tok->value[0] == '.'); // hack for fifo[i].out
                     tok->operands.push_back(tnext);
                     tnext = get1Token();
+                }
+                }
+                if (dotExpr) {
+                    if (tok)
+                        dotExpr->operands.push_back(tok);
+                    tok = dotExpr;
                 }
                 repeatGet1Token = tnext;
                 if (unary) {
@@ -748,7 +761,6 @@ lll:;
                 head = TOP;
         }
     }
-    foldMember(head);
     head = cleanupExpr(head, preserveParen);
     return head;
 }

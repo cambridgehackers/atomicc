@@ -136,6 +136,9 @@ char *getExecutionFilename(char *buf, int buflen);
 void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault);
 std::string exprWidth(ACCExpr *expr, bool forceNumeric = false);
 std::string makeSection(std::string var, ACCExpr *init, ACCExpr *limit, ACCExpr *incr);
+typedef const char *CCharPointer;
+std::string getBoundedString(CCharPointer *bufpp, char terminator = 0);
+void extractSubscript(std::string &source, int index, std::string &sub);
 
 // expr.cpp
 bool bitOp(std::string s);
@@ -164,6 +167,7 @@ bool booleanBinop(std::string s);
 bool arithOp(std::string s);
 bool relationalOp(std::string s);
 bool isConstExpr(ACCExpr *expr);
+std::string replacePeriod(std::string value);
 extern int trace_expr;
 
 // readIR.cpp
@@ -184,6 +188,7 @@ void cleanupIR(std::list<ModuleIR *> &irSeq);
 
 // verilog.cpp
 void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);
+void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward);
 
 // filegen.cpp
 extern std::map<std::string, int> genvarMap;

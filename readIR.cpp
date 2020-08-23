@@ -24,49 +24,15 @@
 std::string myGlobalName;       // imported from main.cpp
 static int trace_readIR;//= 1;
 static char buf[MAX_READ_LINE];
-static char *bufp;
+static const char *bufp;
 static int lineNumber = 0;
 static FILE *OStrGlobal;
 
 static std::string getExpressionString(char terminator = 0)
 {
-    const char *startp = bufp;
-    int level = 0, levelb = 0, levelc = 0;
-    bool inQuote = false, beforeParen = true;
     while (*bufp == ' ')
         bufp++;
-    while (*bufp && ((terminator ? (*bufp != terminator) : beforeParen) || level != 0 || levelb != 0 || levelc != 0)) {
-        if (inQuote) {
-            if (*bufp == '"')
-                inQuote = false;
-            if (*bufp == '\\')
-                bufp++;
-        }
-        else {
-        if (*bufp == '"')
-            inQuote = true;
-        else if (*bufp == '(') {
-            level++;
-            beforeParen = false;
-        }
-        else if (*bufp == ')')
-            level--;
-        else if (*bufp == '{') {
-            levelb++;
-            beforeParen = false;
-        }
-        else if (*bufp == '}')
-            levelb--;
-        else if (*bufp == '[') {
-            levelc++;
-            beforeParen = false;
-        }
-        else if (*bufp == ']')
-            levelc--;
-        }
-        bufp++;
-    }
-    std::string ret = std::string(startp, bufp - startp);
+    std::string ret = getBoundedString(&bufp, terminator);
     if (trace_readIR)
         printf("[%s:%d] '%s'\n", __FUNCTION__, __LINE__, ret.c_str());
     return ret;
@@ -160,7 +126,7 @@ static bool readLine(void)
 }
 static std::string getToken()
 {
-    char *startp = bufp;
+    const char *startp = bufp;
     while (*bufp == ' ')
         bufp++;
     while (*bufp && *bufp != ' ')
@@ -183,7 +149,7 @@ static std::string specializeTypename(std::string ret)
 
 static std::string getType()
 {
-    char *startp = bufp;
+    const char *startp = bufp;
     while (*bufp == ' ')
         bufp++;
     while (*bufp && *bufp != ' ' && *bufp != '(')
@@ -200,6 +166,7 @@ static std::string getType()
 
 static ACCExpr *cleanInterface(ACCExpr *expr)
 {
+    expr->value = replacePeriod(expr->value);
     std::string name = expr->value;
     if (name == "_")
         name = "";
@@ -289,6 +256,11 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *value = inputExpression(bufp), *subscript = nullptr, *param = nullptr;
                 // TODO: make this processing more general
+                value->value = replacePeriod(value->value);
+                int ind = value->value.rfind(DOLLAR);
+                if (ind > 0)
+                    value->value = value->value.substr(0, ind) + PERIOD + value->value.substr(ind+1);
+#if 0
                 if (value->value == PERIOD) {     // handle qualified expr case
                     ACCExpr *newValue = value->operands.front();
                     value->operands.pop_front();
@@ -298,6 +270,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                     }
                     value = newValue;
                 }
+#endif
                 for (auto item: value->operands) {
                      if (item->value == "[")
                          subscript = item;

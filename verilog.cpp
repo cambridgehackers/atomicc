@@ -118,10 +118,16 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     if (trace_assign)
         printf("[%s:%d] start [%s/%d]count[%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin && generateSection == "") {
+        std::string base = target;
+        ind = base.find_first_of(PERIOD "[");
+        if (ind > 0)
+            base = base.substr(0, ind);
+        if (!refList[base].pin) {
         printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
 if (0)
         if (target.find("[") == std::string::npos)
         exit(-1);
+        }
     }
     updateWidth(value, convertType(type));
     if (isIdChar(value->value[0])) {
@@ -523,22 +529,20 @@ static void walkRef (ACCExpr *expr)
         return;
     std::string item = expr->value;
     if (isIdChar(item[0])) {
+        if (!startswith(item, "__inst$Genvar") && item != "$past") {
         std::string base = item;
-        int ind = base.find("[");
+        int ind = base.find(PERIOD "[");
         if (ind > 0)
             base = base.substr(0, ind);
-        if (!startswith(item, "__inst$Genvar") && item != "$past") {
-        if (!refList[item].pin)
-            printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
-        if (base != item)
-{
-if (trace_assign)
-printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
-item = base;
-}
-        if(!refList[item].pin) {
-            printf("[%s:%d] pin not found '%s'\n", __FUNCTION__, __LINE__, item.c_str());
-            //exit(-1);
+        if (!refList[item].pin) {
+            if (base != item) {
+                if (trace_assign)
+                    printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
+                if(!refList[base].pin) {
+                    printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
+                    //exit(-1);
+                }
+            }
         }
         }
         refList[item].count++;
@@ -887,32 +891,53 @@ void showRef(const char *label, std::string name)
 static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bool isForward)
 {
     std::string tstr = tree2str(target), sstr = tree2str(source);
-    if (trace_assign || trace_connect || (!refList[tstr].out && !refList[sstr].out))
-        printf("%s: IFCCC '%s'/%d/%d '%s'/%d/%d\n", __FUNCTION__, tstr.c_str(), refList[tstr].out, refList[target->value].out, sstr.c_str(), refList[sstr].out, refList[source->value].out);
+    std::string tif = tstr, sif = sstr;
+    int ind = tif.find_first_of(PERIOD "[");
+    if (ind > 0)
+        tif = tif.substr(0, ind);
+    ind = sif.find_first_of(PERIOD "[");
+    if (ind > 0)
+        sif = sif.substr(0, ind);
+    bool tdir = refList[tif].out ^ (tif.find(DOLLAR) != std::string::npos) ^ endswith(tstr, "__RDY");;
+    bool sdir = refList[sif].out ^ (sif.find(DOLLAR) != std::string::npos) ^ endswith(sstr, "__RDY");;
+    if (trace_assign || trace_connect || (!tdir && !sdir))
+        printf("%s: IFCCC '%s'/%d/%d '%s'/%d/%d\n", __FUNCTION__, tstr.c_str(), tdir, refList[target->value].out, sstr.c_str(), sdir, refList[source->value].out);
     showRef("target", target->value);
     showRef("source", source->value);
-    if (refList[source->value].out) {
+    if (sdir) {
         setAssign(sstr, target, type);
-        refList[target->value].done = true;
+        refList[tif].done = true;
     }
     else {
         setAssign(tstr, source, type);
-        refList[source->value].done = true;
+        refList[sif].done = true;
     }
 }
 
-std::string zzreplacePeriod(std::string value)
+void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
 {
-    int ind;
-    while ((ind = value.find(PERIOD)) > 0)
-        value = value.substr(0, ind) + DOLLAR + value.substr(ind+1);
-    return value;
+    std::string ICtarget = tree2str(targetTree);
+    std::string ICsource = tree2str(sourceTree);
+    for (auto MI : IIR->methods) {
+        ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
+        if (trace_connect)
+            printf("[%s:%d] ICtarget '%s' ICsource '%s'\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICsource.c_str());
+        if (target->value.length() && target->value.substr(target->value.length()-1) == PERIOD)
+            target->value = target->value.substr(0, target->value.length()-1);
+        if (source->value.length() && source->value.substr(source->value.length()-1) == PERIOD)
+            source->value = source->value.substr(0, source->value.length()-1);
+        target = allocExpr(PERIOD, target, allocExpr(MI->name));
+        source = allocExpr(PERIOD, source, allocExpr(MI->name));
+        connectTarget(target, source, MI->type, isForward);
+        std::string tstr = baseMethodName(tree2str(target)) + DOLLAR;
+        std::string sstr = baseMethodName(tree2str(source)) + DOLLAR;
+        for (auto info: MI->params)
+            connectTarget(allocExpr(tstr+info.name), allocExpr(sstr+info.name), info.type, isForward);
+    }
 }
 
 static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
 {
-    //targetTree->value = replacePeriod(targetTree->value);
-    //sourceTree->value = replacePeriod(sourceTree->value);
     std::string ICtarget = tree2str(targetTree);
     std::string ICsource = tree2str(sourceTree);
     if (trace_connect)
@@ -933,28 +958,6 @@ static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTr
         source->value += fld.fldName;
         connectMethods(lookupInterface(fld.type), target, source, isForward);
     }
-#if 0
-    for (auto MI : IIR->methods) {
-        ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
-        if (trace_connect)
-            printf("[%s:%d] ICtarget '%s' ICsource '%s'\n", __FUNCTION__, __LINE__, ICtarget.c_str(), ICsource.c_str());
-        if (target->value.length() && target->value.substr(target->value.length()-1) == PERIOD)
-            target->value = target->value.substr(0, target->value.length()-1);
-        if (source->value.length() && source->value.substr(source->value.length()-1) == PERIOD)
-            source->value = source->value.substr(0, source->value.length()-1);
-        target->value += PERIOD + MI->name;
-        source->value += PERIOD + MI->name;
-        connectTarget(target, source, MI->type, isForward);
-        std::string tstr = baseMethodName(target->value) + DOLLAR;
-        std::string sstr = baseMethodName(source->value) + DOLLAR;
-        for (auto info: MI->params) {
-            ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
-            target->value = tstr + info.name;
-            source->value = sstr + info.name;
-            connectTarget(target, source, info.type, isForward);
-        }
-    }
-#endif
     if (IIR->methods.size())
         connectTarget(targetTree, sourceTree, IIR->name, isForward);
 }
@@ -1079,6 +1082,11 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         condLines[generateSection].assert.push_back("    " + indent + tree2str(value) + ";");
     }
     for (auto info: MI->callList) {
+        ACCExpr *subscript = nullptr;
+        if (info->value->operands.size() > 1) {
+            subscript = info->value->operands.front()->operands.front();
+            info->value->operands.pop_front();
+        }
         walkRewrite(info->cond);
         walkRewrite(info->value);
         std::string section = generateSection;
@@ -1091,7 +1099,9 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             dumpExpr("READCALL", value);
             exit(-1);
         }
-        std::string calledName = value->value, calledEna = getEnaName(calledName);
+        ACCExpr *callTarget = dupExpr(value);
+        callTarget->operands.pop_back();
+        std::string calledName = tree2str(callTarget), calledEna = getEnaName(calledName);
         std::string vecCount;
         MapNameValue mapValue;
         MethodInfo *CI = lookupQualName(IR, calledName, vecCount, mapValue);
@@ -1105,19 +1115,24 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         if (!info->isAction)
             continue;
         ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName)), cond));
-        if (value->operands.size() > 1) {
-            ACCExpr *subscript = nullptr;
+        if (subscript) {
             std::string sub;
             tempCond = simpleReplace(tempCond);
             tempCond = replaceAssign(tempCond, getRdyName(calledEna), true); // remove __RDY before adding subscript!
-            subscript = value->operands.front()->operands.front();
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
             section = makeSection(var->value, allocExpr("0"),
                 allocExpr("<", var, allocExpr(vecCount)), allocExpr("+", var, allocExpr("1")));
             sub = "[" + var->value + "]";
             int ind = calledEna.find_last_of(DOLLAR PERIOD);
             if (ind > 0) {
-                calledEna = calledEna.substr(0, ind) + sub + calledEna.substr(ind);
+                std::string post = calledEna.substr(ind);
+                calledEna = calledEna.substr(0, ind);
+                ind = post.rfind(DOLLAR);
+                if (ind > 1)
+                    post = post.substr(0, ind) + PERIOD + post.substr(ind+1);
+                //if (post[0] == DOLLAR[0])
+                    //post = PERIOD + post.substr(1);
+                calledEna += sub + post;
             }
             else
                 calledEna += sub;
@@ -1172,6 +1187,15 @@ void generateMethodGroup(ModuleIR *IR, void (*generateMethod)(ModuleIR *IR, std:
         assert(MIb && "body item ");
         generateMethod(IR, MI->name, MIb);
     }
+    }
+}
+
+static void interfaceAssign(std::string target, ACCExpr *source, std::string type)
+{
+    if (auto interface = lookupInterface(type)) {
+        connectMethodList(interface, allocExpr(target), source, false);
+        refList[target].done = true; // mark that assigns have already been output
+        refList[tree2str(source)].done = true; // mark that assigns have already been output
     }
 }
 
@@ -1410,4 +1434,25 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, mitem.value.c_st
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, ""/*not param*/, mitem.vecCount});
     }
+#if 0
+    for (auto item: assignList) {
+        std::string temp = item.first;
+        int ind = temp.find('[');
+        if (ind != -1)
+            temp = temp.substr(0,ind);
+        if (item.second.value && (refList[temp].count || !refList[temp].pin) && !refList[item.first].done) {
+    if (auto interface = lookupInterface(item.second.type)) {
+printf("[%s:%d] RRRRRRRRRRRRRRRR count %d done %d %s = %s type %s\n", __FUNCTION__, __LINE__, refList[item.first].count, refList[item.first].done, item.first.c_str(), tree2str(item.second.value).c_str(), item.second.type.c_str());
+}
+            interfaceAssign(item.first, item.second.value, item.second.type);
+        }
+    }
+#endif
+    for (auto ctop: condAssignList) {
+        for (auto item: ctop.second) {
+            generateSection = ctop.first;
+            interfaceAssign(item.first, item.second.value, item.second.type);
+        }
+    }
+    generateSection = "";
 }

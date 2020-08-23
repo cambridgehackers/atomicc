@@ -123,6 +123,13 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
     fprintf(OStr, ");\n");
 }
 
+static void genAssign(FILE *OStr, std::string target, ACCExpr *source)
+{
+    if (!refList[target].done)
+        fprintf(OStr, "    assign %s = %s;\n", finishString(target).c_str(), finishExpr(source).c_str());
+    refList[target].done = true; // mark that assigns have already been output
+}
+
 void generateVerilogOutput(FILE *OStr)
 {
     std::list<std::string> resetList;
@@ -232,7 +239,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                         goto next;
             if (!refList[temp].done && refList[temp].count) {
                 if (assignList[item.first].value)
-                    fprintf(OStr, "    assign %s = %s;\n", finishString(item.first).c_str(), finishExpr(assignList[item.first].value).c_str());
+                    genAssign(OStr, item.first, assignList[item.first].value);
                 else if (refList[temp].vecCount == "") {
                     if (!lookupInterface(refList[temp].type) && !lookupIR(refList[temp].type))
                     fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", finishString(item.first).c_str());
@@ -254,14 +261,13 @@ next:;
             if (!seen)
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
             seen = true;
-            fprintf(OStr, "    assign %s = %s;\n", finishString(item.first).c_str(), finishExpr(item.second.value).c_str());
-            refList[item.first].done = true; // mark that assigns have already been output
+            genAssign(OStr, item.first, item.second.value);
         }
     }
     for (auto ctop: condAssignList) {
         fprintf(OStr, "%s\n", finishString(ctop.first).c_str());
         for (auto item: ctop.second) {
-            fprintf(OStr, "        assign %s = %s;\n", finishString(item.first).c_str(), finishExpr(item.second.value).c_str());
+            genAssign(OStr, item.first, item.second.value);
         }
         fprintf(OStr, "    end;\n");
     }

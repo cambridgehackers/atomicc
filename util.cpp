@@ -397,6 +397,11 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
     }
     if (traceLookup)
         printf("%s: START searchIR %p %s ifc %s searchStr %s implements %p\n", __FUNCTION__, (void *)searchIR, searchIR->name.c_str(), searchIR->interfaceName.c_str(), searchStr.c_str(), (void *)implements);
+    int ind = searchStr.find("[");
+    if (ind > 0) {
+        std::string sub;
+        extractSubscript(searchStr, ind, sub);
+    }
     while (1) {
         int ind = searchStr.find_first_of(PERIOD DOLLAR);
         int ind2 = searchStr.find("[");
@@ -980,4 +985,52 @@ std::string makeSection(std::string var, ACCExpr *init, ACCExpr *limit, ACCExpr 
     snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin",
         var.c_str(), tree2str(init).c_str(), tree2str(limit).c_str(), var.c_str(), tree2str(incr).c_str());
     return tempBuf;
+}
+
+std::string getBoundedString(CCharPointer *bufpp, char terminator)
+{
+    const char *bufp = *bufpp;
+    const char *startp = bufp;
+    int level = 0, levelb = 0, levelc = 0;
+    bool inQuote = false, beforeParen = true;
+    while (*bufp && ((terminator ? (*bufp != terminator) : beforeParen) || level != 0 || levelb != 0 || levelc != 0)) {
+        if (inQuote) {
+            if (*bufp == '"')
+                inQuote = false;
+            if (*bufp == '\\')
+                bufp++;
+        }
+        else {
+        if (*bufp == '"')
+            inQuote = true;
+        else if (*bufp == '(') {
+            level++;
+            beforeParen = false;
+        }
+        else if (*bufp == ')')
+            level--;
+        else if (*bufp == '{') {
+            levelb++;
+            beforeParen = false;
+        }
+        else if (*bufp == '}')
+            levelb--;
+        else if (*bufp == '[') {
+            levelc++;
+            beforeParen = false;
+        }
+        else if (*bufp == ']')
+            levelc--;
+        }
+        bufp++;
+    }
+    *bufpp = bufp;
+    return std::string(startp, bufp - startp);
+}
+
+void extractSubscript(std::string &source, int index, std::string &sub)
+{
+    const char *bufp = source.c_str() + index;
+    sub = getBoundedString(&bufp);
+    source = source.substr(0, index) + source.substr(index + sub.length());
 }

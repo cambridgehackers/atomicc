@@ -160,7 +160,7 @@ exit(-1);
                     }
                 }
             }
-printf("[%s:%d] outcall %d usertypename %s userinterf %s fieldname %s type %s\n", __FUNCTION__, __LINE__, outcall, userTypeName.c_str(), userInterface.c_str(), fieldName.c_str(), type.c_str());
+printf("[%s:%d] outcall %d usertname %s userif %s fieldname %s type %s\n", __FUNCTION__, __LINE__, outcall, userTypeName.c_str(), userInterface.c_str(), fieldName.c_str(), type.c_str());
             if (outcall) {
                 pipeUser.push_back(fieldName + DOLLAR + "pipe");
             }
