@@ -437,10 +437,6 @@ tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
 static void typeCleanIR(ModuleIR *IR);
 static std::string typeClean(std::string type)
 {
-    if (auto ftype = lookupIR(type))
-        typeCleanIR(ftype);
-    if (auto interface = lookupInterface(type))
-        typeCleanIR(interface);
 #define VARIANT "_OC_"
     if (startswith(type + VARIANT, "PipeIn" VARIANT)) {
         auto IR = lookupInterface(type);
@@ -450,9 +446,13 @@ static std::string typeClean(std::string type)
     if (startswith(type + VARIANT, "PipeOut" VARIANT)) {
         auto IR = lookupInterface(type);
         for (auto MI: IR->methods)
-            if (MI->type != "")
+            if (MI->name == "first")
                 return "PipeOut(width=" + convertType(MI->type) + ")"; // Bit(x) first();
     }
+    if (auto ftype = lookupIR(type))
+        typeCleanIR(ftype);
+    if (auto interface = lookupInterface(type))
+        typeCleanIR(interface);
     return type;
 }
 
@@ -554,7 +554,7 @@ skipLab:;
     for (auto mapItem : mapIndex) {
         ModuleIR *IR = mapItem.second;
 #else
-    for (auto IR : irSeq) {
+    for (auto IR : irSeq)
 #endif
         std::string modName = IR->name;
         int ind = modName.find("(");

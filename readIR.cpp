@@ -40,14 +40,12 @@ static std::string getExpressionString(char terminator = 0)
 
 static std::string changeSeparator(std::string value)
 {
-#if 0
-    int ind = value.find(DOLLAR);
+    int ind = value.rfind(DOLLAR);
     if (value.length() && isIdChar(value[0]) && ind > 0
      && !startswith(value, "__inst$Genvar")
      && !startswith(value, "FOR$")
      && !startswith(value, "RULE$"))
         value = value.substr(0, ind) + PERIOD + value.substr(ind+1);
-#endif
     return value;
 }
 
@@ -55,7 +53,7 @@ static void walkFixup(ACCExpr *expr)
 {
     if (!expr)
         return;
-    expr->value = changeSeparator(expr->value);
+    expr->value = /*changeSeparator*/(expr->value);
     foldMember(expr);
     for (auto item: expr->operands)
         walkFixup(item);
