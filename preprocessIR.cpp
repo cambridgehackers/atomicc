@@ -511,11 +511,11 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
 //dumpModule("MASTER", lookupInterface((*IR)->interfaceName));
 //dumpModule("FIELD", lookupInterface(fieldIR->interfaceName));
             for (auto item: (*IR)->interfaceConnect) {
-                std::string target = tree2str(item.target);
-                std::string source = tree2str(item.source);
+                std::string target = replacePeriod(tree2str(item.target));
+                std::string source = replacePeriod(tree2str(item.source));
 printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__, __LINE__, target.c_str(), source.c_str(), item.type.c_str(), item.isForward);
-                 if ((target != field.fldName + PERIOD + source)
-                  && (source != field.fldName + PERIOD + target)) {
+                 if ((target != field.fldName + DOLLAR + source)
+                  && (source != field.fldName + DOLLAR + target)) {
                      goto skipLab;
                  }
             }
@@ -530,7 +530,9 @@ printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__,
              || MI->alloca.size() || MI->letList.size() || MI->printfList.size())
                 goto skipLab;
             CallListElement *call = MI->callList.front();
-            if (call->cond || call->value->value != (field.fldName + PERIOD + MI->name))
+            std::string calltarget = replacePeriod(call->value->value);
+            std::string fieldtarget = replacePeriod(field.fldName + PERIOD + MI->name);
+            if (call->cond || calltarget != fieldtarget)
                 goto skipLab;
         }
 printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), field.fldName.c_str(), field.type.c_str());
