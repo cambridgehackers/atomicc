@@ -457,7 +457,7 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
     for (auto item: pinPorts)
     switch (item.variant) {
     case PINI_INTERFACE:
-        checkWire(item.name, item.type, item.isOutput, item.isInout, ""/*not param*/, item.isLocal, instance==""/*isArgument*/, item.vecCount);
+        checkWire(item.name, item.type, item.isOutput, item.isInout, ""/*not param*/, item.isLocal, false/*isArgument*/, item.vecCount);
         break;
     case PINI_METHOD:
         checkWire(item.name, item.type, item.isOutput ^ (item.type != ""), false, ""/*not param*/, item.isLocal, false/*isArgument*/, item.vecCount);
