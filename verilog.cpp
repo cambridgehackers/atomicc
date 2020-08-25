@@ -573,12 +573,14 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool e
     if (trace_assign)
     printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     std::string item = expr->value;
-    if (guardName != "" && (startswith(item, guardName) || (item == PERIOD && startswith(expr->operands.front()->value, guardName)))) {
+    if (item == PERIOD)
+        item = tree2str(expr);
+    if (guardName != "" && startswith(item, guardName)) {
         if (trace_assign)
-        printf("[%s:%d] remove guard of called method from enable line %s\n", __FUNCTION__, __LINE__, item.c_str());
+        printf("[%s:%d] remove guard '%s' of called method from enable line %s\n", __FUNCTION__, __LINE__, guardName.c_str(), item.c_str());
         return allocExpr("1");
     }
-    if (isIdChar(item[0]) && !expr->operands.size()) {
+    if (expr->value == PERIOD || (isIdChar(item[0]) && !expr->operands.size())) {
         if (!assignList[item].noRecursion || enableListProcessing)
         if (ACCExpr *assignValue = assignList[item].value)
         if (assignValue->value[0] != '@')    // hack to prevent propagation of __reduce operators
@@ -1120,6 +1122,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             tempCond = simpleReplace(tempCond);
             tempCond = replaceAssign(tempCond, getRdyName(calledEna), true); // remove __RDY before adding subscript!
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
+printf("[%s:%d] VECCCCCC %s\n", __FUNCTION__, __LINE__, vecCount.c_str());
             section = makeSection(var->value, allocExpr("0"),
                 allocExpr("<", var, allocExpr(vecCount)), allocExpr("+", var, allocExpr("1")));
             sub = "[" + var->value + "]";
@@ -1205,6 +1208,7 @@ static void interfaceAssign(std::string target, ACCExpr *source, std::string typ
 void generateModuleDef(ModuleIR *IR, ModList &modLineTop)
 {
 static ModList modLine;
+    buildAccessible(IR);
     generateSection = "";
     condAssignList.clear();
     refList.clear();
@@ -1319,6 +1323,7 @@ static ModList modLine;
                     setAssign(name_or1, allocExpr("@|", allocExpr(name_or)), "Bit(1)");
                     assignList[name_or1].noRecursion = true;
                     ACCExpr *var = allocExpr(GENVAR_NAME "1");
+printf("[%s:%d] VECCCCCC %s\n", __FUNCTION__, __LINE__, nameVec.c_str());
                     generateSection = makeSection(var->value, allocExpr("0"),
                         allocExpr("<", var, allocExpr(nameVec)), allocExpr("+", var, allocExpr("1")));
                     std::string sub = "[" + var->value + "]";

@@ -139,6 +139,8 @@ std::string makeSection(std::string var, ACCExpr *init, ACCExpr *limit, ACCExpr 
 typedef const char *CCharPointer;
 std::string getBoundedString(CCharPointer *bufpp, char terminator = 0);
 void extractSubscript(std::string &source, int index, std::string &sub);
+void buildAccessible(ModuleIR *IR);
+void walkAccessible(ACCExpr *expr);
 
 // expr.cpp
 bool bitOp(std::string s);
