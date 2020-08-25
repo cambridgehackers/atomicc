@@ -390,10 +390,11 @@ MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
 typedef struct {
     std::string type;
     std::string vecCount;
+    std::string fieldType; // top level field element type (used for extracting mapValue)
 } AccessibleInfo;
 
 static std::map<std::string, AccessibleInfo> accessibleInterfaces; // map of 'interface local name' -> 'type'
-void addAccessible(std::string interfaceType, std::string name, std::string vecCount)
+void addAccessible(std::string interfaceType, std::string name, std::string vecCount, std::string fieldType)
 {
     ModuleIR *IR = lookupInterface(interfaceType);
     if (!IR)
@@ -402,9 +403,9 @@ void addAccessible(std::string interfaceType, std::string name, std::string vecC
     if (prefix != "")
         prefix += DOLLAR;
     for (auto item: IR->interfaces)
-        addAccessible(item.type, prefix + item.fldName, vecCount);
+        addAccessible(item.type, prefix + item.fldName, vecCount, fieldType);
     if (IR->methods.size() || IR->fields.size())
-        accessibleInterfaces[name] = AccessibleInfo{interfaceType, vecCount};
+        accessibleInterfaces[name] = AccessibleInfo{interfaceType, vecCount, fieldType};
 }
 
 std::string findAccessible(std::string name)
@@ -435,10 +436,10 @@ void walkAccessible(ACCExpr *expr)
 void buildAccessible(ModuleIR *IR)
 {
     accessibleInterfaces.clear();
-    addAccessible(IR->interfaceName, "", "");
+    addAccessible(IR->interfaceName, "", "", "");
     for (auto item: IR->fields)
         if (auto IIR = lookupIR(item.type))
-           addAccessible(IIR->interfaceName, item.fldName, item.vecCount);
+           addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type);
     //for (auto item: accessibleInterfaces)
         //printf("[%s:%d] %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
 
@@ -492,124 +493,22 @@ void buildAccessible(ModuleIR *IR)
 
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount, MapNameValue &mapValue)
 {
-#if 0
-    std::string fieldName;
-    ModuleIR *implements = lookupInterface(searchIR->interfaceName);
-    if (!implements) {
-        printf("[%s:%d] module %s missing interfaceName %s\n", __FUNCTION__, __LINE__, searchIR->name.c_str(), searchIR->interfaceName.c_str());
-        exit(-1);
-    }
-    if (traceLookup)
-        printf("%s: START searchIR %p %s ifc %s searchStr %s implements %p\n", __FUNCTION__, (void *)searchIR, searchIR->name.c_str(), searchIR->interfaceName.c_str(), searchStr.c_str(), (void *)implements);
-#endif
     int ind = searchStr.find("[");
     if (ind > 0) {
         std::string sub;
         extractSubscript(searchStr, ind, sub);
     }
-#if 0
-    while (1) {
-        int ind = searchStr.find_first_of(PERIOD DOLLAR);
-        int ind2 = searchStr.find("[");
-        int indnext = ind + 1;
-        if (ind2 != -1 && (ind == -1 || ind2 < ind)) { // handle subscript
-            ind = ind2;
-            indnext = searchStr.find("]") + 1;
-            if (searchStr[indnext] == PERIOD[0] || searchStr[indnext] == DOLLAR[0])
-                indnext++;
-        }
-        fieldName = searchStr.substr(0, ind);
-        if (traceLookup)
-            printf("[%s:%d] IR %s: ind %d indnext %d fieldName %s searchStr %s\n", __FUNCTION__, __LINE__, searchIR->name.c_str(), ind, indnext, fieldName.c_str(), searchStr.c_str());
-        ModuleIR *nextIR = nullptr;
-        while(1) {
-        if (traceLookup) {
-            printf("[%s:%d] searchir %p implements %p\n", __FUNCTION__, __LINE__, (void *)searchIR, (void *)implements);
-            dumpModule("IMPL", searchIR);
-        }
-        nextIR = iterField(searchIR, CBAct {
-            std::string fldName = item.fldName;
-            if (traceLookup)
-                printf("[%s:%d] ind %d fldname %s fieldName %s type %s\n", __FUNCTION__, __LINE__, ind, fldName.c_str(), fieldName.c_str(), item.type.c_str());
-            if (fldName == fieldName) { //ind != -1 && 
-                if (item.vecCount != "")
-                    vecCount = item.vecCount;  // tell caller we were a vector
-                if (traceLookup)
-                     printf("[%s:%d]found name %s vecCount %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
-                extractParam("CALL_" + item.fldName, item.type, mapValue);
-                return lookupIR(item.type);
-            }
-            return nullptr; });
-        if (traceLookup)
-            printf("[%s:%d] nextIR %p\n", __FUNCTION__, __LINE__, (void *)nextIR);
-        if (!nextIR)
-        nextIR = iterInterface(searchIR, CBAct {
-            std::string fldName = item.fldName;
-            if (traceLookup)
-                printf("[%s:%d] ind %d fldname %s fieldName %s type %s searchStr %s\n", __FUNCTION__, __LINE__, ind, fldName.c_str(), fieldName.c_str(), item.type.c_str(), searchStr.c_str());
-            if (fldName == fieldName) {     //ind != -1 && 
-                if (item.vecCount != "")
-                    vecCount = item.vecCount;  // tell caller we were a vector
-                if (traceLookup)
-                     printf("[%s:%d]found name %s vecCount %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
-                return lookupInterface(item.type);
-            }
-            return nullptr; });
-        if (!nextIR) {
-        nextIR = iterInterface(searchIR, CBAct {
-            std::string fldName = item.fldName;
-            if (traceLookup)
-                printf("[%s:%d] ind %d fldname %s fieldName %s type %s searchStr %s\n", __FUNCTION__, __LINE__, ind, fldName.c_str(), fieldName.c_str(), item.type.c_str(), searchStr.c_str());
-            if (fldName == "") {     //ind != -1 && 
-                if (traceLookup)
-                     printf("[%s:%d]found \n", __FUNCTION__, __LINE__);
-                return lookupInterface(item.type);
-            }
-            return nullptr; });
-            if (traceLookup)
-                printf("[%s:%d] NULL nextIR %p searchstr %s\n", __FUNCTION__, __LINE__, (void *)nextIR, searchStr.c_str());
-            if (nextIR) {
-                searchIR = nextIR;
-                continue;
-            }
-        }
-        if (traceLookup)
-            printf("[%s:%d] nextIR %p\n", __FUNCTION__, __LINE__, (void *)nextIR);
-        if (nextIR && nextIR->interfaceName != "") { // lookup points to an interface
-            if (traceLookup)
-                printf("[%s:%d] lookingup %s\n", __FUNCTION__, __LINE__, nextIR->interfaceName.c_str());
-            nextIR = lookupInterface(nextIR->interfaceName);
-        }
-        if (traceLookup)
-            printf("[%s:%d]nextIR %p name %s implements %p\n", __FUNCTION__, __LINE__, (void *)nextIR, nextIR ? nextIR->name.c_str() : "", (void *)implements);
-        ModuleIR *temp = implements;
-        implements = nullptr;
-        if (traceLookup)
-            printf("[%s:%d] searchstr '%s' indnext %d nextIR %p temp %p\n", __FUNCTION__, __LINE__, searchStr.c_str(), indnext, (void *)nextIR, (void *)temp);
-        if (!nextIR && temp) {
-            searchIR = temp;
-            continue;
-        }
-        break;
-        };
-        searchStr = searchStr.substr(indnext);
-        if (!nextIR)
-            break;
-        searchIR = nextIR;
-    };
-#endif
     std::string prefix = findAccessible(searchStr);
-printf("[%s:%d] searchstr %s prefix %s\n", __FUNCTION__, __LINE__, searchStr.c_str(), prefix.c_str());
     if (prefix != "") {
         auto info = accessibleInterfaces[prefix];
         ModuleIR *searchIR = lookupInterface(info.type);
         vecCount = info.vecCount;
+        extractParam("lookupQualName", info.fieldType, mapValue);
         searchStr = searchStr.substr(prefix.length() + 1);
-    if (traceLookup) {
-        printf("[%s:%d] searchIR %p search %s\n", __FUNCTION__, __LINE__, (void *)searchIR, searchStr.c_str());
-        dumpModule("SEARCHIR", searchIR);
-    }
-    if (searchIR)
+        if (traceLookup) {
+            printf("[%s:%d] searchIR %p search %s\n", __FUNCTION__, __LINE__, (void *)searchIR, searchStr.c_str());
+            dumpModule("SEARCHIR", searchIR);
+        }
         return lookupMethod(searchIR, searchStr);
     }
     return nullptr;

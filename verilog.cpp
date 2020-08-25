@@ -1122,7 +1122,6 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             tempCond = simpleReplace(tempCond);
             tempCond = replaceAssign(tempCond, getRdyName(calledEna), true); // remove __RDY before adding subscript!
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
-printf("[%s:%d] VECCCCCC %s\n", __FUNCTION__, __LINE__, vecCount.c_str());
             section = makeSection(var->value, allocExpr("0"),
                 allocExpr("<", var, allocExpr(vecCount)), allocExpr("+", var, allocExpr("1")));
             sub = "[" + var->value + "]";
@@ -1309,8 +1308,14 @@ static ModList modLine;
                 return;
             name = getRdyName(name);
             std::string nameVec = refList[name].vecCount;
+            MapNameValue mapValue;
+            lookupQualName(IR, name, nameVec, mapValue);
             if (isIdChar(name[0]) && nameVec != "") {
-                std::string name_or = name + "_or";       // convert unpacked array to vector
+                std::string newName = name;
+                int ind;
+                while ((ind = newName.find(PERIOD)) > 0)
+                    newName = newName.substr(0, ind) + "__" + newName.substr(ind+1);  // to defeat the walkAccessible() processing, use "__"
+                std::string name_or = newName + "_or";       // convert unpacked array to vector
                 std::string name_or1 = name_or + "1";
                 if (!refList[name_or].pin) {
                     // adding a space to the 'name_or' declaration forces the
@@ -1323,11 +1328,15 @@ static ModList modLine;
                     setAssign(name_or1, allocExpr("@|", allocExpr(name_or)), "Bit(1)");
                     assignList[name_or1].noRecursion = true;
                     ACCExpr *var = allocExpr(GENVAR_NAME "1");
-printf("[%s:%d] VECCCCCC %s\n", __FUNCTION__, __LINE__, nameVec.c_str());
                     generateSection = makeSection(var->value, allocExpr("0"),
                         allocExpr("<", var, allocExpr(nameVec)), allocExpr("+", var, allocExpr("1")));
                     std::string sub = "[" + var->value + "]";
-                    setAssign(name_or + sub, allocExpr(name + sub), "Bit(1)");
+                    ind = name.find(PERIOD);
+                    if (ind > 0)
+                        name = name.substr(0, ind) + sub + name.substr(ind);
+                    else
+                        name = name + sub;
+                    setAssign(name_or + sub, allocExpr(name), "Bit(1)");
                     generateSection = "";
                 }
                 name = name_or1;
