@@ -581,6 +581,8 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool e
         return allocExpr("1");
     }
     if (expr->value == PERIOD || (isIdChar(item[0]) && !expr->operands.size())) {
+        if (trace_assign)
+            printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, enableListProcessing, tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
         if (!assignList[item].noRecursion || enableListProcessing)
         if (ACCExpr *assignValue = assignList[item].value)
         if (assignValue->value[0] != '@')    // hack to prevent propagation of __reduce operators
@@ -1397,6 +1399,8 @@ static ModList modLine;
     for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY
         generateSection = top.first;
         for (auto item: top.second) {
+        if (trace_assign)
+            printf("[%s:%d] ENABLELIST section %s first %s second %s\n", __FUNCTION__, __LINE__, generateSection.c_str(), item.first.c_str(), tree2str(item.second.phi).c_str());
         setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first), true), "Bit(1)");
         }
     }

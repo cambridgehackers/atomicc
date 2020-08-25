@@ -438,6 +438,7 @@ static void typeCleanIR(ModuleIR *IR);
 static std::string typeClean(std::string type)
 {
 #define VARIANT "_OC_"
+#define VARIANTP "_IC_"
     if (startswith(type + VARIANT, "PipeIn" VARIANT)) {
         auto IR = lookupInterface(type);
         auto argType = IR->methods.front()->params.front().type; // enq(Bit(x) v);
@@ -448,6 +449,11 @@ static std::string typeClean(std::string type)
         for (auto MI: IR->methods)
             if (MI->name == "first")
                 return "PipeOut(width=" + convertType(MI->type) + ")"; // Bit(x) first();
+    }
+    if (startswith(type + VARIANTP, "PipeInB" VARIANTP)) {
+        auto IR = lookupInterface(type);
+        auto argType = IR->methods.front()->params.front().type; // enq(Bit(x) v);
+        return "PipeInB(width=" + convertType(argType) + ")";
     }
     if (auto ftype = lookupIR(type))
         typeCleanIR(ftype);

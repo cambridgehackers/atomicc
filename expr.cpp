@@ -213,6 +213,7 @@ int walkCount (ACCExpr *expr)
     if (!expr)
         return 0;
     int count = 1;  // include this node in count
+    if (expr->value != PERIOD)
     for (auto item: expr->operands)
         count += walkCount(item);
     return count;
