@@ -426,8 +426,12 @@ std::string findAccessible(std::string aname)
 
 void fixupAccessible(std::string &name)
 {
-    if (int len = findAccessible(name).length())
-        name = name.substr(0, len) + PERIOD + name.substr(len+1);
+    if (int len = findAccessible(name).length()) {
+        std::string interface = name.substr(0, len);
+        //printf("[%s:%d] interface %s pin %d count %d\n", __FUNCTION__, __LINE__, interface.c_str(), refList[interface].pin, refList[interface].count);
+        refList[interface].count++;
+        name = interface + PERIOD + name.substr(len+1);
+    }
 }
 
 void walkAccessible(ACCExpr *expr)
@@ -438,8 +442,6 @@ void walkAccessible(ACCExpr *expr)
         foldMember(expr);
     if (isIdChar(expr->value[0])) {
         fixupAccessible(expr->value);
-        //if (int len = findAccessible(expr->value).length())
-            //expr->value = expr->value.substr(0, len) + PERIOD + expr->value.substr(len+1);
     }
     for (auto item: expr->operands)
         walkAccessible(item);

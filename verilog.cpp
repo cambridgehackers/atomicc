@@ -392,7 +392,7 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
         }
         if (interfaceName != "")
             interfaceName += PERIOD;
-printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
+printf("[%s:%d]befpin '%s' fldname '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str(), item.fldName.c_str());
         collectInterfacePins(IIR, instance != "", item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, false);
     }
     std::string moduleInstantiation = IR->name;
@@ -441,7 +441,7 @@ printf("[%s:%d]befpin '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str());
         if (trace_ports)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.name.c_str(), item.type.c_str());
         for (auto pitem: item.params) {
-            checkWire(baseMethodName(item.name) + PERIOD + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal, instance==""/*isArgument*/, item.vecCount);
+            checkWire(baseMethodName(item.name) + DOLLAR + pitem.name, pitem.type, item.isOutput, false, ""/*not param*/, item.isLocal, instance==""/*isArgument*/, item.vecCount);
         }
         break;
     case PINI_PORT:
@@ -1209,7 +1209,7 @@ static ModList modLine;
                 printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, item.fldName.c_str(), refList[item.fldName].pin);
             }
             assert (!refList[item.fldName].pin);
-            refList[item.fldName] = RefItem{0, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, item.vecCount, false};
+            refList[item.fldName] = RefItem{item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, item.vecCount, false};
         }
         else
             generateModuleSignature(itemIR, item.type, item.fldName + DOLLAR, modLine, IR->params[item.fldName], item.vecCount);
