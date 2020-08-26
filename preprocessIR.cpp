@@ -537,7 +537,7 @@ printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__,
                 goto skipLab;
             CallListElement *call = MI->callList.front();
             std::string calltarget = replacePeriod(call->value->value);
-            std::string fieldtarget = replacePeriod(field.fldName + PERIOD + MI->name);
+            std::string fieldtarget = replacePeriod(field.fldName + DOLLAR + MI->name);
             if (call->cond || calltarget != fieldtarget)
                 goto skipLab;
         }

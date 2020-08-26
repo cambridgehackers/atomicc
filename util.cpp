@@ -404,19 +404,30 @@ void addAccessible(std::string interfaceType, std::string name, std::string vecC
         prefix += DOLLAR;
     for (auto item: IR->interfaces)
         addAccessible(item.type, prefix + item.fldName, vecCount, fieldType);
-    if (IR->methods.size() || IR->fields.size())
+    if (IR->methods.size()) {
+        if (name[name.length()-1] == DOLLAR[0] || name[name.length()-1] == PERIOD[0])
+            name = name.substr(0, name.length()-1);
         accessibleInterfaces[name] = AccessibleInfo{interfaceType, vecCount, fieldType};
+    }
 }
 
-std::string findAccessible(std::string name)
+std::string findAccessible(std::string aname)
 {
+    std::string name = replacePeriod(aname);
+    std::string ret;
     for (auto item: accessibleInterfaces) {
         unsigned len = item.first.length();
-        if (name.length() > len && startswith(name, item.first)
-         && (name[len] == DOLLAR[0] || name[len] == PERIOD[0]))
-            return item.first;
+        if (name.length() > len && startswith(name, item.first) && len > ret.length()
+         && name[len] == DOLLAR[0])
+            ret = item.first;
     }
-    return "";
+    return ret;
+}
+
+void fixupAccessible(std::string &name)
+{
+    if (int len = findAccessible(name).length())
+        name = name.substr(0, len) + PERIOD + name.substr(len+1);
 }
 
 void walkAccessible(ACCExpr *expr)
@@ -426,8 +437,9 @@ void walkAccessible(ACCExpr *expr)
     if (expr->value == PERIOD)
         foldMember(expr);
     if (isIdChar(expr->value[0])) {
-        if (int len = findAccessible(expr->value).length())
-            expr->value = expr->value.substr(0, len) + PERIOD + expr->value.substr(len+1);
+        fixupAccessible(expr->value);
+        //if (int len = findAccessible(expr->value).length())
+            //expr->value = expr->value.substr(0, len) + PERIOD + expr->value.substr(len+1);
     }
     for (auto item: expr->operands)
         walkAccessible(item);
@@ -437,11 +449,26 @@ void buildAccessible(ModuleIR *IR)
 {
     accessibleInterfaces.clear();
     addAccessible(IR->interfaceName, "", "", "");
-    for (auto item: IR->fields)
-        if (auto IIR = lookupIR(item.type))
+    for (auto item: IR->fields) {
+printf("[%s:%d] STRUCCUCUC %s type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.type.c_str());
+        if (auto IIR = lookupIR(item.type)) {
            addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type);
-    //for (auto item: accessibleInterfaces)
-        //printf("[%s:%d] %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
+printf("[%s:%d] STRUCCUCUC %s str %d type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), IIR->isStruct, item.type.c_str());
+           if (IIR->isStruct)
+               accessibleInterfaces[item.fldName] = AccessibleInfo{"", item.vecCount, item.type};
+        }
+    }
+    for (auto MI: IR->methods) {
+        for (auto item: MI->alloca) {
+              //if (refList[item.first].pin) {
+            if (auto IIR = lookupIR(item.second.type))
+            if (IIR->isStruct)
+               accessibleInterfaces[item.first] = AccessibleInfo{"", "", item.second.type};
+        }
+    }
+printf("[%s:%d]LISTISISI\n", __FUNCTION__, __LINE__);
+    for (auto item: accessibleInterfaces)
+        printf("[%s:%d] %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.type.c_str());
 
     for (auto item: IR->interfaceConnect) {
         walkAccessible(item.target);

@@ -140,6 +140,7 @@ typedef const char *CCharPointer;
 std::string getBoundedString(CCharPointer *bufpp, char terminator = 0);
 void extractSubscript(std::string &source, int index, std::string &sub);
 void buildAccessible(ModuleIR *IR);
+void fixupAccessible(std::string &name);
 void walkAccessible(ACCExpr *expr);
 
 // expr.cpp

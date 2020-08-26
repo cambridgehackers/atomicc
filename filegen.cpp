@@ -95,6 +95,14 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 fprintf(OStr, "input wire CLK, input wire nRST,\n    ");
                 handleCLK = false;
             }
+            std::string dirs = dirStr[mitem.out];
+            if (mitem.inout)
+                dirs = "inout wire";
+            if (mitem.vecCount == "")
+                mitem.vecCount = convertType(mitem.type, 2);
+            std::string array;
+            if (mitem.vecCount != "")
+                array = "[" + mitem.vecCount + " - 1:0]";
             ModuleIR *IIR = lookupInterface(mitem.type);
             if (IIR) {
                 std::string vtype = stripModuleParam(mitem.type);
@@ -102,19 +110,11 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                     vtype += ".client";
                 else
                     vtype += ".server";
-                fprintf(OStr, "%s %s", vtype.c_str(), mitem.value.c_str());
+                fprintf(OStr, "%s %s%s", vtype.c_str(), mitem.value.c_str(), array.c_str());
             }
             else {
-            std::string dirs = dirStr[mitem.out];
-            if (mitem.inout)
-                dirs = "inout wire";
-            if (mitem.vecCount == "")
-                mitem.vecCount = convertType(mitem.type, 2);
-            std::string sizeStr = sizeProcess(mitem.type);
-            std::string array;
-            if (mitem.vecCount != "")
-                array = "[" + mitem.vecCount + " - 1:0]";
-            fprintf(OStr, "%s %s%s%s", dirs.c_str(), sizeStr.c_str(), mitem.value.c_str(), array.c_str());
+                std::string sizeStr = sizeProcess(mitem.type);
+                fprintf(OStr, "%s %s%s%s", dirs.c_str(), sizeStr.c_str(), mitem.value.c_str(), array.c_str());
             }
         }
     }

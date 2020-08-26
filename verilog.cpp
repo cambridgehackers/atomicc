@@ -55,44 +55,19 @@ static void traceZero(const char *label)
     }
 }
 
-std::string findRewrite(std::string item)
-{
-    std::string prefix;
-    if (!refList[item].pin) {
-        for (auto ritem: refList) {
-            if ((startswith(item, ritem.first + DOLLAR) || startswith(item, ritem.first + PERIOD))
-             && ritem.first.length() > prefix.length())
-                prefix = ritem.first;
-        }
-        if (prefix != "") { // interface reference
-            refList[prefix].count++;
-            prefix += PERIOD + item.substr(prefix.length() + 1);
-        }
-    }
-    return prefix;
-}
-
 static void walkRewrite (ACCExpr *expr)
 {
     if (!expr)
         return;
-    if (isIdChar(expr->value[0])) {
-        std::string prefix = findRewrite(expr->value);
-        if (prefix != "") { // interface reference
-            expr->value = prefix;
-        }
-    }
+    if (isIdChar(expr->value[0]))
+        fixupAccessible(expr->value);
     for (auto item: expr->operands)
         walkRewrite(item);
 }
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
-    if (!refList[target].pin) {
-        std::string rewrite = findRewrite(target);
-        if (rewrite != "")
-            target = rewrite;
-    }
+    fixupAccessible(target);
     bool tDir = refList[target].out;
     if (!value)
         return;
@@ -1132,6 +1107,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
                 std::string post = calledEna.substr(ind);
                 calledEna = calledEna.substr(0, ind);
                 ind = post.rfind(DOLLAR);
+printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), ind);
                 if (ind > 1)
                     post = post.substr(0, ind) + PERIOD + post.substr(ind+1);
                 //if (post[0] == DOLLAR[0])
