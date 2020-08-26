@@ -260,6 +260,11 @@ std::string genericModuleParam(std::string name, MapNameValue *mapValue)
                 if (oldVal != "0" && oldVal != "1" && newval != "") { // don't translate trivial values
                     oldVal = newval;
                 }
+                for (auto c: oldVal)
+                    if (!std::isalnum(c) && c != '(' && c != ')') {
+                        oldVal = "(" + oldVal + ")";
+                        break;
+                    }
                 ret += oldVal;
                 sep = ",";
             }
@@ -322,8 +327,14 @@ std::string convertType(std::string arg, int arrayProcess)
             std::string thisSize = convertType(item.type);
             if (item.vecCount != "")
                 thisSize = "(" + thisSize + " * " + item.vecCount + ")";
-            if (total == "")
+            if (total == "") {
+                for (auto c: thisSize)
+                    if (!std::isalnum(c)) {
+                        thisSize = "(" + thisSize + ")";
+                        break;
+                    }
                 total = thisSize;
+            }
             else
                 total = "(" + total + " + " + thisSize + ")";
         }

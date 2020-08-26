@@ -90,7 +90,7 @@ static void generateInterfaces(FILE *OStrV)
         std::list<std::string> hints;
         std::string name = item.first;
         ModuleIR *IR = item.second;
-printf("[%s:%d] interface %s = %s\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
+//printf("[%s:%d] interface %s = %s\n", __FUNCTION__, __LINE__, name.c_str(), IR->name.c_str());
         fprintf(OStrV, "(* * interface %s *)\nRecord %s := {\n    %s'mod: Mod;\n",
              IR->name.c_str(), name.c_str(), name.c_str());
         for (auto MI: IR->methods) {
