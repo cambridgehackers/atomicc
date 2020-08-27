@@ -405,7 +405,7 @@ typedef struct {
 } AccessibleInfo;
 
 static std::map<std::string, AccessibleInfo> accessibleInterfaces; // map of 'interface local name' -> 'type'
-void addAccessible(std::string interfaceType, std::string name, std::string vecCount, std::string fieldType)
+void addAccessible(std::string interfaceType, std::string name, std::string vecCount, std::string fieldType, bool top)
 {
     ModuleIR *IR = lookupInterface(interfaceType);
     if (!IR)
@@ -414,10 +414,11 @@ void addAccessible(std::string interfaceType, std::string name, std::string vecC
     if (prefix != "")
         prefix += DOLLAR;
     for (auto item: IR->interfaces)
-        addAccessible(item.type, prefix + item.fldName, vecCount, fieldType);
+        addAccessible(item.type, prefix + item.fldName, vecCount, fieldType, false);
     if (IR->methods.size()) {
         if (name[name.length()-1] == DOLLAR[0] || name[name.length()-1] == PERIOD[0])
             name = name.substr(0, name.length()-1);
+        if (!top)
         accessibleInterfaces[name] = AccessibleInfo{interfaceType, vecCount, fieldType};
     }
 }
@@ -429,7 +430,7 @@ std::string findAccessible(std::string aname)
     for (auto item: accessibleInterfaces) {
         unsigned len = item.first.length();
         if (name.length() > len && startswith(name, item.first) && len > ret.length()
-         && name[len] == DOLLAR[0])
+         && (name[len] == DOLLAR[0] || name[len] == '['))
             ret = item.first;
     }
     return ret;
@@ -439,9 +440,17 @@ void fixupAccessible(std::string &name)
 {
     if (int len = findAccessible(name).length()) {
         std::string interface = name.substr(0, len);
-        //printf("[%s:%d] interface %s pin %d count %d\n", __FUNCTION__, __LINE__, interface.c_str(), refList[interface].pin, refList[interface].count);
+        name = name.substr(len);
+        //printf("[%s:%d] interface %s name %s pin %d count %d\n", __FUNCTION__, __LINE__, interface.c_str(), name.c_str(), refList[interface].pin, refList[interface].count);
+        if (name[0] == '[') {
+            int ind = name.find("]");
+            interface += name.substr(0, ind+1);
+            name = name.substr(ind+1);
+        }
+        if (name != "")
+            name = name.substr(1);
         refList[interface].count++;
-        name = interface + PERIOD + name.substr(len+1);
+        name = interface + PERIOD + name;
     }
 }
 
@@ -461,11 +470,11 @@ void walkAccessible(ACCExpr *expr)
 void buildAccessible(ModuleIR *IR)
 {
     accessibleInterfaces.clear();
-    addAccessible(IR->interfaceName, "", "", "");
+    addAccessible(IR->interfaceName, "", "", "", true);
     for (auto item: IR->fields) {
 printf("[%s:%d] STRUCCUCUC %s type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.type.c_str());
         if (auto IIR = lookupIR(item.type)) {
-           addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type);
+           addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type, true);
 printf("[%s:%d] STRUCCUCUC %s str %d type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), IIR->isStruct, item.type.c_str());
            if (IIR->isStruct)
                accessibleInterfaces[item.fldName] = AccessibleInfo{"", item.vecCount, item.type};
