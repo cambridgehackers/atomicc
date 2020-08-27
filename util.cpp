@@ -474,7 +474,7 @@ void buildAccessible(ModuleIR *IR)
     for (auto item: IR->fields) {
 printf("[%s:%d] STRUCCUCUC %s type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.type.c_str());
         if (auto IIR = lookupIR(item.type)) {
-           addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type, true);
+           addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type, false);
 printf("[%s:%d] STRUCCUCUC %s str %d type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), IIR->isStruct, item.type.c_str());
            if (IIR->isStruct)
                accessibleInterfaces[item.fldName] = AccessibleInfo{"", item.vecCount, item.type};

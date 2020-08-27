@@ -318,6 +318,7 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
         //MapNameValue mapValue = parentMap;
         extractParam("FIELD_" + item.fldName, item.type, mapValue);
         std::string interfaceName = item.fldName;
+        bool out = instance ^ item.isOutput;
         ModuleIR *IIR = lookupInterface(item.type);
         if (!IIR) {
             printf("%s: in module '%s', interface lookup '%s' name '%s' failed\n", __FUNCTION__, IR->name.c_str(), item.type.c_str(), interfaceName.c_str());
@@ -331,7 +332,7 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
         if (item.fldName == "")
             collectInterfacePins(IIR, instance, pinPrefix + item.fldName, methodPrefix + interfaceName, localFlag, mapValue, ptrFlag, updatedVecCount, localInterface, isSync);
         else
-        pinPorts.push_back(PinInfo{PINI_INTERFACE, item.type, methodPrefix + interfaceName, ptrFlag, false, localFlag, params, ""/*not param*/, false, updatedVecCount});
+        pinPorts.push_back(PinInfo{PINI_INTERFACE, item.type, methodPrefix + interfaceName, out != ptrFlag, false, localFlag, params, ""/*not param*/, false, updatedVecCount});
     }
 }
 
@@ -878,8 +879,9 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
     ind = sif.find_first_of(PERIOD "[");
     if (ind > 0)
         sif = sif.substr(0, ind);
-    bool tdir = refList[tif].out ^ (tif.find(DOLLAR) != std::string::npos) ^ endswith(tstr, "__RDY");
-    bool sdir = refList[sif].out ^ (sif.find(DOLLAR) != std::string::npos) ^ endswith(sstr, "__RDY");
+    // TODO: need to update this to be 'has a return type' (i.e. handle value methods
+    bool tdir = refList[tif].out ^ endswith(tstr, "__RDY");
+    bool sdir = refList[sif].out ^ endswith(sstr, "__RDY");
     if (trace_assign || trace_connect || trace_interface || (!tdir && !sdir))
         printf("%s: IFCCC '%s'/%d/%d pin %d '%s'/%d/%d pin %d\n", __FUNCTION__, tstr.c_str(), tdir, refList[target->value].out, refList[tif].pin, sstr.c_str(), sdir, refList[source->value].out, refList[sif].pin);
     showRef("target", target->value);
