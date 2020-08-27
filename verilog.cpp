@@ -93,14 +93,14 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
     if (trace_assign)
-        printf("[%s:%d] start [%s/%d]count[%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, tree2str(value).c_str(), type.c_str());
+        printf("[%s:%d] start [%s/%d]count[%d] = %s vdir %d type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, valStr.c_str(), sDir, type.c_str());
     if (!refList[target].pin && generateSection == "") {
         std::string base = target;
         ind = base.find_first_of(PERIOD "[");
         if (ind > 0)
             base = base.substr(0, ind);
         if (!refList[base].pin) {
-        printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
+        printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), valStr.c_str(), type.c_str());
 if (0)
         if (target.find("[") == std::string::npos)
         exit(-1);
@@ -477,7 +477,7 @@ static ACCExpr *walkRemoveParam (ACCExpr *expr)
         int pin = refList[op].pin;
         if (refList[op].isArgument) {
 //if (trace_assign)
-printf("[%s:%d] reject use of non-state op %s %d\n", __FUNCTION__, __LINE__, op.c_str(), pin);
+printf("[%s:%d] INFO: reject use of non-state op %s %d\n", __FUNCTION__, __LINE__, op.c_str(), pin);
             return nullptr;
         }
         //assert(refList[op].pin);
@@ -877,18 +877,22 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
     ind = sif.find_first_of(PERIOD "[");
     if (ind > 0)
         sif = sif.substr(0, ind);
-    bool tdir = refList[tif].out ^ (tif.find(DOLLAR) != std::string::npos) ^ endswith(tstr, "__RDY");;
-    bool sdir = refList[sif].out ^ (sif.find(DOLLAR) != std::string::npos) ^ endswith(sstr, "__RDY");;
+    bool tdir = refList[tif].out ^ (tif.find(DOLLAR) != std::string::npos) ^ endswith(tstr, "__RDY");
+    bool sdir = refList[sif].out ^ (sif.find(DOLLAR) != std::string::npos) ^ endswith(sstr, "__RDY");
     if (trace_assign || trace_connect || (!tdir && !sdir))
-        printf("%s: IFCCC '%s'/%d/%d '%s'/%d/%d\n", __FUNCTION__, tstr.c_str(), tdir, refList[target->value].out, sstr.c_str(), sdir, refList[source->value].out);
+        printf("%s: IFCCC '%s'/%d/%d pin %d '%s'/%d/%d pin %d\n", __FUNCTION__, tstr.c_str(), tdir, refList[target->value].out, refList[tif].pin, sstr.c_str(), sdir, refList[source->value].out, refList[sif].pin);
     showRef("target", target->value);
     showRef("source", source->value);
     if (sdir) {
         setAssign(sstr, target, type);
+        //refList[tstr].count++;
+        //refList[sstr].count++;
         refList[tif].done = true;
     }
     else {
         setAssign(tstr, source, type);
+        //refList[tstr].count++;
+        //refList[sstr].count++;
         refList[sif].done = true;
     }
 }
@@ -907,9 +911,22 @@ void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, 
             source->value = source->value.substr(0, source->value.length()-1);
         target = allocExpr(PERIOD, target, allocExpr(MI->name));
         source = allocExpr(PERIOD, source, allocExpr(MI->name));
+#if 1
+        std::string tstr = replacePeriod(tree2str(target));
+        std::string sstr = replacePeriod(tree2str(source));
+        fixupAccessible(tstr);
+        fixupAccessible(sstr);
+        target = allocExpr(tstr);
+        source = allocExpr(sstr);
+#else
+        fixupAccessible(source->value);
+        std::string tstr = tree2str(target);
+        std::string sstr = tree2str(source);
+#endif
+//printf("[%s:%d] target %s source %s\n", __FUNCTION__, __LINE__, tstr.c_str(), sstr.c_str());
         connectTarget(target, source, MI->type, isForward);
-        std::string tstr = baseMethodName(tree2str(target)) + DOLLAR;
-        std::string sstr = baseMethodName(tree2str(source)) + DOLLAR;
+        tstr = baseMethodName(tstr) + DOLLAR;
+        sstr = baseMethodName(sstr) + DOLLAR;
         for (auto info: MI->params)
             connectTarget(allocExpr(tstr+info.name), allocExpr(sstr+info.name), info.type, isForward);
     }
