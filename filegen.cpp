@@ -125,8 +125,12 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
 
 static void genAssign(FILE *OStr, std::string target, ACCExpr *source)
 {
-    if (!refList[target].done)
-        fprintf(OStr, "    assign %s = %s;\n", finishString(target).c_str(), finishExpr(source).c_str());
+    if (!refList[target].done) {
+        std::string tstr = finishString(target);
+        std::string sstr = finishExpr(source);
+        if (tstr != sstr)
+            fprintf(OStr, "    assign %s = %s;\n", tstr.c_str(), sstr.c_str());
+    }
     refList[target].done = true; // mark that assigns have already been output
 }
 
@@ -257,6 +261,8 @@ next:;
         int ind = temp.find('[');
         if (ind != -1)
             temp = temp.substr(0,ind);
+        if (trace_assign)
+            printf("[%s:%d] assign %s value %s count %d pin %d done %d\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str(), refList[temp].count, refList[temp].pin, refList[item.first].done);
         if (item.second.value && (refList[temp].count || !refList[temp].pin) && !refList[item.first].done) {
             if (!seen)
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
