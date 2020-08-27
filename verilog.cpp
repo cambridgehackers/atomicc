@@ -22,6 +22,7 @@
 #include "common.h"
 
 int trace_assign;//= 1;
+int trace_interface;//= 1;
 int trace_declare;//= 1;
 int trace_ports;//= 1;
 int trace_connect;//= 1;
@@ -92,7 +93,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     walkRewrite(value);
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
-    if (trace_assign)
+    if (trace_interface)
         printf("[%s:%d] start [%s/%d]count[%d] = %s vdir %d type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, valStr.c_str(), sDir, type.c_str());
     if (!refList[target].pin && generateSection == "") {
         std::string base = target;
@@ -369,7 +370,7 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
         }
         if (!isLocal)
         modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
-        if (trace_ports)
+        if (trace_interface)
             printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s'\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str());
         //if (isparam == "")
         //xpandStruct(IR, instName, type, dir, false, PIN_WIRE, vc, isArgument);
@@ -879,7 +880,7 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
         sif = sif.substr(0, ind);
     bool tdir = refList[tif].out ^ (tif.find(DOLLAR) != std::string::npos) ^ endswith(tstr, "__RDY");
     bool sdir = refList[sif].out ^ (sif.find(DOLLAR) != std::string::npos) ^ endswith(sstr, "__RDY");
-    if (trace_assign || trace_connect || (!tdir && !sdir))
+    if (trace_assign || trace_connect || trace_interface || (!tdir && !sdir))
         printf("%s: IFCCC '%s'/%d/%d pin %d '%s'/%d/%d pin %d\n", __FUNCTION__, tstr.c_str(), tdir, refList[target->value].out, refList[tif].pin, sstr.c_str(), sdir, refList[source->value].out, refList[sif].pin);
     showRef("target", target->value);
     showRef("source", source->value);
@@ -911,18 +912,12 @@ void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, 
             source->value = source->value.substr(0, source->value.length()-1);
         target = allocExpr(PERIOD, target, allocExpr(MI->name));
         source = allocExpr(PERIOD, source, allocExpr(MI->name));
-#if 1
         std::string tstr = replacePeriod(tree2str(target));
         std::string sstr = replacePeriod(tree2str(source));
         fixupAccessible(tstr);
         fixupAccessible(sstr);
         target = allocExpr(tstr);
         source = allocExpr(sstr);
-#else
-        fixupAccessible(source->value);
-        std::string tstr = tree2str(target);
-        std::string sstr = tree2str(source);
-#endif
 //printf("[%s:%d] target %s source %s\n", __FUNCTION__, __LINE__, tstr.c_str(), sstr.c_str());
         connectTarget(target, source, MI->type, isForward);
         tstr = baseMethodName(tstr) + DOLLAR;
@@ -1441,7 +1436,7 @@ static ModList modLine;
             skipReplace = mitem.vecCount != "" || mitem.value == "SyncFF";
         }
         else if (!skipReplace) {
-if (trace_assign)
+if (trace_interface)
 printf("[%s:%d] replaceParam '%s' count %d done %d\n", __FUNCTION__, __LINE__, mitem.value.c_str(), refList[val].count, refList[val].done);
             if (refList[mitem.value].count == 0) {
                 refList[mitem.value].done = true;  // 'assign' line not needed; value is assigned by object inst
