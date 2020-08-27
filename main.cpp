@@ -116,10 +116,13 @@ static void generateVerilogInterface(std::string name, FILE *OStrVH)
          if (methodName == rdyMethodName)
              continue;
         std::string type = "logic";
-        if (MI->type != "")
+        if (MI->type != "") {
             type = typeDeclaration(MI->type);
+            outname.push_back(methodName);
+        }
+        else
+            inname.push_back(methodName);
         fields.push_back(type + " " + methodName);
-        inname.push_back(methodName);
         for (auto pitem: MI->params) {
             std::string pname = baseMethodName(methodName) + DOLLAR + pitem.name;
             fields.push_back(typeDeclaration(pitem.type) + " " + pname);
