@@ -90,6 +90,8 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         }
     }
     walkRewrite(value);
+    std::string valStr = tree2str(value);
+    bool sDir = refList[valStr].out;
     if (trace_assign)
         printf("[%s:%d] start [%s/%d]count[%d] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, tree2str(value).c_str(), type.c_str());
     if (!refList[target].pin && generateSection == "") {
@@ -106,11 +108,9 @@ if (0)
     }
     updateWidth(value, convertType(type));
     if (isIdChar(value->value[0])) {
-        bool sDir = refList[value->value].out;
         if (trace_assign)
         printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
     }
-    std::string valStr = tree2str(value);
     if (assignList[target].type != "" && assignList[target].value->value != "{") { // aggregate alloca items always start with an expansion expr
         if (isIdChar(value->value[0]) && assignList[valStr].type == "") {
         printf("[%s:%d] warnduplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
@@ -1172,6 +1172,11 @@ void generateMethodGroup(ModuleIR *IR, void (*generateMethod)(ModuleIR *IR, std:
 
 static void interfaceAssign(std::string target, ACCExpr *source, std::string type)
 {
+    std::string temp = target;
+    int ind = temp.find('[');
+    if (ind != -1)
+        temp = temp.substr(0,ind);
+    if (!refList[target].done && source)
     if (auto interface = lookupInterface(type)) {
         connectMethodList(interface, allocExpr(target), source, false);
         refList[target].done = true; // mark that assigns have already been output
@@ -1382,9 +1387,23 @@ static ModList modLine;
     }
     generateSection = "";
 
+#if 0
+    for (auto item: assignList) {
+        interfaceAssign(item.first, item.second.value, item.second.type);
+    }
+#endif
+    for (auto ctop: condAssignList) {
+        for (auto item: ctop.second) {
+            generateSection = ctop.first;
+            interfaceAssign(item.first, item.second.value, item.second.type);
+        }
+    }
+    generateSection = "";
+
     setAssignRefCount(IR);
     collectCSE();
     optimizeBitAssigns();
+
     // recursively process all replacements internal to the list of 'setAssign' items
     for (auto item = assignList.begin(), iend = assignList.end(); item != iend; item++)
         item->second.value = replaceAssign(item->second.value);
@@ -1428,25 +1447,4 @@ printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, mitem.value.c_st
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, ""/*not param*/, mitem.vecCount});
     }
-#if 0
-    for (auto item: assignList) {
-        std::string temp = item.first;
-        int ind = temp.find('[');
-        if (ind != -1)
-            temp = temp.substr(0,ind);
-        if (item.second.value && (refList[temp].count || !refList[temp].pin) && !refList[item.first].done) {
-    if (auto interface = lookupInterface(item.second.type)) {
-printf("[%s:%d] RRRRRRRRRRRRRRRR count %d done %d %s = %s type %s\n", __FUNCTION__, __LINE__, refList[item.first].count, refList[item.first].done, item.first.c_str(), tree2str(item.second.value).c_str(), item.second.type.c_str());
-}
-            interfaceAssign(item.first, item.second.value, item.second.type);
-        }
-    }
-#endif
-    for (auto ctop: condAssignList) {
-        for (auto item: ctop.second) {
-            generateSection = ctop.first;
-            interfaceAssign(item.first, item.second.value, item.second.type);
-        }
-    }
-    generateSection = "";
 }
