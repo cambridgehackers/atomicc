@@ -442,28 +442,37 @@ void fixupAccessible(std::string &name)
     if (int len = findAccessible(name).length()) {
         std::string interface = name.substr(0, len), sub1, sub2;
         name = name.substr(len);
-        //printf("[%s:%d] interface %s name %s pin %d count %d\n", __FUNCTION__, __LINE__, interface.c_str(), name.c_str(), refList[interface].pin, refList[interface].count);
+        if (trace_interface)
+            printf("[%s:%d] interface %s name %s pin %d count %d\n", __FUNCTION__, __LINE__, interface.c_str(), name.c_str(), refList[interface].pin, refList[interface].count);
         if (name[0] == '[') {
             int ind = name.find("]");
-            interface += name.substr(0, ind+1);
+            sub1 = name.substr(0, ind+1);
             name = name.substr(ind+1);
         }
         if (name != "")
             name = name.substr(1);
+        int ind = name.find("[");
+        if (ind >= 0) {
+            std::string first = name.substr(0, ind);
+            name = name.substr(ind);
+            ind = name.find("]");
+            sub2 = name.substr(0, ind+1);
+            name = first + name.substr(ind+1);
+        }
+        if (trace_interface)
+            printf("[%s:%d] interface '%s' sub1 '%s' sub2 '%s' name '%s' pin %d count %d\n", __FUNCTION__, __LINE__, interface.c_str(), sub1.c_str(), sub2.c_str(), name.c_str(), refList[interface].pin, refList[interface].count);
         interface += sub1 + sub2;
         refList[interface].count++;
-        name = interface + PERIOD + name;
+        if (interface != "" && name != "")
+            name = PERIOD + name;
+        name = interface + name;
     }
 }
 
-void foldMember(ACCExpr *expr)
+static void foldSingle(ACCExpr *expr)
 {
     if (!expr)
         return;
-#if 0
-    foldSingle(expr);
-    fixupAccessible(expr->value);
-#else
     if (expr->value == PERIOD) {
         if (expr->operands.size() < 2) {
             dumpExpr("BADFIELDSPEC", expr);
@@ -484,18 +493,24 @@ void foldMember(ACCExpr *expr)
             sep = PERIOD;
         }
     }
-#endif
+}
+
+void foldMember(ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    foldSingle(expr);
     for (auto item: expr->operands)
-        foldMember(item);
+        foldSingle(item);
 }
 
 void walkFixup(ACCExpr *expr)
 {
-    if (!expr)
-        return;
+    //if (!expr)
+        //return;
     foldMember(expr);
-    for (auto item: expr->operands)
-        walkFixup(item);
+    //for (auto item: expr->operands)
+        //walkFixup(item);
 }
 
 void walkRewrite (ACCExpr *expr)
@@ -513,6 +528,7 @@ void walkAccessible(ACCExpr *expr)
 {
     if (!expr)
         return;
+    //foldSingle(expr);
     if (expr->value == PERIOD)
         foldMember(expr);
     if (isIdChar(expr->value[0])) {

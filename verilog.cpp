@@ -57,36 +57,19 @@ static void traceZero(const char *label)
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
-    fixupAccessible(target);
     bool tDir = refList[target].out;
     if (!value)
         return;
     if (type == "Bit(1)") {
         value = cleanupBool(value);
     }
-    int ind = target.find("[");
-    std::string base, sub;
-    if (ind > 0) {
-        base = target.substr(0, ind);
-        sub = target.substr(ind);
-        ind = sub.rfind("]");
-        if (ind > 0) {
-            std::string after = sub.substr(ind+1);
-            sub = sub.substr(0, ind+1);
-            if (after != "" && after[0] == '.')
-                base += PERIOD + after.substr(1);
-            if (refList[base].pin == PIN_MODULE) // normalize subscript location for module pin refs
-                target = base + sub;
-        }
-    }
-    walkRewrite(value);
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
     if (trace_interface)
         printf("[%s:%d] start [%s/%d]count[%d] = %s vdir %d type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, valStr.c_str(), sDir, type.c_str());
     if (!refList[target].pin && generateSection == "") {
         std::string base = target;
-        ind = base.find_first_of(PERIOD "[");
+        int ind = base.find_first_of(PERIOD "[");
         if (ind > 0)
             base = base.substr(0, ind);
         if (!refList[base].pin) {
@@ -126,7 +109,7 @@ if (0)
          && !checkInteger(value, "1")
          && !isEnaName(value->value)
          && !isRdyName(value->value)) {   // preserve these for ease of reading verilog
-            assignList[target].noRecursion = true;
+            //assignList[target].noRecursion = true;
             // we need to replace these in __ENA expressions so that we can remove __RDY expression elements for the __ENA method
         }
         int ind = target.find('[');
@@ -135,7 +118,7 @@ if (0)
             refList[name].count++;
             if (trace_assign)
                 printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, name.c_str(), refList[name].count);
-            assignList[target].noRecursion = true;
+            //assignList[target].noRecursion = true;
         }
     }
 }
@@ -532,13 +515,15 @@ static void decRef(std::string name)
     }
 }
 
-static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
+static int replaceAssignCount;
+static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
 {
     if (!expr)
         return expr;
     if (trace_assign)
     printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     std::string item = expr->value;
+    //replaceAssignCount++;
     if (item == PERIOD)
         item = tree2str(expr);
     if (guardName != "" && startswith(item, guardName)) {
@@ -550,23 +535,33 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool e
         if (trace_interface)
             printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, enableListProcessing, tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
         if (!assignList[item].noRecursion || enableListProcessing)
+        //if (replaceAssignCount < 12)
         if (ACCExpr *assignValue = assignList[item].value)
         if (assignValue->value[0] != '@')    // hack to prevent propagation of __reduce operators
         if (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
         decRef(item);
         walkRef(assignValue);
+        assignList[tree2str(assignValue)].noRecursion = true; // to prevent ping/pong
         if (trace_interface)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
-        return replaceAssign(assignValue, guardName, enableListProcessing);
+        return replaceAssignRec(assignValue, guardName, enableListProcessing);
         }
     }
     ACCExpr *newExpr = allocExpr(expr->value);
     for (auto item: expr->operands)
-        newExpr->operands.push_back(replaceAssign(item, guardName, enableListProcessing));
+        if (expr->value == PERIOD)
+            newExpr->operands.push_back(item);
+        else
+            newExpr->operands.push_back(replaceAssignRec(item, guardName, enableListProcessing));
     newExpr = cleanupExpr(newExpr, true);
     if (trace_assign)
     printf("[%s:%d] end %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(newExpr).c_str());
     return newExpr;
+}
+static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
+{
+     replaceAssignCount = 0;
+     return replaceAssignRec(expr, guardName, enableListProcessing);
 }
 
 static void optimizeBitAssigns(void)
@@ -627,7 +622,7 @@ static bool checkRecursion(ACCExpr *expr)
     return true;
 }
 
-static ACCExpr *simpleReplace (ACCExpr *expr)
+static ACCExpr *simpleReplaceRec (ACCExpr *expr)
 {
     if (!expr)
         return expr;
@@ -639,15 +634,20 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
         if (refList[item].pin != PIN_MODULE
              && (checkOperand(assignValue->value) || isRdyName(item) || isEnaName(item)
                 || (startswith(item, BLOCK_NAME) && assignList[item].size < COUNT_LIMIT))) {
+            assignList[tree2str(assignValue)].noRecursion = true; // to prevent ping/pong
             if (trace_interface)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
             decRef(item);
-            return simpleReplace(assignValue);
+            return simpleReplaceRec(assignValue);
         }
     }
     for (auto oitem: expr->operands)
-        newExpr->operands.push_back(simpleReplace(oitem));
+        newExpr->operands.push_back(simpleReplaceRec(oitem));
     return newExpr;
+}
+static ACCExpr *simpleReplace (ACCExpr *expr)
+{
+    return simpleReplaceRec(expr);
 }
 
 static void setAssignRefCount(ModuleIR *IR)
@@ -1298,7 +1298,12 @@ static ModList modLine;
             lookupQualName(IR, name, nameVec, mapValue);
             if (isIdChar(name[0]) && nameVec != "") {
                 std::string newName = name;
-                int ind;
+                int ind = newName.find("[");
+                    std::string sub;
+                if (ind > 0) {
+                    extractSubscript(newName, ind, sub);
+                }
+                fixupAccessible(newName);
                 while ((ind = newName.find(PERIOD)) > 0)
                     newName = newName.substr(0, ind) + "__" + newName.substr(ind+1);  // to defeat the walkAccessible() processing, use "__"
                 std::string name_or = newName + "_or";       // convert unpacked array to vector
@@ -1376,8 +1381,8 @@ static ModList modLine;
         setAssign(item.first, cleanupExprBuiltin(item.second.phi, item.second.defaultValue), refList[item.first].type);
         if (startswith(item.first, BLOCK_NAME))
             assignList[item.first].size = walkCount(assignList[item.first].value);
-        else
-            assignList[item.first].noRecursion = true;
+        //else
+            //assignList[item.first].noRecursion = true;
         }
     }
     for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY
@@ -1427,25 +1432,23 @@ static ModList modLine;
             skipReplace = mitem.vecCount != "" || val == "SyncFF";
         }
         else if (!skipReplace) {
+            std::string replaceValue = tree2str(assignList[val].value);
 if (trace_interface)
-printf("[%s:%d] replaceParam '%s' count %d done %d\n", __FUNCTION__, __LINE__, val.c_str(), refList[val].count, refList[val].done);
+printf("[%s:%d] replaceParam '%s' count %d done %d mapPort '%s' assign '%s'\n", __FUNCTION__, __LINE__, val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), replaceValue.c_str());
             if (refList[val].count == 0) {
-                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
                 if (refList[val].out && !refList[val].inout)
                     val = "0";
                 else
                     val = "";
             }
             else if (refList[val].count <= 1) {
-            val = mapPort[val];
-            if (val != "") {
-if (trace_assign)
-printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, mitem.value.c_str(), val.c_str());
+            if (mapPort[val] != "") {
+                val = mapPort[val];
                 decRef(mitem.value);
-                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
             }
             else
-                val = tree2str(replaceAssign(allocExpr(mitem.value)));
+                val = tree2str(replaceAssign(allocExpr(val)));
+            refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
             }
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, ""/*not param*/, mitem.vecCount});
