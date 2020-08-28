@@ -49,16 +49,6 @@ static std::string changeSeparator(std::string value)
     return value;
 }
 
-static void walkFixup(ACCExpr *expr)
-{
-    if (!expr)
-        return;
-    expr->value = /*changeSeparator*/(expr->value);
-    foldMember(expr);
-    for (auto item: expr->operands)
-        walkFixup(item);
-}
-
 static ACCExpr *inputExpression(std::string inStr)
 {
     ACCExpr *expr = str2tree(inStr);

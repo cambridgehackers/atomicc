@@ -130,34 +130,6 @@ ACCExpr *getRHS(ACCExpr *expr, int match)
      return nullptr;
 }
 
-void foldMember(ACCExpr *expr)
-{
-    if (!expr)
-        return;
-    if (expr->value == PERIOD) {
-        if (expr->operands.size() < 2) {
-            dumpExpr("BADFIELDSPEC", expr);
-            return;
-        }
-        expr->value = "";
-        auto oplist = expr->operands;
-        expr->operands.clear();
-        std::string sep;
-        for (auto item: oplist) {
-            if (!isIdChar(item->value[0])) {
-                expr->operands.push_back(item);    // hack for now!!!! (subscript tree attached to '.' operator)
-                continue;
-            }
-            expr->value += sep + item->value; // fold member specifier into base name
-            for (auto op: item->operands)
-                expr->operands.push_back(op);
-            sep = PERIOD;
-        }
-    }
-    for (auto item: expr->operands)
-        foldMember(item);
-}
-
 std::string tree2str(ACCExpr *expr, bool addSpaces)
 {
     if (!expr)
@@ -360,9 +332,10 @@ static ACCExpr *get1Token(void)
     ret = allocExpr(lexToken);
     if (isParen(ret->value)) {
         std::string val = ret->value;
+        std::string post = treePost(val);
         if (trace_expr)
-            printf("[%s:%d] before subparse of '%s'\n", __FUNCTION__, __LINE__, ret->value.c_str());
-        ret = getExprList(ret, treePost(val).substr(1), false, true);
+            printf("[%s:%d] before subparse of '%s' post '%s' bufferlen %d\n", __FUNCTION__, __LINE__, ret->value.c_str(), post.c_str(), (int)strlen(&lexString[lexIndex]));
+        ret = getExprList(ret, post.substr(1), false, true);
         if (ret->value != val)
             ret = allocExpr(val, ret); // over optimization of '(<singleItem>)'
         if (trace_expr) {

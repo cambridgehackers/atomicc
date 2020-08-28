@@ -171,7 +171,9 @@ bool arithOp(std::string s);
 bool relationalOp(std::string s);
 bool isConstExpr(ACCExpr *expr);
 std::string replacePeriod(std::string value);
-extern int trace_expr;
+void walkFixup(ACCExpr *expr);
+void walkRewrite (ACCExpr *expr);
+extern int trace_expr, trace_interface;
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &fileList, std::string OutputDir);

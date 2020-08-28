@@ -22,7 +22,6 @@
 #include "common.h"
 
 int trace_assign;//= 1;
-int trace_interface;//= 1;
 int trace_declare;//= 1;
 int trace_ports;//= 1;
 int trace_connect;//= 1;
@@ -54,16 +53,6 @@ static void traceZero(const char *label)
         if (aitem.second.value && refList[aitem.first].count == 0)
             printf("[%s:%d] %s: ASSIGN %s = %s size %d count %d[%d] pin %d type %s\n", __FUNCTION__, __LINE__, label, aitem.first.c_str(), tree2str(aitem.second.value).c_str(), walkCount(aitem.second.value), refList[aitem.first].count, refList[temp].count, refList[temp].pin, refList[temp].type.c_str());
     }
-}
-
-static void walkRewrite (ACCExpr *expr)
-{
-    if (!expr)
-        return;
-    if (isIdChar(expr->value[0]))
-        fixupAccessible(expr->value);
-    for (auto item: expr->operands)
-        walkRewrite(item);
 }
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
@@ -553,12 +542,12 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool e
     if (item == PERIOD)
         item = tree2str(expr);
     if (guardName != "" && startswith(item, guardName)) {
-        if (trace_assign)
+        if (trace_interface)
         printf("[%s:%d] remove guard '%s' of called method from enable line %s\n", __FUNCTION__, __LINE__, guardName.c_str(), item.c_str());
         return allocExpr("1");
     }
     if (expr->value == PERIOD || (isIdChar(item[0]) && !expr->operands.size())) {
-        if (trace_assign)
+        if (trace_interface)
             printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, enableListProcessing, tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
         if (!assignList[item].noRecursion || enableListProcessing)
         if (ACCExpr *assignValue = assignList[item].value)
@@ -566,7 +555,7 @@ static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool e
         if (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
         decRef(item);
         walkRef(assignValue);
-        if (trace_assign)
+        if (trace_interface)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
         return replaceAssign(assignValue, guardName, enableListProcessing);
         }
@@ -650,7 +639,7 @@ static ACCExpr *simpleReplace (ACCExpr *expr)
         if (refList[item].pin != PIN_MODULE
              && (checkOperand(assignValue->value) || isRdyName(item) || isEnaName(item)
                 || (startswith(item, BLOCK_NAME) && assignList[item].size < COUNT_LIMIT))) {
-            if (trace_assign)
+            if (trace_interface)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
             decRef(item);
             return simpleReplace(assignValue);
@@ -1435,20 +1424,20 @@ static ModList modLine;
     for (auto mitem: modLine) {
         std::string val = mitem.value;
         if (mitem.moduleStart) {
-            skipReplace = mitem.vecCount != "" || mitem.value == "SyncFF";
+            skipReplace = mitem.vecCount != "" || val == "SyncFF";
         }
         else if (!skipReplace) {
 if (trace_interface)
-printf("[%s:%d] replaceParam '%s' count %d done %d\n", __FUNCTION__, __LINE__, mitem.value.c_str(), refList[val].count, refList[val].done);
-            if (refList[mitem.value].count == 0) {
-                refList[mitem.value].done = true;  // 'assign' line not needed; value is assigned by object inst
-                if (refList[mitem.value].out && !refList[mitem.value].inout)
+printf("[%s:%d] replaceParam '%s' count %d done %d\n", __FUNCTION__, __LINE__, val.c_str(), refList[val].count, refList[val].done);
+            if (refList[val].count == 0) {
+                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
+                if (refList[val].out && !refList[val].inout)
                     val = "0";
                 else
                     val = "";
             }
-            else if (refList[mitem.value].count <= 1) {
-            val = mapPort[mitem.value];
+            else if (refList[val].count <= 1) {
+            val = mapPort[val];
             if (val != "") {
 if (trace_assign)
 printf("[%s:%d] ZZZZ mappp %s -> %s\n", __FUNCTION__, __LINE__, mitem.value.c_str(), val.c_str());

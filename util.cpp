@@ -21,6 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+int trace_interface;//=1;
 int trace_expand;//=1;
 int trace_parameters;//=1;
 int trace_IR;//=1;
@@ -439,7 +440,7 @@ std::string findAccessible(std::string aname)
 void fixupAccessible(std::string &name)
 {
     if (int len = findAccessible(name).length()) {
-        std::string interface = name.substr(0, len);
+        std::string interface = name.substr(0, len), sub1, sub2;
         name = name.substr(len);
         //printf("[%s:%d] interface %s name %s pin %d count %d\n", __FUNCTION__, __LINE__, interface.c_str(), name.c_str(), refList[interface].pin, refList[interface].count);
         if (name[0] == '[') {
@@ -449,9 +450,63 @@ void fixupAccessible(std::string &name)
         }
         if (name != "")
             name = name.substr(1);
+        interface += sub1 + sub2;
         refList[interface].count++;
         name = interface + PERIOD + name;
     }
+}
+
+void foldMember(ACCExpr *expr)
+{
+    if (!expr)
+        return;
+#if 0
+    foldSingle(expr);
+    fixupAccessible(expr->value);
+#else
+    if (expr->value == PERIOD) {
+        if (expr->operands.size() < 2) {
+            dumpExpr("BADFIELDSPEC", expr);
+            return;
+        }
+        expr->value = "";
+        auto oplist = expr->operands;
+        expr->operands.clear();
+        std::string sep;
+        for (auto item: oplist) {
+            if (!isIdChar(item->value[0])) {
+                expr->operands.push_back(item);    // hack for now!!!! (subscript tree attached to '.' operator)
+                continue;
+            }
+            expr->value += sep + item->value; // fold member specifier into base name
+            for (auto op: item->operands)
+                expr->operands.push_back(op);
+            sep = PERIOD;
+        }
+    }
+#endif
+    for (auto item: expr->operands)
+        foldMember(item);
+}
+
+void walkFixup(ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    foldMember(expr);
+    for (auto item: expr->operands)
+        walkFixup(item);
+}
+
+void walkRewrite (ACCExpr *expr)
+{
+    //foldMember(expr);
+    if (!expr)
+        return;
+    if (isIdChar(expr->value[0]))
+        fixupAccessible(expr->value);
+    for (auto item: expr->operands)
+        walkRewrite(item);
 }
 
 void walkAccessible(ACCExpr *expr)
@@ -472,10 +527,10 @@ void buildAccessible(ModuleIR *IR)
     accessibleInterfaces.clear();
     addAccessible(IR->interfaceName, "", "", "", true);
     for (auto item: IR->fields) {
-printf("[%s:%d] STRUCCUCUC %s type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.type.c_str());
+//printf("[%s:%d] STRUCCUCUC %s type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.type.c_str());
         if (auto IIR = lookupIR(item.type)) {
            addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type, false);
-printf("[%s:%d] STRUCCUCUC %s str %d type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), IIR->isStruct, item.type.c_str());
+//printf("[%s:%d] STRUCCUCUC %s str %d type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), IIR->isStruct, item.type.c_str());
            if (IIR->isStruct)
                accessibleInterfaces[item.fldName] = AccessibleInfo{"", item.vecCount, item.type};
         }
