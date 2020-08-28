@@ -105,92 +105,15 @@ if (0)
         condAssignList[generateSection][target] = AssignItem{value, type, false, 0};
     else {
         assignList[target] = AssignItem{value, type, false, 0};
-        if ((isEnaName(target) || isRdyName(target))
-         && !checkInteger(value, "1")
-         && !isEnaName(value->value)
-         && !isRdyName(value->value)) {   // preserve these for ease of reading verilog
-            //assignList[target].noRecursion = true;
-            // we need to replace these in __ENA expressions so that we can remove __RDY expression elements for the __ENA method
-        }
         int ind = target.find('[');
         if (ind != -1) {
             std::string name = target.substr(0,ind);
             refList[name].count++;
             if (trace_assign)
                 printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, name.c_str(), refList[name].count);
-            //assignList[target].noRecursion = true;
         }
     }
 }
-#if 0
-static void expandStruct(ModuleIR *IR, std::string fldName, std::string type)
-{
-    ACCExpr *itemList = allocExpr("{");
-    std::list<FieldItem> fieldList;
-    getFieldList(fieldList, fldName, "", type, false, 0, false);
-    for (auto fitem : fieldList) {
-        std::string lvecCount;
-        std::string tempType = fitem.type;
-        if (startswith(fitem.type, "ARRAY_")) {
-            tempType = fitem.type.substr(6);
-            int ind = tempType.find("_");
-            if (ind > 0) {
-                if (lvecCount != "") {
-                    printf("[%s:%d] dup veccount %s new %s\n", __FUNCTION__, __LINE__, lvecCount.c_str(), tempType.c_str());
-                    exit(-1);
-                }
-                lvecCount = tempType.substr(0, ind);
-                tempType = tempType.substr(ind+1);
-            }
-        }
-        uint64_t offset = fitem.offset;
-        int64_t uppern = offset - 1;
-        std::string upper = autostr(uppern);
-        if (uppern < 0)
-            upper = "-" + autostr(-uppern);
-        if (tempType[0] == '@')
-            upper = tempType.substr(1) + "+ (" + upper + ")";
-        else if (upper != " ")
-            upper = "(" + upper + " + " + convertType(tempType) + ")";
-        else
-            upper = convertType(tempType);
-        std::string base = fldName;
-        if (fitem.base != "")
-            base = fitem.base;
-        std::string fnew = base + "[" + upper + ":" + autostr(offset) + "]";
-        ACCExpr *fexpr = allocExpr(base, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(autostr(offset)))));
-if (trace_expand || refList[fitem.name].pin)
-printf("[%s:%d] set %s = %s alias %d base %s , %s[%d : %s] fnew %s pin %d fnew %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), tempType.c_str(), fitem.alias, base.c_str(), fldName.c_str(), (int)offset, upper.c_str(), fnew.c_str(), refList[fitem.name].pin, tree2str(fexpr).c_str());
-        assert (!refList[fitem.name].pin || (refList[fitem.name].pin == PIN_WIRE));
-        refList[fitem.name] = RefItem{0, tempType, true, false, PIN_WIRE, false, false, lvecCount, false};
-        if (refList[fnew].pin) {
-            printf("[%s:%d] %s pin exists %d PIN_ALIAS\n", __FUNCTION__, __LINE__, fnew.c_str(), refList[fnew].pin);
-        }
-        //assert (!refList[fnew].pin);
-        refList[fnew] = RefItem{0, tempType, true, false, PIN_ALIAS, false, false, lvecCount, false};
-        if (trace_declare)
-            printf("[%s:%d]NEWREF %s %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), fnew.c_str(), tempType.c_str());
-        if (!fitem.alias)
-            itemList->operands.push_front(allocExpr(fitem.name));
-        else {
-//printf("[%s:%d]AAAAAAAA name %s fexpr %s type %s\n", __FUNCTION__, __LINE__, fitem.name.c_str(), tree2str(fexpr).c_str(), fitem.type.c_str());
-            setAssign(fitem.name, fexpr, fitem.type);
-//refList[fitem.name + " "].count++;
-//refList[fitem.name].count++;
-        }
-    }
-#if 0
-    if (force) {
-        assert (!refList[fldName].pin);
-        refList[fldName] = RefItem{0, type, true, false, PIN_WIRE, false, false, "", false};
-        if (trace_declare)
-            printf("[%s:%d]NEWREF2 %s type %s\n", __FUNCTION__, __LINE__, fldName.c_str(), type.c_str());
-    }
-#endif
-    if (itemList->operands.size() > 0)
-        setAssign(fldName, itemList, type);
-}
-#endif
 
 static void addRead(MetaSet &list, ACCExpr *cond)
 {
@@ -515,7 +438,6 @@ static void decRef(std::string name)
     }
 }
 
-static int replaceAssignCount;
 static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
 {
     if (!expr)
@@ -523,7 +445,6 @@ static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", boo
     if (trace_assign)
     printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     std::string item = expr->value;
-    //replaceAssignCount++;
     if (item == PERIOD)
         item = tree2str(expr);
     if (guardName != "" && startswith(item, guardName)) {
@@ -535,7 +456,6 @@ static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", boo
         if (trace_interface)
             printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, enableListProcessing, tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
         if (!assignList[item].noRecursion || enableListProcessing)
-        //if (replaceAssignCount < 12)
         if (ACCExpr *assignValue = assignList[item].value)
         if (assignValue->value[0] != '@')    // hack to prevent propagation of __reduce operators
         if (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
@@ -560,7 +480,6 @@ static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", boo
 }
 static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
 {
-     replaceAssignCount = 0;
      return replaceAssignRec(expr, guardName, enableListProcessing);
 }
 
@@ -661,7 +580,6 @@ static void setAssignRefCount(ModuleIR *IR)
         }
     }
     for (auto item: assignList) {
-        //assignList[item.first].noRecursion = true;
 //printf("[%s:%d] ref[%s].norec %d value %s\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion, tree2str(item.second.value).c_str());
         if (item.second.type == "Bit(1)")
             assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
@@ -1008,30 +926,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         updateWidth(value, convertType(info->type));
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
-        std::string dest = tree2str(info->dest);
-        std::list<FieldItem> fieldList;
-        getFieldList(fieldList, dest, "", info->type, true, 0, false);
-        if (fieldList.size() == 1) {
-            std::string first = fieldList.front().name;
-            appendMux(generateSection, dest, cond, value, "0");
-            if (first != dest)
-                appendMux(generateSection, first, cond, value, "0");
-        }
-        else {
-        std::string splitItem = tree2str(value);
-        if ((value->operands.size() || !isIdChar(value->value[0]))) {
-            splitItem = dest + "$lettemp";
-            appendMux(generateSection, splitItem, cond, value, "0");
-        }
-        for (auto fitem : fieldList) {
-            std::string offset = autostr(fitem.offset);
-            std::string upper = convertType(fitem.type) + " - 1";
-            if (offset != "0")
-                upper += " + " + offset;
-            appendMux(generateSection, fitem.name, cond,
-                allocExpr(splitItem, allocExpr("[", allocExpr(":", allocExpr(upper), allocExpr(offset)))), "0");
-        }
-        }
+        appendMux(generateSection, tree2str(info->dest), cond, value, "0");
     }
     for (auto info: MI->assertList) {
         walkRewrite(info->cond);
@@ -1381,8 +1276,6 @@ static ModList modLine;
         setAssign(item.first, cleanupExprBuiltin(item.second.phi, item.second.defaultValue), refList[item.first].type);
         if (startswith(item.first, BLOCK_NAME))
             assignList[item.first].size = walkCount(assignList[item.first].value);
-        //else
-            //assignList[item.first].noRecursion = true;
         }
     }
     for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY

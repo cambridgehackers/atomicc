@@ -686,43 +686,6 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
     return origName;
 }
 
-void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool force, uint64_t aoffset, bool alias)
-{
-    if (trace_expand)
-        printf("[%s:%d] entry %s type %s force %d \n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), force);
-    __block uint64_t offset = aoffset;
-    std::string sname = name + PERIOD;
-#if 1
-    if (ModuleIR *IR = lookupIR(type)) {
-#if 0
-        for (auto item: IR->unionList) {
-            uint64_t toff = offset;
-            std::string tname;
-printf("[%s:%d]\n", __FUNCTION__, __LINE__);
-exit(-1);
-            if (out) {
-                toff = 0;
-                tname = name;
-            }
-            getFieldList(fieldList, sname + item.name, tname, item.type, true, toff, true);
-        }
-#endif
-        iterField(IR, CBAct {
-                if (item.isParameter == "") {
-                    getFieldList(fieldList, sname + item.fldName, base, item.type, true, offset, alias);
-                    offset += atoi(convertType(item.type).c_str());
-                }
-            return nullptr; });
-    }
-    else 
-#endif
-    if (force) {
-        if (trace_expand)
-            printf("[%s:%d] getadd %s\n", __FUNCTION__, __LINE__, name.c_str());
-        fieldList.push_back(FieldItem{name, base, type, alias, offset});
-    }
-}
-
 ModuleIR *allocIR(std::string name, bool isInterface)
 {
     std::string iname = name;

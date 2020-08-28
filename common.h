@@ -124,7 +124,6 @@ ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker);
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name);
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount, MapNameValue &mapValue);
 std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr);
-void getFieldList(std::list<FieldItem> &fieldList, std::string name, std::string base, std::string type, bool force, uint64_t offset, bool alias);
 ModuleIR *allocIR(std::string name, bool isInterface = false);
 MethodInfo *allocMethod(std::string name);
 bool addMethod(ModuleIR *IR, MethodInfo *MI);

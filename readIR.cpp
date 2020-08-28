@@ -248,17 +248,6 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 int ind = value->value.rfind(DOLLAR);
                 if (ind > 0)
                     value->value = value->value.substr(0, ind) + PERIOD + value->value.substr(ind+1);
-#if 0
-                if (value->value == PERIOD) {     // handle qualified expr case
-                    ACCExpr *newValue = value->operands.front();
-                    value->operands.pop_front();
-                    for (auto item: value->operands) {
-                        newValue->value += DOLLAR + item->value;
-                        newValue->operands.push_back(item->operands.front());
-                    }
-                    value = newValue;
-                }
-#endif
                 for (auto item: value->operands) {
                      if (item->value == "[")
                          subscript = item;

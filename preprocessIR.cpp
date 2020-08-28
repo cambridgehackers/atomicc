@@ -61,42 +61,7 @@ static void walkSubscript (ModuleIR *IR, ACCExpr *expr, bool inGenerate)
     }
     expr->value += "[" + tree2str(subscript) + "]" + post;
 }
-#if 0
-static ACCExpr *findSubscript (ModuleIR *IR, ACCExpr *expr, std::string &size, std::string &fieldName, ACCExpr **subscript, std::string &post)
-{
-    if (isIdChar(expr->value[0]) && expr->operands.size() && expr->operands.front()->value == SUBSCRIPT_MARKER) {
-        fieldName = expr->value;
-        ACCExpr *sub = expr->operands.front()->operands.front();
-        expr->operands.pop_front();
-        if (expr->operands.size() && isIdChar(expr->operands.front()->value[0])) {
-            post = expr->operands.front()->value;
-            expr->operands.pop_front();
-            if (post[0] == '$')
-                post = PERIOD + post.substr(1);
-        }
-        if (isConstExpr(sub)) {
-            expr->value += "[" + tree2str(sub) + "]" + post;
-            return nullptr;
-        }
-        *subscript = sub;
-        for (auto item: IR->fields)
-            if (item.fldName == expr->value) {
-                size = item.vecCount;
-                return expr;
-            }
-        for (auto item: IR->interfaces)
-            if (item.fldName == expr->value) {
-                size = item.vecCount;
-                return expr;
-            }
-        return expr;
-    }
-    for (auto item: expr->operands)
-        if (ACCExpr *ret = findSubscript(IR, item, size, fieldName, subscript, post))
-            return ret;
-    return nullptr;
-}
-#endif
+
 static std::string updateCount(std::string count, std::list<PARAM_MAP> &paramMap) // also check instantiateType()
 {
     for (auto item: paramMap)
@@ -241,123 +206,9 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
 {
     std::string methodName = MI->name;
     std::map<std::string, int> localConnect;
-#if 0
-    static int bodyIndex = 99;
-    walkSubscript(IR, MI->guard, isGenerate);
-    for (auto item: MI->storeList) {
-        walkSubscript(IR, item->dest, isGenerate);
-        walkSubscript(IR, item->cond, isGenerate);
-        walkSubscript(IR, item->value, isGenerate);
-    }
-    for (auto item: MI->letList) {
-        walkSubscript(IR, item->dest, isGenerate);
-        walkSubscript(IR, item->cond, isGenerate);
-        walkSubscript(IR, item->value, isGenerate);
-    }
-    for (auto item: MI->assertList)
-        walkSubscript(IR, item->cond, isGenerate);
-    for (auto item: MI->callList)
-        walkSubscript(IR, item->cond, isGenerate);
-    for (auto item: MI->printfList)
-        walkSubscript(IR, item->cond, isGenerate);
-    for (auto IC : MI->interfaceConnect) {
-        walkSubscript(IR, IC.target, false);
-        walkSubscript(IR, IC.source, false);
-        //walkSubst(IR, info->target);
-        //walkSubst(IR, info->source);
-        //info->target = cleanupExprBuiltin(info->target);
-        //info->source = cleanupExprBuiltin(info->source);
-        if (!IC.isForward) {
-            localConnect[tree2str(IC.target)] = 1;
-            localConnect[tree2str(IC.source)] = 1;
-        }
-    }
-#endif
     for (auto item = IR->interfaces.begin(); item != IR->interfaces.end(); item++)
         if (localConnect[item->fldName])
             item->isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)
-    // subscript processing requires that we defactor the entire statement,
-    // not just add a condition expression into the tree
-//bool moved = false;
-#if 0
-    auto expandTree = [&] (int sort, ACCExpr **condp, ACCExpr *expandArg, bool isAction = false, ACCExpr *value = nullptr, std::string type = "") -> bool {
-        std::string size;
-        ACCExpr *cond = *condp, *subscript = nullptr;
-        std::string fieldName, post;
-        if (ACCExpr *expr = findSubscript(IR, expandArg, size, fieldName, &subscript, post)) {
-printf("[%s:%d] sort %d FORINDE %d expandard %s expr %s subscr %s size %s\n", __FUNCTION__, __LINE__, sort, bodyIndex, tree2str(expandArg).c_str(),
-tree2str(expr).c_str(), tree2str(subscript).c_str(), size.c_str());
-            ACCExpr *var = allocExpr(GENVAR_NAME "1");
-            cond = cleanupBool(allocExpr("&", allocExpr("==", var, subscript), cond));
-            expr->value = fieldName + "[" + var->value + "]" + post;
-            std::string body = "FOR$" + autostr(bodyIndex++) + "Body__ENA";
-            MethodInfo *BMI = allocMethod(body);
-            BMI->params.push_back(ParamElement{var->value, "Bit(32)", ""});
-            addMethod(IR, BMI);
-            if (sort == 1)
-                BMI->storeList.push_back(new StoreListElement{expandArg, value, cond});
-            else if (sort == 2)
-                BMI->letList.push_back(new LetListElement{expandArg, value, cond, type});
-            else if (sort == 3)
-                BMI->callList.push_back(new CallListElement{expandArg, cond, isAction});
-            else if (sort == 4)
-                BMI->printfList.push_back(new CallListElement{expandArg, cond, isAction});
-            MI->generateFor.push_back(GenerateForItem{cond, var->value,
-                 allocExpr("0"), allocExpr("<", var, allocExpr(size)),
-                 allocExpr("+", var, allocExpr("1")), baseMethodName(body)});
-            IR->genvarCount = 1;
-//dumpMethod("NEWFOR", BMI);
-//moved = true;
-            return true;
-        }
-        return false;
-    };
-//dumpMethod("BEFORE", MI);
-    for (auto item = MI->storeList.begin(), iteme = MI->storeList.end(); item != iteme; ) {
-        if (expandTree(1, &(*item)->cond, (*item)->dest, false, (*item)->value))
-            item = MI->storeList.erase(item);
-        else
-            item++;
-    }
-    for (auto item = MI->letList.begin(), iteme = MI->letList.end(); item != iteme; ) {
-        std::string iname = (*item)->type;
-        if (startswith(iname, "ARRAY_")) {
-            iname = iname.substr(6);
-            int ind = iname.find("_");
-            if (ind > 0)
-                iname = iname.substr(ind+1);
-        }
-        if (lookupInterface(iname)) {
-            bool        isForward = false; //checkItem("/Forward");
-            std::string target = tree2str((*item)->dest);
-            std::string source = tree2str((*item)->value);
-            for (auto iitem: IR->interfaces) {
-                if (target == iitem.fldName || source == iitem.fldName)
-                    isForward = true;
-            }
-            IR->interfaceConnect.push_back(InterfaceConnectType{(*item)->dest, (*item)->value, (*item)->type, isForward});
-            item = MI->letList.erase(item);
-        }
-        else if (expandTree(2, &(*item)->cond, (*item)->dest, false, (*item)->value, (*item)->type))
-            item = MI->letList.erase(item);
-        else
-            item++;
-    }
-    for (auto item = MI->callList.begin(), iteme = MI->callList.end(); item != iteme; ) {
-        if (expandTree(3, &(*item)->cond, (*item)->value, (*item)->isAction))
-            item = MI->callList.erase(item);
-        else
-            item++;
-    }
-    for (auto item = MI->printfList.begin(), iteme = MI->printfList.end(); item != iteme; ) {
-        if (expandTree(4, &(*item)->cond, (*item)->value, (*item)->isAction))
-            item = MI->printfList.erase(item);
-        else
-            item++;
-    }
-//if (moved) dumpMethod("PREVMETH", MI);
-#endif
-
     // now replace __bitconcat, __bitsubstr, __phi
     MI->guard = cleanupExpr(MI->guard);
     for (auto info: MI->storeList) {
@@ -788,20 +639,6 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
         }
         item++;
     }
-#if 0
-    for (auto item: MI->alloca) {
-        if (!item.second.noReplace)
-            continue;
-        ACCExpr *itemList = allocExpr("{"); // }
-        std::list<FieldItem> fieldList;
-        getFieldList(fieldList, item.first, "", item.second.type, true, 0, false);
-        for (auto fitem : fieldList)
-            if (!fitem.alias)
-                itemList->operands.push_front(allocExpr(fitem.name));
-        if (itemList->operands.size() > 1)
-            replaceMethodExpr(MI, allocExpr(item.first), itemList);
-    }
-#endif
 }
 
 void cleanupIR(std::list<ModuleIR *> &irSeq)
