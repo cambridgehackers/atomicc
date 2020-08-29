@@ -439,6 +439,7 @@ std::string findAccessible(std::string aname)
 
 void fixupAccessible(std::string &name)
 {
+    name = replacePeriod(name);
     if (int len = findAccessible(name).length()) {
         std::string interface = name.substr(0, len), sub1, sub2;
         name = name.substr(len);
@@ -545,7 +546,7 @@ void buildAccessible(ModuleIR *IR)
     for (auto item: IR->fields) {
 //printf("[%s:%d] STRUCCUCUC %s type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.type.c_str());
         if (auto IIR = lookupIR(item.type)) {
-           addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type, false);
+           addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type, true);
 //printf("[%s:%d] STRUCCUCUC %s str %d type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), IIR->isStruct, item.type.c_str());
            if (IIR->isStruct)
                accessibleInterfaces[item.fldName] = AccessibleInfo{"", item.vecCount, item.type};
@@ -559,7 +560,7 @@ void buildAccessible(ModuleIR *IR)
                accessibleInterfaces[item.first] = AccessibleInfo{"", "", item.second.type};
         }
     }
-printf("[%s:%d]LISTISISI\n", __FUNCTION__, __LINE__);
+    printf("[%s:%d]LIST OF ACCESSIBLE INTERFACES\n", __FUNCTION__, __LINE__);
     for (auto item: accessibleInterfaces)
         printf("[%s:%d] %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.type.c_str());
 
@@ -618,19 +619,34 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
         std::string sub;
         extractSubscript(searchStr, ind, sub);
     }
+    searchStr = replacePeriod(searchStr);
     std::string prefix = findAccessible(searchStr);
     if (prefix != "") {
         auto info = accessibleInterfaces[prefix];
-        ModuleIR *searchIR = lookupInterface(info.type);
+        searchIR = lookupInterface(info.type);
         vecCount = info.vecCount;
         extractParam("lookupQualName", info.fieldType, mapValue);
         searchStr = searchStr.substr(prefix.length() + 1);
-        if (traceLookup) {
-            printf("[%s:%d] searchIR %p search %s\n", __FUNCTION__, __LINE__, (void *)searchIR, searchStr.c_str());
-            dumpModule("SEARCHIR", searchIR);
-        }
-        return lookupMethod(searchIR, searchStr);
     }
+    else {
+        ind = searchStr.find(DOLLAR);
+        if (ind > 0) {
+            std::string fieldname = searchStr.substr(0, ind);
+            for (auto item: searchIR->fields)
+                if (fieldname == item.fldName) {
+                    if (auto IR = lookupIR(item.type)) {
+                        searchIR = lookupInterface(IR->interfaceName);
+                        searchStr = searchStr.substr(ind+1);
+                    }
+                    break;
+                }
+        }
+    }
+    if (traceLookup) {
+        printf("[%s:%d] searchIR %p search %s\n", __FUNCTION__, __LINE__, (void *)searchIR, searchStr.c_str());
+        dumpModule("SEARCHIR", searchIR);
+    }
+    return lookupMethod(searchIR, searchStr);
     return nullptr;
 }
 

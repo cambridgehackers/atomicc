@@ -57,6 +57,7 @@ static void traceZero(const char *label)
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
+    fixupAccessible(target);
     bool tDir = refList[target].out;
     if (!value)
         return;
@@ -258,18 +259,14 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
             printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, instName.c_str(), refList[instName].pin, refPin);
         }
         assert (!refList[instName].pin);
-        if (trace_ports)
-            printf("[%s:%d] name %s type %s dir %d vecCount %s interfaceVecCount %s\n", __FUNCTION__, __LINE__, name.c_str(), type.c_str(), dir, vecCount.c_str(), interfaceVecCount.c_str());
         refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || vc != "", type, dir != 0, inout, refPin, false, false, vc, isArgument};
             if(instance == "" && interfaceVecCount != "")
                 refList[instName].done = true;  // prevent default blanket assignment generation
         }
         if (!isLocal)
         modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
-        if (trace_interface)
-            printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s'\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str());
-        //if (isparam == "")
-        //xpandStruct(IR, instName, type, dir, false, PIN_WIRE, vc, isArgument);
+        if (trace_assign || trace_ports || trace_interface)
+            printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s' pin %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str(), refPin);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
 //dumpModule("PINS", IR);
@@ -776,31 +773,65 @@ void showRef(const char *label, std::string name)
         refList[name].vecCount.c_str(), refList[name].isArgument);
 }
 
+bool getDirection(std::string &name)
+{
+    std::string orig = name;
+    bool ret = refList[name].out;
+    int ind = name.find_first_of(PERIOD "[");
+    if (ind > 0) {
+        std::string post = name.substr(ind);
+        name = name.substr(0, ind);
+        std::string type = refList[name].type;
+        ret = refList[name].out;
+        std::string sub;
+        if (post[0] == '[') {
+            int ind = post.find("]");
+            sub = post.substr(0, ind);
+            post = post.substr(ind);
+        }
+        if (post[0] == '.')
+            post = post.substr(1);
+        if (trace_assign || trace_connect || trace_interface)
+            printf("[%s:%d] name %s post %s sub %s type %s count %d\n", __FUNCTION__, __LINE__, name.c_str(), post.c_str(), sub.c_str(), type.c_str(), refList[name].count);
+        if (auto IR = lookupInterface(type)) {
+            for (auto MI: IR->methods) {
+                if (MI->name == post)
+                    if (MI->type != "") {
+                        //ret = !ret;
+                    }
+            }
+        }
+        //refList[orig].count++;
+        //refList[orig].out = ret;
+    }
+    return ret;
+}
+
 static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bool isForward)
 {
     std::string tstr = tree2str(target), sstr = tree2str(source);
     std::string tif = tstr, sif = sstr;
-    int ind = tif.find_first_of(PERIOD "[");
-    if (ind > 0)
-        tif = tif.substr(0, ind);
-    ind = sif.find_first_of(PERIOD "[");
-    if (ind > 0)
-        sif = sif.substr(0, ind);
     // TODO: need to update this to be 'has a return type' (i.e. handle value methods
-    bool tdir = refList[tif].out ^ endswith(tstr, "__RDY");
-    bool sdir = refList[sif].out ^ endswith(sstr, "__RDY");
+    bool tdir = getDirection(tif) ^ endswith(tstr, "__RDY");
+    bool sdir = getDirection(sif) ^ endswith(sstr, "__RDY");
     if (trace_assign || trace_connect || trace_interface || (!tdir && !sdir))
         printf("%s: IFCCC '%s'/%d/%d pin %d '%s'/%d/%d pin %d\n", __FUNCTION__, tstr.c_str(), tdir, refList[target->value].out, refList[tif].pin, sstr.c_str(), sdir, refList[source->value].out, refList[sif].pin);
     showRef("target", target->value);
     showRef("source", source->value);
     if (sdir) {
+        if (assignList[sstr].type == "")
         setAssign(sstr, target, type);
+        else
+            printf("[%s:%d] skip assign to %s type %s\n", __FUNCTION__, __LINE__, sstr.c_str(), assignList[sstr].type.c_str());
         //refList[tstr].count++;
         //refList[sstr].count++;
         refList[tif].done = true;
     }
     else {
+        if (assignList[tstr].type == "")
         setAssign(tstr, source, type);
+        else
+            printf("[%s:%d] skip assign to %s type %s\n", __FUNCTION__, __LINE__, tstr.c_str(), assignList[tstr].type.c_str());
         //refList[tstr].count++;
         //refList[sstr].count++;
         refList[sif].done = true;
@@ -1156,7 +1187,6 @@ static ModList modLine;
             assert (!refList[item.first].pin);
             bool isStruct = lookupIR(item.second.type) != nullptr || lookupInterface(item.second.type) != nullptr;
             refList[item.first] = RefItem{isStruct ? 2 : 0, item.second.type, true, false, PIN_WIRE, false, false, convertType(item.second.type, 2), false};
-            //expandStruct(IR, item.first, item.second.type);
         }
         for (auto item: MI->generateFor) {
             MethodInfo *MIb = IR->generateBody[item.body];
@@ -1321,13 +1351,15 @@ static ModList modLine;
     bool skipReplace = false;
     for (auto mitem: modLine) {
         std::string val = mitem.value;
+        std::string modname;
         if (mitem.moduleStart) {
             skipReplace = mitem.vecCount != "" || val == "SyncFF";
+            modname = mitem.value;
         }
         else if (!skipReplace) {
-            std::string replaceValue = tree2str(assignList[val].value);
+            ACCExpr *assignValue = assignList[val].value;
 if (trace_interface)
-printf("[%s:%d] replaceParam '%s' count %d done %d mapPort '%s' assign '%s'\n", __FUNCTION__, __LINE__, val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), replaceValue.c_str());
+printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), tree2str(assignValue).c_str());
             if (refList[val].count == 0) {
                 if (refList[val].out && !refList[val].inout)
                     val = "0";
