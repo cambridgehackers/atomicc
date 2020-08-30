@@ -1113,6 +1113,28 @@ static void interfaceAssign(std::string target, ACCExpr *source, std::string typ
     }
 }
 
+typedef struct {
+    std::string value;
+    std::string type;
+} InterfaceMapType;
+static std::map<std::string, std::string> mapParam;
+static void interfaceMakeMap(std::string target, std::string source, std::string type)
+{
+    if (auto IIR = lookupInterface(type)) {
+        for (auto MI : IIR->methods) {
+            std::string tstr = replacePeriod(target + PERIOD + MI->name);
+            std::string sstr = replacePeriod(source + PERIOD + MI->name);
+            fixupAccessible(tstr);
+            fixupAccessible(sstr);
+            mapParam[tstr] = sstr;
+            tstr = baseMethodName(tstr) + DOLLAR;
+            sstr = baseMethodName(sstr) + DOLLAR;
+            for (auto info: MI->params)
+                mapParam[tstr+info.name] = sstr+info.name;
+        }
+    }
+}
+
 /*
  * Generate *.sv and *.vh for a Verilog module
  */
@@ -1341,12 +1363,19 @@ static ModList modLine;
 
     // last chance to optimize out single assigns to output ports
     std::map<std::string, std::string> mapPort;
-    for (auto item: assignList)
+    std::map<std::string, InterfaceMapType> interfaceMap;
+    for (auto item: assignList) {
         if ((refList[item.first].out || refList[item.first].inout) && refList[item.first].pin == PIN_MODULE
           && item.second.value && isIdChar(item.second.value->value[0]) && !item.second.value->operands.size()
           && refList[item.second.value->value].pin != PIN_MODULE) {
             mapPort[item.second.value->value] = item.first;
         }
+        if (lookupInterface(item.second.type)) {
+            std::string value = tree2str(item.second.value);
+            interfaceMap[item.first] = InterfaceMapType{value, item.second.type};
+            interfaceMap[value] = InterfaceMapType{item.first, item.second.type};
+        }
+    }
     // process assignList replacements, mark referenced items
     bool skipReplace = false;
     for (auto mitem: modLine) {
@@ -1355,12 +1384,32 @@ static ModList modLine;
         if (mitem.moduleStart) {
             skipReplace = mitem.vecCount != "" || val == "SyncFF";
             modname = mitem.value;
+            mapParam.clear();
         }
         else if (!skipReplace) {
-            ACCExpr *assignValue = assignList[val].value;
+            std::string newValue = tree2str(assignList[val].value);
+            if (newValue == "")
+                newValue = mapParam[val];
 if (trace_interface)
-printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), tree2str(assignValue).c_str());
-            if (refList[val].count == 0) {
+printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), newValue.c_str());
+            if (newValue == "" && refList[val].count == 0) {
+                int ind = val.find_first_of(PERIOD DOLLAR);
+                if (ind > 1) {
+                    std::string prefix = val.substr(0, ind);
+                    std::string post = val.substr(ind);
+                    auto look = interfaceMap.find(prefix);
+                    if (look != interfaceMap.end()) {
+                        if (trace_interface)
+                            printf("[%s:%d] find prefix %s post %s lookvalue %s looktype %s\n", __FUNCTION__, __LINE__, prefix.c_str(), post.c_str(), look->second.value.c_str(), look->second.type.c_str());
+                        refList[look->first].done = true;
+                        refList[look->second.value].done = true;
+                        interfaceMakeMap(prefix, look->second.value, look->second.type);
+                    }
+                }
+            }
+            if (mapParam[val] != "")
+                val = mapParam[val];
+            else if (refList[val].count == 0) {
                 if (refList[val].out && !refList[val].inout)
                     val = "0";
                 else
