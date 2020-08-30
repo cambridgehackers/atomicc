@@ -43,13 +43,6 @@ std::string finishExpr(ACCExpr *expr)
     return tree2str(cleanupExprBuiltin(replacePins(expr), "0", true));
 }
 
-std::string stripModuleParam(std::string value)
-{
-    int ind = value.find("(");
-    if (ind > 0)
-        return value.substr(0, ind);
-    return value;
-}
 void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
 {
     std::string sep;
@@ -105,7 +98,10 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 array = "[" + mitem.vecCount + " - 1:0]";
             ModuleIR *IIR = lookupInterface(mitem.type);
             if (IIR) {
-                std::string vtype = stripModuleParam(mitem.type);
+                std::string vtype = mitem.type;   // strip off module parameters -- not allowed on formals
+                int ind = vtype.find("(");
+                if (ind > 0)
+                    vtype = vtype.substr(0, ind);
                 if (mitem.out)
                     vtype += ".client";
                 else
@@ -134,6 +130,20 @@ static void genAssign(FILE *OStr, std::string target, ACCExpr *source)
     refList[target].done = true; // mark that assigns have already been output
 }
 
+static std::string declareInstance(std::string type, std::string vecCountStr, std::string params)
+{
+    std::string ret;
+
+    if (auto IR = lookupIR(type)) {
+    }
+    else if (auto IR = lookupInterface(type)) {
+        ret = "()";
+    }
+    else
+        return "";
+    return genericModuleParam(type) + " " + vecCountStr + ret;
+}
+
 void generateVerilogOutput(FILE *OStr)
 {
     std::list<std::string> resetList;
@@ -151,11 +161,9 @@ void generateVerilogOutput(FILE *OStr)
                 resetList.push_back(item.first);
             }
             vecCountStr = item.first + vecCountStr;
-            if (auto IR = lookupIR(item.second.type)) {
-                fprintf(OStr, "    %s %s;\n", genericModuleParam(item.second.type).c_str(), vecCountStr.c_str());
-            }
-            else if (auto IR = lookupInterface(item.second.type)) {
-                fprintf(OStr, "    %s %s();\n", genericModuleParam(item.second.type).c_str(), vecCountStr.c_str());
+            std::string inst = declareInstance(item.second.type, vecCountStr, ""); //std::string params; //IR->params[item.fldName]
+            if (inst != "") {
+                fprintf(OStr, "    %s;\n", inst.c_str());
             }
             else
             fprintf(OStr, "    reg %s;\n", (sizeProcess(item.second.type) + vecCountStr).c_str());
@@ -171,11 +179,9 @@ void generateVerilogOutput(FILE *OStr)
             if (item.second.vecCount == "")
                 vecCountStr = "";
             vecCountStr = item.first + vecCountStr;
-            if (auto IR = lookupIR(item.second.type)) {
-                fprintf(OStr, "    %s %s;\n", genericModuleParam(item.second.type).c_str(), vecCountStr.c_str());
-            }
-            else if (auto IR = lookupInterface(item.second.type)) {
-                fprintf(OStr, "    %s %s();\n", genericModuleParam(item.second.type).c_str(), vecCountStr.c_str());
+            std::string inst = declareInstance(item.second.type, vecCountStr, "");
+            if (inst != "") {
+                fprintf(OStr, "    %s;\n", inst.c_str());
             }
             else
             fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + vecCountStr).c_str());

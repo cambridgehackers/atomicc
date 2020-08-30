@@ -24,7 +24,7 @@
 typedef struct {
     FieldElement field;
     ModuleIR *IR; // containing Module
-    ModuleIR *inter; // interface
+    std::string inter; // interface
 } SoftwareItem;
 
 static const char *jsonPrefix = 
@@ -52,7 +52,8 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
 {
     fprintf(OStrJ, "%s\n        { \"cdecls\": [", jsonSep.c_str());
     std::string msep;
-    for (auto MI : swInfo.inter->methods) {
+    ModuleIR *interface = lookupInterface(swInfo.inter);
+    for (auto MI : interface->methods) {
         std::string methodName = MI->name;
         if (isRdyName(methodName))
             continue;
@@ -96,8 +97,7 @@ exit(-1);
         for (auto interfaceName: implements->softwareName) {
             for (auto iitem: implements->interfaces) {
                 if (iitem.fldName == interfaceName) {
-                    ModuleIR *inter = lookupInterface(iitem.type);
-                    softwareNameList[CBEMangle(inter->name)] = SoftwareItem{iitem, IR, inter};
+                    softwareNameList[CBEMangle(iitem.type)] = SoftwareItem{iitem, IR, iitem.type};
                 }
             }
         }
@@ -134,7 +134,7 @@ exit(-1);
         for (auto item: softwareNameList) {
             jsonGenerate(OStrJ, item.first, item.second);
             bool outcall = item.second.field.isPtr;
-            std::string userTypeName = item.second.inter->name;
+            std::string userTypeName = item.second.inter;
             std::string userInterface = item.second.field.fldName;
             fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
             std::string type = (outcall ? "___M2P" : "___P2M") + userTypeName;

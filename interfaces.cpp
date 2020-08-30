@@ -162,9 +162,7 @@ static void processP2M(ModuleIR *IR)
         if (inter.fldName == "method") {
             IIR = lookupInterface(inter.type);
             target = inter.fldName;
-            std::string iname = inter.type;
-            IR->name = "___P2M" + iname;
-            std::string type = "P2M_MD_" + iname + "_OD__KD__KD_Data";
+            IR->name = "___P2M" + inter.type;
     if (trace_software)
 dumpModule("P2M/IIR :" + target, IIR);
         }

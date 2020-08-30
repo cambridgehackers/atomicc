@@ -232,6 +232,31 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
     }
 }
 
+static std::string moduleInstance(std::string name, std::string params)
+{
+    std::string ret = genericModuleParam(name);
+//printf("[%s:%d] name %s ret %s params %s\n", __FUNCTION__, __LINE__, name.c_str(), ret.c_str(), params.c_str());
+    if (params != "") {
+        std::string actual, sep;
+        const char *p = params.c_str();
+        p++;
+        char ch = ';';
+        while (ch == ';') {
+            const char *start = p;
+            while (*p++ != ':')
+                ;
+            std::string temp(start, p-1);
+            start = p;
+            while ((ch = *p++) && ch != ';' && ch != '>')
+                ;
+            actual += sep + PERIOD + temp + "(" + std::string(start, p-1) + ")";
+            sep = ",";
+        }
+        ret += "#(" + actual + ")";
+    }
+    return ret;
+}
+
 /*
  * Generate verilog module header for class definition or reference
  */
@@ -293,28 +318,8 @@ printf("[%s:%d]befpin '%s' fldname '%s'\n", __FUNCTION__, __LINE__, interfaceNam
     int ind = moduleInstantiation.find("(");
     if (ind > 0)
         moduleInstantiation = moduleInstantiation.substr(0, ind);
-    if (instance != "") {
-        moduleInstantiation = genericModuleParam(instanceType);
-//printf("[%s:%d] instance %s params %s\n", __FUNCTION__, __LINE__, instance.substr(0,instance.length()-1).c_str(), params.c_str());
-        if (params != "") {
-            std::string actual, sep;
-            const char *p = params.c_str();
-            p++;
-            char ch = ';';
-            while (ch == ';') {
-                const char *start = p;
-                while (*p++ != ':')
-                    ;
-                std::string name(start, p-1);
-                start = p;
-                while ((ch = *p++) && ch != ';' && ch != '>')
-                    ;
-                actual += sep + PERIOD + name + "(" + std::string(start, p-1) + ")";
-                sep = ",";
-            }
-            moduleInstantiation += "#(" + actual + ")";
-        }
-    }
+    if (instance != "")
+        moduleInstantiation = moduleInstance(instanceType, params);
     modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, !handleCLK, 0, false, ""/*not param*/, vecCount});
     for (auto item: pinPorts)
     switch (item.variant) {
@@ -838,8 +843,10 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
     }
 }
 
-void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
+static void connectMethodList(std::string interfaceName, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
 {
+    ModuleIR *IIR = lookupInterface(interfaceName);
+    assert(IIR);
     std::string ICtarget = tree2str(targetTree);
     std::string ICsource = tree2str(sourceTree);
     for (auto MI : IIR->methods) {
@@ -867,8 +874,10 @@ void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, 
     }
 }
 
-static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
+static void connectMethods(std::string interfaceName, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
 {
+    ModuleIR *IIR = lookupInterface(interfaceName);
+    assert(IIR);
     std::string ICtarget = tree2str(targetTree);
     std::string ICsource = tree2str(sourceTree);
     if (trace_connect)
@@ -878,7 +887,7 @@ static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTr
         target->value += fld.fldName;
         source->value += fld.fldName;
         if (ModuleIR *IR = lookupIR(fld.type)) {
-            connectMethods(lookupInterface(IR->interfaceName), target, source, isForward);
+            connectMethods(IR->interfaceName, target, source, isForward);
             continue;
         }
         connectTarget(target, source, fld.type, isForward);
@@ -887,10 +896,10 @@ static void connectMethods(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTr
         ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
         target->value += fld.fldName;
         source->value += fld.fldName;
-        connectMethods(lookupInterface(fld.type), target, source, isForward);
+        connectMethods(fld.type, target, source, isForward);
     }
     if (IIR->methods.size())
-        connectTarget(targetTree, sourceTree, IIR->name, isForward);
+        connectTarget(targetTree, sourceTree, interfaceName, isForward);
 }
 
 void appendMux(std::string section, std::string name, ACCExpr *cond, ACCExpr *value, std::string defaultValue)
@@ -924,11 +933,7 @@ static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo
             if (ind > 0)
                 iname = iname.substr(ind+1);
         }
-        ModuleIR *IIR = lookupInterface(iname);
-        if (!IIR)
-            dumpMethod("MISSINGCONNECT", MI);
-        assert(IIR && "interfaceConnect interface type");
-        connectMethods(IIR, IC.target, IC.source, IC.isForward);
+        connectMethods(iname, IC.target, IC.source, IC.isForward);
     }
 }
 static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
@@ -1107,7 +1112,7 @@ static void interfaceAssign(std::string target, ACCExpr *source, std::string typ
         temp = temp.substr(0,ind);
     if (!refList[target].done && source)
     if (auto interface = lookupInterface(type)) {
-        connectMethodList(interface, allocExpr(target), source, false);
+        connectMethodList(type, allocExpr(target), source, false);
         refList[target].done = true; // mark that assigns have already been output
         refList[tree2str(source)].done = true; // mark that assigns have already been output
     }
@@ -1312,11 +1317,7 @@ static ModList modLine;
             if (ind > 0)
                 iname = iname.substr(ind+1);
         }
-        ModuleIR *IIR = lookupInterface(iname);
-        if (!IIR)
-            dumpModule("MISSINGCONNECT", IR);
-        assert(IIR && "interfaceConnect interface type");
-        connectMethods(IIR, IC.target, IC.source, IC.isForward);
+        connectMethods(iname, IC.target, IC.source, IC.isForward);
     }
     traceZero("AFTCONNECT");
     generateMethodGroup(IR, generateMethodGuard);
