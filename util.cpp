@@ -392,6 +392,7 @@ MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
     std::string nameShort = name;
     if (isEnaName(nameShort))
         nameShort = baseMethodName(nameShort);
+    if (IR)
     for (auto MI : IR->methods) {
         if (MI->name == name || MI->name == nameENA || MI->name == nameShort)
             return MI;
@@ -756,6 +757,8 @@ bool addMethod(ModuleIR *IR, MethodInfo *MI)
 
 void dumpMethod(std::string name, MethodInfo *MI)
 {
+    if (!MI)
+        return;
     std::string methodName = MI->name;
     printf("%s    METHOD%s %s(", name.c_str(), MI->rule ? "/Rule" : "", methodName.c_str());
     std::string sep;
