@@ -133,8 +133,8 @@ assert(HIR);
         std::string sourceParam = "{ 16'd" + autostr(counter) + ", 16'd"
             + autostr(PORTALNUM)+ call + ", 16'd" + autostr(vecLength) + "}";
         MInew->callList.push_back(new CallListElement{
-             allocExpr(target, allocExpr(PARAMETER_MARKER,
-                 allocExpr(sourceParam))), nullptr, true});
+            allocExpr(target, allocExpr(PARAMETER_MARKER,
+                allocExpr(sourceParam))), nullptr, true});
         if (generateTrace) {
             ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
                 allocExpr("\"DISPLAYM2P %x\""), allocExpr(sourceParam)));
@@ -232,7 +232,9 @@ assert(MInew);
                 //MInew->callList.push_back(new CallListElement{call, cond, true});
             }
             // when calling 'value' or 'actionValue' method, enqueue return value
-            int64_t dataLength = 32 + 16; // include length of tag and bitlength
+        int64_t dataLength = 32 + 16; // include length of tag and bitlength
+        std::string target = "returnInd$enq__ENA";
+
             dataLength += atoi(convertType(instantiateType(MI->type, mapValue)).c_str());
             std::string call = ", " + callExpr->value;
         call += ", 16'd" + autostr(10/* bitlength*/);
@@ -245,9 +247,11 @@ assert(MInew);
             call += ", " + autostr(dataLength) + "'d0";
         std::string sourceParam = "{ 16'd" + autostr(counter) + ", 16'd"
             + autostr(PORTALNUM)+ call + ", 16'd" + autostr(vecLength) + "}";
-            callExpr = allocExpr("returnInd$enq__ENA", allocExpr(PARAMETER_MARKER,
-                allocExpr(sourceParam)));
+        MInew->callList.push_back(new CallListElement{
+            allocExpr(target, allocExpr(PARAMETER_MARKER,
+                allocExpr(sourceParam))), cond, true});
         }
+        else
         MInew->callList.push_back(new CallListElement{callExpr, cond, true});
         counter++;
     }
