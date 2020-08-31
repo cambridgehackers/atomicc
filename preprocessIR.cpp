@@ -574,7 +574,7 @@ skipLab:;
                 }
             }
             auto typeMI = lookupMethod(IIR, name);
-            printf("[%s:%d] interface %s ifcname %s name %s typeMI %p\n", __FUNCTION__, __LINE__, interface.c_str(), ifcname.c_str(), name.c_str(), typeMI);
+            //printf("[%s:%d] interface %s ifcname %s name %s typeMI %p\n", __FUNCTION__, __LINE__, interface.c_str(), ifcname.c_str(), name.c_str(), typeMI);
             std::map<std::string, std::string> remapParam;
             if (typeMI)
             for (auto origp = MI->params.begin(), orige = MI->params.end(), typep = typeMI->params.begin(); origp != orige; origp++, typep++) {

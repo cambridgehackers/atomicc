@@ -269,6 +269,7 @@ next:;
             temp = temp.substr(0,ind);
         if (trace_assign)
             printf("[%s:%d] assign %s value %s count %d pin %d done %d\n", __FUNCTION__, __LINE__, item.first.c_str(), tree2str(item.second.value).c_str(), refList[temp].count, refList[temp].pin, refList[item.first].done);
+        if (lookupInterface(refList[temp].type) == nullptr)
         if (item.second.value && (refList[temp].count || !refList[temp].pin) && !refList[item.first].done) {
             if (!seen)
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
