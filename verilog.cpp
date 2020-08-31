@@ -1068,8 +1068,8 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
         int argCount = CI->params.size();
         for (auto item: param->operands) {
             if(argCount-- > 0) {
-                std::string size = tree2str(cleanupInteger(cleanupExpr(str2tree(convertType(instantiateType(AI->type, mapValue))))));
-                appendMux(section, pname + AI->name, tempCond, item, size + "'d0");
+                std::string size; // = tree2str(cleanupInteger(cleanupExpr(str2tree(convertType(instantiateType(AI->type, mapValue)))))) + "'d";
+                appendMux(section, pname + AI->name, tempCond, item, size + "0");
                 AI++;
             }
         }

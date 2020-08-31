@@ -23,7 +23,7 @@
 
 int trace_interface;//=1;
 int trace_expand;//=1;
-int trace_parameters;//=1;
+int trace_parameters=1;
 int trace_IR;//=1;
 static int trace_iter;//=1;
 static int traceLookup;//=1;

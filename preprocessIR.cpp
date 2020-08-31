@@ -21,13 +21,14 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+#define TEMP_NAME "temp"
 typedef struct {
     std::string name;
     std::string value;
 } PARAM_MAP;
 int implementPrintf;//=1;
 std::map<std::string, int> genericModule;
-static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest = false);
+static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest = false, bool prefixReplace = false);
 
 static void walkSubst (ModuleIR *IR, ACCExpr *expr)
 {
@@ -278,6 +279,15 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
 }
 
 static void typeCleanIR(ModuleIR *IR);
+static std::map<std::string, std::string> typeCleanMap;
+static std::string addTypeCleanMap(std::string oldType, std::string newType)
+{
+    auto lookup = typeCleanMap.find(oldType);
+    if (lookup == typeCleanMap.end())
+        typeCleanMap[oldType] = newType;
+    return newType;
+}
+
 static std::string typeClean(std::string type)
 {
 #define VARIANT "_OC_"
@@ -285,18 +295,18 @@ static std::string typeClean(std::string type)
     if (startswith(type + VARIANT, "PipeIn" VARIANT)) {
         auto IR = lookupInterface(type);
         auto argType = IR->methods.front()->params.front().type; // enq(Bit(x) v);
-        return "PipeIn(width=" + convertType(argType) + ")";
+        return addTypeCleanMap(type, "PipeIn(width=" + convertType(argType) + ")");
     }
     if (startswith(type + VARIANT, "PipeOut" VARIANT)) {
         auto IR = lookupInterface(type);
         for (auto MI: IR->methods)
             if (MI->name == "first")
-                return "PipeOut(width=" + convertType(MI->type) + ")"; // Bit(x) first();
+                return addTypeCleanMap(type, "PipeOut(width=" + convertType(MI->type) + ")"); // Bit(x) first();
     }
     if (startswith(type + VARIANTP, "PipeInB" VARIANTP)) {
         auto IR = lookupInterface(type);
         auto argType = IR->methods.front()->params.front().type; // enq(Bit(x) v);
-        return "PipeInB(width=" + convertType(argType) + ")";
+        return addTypeCleanMap(type, "PipeInB(width=" + convertType(argType) + ")");
     }
     if (auto ftype = lookupIR(type))
         typeCleanIR(ftype);
@@ -333,6 +343,48 @@ static void typeCleanIR(ModuleIR *IR)
     }
     for (auto MI: IR->methods)
         typeCleanMethod(MI);
+}
+
+static ModuleIR *copyInterface(std::string oldName, std::string newName, MapNameValue &mapValue)
+{
+    ModuleIR *oldIR = lookupInterface(oldName);
+    ModuleIR *IR = allocIR(newName, oldIR->isInterface);
+    IR->metaList = oldIR->metaList;
+    IR->softwareName = oldIR->softwareName;
+    IR->generateBody = oldIR->generateBody;
+    IR->priority = oldIR->priority;
+    IR->fields = oldIR->fields;
+    IR->params = oldIR->params;
+    IR->unionList = oldIR->unionList;
+    IR->interfaces = oldIR->interfaces;
+    IR->interfaceConnect = oldIR->interfaceConnect;
+    IR->genvarCount = oldIR->genvarCount;
+    IR->isStruct = oldIR->isStruct;
+    IR->isSerialize = oldIR->isSerialize;
+    IR->transformGeneric = oldIR->transformGeneric;
+    for (auto MI : oldIR->methods) {
+        MethodInfo *nMI = allocMethod(MI->name);
+        IR->methods.push_back(nMI);
+        for (auto pitem: MI->params)
+            nMI->params.push_back(ParamElement{pitem.name, instantiateType(pitem.type, mapValue), pitem.init});
+        nMI->guard = MI->guard;
+        nMI->subscript = MI->subscript;
+        nMI->generateSection = MI->generateSection;
+        nMI->rule = MI->rule;
+        nMI->action = MI->action;
+        nMI->storeList = MI->storeList;
+        nMI->letList = MI->letList;
+        nMI->assertList = MI->assertList;
+        nMI->callList = MI->callList;
+        nMI->printfList = MI->printfList;
+        nMI->type = instantiateType(MI->type, mapValue);
+        nMI->generateFor = MI->generateFor;
+        nMI->instantiateFor = MI->instantiateFor;
+        nMI->alloca = MI->alloca;
+        //nMI->meta = MI->meta;
+    }
+//dumpModule("NEWMOD", IR);
+    return IR;
 }
 
 void preprocessIR(std::list<ModuleIR *> &irSeq)
@@ -484,6 +536,62 @@ skipLab:;
             preprocessMethod(IR, item.second, true);
         typeCleanIR(IR);   // normalize all 'PipeIn_xxx' and 'PipeOut_xxx'
     }
+    for (auto item: typeCleanMap) {
+        std::string name = item.second;
+        if (startswith(name, "PipeIn("))
+            name = "PipeIn(width=32)";
+        auto updateCopyType = [&](std::string &type) -> void {
+            if (type != "" && type != "Bit(1)")
+                type = "Bit(width)";
+        };
+        MapNameValue mapValue;
+        ModuleIR *IIR = copyInterface(item.first, name, mapValue);
+        for (auto MI: IIR->methods) {
+            updateCopyType(MI->type);
+            for (auto itemi = MI->params.begin(), iteme = MI->params.end(); itemi != iteme; itemi++)
+                updateCopyType(itemi->type);
+        }
+        interfaceIndex[item.first] = IIR; // replace old with new
+    }
+    for (auto IR : irSeq) {
+        for (auto MI: IR->methods) {
+            if (MI->type == "" && MI->params.size() == 0)
+                continue;
+            std::string name = MI->name;
+            std::string interface = IR->interfaceName;
+            auto IIR = lookupInterface(interface);
+            int ind = name.find_first_of(DOLLAR PERIOD);
+            std::string ifcname;
+            if (ind > 0) {
+                ifcname = name.substr(0, ind);
+                name = name.substr(ind+1);
+                for (auto item: IIR->interfaces) {
+                    if (item.fldName == ifcname) {
+                        interface = item.type;
+                        IIR = lookupInterface(interface);
+                        break;
+                    }
+                }
+            }
+            auto typeMI = lookupMethod(IIR, name);
+            printf("[%s:%d] interface %s ifcname %s name %s typeMI %p\n", __FUNCTION__, __LINE__, interface.c_str(), ifcname.c_str(), name.c_str(), typeMI);
+            std::map<std::string, std::string> remapParam;
+            if (typeMI)
+            for (auto origp = MI->params.begin(), orige = MI->params.end(), typep = typeMI->params.begin(); origp != orige; origp++, typep++) {
+                if (origp->type != typep->type) {
+                    remapParam[origp->name] = origp->type;
+                    origp->type = typep->type;
+                }
+            }
+            for(auto item: remapParam) {
+                std::string param = baseMethodName(replacePeriod(MI->name)) + DOLLAR + item.first;
+                ACCExpr *replacement = allocExpr(TEMP_NAME DOLLAR + param);
+                MI->alloca[replacement->value] = AllocaItem{item.second, false};
+                replaceMethodExpr(MI, allocExpr(param + DOLLAR), replacement, false, true);  // replace prefixes on all expr values
+                MI->letList.push_back(new LetListElement{replacement, allocExpr(param), nullptr, item.second});
+            }
+        }
+    }
 }
 
 /*
@@ -512,85 +620,49 @@ static void rewriteExpr(MethodInfo *MI, ACCExpr *expr)
         rewriteExpr(MI, item);
 }
 
-static ACCExpr *walkReplaceExpr (ACCExpr *expr, ACCExpr *pattern, ACCExpr *replacement)
+static ACCExpr *walkReplaceExpr (ACCExpr *expr, ACCExpr *pattern, ACCExpr *replacement, bool prefixReplace)
 {
     if (!expr)
         return expr;
-    if (matchExpr(expr, pattern))
+    if (prefixReplace) {
+        if (startswith(expr->value, pattern->value))
+            return allocExpr(replacement->value + PERIOD + expr->value.substr(pattern->value.length()));
+    }
+    else if (matchExpr(expr, pattern))
         return replacement;
     ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
     for (auto item: expr->operands)
-        if (ACCExpr *operand = walkReplaceExpr(item, pattern, replacement))
+        if (ACCExpr *operand = walkReplaceExpr(item, pattern, replacement, prefixReplace))
             newExpr->operands.push_back(operand);
     return newExpr;
 }
-static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest)
+static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replacement, bool replaceLetDest, bool prefixReplace)
 {
-    MI->guard = walkReplaceExpr(MI->guard, pattern, replacement);
+    MI->guard = walkReplaceExpr(MI->guard, pattern, replacement, prefixReplace);
     for (auto item: MI->storeList) {
-        item->dest = walkReplaceExpr(item->dest, pattern, replacement);
-        item->value = walkReplaceExpr(item->value, pattern, replacement);
-        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
+        item->dest = walkReplaceExpr(item->dest, pattern, replacement, prefixReplace);
+        item->value = walkReplaceExpr(item->value, pattern, replacement, prefixReplace);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement, prefixReplace);
     }
     for (auto item: MI->letList) {
         if (replaceLetDest)
-            item->dest = walkReplaceExpr(item->dest, pattern, replacement);
-        item->value = walkReplaceExpr(item->value, pattern, replacement);
-        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
+            item->dest = walkReplaceExpr(item->dest, pattern, replacement, prefixReplace);
+        item->value = walkReplaceExpr(item->value, pattern, replacement, prefixReplace);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement, prefixReplace);
     }
     for (auto item: MI->assertList) {
-        item->value = walkReplaceExpr(item->value, pattern, replacement);
-        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
+        item->value = walkReplaceExpr(item->value, pattern, replacement, prefixReplace);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement, prefixReplace);
     }
     for (auto item: MI->callList) {
-        item->value = walkReplaceExpr(item->value, pattern, replacement);
-        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
+        item->value = walkReplaceExpr(item->value, pattern, replacement, prefixReplace);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement, prefixReplace);
     }
     for (auto item: MI->printfList) {
-        item->value = walkReplaceExpr(item->value, pattern, replacement);
-        item->cond = walkReplaceExpr(item->cond, pattern, replacement);
+        item->value = walkReplaceExpr(item->value, pattern, replacement, prefixReplace);
+        item->cond = walkReplaceExpr(item->cond, pattern, replacement, prefixReplace);
     }
-}
-void copyInterface(std::string oldName, std::string newName, MapNameValue &mapValue)
-{
-    ModuleIR *oldIR = lookupInterface(oldName);
-    ModuleIR *IR = allocIR(newName, oldIR->isInterface);
-    IR->metaList = oldIR->metaList;
-    IR->softwareName = oldIR->softwareName;
-    IR->generateBody = oldIR->generateBody;
-    IR->priority = oldIR->priority;
-    IR->fields = oldIR->fields;
-    IR->params = oldIR->params;
-    IR->unionList = oldIR->unionList;
-    IR->interfaces = oldIR->interfaces;
-    IR->interfaceConnect = oldIR->interfaceConnect;
-    IR->genvarCount = oldIR->genvarCount;
-    IR->isStruct = oldIR->isStruct;
-    IR->isSerialize = oldIR->isSerialize;
-    IR->transformGeneric = oldIR->transformGeneric;
-    for (auto MI : oldIR->methods) {
-        MethodInfo *nMI = allocMethod(MI->name);
-        IR->methods.push_back(nMI);
-        for (auto pitem: MI->params)
-            nMI->params.push_back(ParamElement{pitem.name, instantiateType(pitem.type, mapValue), pitem.init});
-        nMI->guard = MI->guard;
-        nMI->subscript = MI->subscript;
-        nMI->generateSection = MI->generateSection;
-        nMI->rule = MI->rule;
-        nMI->action = MI->action;
-        nMI->storeList = MI->storeList;
-        nMI->letList = MI->letList;
-        nMI->assertList = MI->assertList;
-        nMI->callList = MI->callList;
-        nMI->printfList = MI->printfList;
-        nMI->type = instantiateType(MI->type, mapValue);
-        nMI->generateFor = MI->generateFor;
-        nMI->instantiateFor = MI->instantiateFor;
-        nMI->alloca = MI->alloca;
-        //nMI->meta = MI->meta;
-    }
-//dumpModule("NEWMOD", IR);
 }
 
 static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
