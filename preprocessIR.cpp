@@ -157,7 +157,7 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
 
 static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface = false)
 {
-    std::string iName = updateType(IR->interfaceName, paramMap);
+    std::string iName = IR->interfaceName;
     if (!isInterface)
         buildGeneric(lookupInterface(IR->interfaceName), iName, paramMap, true);
     IR->transformGeneric = true;

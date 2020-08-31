@@ -167,6 +167,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
     assert(IR);
     bool isSync = startswith(IR->name, "PipeInSync") || argIsSync;
     MapNameValue mapValue = parentMap;
+    if (instance)
     extractParam("COLLECT", IR->name, mapValue);
     vecCount = instantiateType(vecCount, mapValue);
 //for (auto item: mapValue)
@@ -212,6 +213,7 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
     }
     for (FieldElement item : IR->interfaces) {
         //MapNameValue mapValue = parentMap;
+        if (instance)
         extractParam("FIELD_" + item.fldName, item.type, mapValue);
         std::string interfaceName = item.fldName;
         bool out = instance ^ item.isOutput;
@@ -263,6 +265,7 @@ static std::string moduleInstance(std::string name, std::string params)
 static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std::string instance, ModList &modParam, std::string params, std::string vecCount)
 {
     MapNameValue mapValue;
+    if (instance != "")
     extractParam("SIGN_" + IR->name, instanceType, mapValue);
     std::string minst;
     if (instance != "")
@@ -1161,6 +1164,7 @@ static ModList modLine;
     syncPins.clear();     // pins from PipeInSync
 
     printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
+    //dumpModule("START", IR);
     generateModuleSignature(IR, "", "", modLineTop, "", "");
 
     iterField(IR, CBAct {
