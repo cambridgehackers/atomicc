@@ -883,6 +883,13 @@ static void connectMethods(std::string interfaceName, ACCExpr *targetTree, ACCEx
     assert(IIR);
     std::string ICtarget = tree2str(targetTree);
     std::string ICsource = tree2str(sourceTree);
+    if (ICsource.find(DOLLAR) != std::string::npos && ICtarget.find(DOLLAR) == std::string::npos) {
+        ACCExpr *temp = targetTree;
+        targetTree = sourceTree;
+        sourceTree = temp;
+        ICtarget = tree2str(targetTree);
+        ICsource = tree2str(sourceTree);
+    }
     if (trace_connect)
         printf("%s: CONNECT target '%s' source '%s' forward %d\n", __FUNCTION__, ICtarget.c_str(), ICsource.c_str(), isForward);
     for (auto fld : IIR->fields) {
@@ -1379,13 +1386,15 @@ static ModList modLine;
             std::string value = tree2str(item.second.value);
             interfaceMap[item.first] = InterfaceMapType{value, item.second.type};
             interfaceMap[value] = InterfaceMapType{item.first, item.second.type};
+            if (trace_interface)
+                printf("[%s:%d] interfacemap %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), value.c_str());
         }
     }
     // process assignList replacements, mark referenced items
     bool skipReplace = false;
+    std::string modname;
     for (auto mitem: modLine) {
         std::string val = mitem.value;
-        std::string modname;
         if (mitem.moduleStart) {
             skipReplace = mitem.vecCount != "" || val == "SyncFF";
             modname = mitem.value;
@@ -1395,8 +1404,10 @@ static ModList modLine;
             std::string newValue = tree2str(assignList[val].value);
             if (newValue == "")
                 newValue = mapParam[val];
-if (trace_interface)
-printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), newValue.c_str());
+            if (newValue == "")
+                newValue = interfaceMap[val].value;
+            if (trace_interface)
+                printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), newValue.c_str());
             if (newValue == "" && refList[val].count == 0) {
                 int ind = val.find_first_of(PERIOD DOLLAR);
                 if (ind > 1) {
@@ -1415,18 +1426,25 @@ printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' assign '%s'\
             if (mapParam[val] != "")
                 val = mapParam[val];
             else if (refList[val].count == 0) {
-                if (refList[val].out && !refList[val].inout)
+                if (interfaceMap[val].value != "") {
+                    val = interfaceMap[val].value;
+                    refList[val].count++;
+                    refList[val].done = true;
+                }
+                else if (refList[val].out && !refList[val].inout)
                     val = "0";
                 else
                     val = "";
             }
-            else if (refList[val].count <= 1) {
+            else { //if (refList[val].count <= 1)
             if (mapPort[val] != "") {
                 val = mapPort[val];
                 decRef(mitem.value);
             }
             else
                 val = tree2str(replaceAssign(allocExpr(val)));
+            if (trace_interface)
+                printf("[%s:%d] newval %s\n", __FUNCTION__, __LINE__, val.c_str());
             refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
             }
         }
