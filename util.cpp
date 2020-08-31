@@ -23,10 +23,11 @@
 
 int trace_interface;//=1;
 int trace_expand;//=1;
-int trace_parameters=1;
+int trace_parameters;//=1;
 int trace_IR;//=1;
 static int trace_iter;//=1;
 static int traceLookup;//=1;
+static int trace_accessible=1;
 std::map<std::string, ModuleIR *> mapIndex, mapStripped, interfaceIndex, interfaceStripped;
 
 std::string baseMethodName(std::string pname)
@@ -553,6 +554,9 @@ void buildAccessible(ModuleIR *IR)
                accessibleInterfaces[item.fldName] = AccessibleInfo{"", item.vecCount, item.type};
         }
     }
+    for (auto item: IR->interfaces) {
+        addAccessible(item.type, item.fldName, item.vecCount, item.type, false);
+    }
     for (auto MI: IR->methods) {
         for (auto item: MI->alloca) {
               //if (refList[item.first].pin) {
@@ -561,9 +565,11 @@ void buildAccessible(ModuleIR *IR)
                accessibleInterfaces[item.first] = AccessibleInfo{"", "", item.second.type};
         }
     }
-    printf("[%s:%d]LIST OF ACCESSIBLE INTERFACES\n", __FUNCTION__, __LINE__);
-    for (auto item: accessibleInterfaces)
-        printf("[%s:%d] %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.type.c_str());
+    if (trace_accessible) {
+        printf("[%s:%d]LIST OF ACCESSIBLE INTERFACES\n", __FUNCTION__, __LINE__);
+        for (auto item: accessibleInterfaces)
+            printf("[%s:%d] %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.type.c_str());
+    }
 
     for (auto item: IR->interfaceConnect) {
         walkAccessible(item.target);
