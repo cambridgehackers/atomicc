@@ -1365,6 +1365,18 @@ static ModList modLine;
     }
     generateSection = "";
 
+    // if a struct is referenced, make sure all the members also have non-zero counts
+    std::string prevName;
+    int prevCount = 0;
+    for (auto item = refList.begin(), iteme = refList.end(); item != iteme; item++) {
+         if (prevName != "" && startswith(item->first, prevName))
+             item->second.count += prevCount;
+         else {
+             prevName = item->first + PERIOD;
+             prevCount = item->second.count;
+         }
+    }
+
     setAssignRefCount(IR);
     collectCSE();
     optimizeBitAssigns();
@@ -1436,7 +1448,7 @@ static ModList modLine;
                 else
                     val = "";
             }
-            else { //if (refList[val].count <= 1)
+            else {
             if (mapPort[val] != "") {
                 val = mapPort[val];
                 decRef(mitem.value);
