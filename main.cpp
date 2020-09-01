@@ -101,8 +101,6 @@ static void generateVerilogInterface(std::string name, FILE *OStrVH)
             continue;
         }
         fields.push_back(typeDeclaration(fitem.type) + " " + fitem.fldName);
-        if (fitem.fldName == "CLK" || fitem.fldName == "nRST")
-            continue;
         if (fitem.isInput)
             inname.push_back(fitem.fldName);
         if (fitem.isOutput)
