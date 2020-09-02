@@ -417,8 +417,9 @@ void addAccessible(std::string interfaceType, std::string name, std::string vecC
     if (prefix != "")
         prefix += DOLLAR;
     for (auto item: IR->interfaces)
+        if (item.fldName != "")
         addAccessible(item.type, prefix + item.fldName, vecCount, fieldType, false);
-    if (IR->methods.size()) {
+    if (IR->methods.size() || IR->fields.size()) {
         if (name[name.length()-1] == DOLLAR[0] || name[name.length()-1] == PERIOD[0])
             name = name.substr(0, name.length()-1);
         if (!top)
@@ -565,7 +566,7 @@ void buildAccessible(ModuleIR *IR)
                accessibleInterfaces[item.first] = AccessibleInfo{"", "", item.second.type};
         }
     }
-    if (trace_accessible) {
+    if (trace_accessible || trace_interface) {
         printf("[%s:%d]LIST OF ACCESSIBLE INTERFACES\n", __FUNCTION__, __LINE__);
         for (auto item: accessibleInterfaces)
             printf("[%s:%d] %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.type.c_str());
@@ -717,7 +718,7 @@ ModuleIR *allocIR(std::string name, bool isInterface)
         {}/*generateBody*/, {}/*priority*/, {}/*fields*/,
         {}/*params*/, {}/*unionList*/, {}/*interfaces*/, {}/*parameters*/,
         {}/*interfaceConnect*/, 0/*genvarCount*/, false/*isExt*/, isInterface,
-        false/*isStruct*/, false/*isSerialize*/, false/*transformGeneric*/,
+        false/*isStruct*/, false/*isSerialize*/, false/*isVerilog*/, false/*transformGeneric*/,
         "" /*interfaceVecCount*/, "" /*interfaceName*/};
 
     if (isInterface)

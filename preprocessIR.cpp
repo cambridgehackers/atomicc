@@ -705,8 +705,27 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
     }
 }
 
+static void hoistVerilog(ModuleIR *top, ModuleIR *current, std::string prefix)
+{
+    if (top != current)
+    for (auto item: current->fields)
+         top->fields.push_back(FieldElement{prefix + item.fldName, item.vecCount,
+             item.type, item.isPtr, item.isInput, item.isOutput, item.isInout,
+             item.isParameter, item.isShared, item.isLocalInterface, item.isExternal});
+    for (auto item: current->interfaces)
+         hoistVerilog(top, lookupInterface(item.type), prefix+item.fldName);
+    current->interfaces.clear();
+}
+
 void cleanupIR(std::list<ModuleIR *> &irSeq)
 {
+    // preprocess 'isVerilog' items first -> changes interface
+    for (auto mapItem : mapIndex) {
+        ModuleIR *IR = mapItem.second;
+        ModuleIR *IIR = lookupInterface(IR->interfaceName);
+        if (IR->isVerilog)
+            hoistVerilog(IIR, IIR, "");
+    }
     for (auto IR: irSeq) {
         for (auto items = IR->interfaces.begin(), iteme = IR->interfaces.end(); items != iteme; items++) {
             MapNameValue mapValue;

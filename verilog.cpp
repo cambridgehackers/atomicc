@@ -222,7 +222,6 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
             printf("%s: in module '%s', interface lookup '%s' name '%s' failed\n", __FUNCTION__, IR->name.c_str(), item.type.c_str(), interfaceName.c_str());
             exit(-1);
         }
-//printf("[%s:%d]befpin\n", __FUNCTION__, __LINE__);
         std::list<ParamElement> params;
         std::string updatedVecCount = instantiateType(item.vecCount, mapValue);
         bool localFlag = isLocal || item.isLocalInterface;
@@ -894,8 +893,16 @@ static void connectMethods(std::string interfaceName, ACCExpr *targetTree, ACCEx
         printf("%s: CONNECT target '%s' source '%s' forward %d\n", __FUNCTION__, ICtarget.c_str(), ICsource.c_str(), isForward);
     for (auto fld : IIR->fields) {
         ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
-        target->value += fld.fldName;
-        source->value += fld.fldName;
+        if (target->value == "" || endswith(target->value, DOLLAR))
+            target->value += fld.fldName;
+        else
+            //target->value += DOLLAR + fld.fldName;
+            target = allocExpr(PERIOD, target, allocExpr(fld.fldName));
+        if (source->value == "" || endswith(source->value, DOLLAR))
+            source->value += fld.fldName;
+        else
+            //source->value += DOLLAR + fld.fldName;
+            source = allocExpr(PERIOD, source, allocExpr(fld.fldName));
         if (ModuleIR *IR = lookupIR(fld.type)) {
             connectMethods(IR->interfaceName, target, source, isForward);
             continue;

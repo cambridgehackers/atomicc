@@ -326,6 +326,7 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &f
         if (trace_readIR)
             printf("[%s:%d] BEFOREMOD remain '%s'\n", __FUNCTION__, __LINE__, bufp);
         bool ext = checkItem("EMODULE"), interface = false, isStruct = false, isSerialize = false;
+        bool isModule = false, isVerilog = false;
         if (!ext)
             interface = checkItem("INTERFACE");
         if (!ext && !interface)
@@ -339,14 +340,18 @@ static void readModuleIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &f
                 fileList.push_back(bufp);
                 continue;
             }
+            else
+                isModule = checkItem("MODULE");
         }
-        ParseCheck(ext || interface || isStruct || isSerialize || checkItem("MODULE"), "Module header missing");
+        isVerilog = checkItem("/Verilog");
+        ParseCheck(ext || interface || isStruct || isSerialize || isModule, "Module header missing");
         std::string name = specializeTypename(getToken());
         ModuleIR *IR = allocIR(name, interface);
         IR->isExt = ext;
         IR->isInterface = interface;
         IR->isStruct = isStruct;
         IR->isSerialize = isSerialize;
+        IR->isVerilog = isVerilog;
         if (!ext && !interface && !isStruct)
             irSeq.push_back(IR);
         if (trace_readIR)
