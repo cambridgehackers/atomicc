@@ -148,8 +148,10 @@ void generateVerilogOutput(FILE *OStr)
 {
     std::list<std::string> resetList;
     // generate local state element declarations and wires
+    refList["CLK"].done = false;
+    refList["nRST"].done = false;
     for (auto item: refList) {
-        if (trace_assign)
+        if (trace_assign || trace_interface)
             printf("[%s:%d] ref %s pin %d count %d done %d out %d inout %d type %s vecCount %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.pin, item.second.count, item.second.done, item.second.out, item.second.inout, item.second.type.c_str(), item.second.vecCount.c_str());
         if (item.second.pin == PIN_REG) {
             // HACK HACK HACK HACK

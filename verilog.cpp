@@ -64,8 +64,6 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     if (type == "Bit(1)") {
         value = cleanupBool(value);
     }
-    if (target == "CLK" || target == "nRST")
-        refList[target].count++;               // make certain that these wires are assigned in output file
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
     if (trace_interface)
@@ -567,7 +565,10 @@ static ACCExpr *simpleReplaceRec (ACCExpr *expr)
         }
     }
     for (auto oitem: expr->operands)
-        newExpr->operands.push_back(simpleReplaceRec(oitem));
+        if (expr->value == PERIOD)
+            newExpr->operands.push_back(oitem);
+        else
+            newExpr->operands.push_back(simpleReplaceRec(oitem));
     return newExpr;
 }
 static ACCExpr *simpleReplace (ACCExpr *expr)
