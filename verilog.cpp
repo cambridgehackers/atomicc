@@ -64,6 +64,8 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     if (type == "Bit(1)") {
         value = cleanupBool(value);
     }
+    if (target == "CLK" || target == "nRST")
+        refList[target].count++;               // make certain that these wires are assigned in output file
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
     if (trace_interface)
@@ -876,7 +878,28 @@ static void connectMethodList(std::string interfaceName, ACCExpr *targetTree, AC
     }
 }
 
-static void connectMethods(std::string interfaceName, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
+static bool verilogInterface(ModuleIR *searchIR, std::string searchStr)
+{
+    int ind = searchStr.find("[");
+    if (ind > 0) {
+        std::string sub;
+        extractSubscript(searchStr, ind, sub);
+    }
+    searchStr = replacePeriod(searchStr);
+    ind = searchStr.find(DOLLAR);
+    if (ind > 0) {
+        std::string fieldname = searchStr.substr(0, ind);
+        for (auto item: searchIR->fields)
+            if (fieldname == item.fldName) {
+                if (auto IR = lookupIR(item.type))
+                    return IR->isVerilog;
+                break;
+            }
+    }
+    return false;
+}
+
+static void connectMethods(ModuleIR *IR, std::string interfaceName, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
 {
     ModuleIR *IIR = lookupInterface(interfaceName);
     assert(IIR);
@@ -889,22 +912,24 @@ static void connectMethods(std::string interfaceName, ACCExpr *targetTree, ACCEx
         ICtarget = tree2str(targetTree);
         ICsource = tree2str(sourceTree);
     }
+    bool targetIsVerilog = verilogInterface(IR, ICtarget);
+    bool sourceIsVerilog = verilogInterface(IR, ICsource);
     if (trace_connect)
         printf("%s: CONNECT target '%s' source '%s' forward %d\n", __FUNCTION__, ICtarget.c_str(), ICsource.c_str(), isForward);
     for (auto fld : IIR->fields) {
         ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
-        if (target->value == "" || endswith(target->value, DOLLAR))
+        if (target->value == "" || endswith(target->value, DOLLAR) || targetIsVerilog)
             target->value += fld.fldName;
         else
             //target->value += DOLLAR + fld.fldName;
             target = allocExpr(PERIOD, target, allocExpr(fld.fldName));
-        if (source->value == "" || endswith(source->value, DOLLAR))
+        if (source->value == "" || endswith(source->value, DOLLAR) || sourceIsVerilog)
             source->value += fld.fldName;
         else
             //source->value += DOLLAR + fld.fldName;
             source = allocExpr(PERIOD, source, allocExpr(fld.fldName));
         if (ModuleIR *IR = lookupIR(fld.type)) {
-            connectMethods(IR->interfaceName, target, source, isForward);
+            connectMethods(IR, IR->interfaceName, target, source, isForward);
             continue;
         }
         connectTarget(target, source, fld.type, isForward);
@@ -913,7 +938,7 @@ static void connectMethods(std::string interfaceName, ACCExpr *targetTree, ACCEx
         ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
         target->value += fld.fldName;
         source->value += fld.fldName;
-        connectMethods(fld.type, target, source, isForward);
+        connectMethods(IR, fld.type, target, source, isForward);
     }
     if (IIR->methods.size())
         connectTarget(targetTree, sourceTree, interfaceName, isForward);
@@ -950,7 +975,7 @@ static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo
             if (ind > 0)
                 iname = iname.substr(ind+1);
         }
-        connectMethods(iname, IC.target, IC.source, IC.isForward);
+        connectMethods(IR, iname, IC.target, IC.source, IC.isForward);
     }
 }
 static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
@@ -1335,7 +1360,7 @@ static ModList modLine;
             if (ind > 0)
                 iname = iname.substr(ind+1);
         }
-        connectMethods(iname, IC.target, IC.source, IC.isForward);
+        connectMethods(IR, iname, IC.target, IC.source, IC.isForward);
     }
     traceZero("AFTCONNECT");
     generateMethodGroup(IR, generateMethodGuard);
