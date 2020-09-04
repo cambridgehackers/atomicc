@@ -419,7 +419,7 @@ void addAccessible(std::string interfaceType, std::string name, std::string vecC
     for (auto item: IR->interfaces)
         if (item.fldName != "")
         addAccessible(item.type, prefix + item.fldName, vecCount, fieldType, false);
-    if (IR->methods.size() || IR->fields.size()) {
+    if (IR->methods.size() || IR->fields.size() || startswith(interfaceType, "PipeInSync")) {
         if (name[name.length()-1] == DOLLAR[0] || name[name.length()-1] == PERIOD[0])
             name = name.substr(0, name.length()-1);
         if (!top)
@@ -631,6 +631,8 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
     std::string prefix = findAccessible(searchStr);
     if (prefix != "") {
         auto info = accessibleInterfaces[prefix];
+        if (startswith(info.type, "PipeInSync"))
+            info.type = "PipeIn"; // for now...
         searchIR = lookupInterface(info.type);
         vecCount = info.vecCount;
         extractParam("lookupQualName", info.fieldType, mapValue);

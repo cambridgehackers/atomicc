@@ -161,11 +161,10 @@ std::list<PinInfo> pinPorts;
 
 
 static bool handleCLK;
-static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface, bool argIsSync)
+static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface)
 {
 //dumpModule("COLLECT", IR);
     assert(IR);
-    bool isSync = startswith(IR->name, "PipeInSync") || argIsSync;
     MapNameValue mapValue = parentMap;
     if (instance)
     extractParam("COLLECT", IR->name, mapValue);
@@ -177,11 +176,6 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         std::string name = methodPrefix + MI->name;
         bool out = instance ^ isPtr;
         std::list<ParamElement> params;
-        if (isSync && endswith(name, "__RDY") == out && !isLocal)
-{
-printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LINE__, name.c_str(), out, isPtr, instance);
-            syncPins[name] = SyncPinsInfo{baseMethodName(name) + "S" + name.substr(name.length()-5), out, isPtr, instance};
-}
         for (auto pitem: MI->params)
             params.push_back(ParamElement{pitem.name, instantiateType(pitem.type, mapValue), pitem.init});
         pinPorts.push_back(PinInfo{PINI_METHOD, instantiateType(MI->type, mapValue), name, out, false, isLocal, params, ""/*not param*/, MI->action, vecCount});
@@ -212,24 +206,37 @@ printf("[%s:%d] SSSS name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LIN
         }
     }
     for (FieldElement item : IR->interfaces) {
+        std::string type = item.type;
         //MapNameValue mapValue = parentMap;
         if (instance)
-        extractParam("FIELD_" + item.fldName, item.type, mapValue);
+        extractParam("FIELD_" + item.fldName, type, mapValue);
         std::string interfaceName = item.fldName;
-        bool out = instance ^ item.isOutput;
-        ModuleIR *IIR = lookupInterface(item.type);
+        bool ptrFlag = isPtr || item.isPtr;
+        bool out = instance ^ item.isOutput ^ ptrFlag;
+        ModuleIR *IIR = lookupInterface(type);
         if (!IIR) {
-            printf("%s: in module '%s', interface lookup '%s' name '%s' failed\n", __FUNCTION__, IR->name.c_str(), item.type.c_str(), interfaceName.c_str());
+            printf("%s: in module '%s', interface lookup '%s' name '%s' failed\n", __FUNCTION__, IR->name.c_str(), type.c_str(), interfaceName.c_str());
             exit(-1);
         }
         std::list<ParamElement> params;
         std::string updatedVecCount = instantiateType(item.vecCount, mapValue);
         bool localFlag = isLocal || item.isLocalInterface;
-        bool ptrFlag = isPtr || item.isPtr;
         if (item.fldName == "")
-            collectInterfacePins(IIR, instance, pinPrefix + item.fldName, methodPrefix + interfaceName, localFlag, mapValue, ptrFlag, updatedVecCount, localInterface, isSync);
-        else
-        pinPorts.push_back(PinInfo{PINI_INTERFACE, item.type, methodPrefix + interfaceName, out != ptrFlag, false, localFlag, params, ""/*not param*/, false, updatedVecCount});
+            collectInterfacePins(IIR, instance, pinPrefix + item.fldName, methodPrefix + interfaceName, localFlag, mapValue, ptrFlag, updatedVecCount, localInterface);
+        else {
+            if (startswith(type, "PipeInSync")) {
+                type = IIR->interfaces.front().type;   // rewrite to PipeIn type
+                if (!localInterface) {
+                    std::string name = methodPrefix + interfaceName + DOLLAR "enq";
+                    std::string suffix = out ? "__RDY" : "__ENA";
+                    std::string oldName = name + suffix;
+                    fixupAccessible(oldName);
+printf("[%s:%d] SSSS oldname %s name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LINE__, oldName.c_str(), name.c_str(), out, isPtr, instance);
+                    syncPins[oldName] = SyncPinsInfo{name + "S" + suffix, out, isPtr, instance};
+                }
+            }
+            pinPorts.push_back(PinInfo{PINI_INTERFACE, type, methodPrefix + interfaceName, out, false, localFlag, params, ""/*not param*/, false, updatedVecCount});
+        }
     }
 }
 
@@ -300,9 +307,9 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
     pinPorts.clear();
     handleCLK = true;
     ModuleIR *implements = lookupInterface(IR->interfaceName);
-    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "", false, false);
+    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "", false);
     if (instance == "")
-        collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true, false);
+        collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true);
     for (FieldElement item : IR->parameters) {
         //extractParam("PARAM_" + item.name, item.type, mapValue);
         std::string interfaceName = item.fldName;
@@ -314,7 +321,7 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
         if (interfaceName != "")
             interfaceName += PERIOD;
 printf("[%s:%d]befpin '%s' fldname '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str(), item.fldName.c_str());
-        collectInterfacePins(IIR, instance != "", item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, false);
+        collectInterfacePins(IIR, instance != "", item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false);
     }
     std::string moduleInstantiation = IR->name;
     int ind = moduleInstantiation.find("(");
@@ -461,7 +468,7 @@ static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", boo
             printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, enableListProcessing, tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
         if (!assignList[item].noRecursion || enableListProcessing)
         if (ACCExpr *assignValue = assignList[item].value)
-        if (assignValue->value[0] != '@')    // hack to prevent propagation of __reduce operators
+        if (assignValue->value[0] != '@') {   // hack to prevent propagation of __reduce operators
         if (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
         decRef(item);
         walkRef(assignValue);
@@ -469,6 +476,13 @@ static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", boo
         if (trace_interface)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
         return replaceAssignRec(assignValue, guardName, enableListProcessing);
+        }
+#if 0
+        else {
+            refList[item].count++;
+            refList[item].done = false;
+        }
+#endif
         }
     }
     ACCExpr *newExpr = allocExpr(expr->value);
@@ -1226,7 +1240,7 @@ static ModList modLine;
             bool instance = item.second.instance;
             std::string sname = item.second.name;
             refList[sname] = RefItem{4, "Bit(1)", false, false, PIN_LOCAL, false, false, "", false};
-            modLine.push_back(ModData{item.first + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
+            modLine.push_back(ModData{replacePeriod(item.first) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
             modLine.push_back(ModData{"out", instance ? item.first : sname, "Bit(1)", false, false, true/*out*/, false, "", ""});
             modLine.push_back(ModData{"in", instance ? sname : item.first, "Bit(1)", false, false, false /*out*/, false, "", ""});
             refList[item.first].count++;
@@ -1452,7 +1466,7 @@ static ModList modLine;
             if (newValue == "")
                 newValue = interfaceMap[val].value;
             if (trace_interface)
-                printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), newValue.c_str());
+                printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' mapParam '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), mapParam[val].c_str(), newValue.c_str());
             if (newValue == "" && refList[val].count == 0) {
                 int ind = val.find_first_of(PERIOD DOLLAR);
                 if (ind > 1) {
@@ -1481,17 +1495,18 @@ static ModList modLine;
                 else
                     val = "";
             }
-            else {
-            if (mapPort[val] != "") {
+            else if (mapPort[val] != "") {
                 val = mapPort[val];
                 decRef(mitem.value);
             }
-            else
+            else {
+                std::string oldVal = val;
                 val = tree2str(replaceAssign(allocExpr(val)));
+                if (oldVal != val)
+                    refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
+            }
             if (trace_interface)
                 printf("[%s:%d] newval %s\n", __FUNCTION__, __LINE__, val.c_str());
-            refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
-            }
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, ""/*not param*/, mitem.vecCount});
     }

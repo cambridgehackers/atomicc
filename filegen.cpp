@@ -29,12 +29,14 @@ std::string finishString(std::string arg)
 
 ACCExpr *replacePins(ACCExpr *expr)
 {
-    if (expr) {
-        if (syncPins.find(expr->value) != syncPins.end())
-            expr->value = finishString(expr->value);
-        for (auto operand: expr->operands)
-            replacePins(operand);
-    }
+    if (!expr)
+        return expr;
+    if (expr->value == PERIOD)
+        foldMember(expr);
+    if (syncPins.find(expr->value) != syncPins.end())
+        expr->value = finishString(expr->value);
+    for (auto operand: expr->operands)
+        replacePins(operand);
     return expr;
 }
 
