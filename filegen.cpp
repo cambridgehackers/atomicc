@@ -27,14 +27,27 @@ std::string finishString(std::string arg)
     return arg;
 }
 
+static void normalizeIdentifier(ACCExpr *expr)
+{
+    if (expr->value == PERIOD) {
+        std::string ret, sep;
+        for (auto item: expr->operands) {
+            if (!isIdChar(item->value[0]) || item->operands.size())
+                return;
+            ret += sep + item->value;
+            sep = PERIOD;
+        }
+        expr->value = ret;
+        expr->operands.clear();
+    }
+}
+
 ACCExpr *replacePins(ACCExpr *expr)
 {
     if (!expr)
         return expr;
-    if (expr->value == PERIOD)
-        foldMember(expr);
-    if (syncPins.find(expr->value) != syncPins.end())
-        expr->value = finishString(expr->value);
+    normalizeIdentifier(expr);
+    expr->value = finishString(expr->value);
     for (auto operand: expr->operands)
         replacePins(operand);
     return expr;

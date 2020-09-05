@@ -449,7 +449,7 @@ static void decRef(std::string name)
     }
 }
 
-static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
+static ACCExpr *replaceAssign(ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
 {
     if (!expr)
         return expr;
@@ -475,14 +475,8 @@ static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", boo
         assignList[tree2str(assignValue)].noRecursion = true; // to prevent ping/pong
         if (trace_interface)
             printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
-        return replaceAssignRec(assignValue, guardName, enableListProcessing);
+        return replaceAssign(assignValue, guardName, enableListProcessing);
         }
-#if 0
-        else {
-            refList[item].count++;
-            refList[item].done = false;
-        }
-#endif
         }
     }
     ACCExpr *newExpr = allocExpr(expr->value);
@@ -490,15 +484,11 @@ static ACCExpr *replaceAssignRec (ACCExpr *expr, std::string guardName = "", boo
         if (expr->value == PERIOD)
             newExpr->operands.push_back(item);
         else
-            newExpr->operands.push_back(replaceAssignRec(item, guardName, enableListProcessing));
+            newExpr->operands.push_back(replaceAssign(item, guardName, enableListProcessing));
     newExpr = cleanupExpr(newExpr, true);
     if (trace_assign)
     printf("[%s:%d] end %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(newExpr).c_str());
     return newExpr;
-}
-static ACCExpr *replaceAssign (ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
-{
-     return replaceAssignRec(expr, guardName, enableListProcessing);
 }
 
 static void optimizeBitAssigns(void)
@@ -1482,6 +1472,7 @@ static ModList modLine;
                     }
                 }
             }
+            std::string oldVal = val;
             if (mapParam[val] != "")
                 val = mapParam[val];
             else if (refList[val].count == 0) {
@@ -1499,12 +1490,10 @@ static ModList modLine;
                 val = mapPort[val];
                 decRef(mitem.value);
             }
-            else {
-                std::string oldVal = val;
+            else
                 val = tree2str(replaceAssign(allocExpr(val)));
-                if (oldVal != val)
-                    refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
-            }
+            if (oldVal != val)
+                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
             if (trace_interface)
                 printf("[%s:%d] newval %s\n", __FUNCTION__, __LINE__, val.c_str());
         }
