@@ -27,7 +27,7 @@ int trace_parameters;//=1;
 int trace_IR;//=1;
 static int trace_iter;//=1;
 static int traceLookup;//=1;
-static int trace_accessible=1;
+static int trace_accessible;//=1;
 std::map<std::string, ModuleIR *> mapIndex, mapStripped, interfaceIndex, interfaceStripped;
 
 std::string baseMethodName(std::string pname)
@@ -721,7 +721,7 @@ ModuleIR *allocIR(std::string name, bool isInterface)
         {}/*params*/, {}/*unionList*/, {}/*interfaces*/, {}/*parameters*/,
         {}/*interfaceConnect*/, 0/*genvarCount*/, false/*isExt*/, isInterface,
         false/*isStruct*/, false/*isSerialize*/, false/*isVerilog*/, false/*transformGeneric*/,
-        "" /*interfaceVecCount*/, "" /*interfaceName*/};
+        "" /*interfaceVecCount*/, "" /*interfaceName*/, ""/*sourceFilename*/};
 
     if (isInterface)
         interfaceIndex[iname] = IR;

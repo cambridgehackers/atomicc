@@ -158,8 +158,9 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
 static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface = false)
 {
     std::string iName = IR->interfaceName;
-    if (!isInterface)
-        buildGeneric(lookupInterface(IR->interfaceName), iName, paramMap, true);
+    auto iifc = lookupInterface(iName);
+    if (!isInterface && iifc)
+        buildGeneric(iifc, iName, paramMap, true);
     IR->transformGeneric = true;
     ModuleIR *genericIR = allocIR(irName, isInterface);
     genericIR->interfaceName = iName;
@@ -175,6 +176,8 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
     genericIR->isInterface = isInterface;
     genericIR->isStruct = IR->isStruct;
     genericIR->isSerialize = IR->isSerialize;
+    genericIR->isVerilog = IR->isVerilog;
+    genericIR->sourceFilename = IR->sourceFilename;
     for (auto item : IR->fields)
         genericIR->fields.push_back(FieldElement{item.fldName,
             updateCount(item.vecCount, paramMap), updateType(item.type, paramMap),
@@ -361,6 +364,8 @@ static ModuleIR *copyInterface(std::string oldName, std::string newName, MapName
     IR->genvarCount = oldIR->genvarCount;
     IR->isStruct = oldIR->isStruct;
     IR->isSerialize = oldIR->isSerialize;
+    IR->isVerilog = oldIR->isVerilog;
+    IR->sourceFilename = oldIR->sourceFilename;
     IR->transformGeneric = oldIR->transformGeneric;
     for (auto MI : oldIR->methods) {
         MethodInfo *nMI = allocMethod(MI->name);

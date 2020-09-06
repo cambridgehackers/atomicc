@@ -162,17 +162,35 @@ static void generateVerilogInterface(std::string name, FILE *OStrVH)
     }
 }
 
+static bool shouldNotOuput(ModuleIR *IR)
+{
+    std::string source = IR->sourceFilename;
+    if (source.find("lib/") != std::string::npos)
+        return true;        // imported from library
+    if ((source == "atomicc.h" && myGlobalName != "atomicc")
+     || (source == "fifo.h" && myGlobalName != "fifo"))
+        return true;
+    return false;
+}
+
 static void appendInterface(std::string name, std::string params)
 {
+printf("[%s:%d] name %s params %s\n", __FUNCTION__, __LINE__, name.c_str(), params.c_str());
     if (name.find("(") == std::string::npos)  // if we inherit parameters, use them (unless we already had some)
         name += params;
-    if (interfaceSeen[name])
+    std::string shortName = name;
+    int ind = shortName.find_first_of("(" "#");
+    if (ind > 0)
+        shortName = shortName.substr(0, ind);
+    if (shortName.find("_OC_") != std::string::npos)       // discard specializations
         return;
-    interfaceSeen[name] = true;
-    if (startswith(name, "PipeIn(") || startswith(name, "PipeOut("))
+    if (interfaceSeen[shortName])
         return;
+    interfaceSeen[shortName] = true;
     ModuleIR *IR = lookupInterface(name);
     assert(IR);
+    if (shouldNotOuput(IR))
+        return;
     for (auto item: IR->interfaces) {
         appendInterface(item.type, params);
     }
@@ -219,9 +237,10 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     std::string defname = myName + "_GENERATED_";
     fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n", defname.c_str(), defname.c_str());
     fprintf(OStrVH, "`include \"atomicclib.vh\"\n\n");
-    for (auto IR: irSeq//mapIndex
-) { // only generate typedefs and interfaces for items declared in this source module
-        //ModuleIR *IR = item.second;
+    for (auto item: mapIndex) {
+        ModuleIR *IR = item.second;
+        if (shouldNotOuput(IR))
+            continue;
         if (IR->isStruct) {
             std::string defname = "__" + IR->name + "_DEF__";
             fprintf(OStrVH, "`ifndef %s\n`define %s\ntypedef struct packed {\n", defname.c_str(), defname.c_str());

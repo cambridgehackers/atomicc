@@ -182,5 +182,6 @@ typedef struct ModuleIR {
     bool                              transformGeneric;
     std::string                       interfaceVecCount;
     std::string                       interfaceName;
+    std::string                       sourceFilename;
 } ModuleIR;
 #endif /* __ATOMICIR_H__ */

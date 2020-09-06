@@ -154,6 +154,8 @@ static std::string getType()
 
 static ACCExpr *cleanInterface(ACCExpr *expr)
 {
+    if (!expr)
+        return expr;
     expr->value = replacePeriod(expr->value);
     std::string name = expr->value;
     if (name == "_")
@@ -319,6 +321,21 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
     }
 }
 
+static std::string CBEUnmangle(std::string S)
+{
+    std::string Result;
+    for (unsigned i = 0, e = S.size(); i != e; ++i)
+        if (S[i] == '_' && i + 3 < S.size() && S[i+3] == '_') {
+            i++;
+            char ch = S[i++] - 'A';
+            ch |= (S[i++] - 'A') << 4;
+            Result += ch;
+        }
+        else
+            Result += S[i];
+    return Result;
+}
+
 static void readModuleIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &fileList, FILE *OStr)
 {
     OStrGlobal = OStr;
@@ -362,7 +379,10 @@ interface, isStruct, isSerialize, ext);
             ParseCheck(checkItem("{"), "Module '{' missing");
         }
         while (readLine() && !checkItem("}")) {
-            if (checkItem("SOFTWARE")) {
+            if (checkItem("FILE")) {
+                IR->sourceFilename = CBEUnmangle(getToken());
+            }
+            else if (checkItem("SOFTWARE")) {
                 IR->softwareName.push_back(getToken());
             }
             else if (checkItem("PRIORITY")) {
