@@ -22,6 +22,9 @@
 #include "common.h"
 
 #define TEMP_NAME "temp"
+#define VARIANT "_OC_"
+#define VARIANTP "_IC_"
+#define SUFFIX_FOR_GENERIC VARIANT "__"
 typedef struct {
     std::string name;
     std::string value;
@@ -155,15 +158,27 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
         newMI->params.push_back(ParamElement{item.name, updateType(item.type, paramMap), ""});
 }
 
-static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface = false)
+static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface)
 {
-    std::string iName = IR->interfaceName;
-    auto iifc = lookupInterface(iName);
-    if (!isInterface && iifc)
-        buildGeneric(iifc, iName, paramMap, true);
+static int counter;
+    if (isInterface) {
+        std::string sub;
+        int ind = irName.find("(");
+        if (ind > 0) {
+            sub = irName.substr(ind);
+            irName = irName.substr(0, ind);
+        }
+        irName += SUFFIX_FOR_GENERIC + autostr(counter++) + sub;
+    }
     IR->transformGeneric = true;
     ModuleIR *genericIR = allocIR(irName, isInterface);
-    genericIR->interfaceName = iName;
+    genericModule[irName] = 1;
+    std::string iName = IR->interfaceName;
+    if (!isInterface)
+    if (auto iifc = lookupInterface(iName)) {
+        auto IIR = buildGeneric(iifc, iifc->name, paramMap, true);
+        genericIR->interfaceName = IIR->name;
+    }
     genericIR->genvarCount = IR->genvarCount;
     genericIR->metaList = IR->metaList;
     genericIR->softwareName = IR->softwareName;
@@ -189,9 +204,9 @@ static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_
         copyGenericMethod(genericIR, MI, paramMap);
     for (auto item : IR->interfaces) {
         std::string iname = updateType(item.type, paramMap);
-        buildGeneric(lookupInterface(item.type), iname, paramMap, true);
+        auto IIR = buildGeneric(lookupInterface(item.type), iname, paramMap, true);
         genericIR->interfaces.push_back(FieldElement{item.fldName,
-             updateCount(item.vecCount, paramMap), iname, item.isPtr, item.isInput,
+             updateCount(item.vecCount, paramMap), IIR->name, item.isPtr, item.isInput,
              item.isOutput, item.isInout,
              item.isParameter, item.isShared, item.isLocalInterface, item.isExternal});
     }
@@ -293,8 +308,6 @@ static std::string addTypeCleanMap(std::string oldType, std::string newType)
 
 static std::string typeClean(std::string type)
 {
-#define VARIANT "_OC_"
-#define VARIANTP "_IC_"
     if (startswith(type + VARIANT, "PipeIn" VARIANT)) {
         auto IR = lookupInterface(type);
         auto argType = IR->methods.front()->params.front().type; // enq(Bit(x) v);
@@ -463,6 +476,8 @@ skipLab:;
     for (auto IR : irSeq)
 #endif
         std::string modName = IR->name;
+        if (modName.find(SUFFIX_FOR_GENERIC) != std::string::npos)
+            continue;
         int ind = modName.find("(");
         if (ind > 0) {
             std::string irName = modName;//.substr(0, ind);
@@ -474,7 +489,7 @@ skipLab:;
             parg = parg.substr(0, parg.length() - 1);
             std::string pname;
             std::list<PARAM_MAP> paramMap;
-//printf("[%s:%d]START %s\n", __FUNCTION__, __LINE__, irName.c_str());
+//printf("[%s:%d]START %s was %s\n", __FUNCTION__, __LINE__, irName.c_str(), IR->name.c_str());
             while (parg != "") {
                 int indVal = parg.find("=");
                 if (indVal <= 0)
@@ -490,10 +505,10 @@ skipLab:;
 //printf("[%s:%d] name %s val %s\n", __FUNCTION__, __LINE__, pname.c_str(), pvalue.c_str());
                 paramMap.push_back(PARAM_MAP{pname, pvalue});
             }
-            ModuleIR *genericIR = buildGeneric(IR, irName, paramMap);
+            ModuleIR *genericIR = buildGeneric(IR, irName, paramMap, false);
+            irName = genericIR->name;
             if (!IR->isExt && !IR->isInterface && !IR->isStruct)
                 irSeq.push_back(genericIR);
-            genericModule[irName] = 1;
             ModuleIR *paramIR = allocIR(irName+PERIOD+"PARAM", true);
             paramIR->isInterface = true;
             genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
