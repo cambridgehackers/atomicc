@@ -92,10 +92,12 @@ static std::string modportNames(std::string first, StrList &inname, std::string 
     }
     return ret;
 }
+
 static void generateVerilogInterface(std::string name, FILE *OStrVH)
 {
     StrList inname, outname, inoutname, fields;
     ModuleIR *IR = lookupInterface(name);
+    name = cleanupModuleType(name);
     for (auto fitem: IR->fields) {
         if (fitem.isParameter != "") {
             continue;
@@ -175,10 +177,9 @@ static bool shouldNotOuput(ModuleIR *IR)
 
 static void appendInterface(std::string name, std::string params)
 {
-printf("[%s:%d] name %s params %s\n", __FUNCTION__, __LINE__, name.c_str(), params.c_str());
-    if (name.find("(") == std::string::npos)  // if we inherit parameters, use them (unless we already had some)
-        name += params;
-    std::string shortName = name;
+    MapNameValue mapValue;
+    name = genericModuleParam(name, params, &mapValue); // if we inherit parameters, use them (unless we already had some)
+    std::string shortName = cleanupModuleType(name);
     int ind = shortName.find_first_of("(" "#");
     if (ind > 0)
         shortName = shortName.substr(0, ind);

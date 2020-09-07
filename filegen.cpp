@@ -113,7 +113,7 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
                 array = "[" + mitem.vecCount + " - 1:0]";
             ModuleIR *IIR = lookupInterface(mitem.type);
             if (IIR) {
-                std::string vtype = mitem.type;   // strip off module parameters -- not allowed on formals
+                std::string vtype = cleanupModuleType(mitem.type);   // strip off module parameters -- not allowed on formals
                 int ind = vtype.find("(");
                 if (ind > 0)
                     vtype = vtype.substr(0, ind);
@@ -156,7 +156,7 @@ static std::string declareInstance(std::string type, std::string vecCountStr, st
     }
     else
         return "";
-    return genericModuleParam(type) + " " + vecCountStr + ret;
+    return genericModuleParam(type, params) + " " + vecCountStr + ret;
 }
 
 void generateVerilogOutput(FILE *OStr)
@@ -328,15 +328,15 @@ next:;
                 for (auto item: tcond.second.info) {
                     std::string endStr;
                     std::string temp;
-                    if (item.first && !checkInteger(item.first, "1")) {
-                        temp = "    if (" + finishExpr(item.first) + ")";
-                        if (item.second.size() > 1) {
+                    if (item.second.cond && !checkInteger(item.second.cond, "1")) {
+                        temp = "    if (" + finishExpr(item.second.cond) + ")";
+                        if (item.second.info.size() > 1) {
                             temp += " begin";
                             endStr = "    end;";
                         }
                         alwaysLines.push_back(temp);
                     }
-                    for (auto citem: item.second) {
+                    for (auto citem: item.second.info) {
                         if (citem.dest) // dest non-null -> assignment statement, otherwise call statement
                             alwaysLines.push_back("    " + finishExpr(citem.dest) + " <= " + finishExpr(citem.value) + ";");
                         else if (citem.value->value == "$finish;")

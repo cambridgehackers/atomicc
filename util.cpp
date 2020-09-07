@@ -209,10 +209,10 @@ printf("[%s:%d] oldtype %s newtype %s\n", __FUNCTION__, __LINE__, arg.c_str(), n
         return mapReturn(arg);
     }
     if (auto IR = lookupIR(bp)) {
-        return mapReturn(genericModuleParam(bp, &mapValue));
+        return mapReturn(genericModuleParam(bp, "", &mapValue));
     }
     if (auto IR = lookupInterface(bp)) {
-        return mapReturn(genericModuleParam(bp, &mapValue));
+        return mapReturn(genericModuleParam(bp, "", &mapValue));
     }
     return mapReturn(bp);
 }
@@ -221,14 +221,19 @@ typedef struct {
     std::string name;
     ACCExpr    *value;
 } ParamMapType;
-std::string genericModuleParam(std::string name, MapNameValue *mapValue)
+std::string genericModuleParam(std::string name, std::string param, MapNameValue *mapValue)
 {
+    name = cleanupModuleType(name);
     std::string orig = name;
     std::list<ParamMapType> pmap;
     std::string ret = name;
     int ind = name.find("(");
-    if (ind > 0) {
+    if (ind > 0)
         ret = name.substr(0, ind);
+    else
+        name = param;
+    ind = name.find("(");
+    if (ind > 0) {
         name = name.substr(ind+1);
         ind = name.rfind(")");
         if (ind > 0)
@@ -348,6 +353,20 @@ std::string convertType(std::string arg, int arrayProcess)
         return bp;
     printf("[%s:%d] convertType FAILED '%s'\n", __FUNCTION__, __LINE__, bp);
     exit(-1);
+}
+
+std::string cleanupModuleType(std::string type)
+{
+    std::string ret = type, post;
+    int ind = ret.find_first_of("#" "(" PERIOD);
+    if (ind > 0) {
+        post = ret.substr(ind);
+        ret = ret.substr(0, ind);
+    }
+    ind = ret.find(SUFFIX_FOR_GENERIC);
+    if (ind > 0)
+        ret = ret.substr(0, ind);
+    return ret + post;
 }
 
 std::string sizeProcess(std::string type)

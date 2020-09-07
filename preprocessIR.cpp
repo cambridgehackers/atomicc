@@ -22,9 +22,6 @@
 #include "common.h"
 
 #define TEMP_NAME "temp"
-#define VARIANT "_OC_"
-#define VARIANTP "_IC_"
-#define SUFFIX_FOR_GENERIC VARIANT "__"
 typedef struct {
     std::string name;
     std::string value;
@@ -346,6 +343,7 @@ static void typeCleanMethod(MethodInfo *MI)
 
 static void typeCleanIR(ModuleIR *IR)
 {
+printf("[%s:%d]IRNANNA %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
     if (auto interface = lookupInterface(IR->interfaceName))
         typeCleanIR(interface);
     for (auto itemi = IR->interfaceConnect.begin(), iteme = IR->interfaceConnect.end(); itemi != iteme; itemi++)
@@ -554,8 +552,11 @@ skipLab:;
             preprocessMethod(IR, MI, false);
         for (auto item: IR->generateBody)
             preprocessMethod(IR, item.second, true);
-        typeCleanIR(IR);   // normalize all 'PipeIn_xxx' and 'PipeOut_xxx'
     }
+    for (auto mapItem : mapIndex)
+        typeCleanIR(mapItem.second);   // normalize all 'PipeIn_xxx' and 'PipeOut_xxx'
+    for (auto mapItem : interfaceIndex)
+        typeCleanIR(mapItem.second);   // normalize all 'PipeIn_xxx' and 'PipeOut_xxx'
     for (auto item: typeCleanMap) {
         std::string name = item.second;
         if (startswith(name, "PipeIn("))
@@ -598,9 +599,10 @@ skipLab:;
             std::map<std::string, std::string> remapParam;
             if (typeMI)
             for (auto origp = MI->params.begin(), orige = MI->params.end(), typep = typeMI->params.begin(); origp != orige; origp++, typep++) {
-                if (origp->type != typep->type) {
+                //if (origp->type != typep->type)
+                if (startswith(interface, "PipeIn") && !startswith(origp->type, "Bit(")) {
                     remapParam[origp->name] = origp->type;
-                    origp->type = typep->type;
+                    origp->type = "Bit(" + convertType(origp->type) + ")"; //typep->type;
                 }
             }
             for(auto item: remapParam) {

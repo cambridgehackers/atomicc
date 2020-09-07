@@ -242,7 +242,7 @@ printf("[%s:%d] SSSS oldname %s name %s out %d isPtr %d instance %d\n", __FUNCTI
 
 static std::string moduleInstance(std::string name, std::string params)
 {
-    std::string ret = genericModuleParam(name);
+    std::string ret = genericModuleParam(name, params);
 //printf("[%s:%d] name %s ret %s params %s\n", __FUNCTION__, __LINE__, name.c_str(), ret.c_str(), params.c_str());
     if (params != "") {
         std::string actual, sep;
@@ -635,12 +635,13 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
         auto info = tcond->second.info;
         tcond->second.info.clear();
         for (auto item = info.begin(), itemEnd = info.end(); item != itemEnd; item++) {
-            tcond->second.info[cleanupBool(replaceAssign(item->first))] = info[item->first];
-            walkRef(item->first);
-            for (auto citem: item->second) {
+            ACCExpr *cond = cleanupBool(replaceAssign(item->second.cond));
+            tcond->second.info[tree2str(cond)] = CondGroupInfo{cond, item->second.info};
+            walkRef(cond);
+            for (auto citem: item->second.info) {
                 if (trace_assign)
                     printf("[%s:%d] %s: %s dest %s value %s\n", __FUNCTION__, __LINE__, methodName.c_str(),
- tree2str(item->first).c_str(), tree2str(citem.dest).c_str(), tree2str(citem.value).c_str());
+ item->first.c_str(), tree2str(citem.dest).c_str(), tree2str(citem.value).c_str());
                 if (citem.dest) {
                     walkRef(citem.value);
                     walkRef(citem.dest);
@@ -769,12 +770,13 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
     dest = replaceAssign(dest);
     value = replaceAssign(value);
     for (auto CI = condLines[generateSection].always[methodName].info.begin(), CE = condLines[generateSection].always[methodName].info.end(); CI != CE; CI++)
-        if (matchExpr(cond, CI->first)) {
-            CI->second.push_back(CondInfo{dest, value});
+        if (matchExpr(cond, CI->second.cond)) {
+            CI->second.info.push_back(CondInfo{dest, value});
             return;
         }
     condLines[generateSection].always[methodName].guard = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
-    condLines[generateSection].always[methodName].info[cond].push_back(CondInfo{dest, value});
+    condLines[generateSection].always[methodName].info[tree2str(cond)].cond = cond;
+    condLines[generateSection].always[methodName].info[tree2str(cond)].info.push_back(CondInfo{dest, value});
 }
 
 void showRef(const char *label, std::string name)

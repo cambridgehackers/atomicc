@@ -29,6 +29,10 @@
 #define BLOCK_NAME "BasicBlockCond_"
 #define COUNT_LIMIT             0//10
 
+#define VARIANT "_OC_"
+#define VARIANTP "_IC_"
+#define SUFFIX_FOR_GENERIC VARIANT "__"
+
 #define DOLLAR           "$"
 #define PERIOD           "."
 
@@ -82,8 +86,12 @@ typedef struct {
     ACCExpr *value;
 } CondInfo;
 typedef struct {
+    ACCExpr * cond;
+    std::list<CondInfo> info;
+} CondGroupInfo;
+typedef struct {
     ACCExpr      *guard;
-    std::map<ACCExpr *, std::list<CondInfo>> info;
+    std::map<std::string, CondGroupInfo> info;
 } CondGroup;
 typedef struct {
     std::string format;
@@ -114,7 +122,7 @@ bool isRdyName(std::string name);
 bool isEnaName(std::string name);
 void extractParam(std::string debugName, std::string replaceList, MapNameValue &mapValue);
 std::string instantiateType(std::string arg, MapNameValue &mapValue);
-std::string genericModuleParam(std::string name, MapNameValue *mapValue = nullptr);
+std::string genericModuleParam(std::string name, std::string param, MapNameValue *mapValue = nullptr);
 std::string convertType(std::string arg, int arrayProcess = 0);
 ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);
@@ -141,6 +149,7 @@ void extractSubscript(std::string &source, int index, std::string &sub);
 void buildAccessible(ModuleIR *IR);
 void fixupAccessible(std::string &name);
 void walkAccessible(ACCExpr *expr);
+std::string cleanupModuleType(std::string type);
 
 // expr.cpp
 bool bitOp(std::string s);
