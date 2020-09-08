@@ -21,6 +21,8 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+#define NOCDataH_SIZE    "(16+128)"
+
 typedef struct {
     FieldElement field;
     ModuleIR *IR; // containing Module
@@ -87,6 +89,7 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
 int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName)
 {
     FILE *OStrJ = nullptr;
+    std::string pipeName = "PipeIn(" NOCDataH_SIZE ")";
     for (auto IR: irSeq) {
         ModuleIR *implements = lookupInterface(IR->interfaceName);
         if (!implements) {
@@ -124,7 +127,6 @@ exit(-1);
         std::string localName = "DUT__" + dutType;
         std::string muxName = "mux";
         std::string muxTypeName = "MuxPipe";
-        std::string pipeName = "PipeIn";
         IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false, false});
         localName += DOLLAR;
         muxName += DOLLAR;
@@ -154,7 +156,7 @@ exit(-1);
                     std::string methodName = MI->name;
                     if (!isRdyName(methodName) && !isEnaName(methodName)) {
                         // actionValue methods get a callback for value
-                        ifcIRinterface->interfaces.push_back(FieldElement{"returnInd", "", "PipeIn", true, false, false, false, ""/*not param*/, false, false, false});
+                        ifcIRinterface->interfaces.push_back(FieldElement{"returnInd", "", pipeName, true, false, false, false, ""/*not param*/, false, false, false});
                         pipeUser.push_back(fieldName + DOLLAR + "returnInd");
                         break;
                     }
@@ -174,7 +176,7 @@ printf("[%s:%d] outcall %d usertname %s userif %s fieldname %s type %s\n", __FUN
         IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
         if (size == 1) {
             IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
-                allocExpr(pipeUser.front()), "PipeIn", true});
+                allocExpr(pipeUser.front()), pipeName, true});
         }
         else {
         IR->fields.push_back(FieldElement{"funnel", "", "FunnelBufferedBase(funnelWidth="
@@ -186,15 +188,15 @@ printf("[%s:%d] outcall %d usertname %s userif %s fieldname %s type %s\n", __FUN
             ind++;
         }
         IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
-            allocExpr("funnel$out"), "PipeIn", true});
+            allocExpr("funnel$out"), pipeName, true});
         }
         }
 #if 0
         if (!hasIndication) {
-            IRifc->interfaces.push_back(FieldElement{"indication", "", "PipeIn",
+            IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName,
                 true/*outcall*/, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
-                allocExpr(fieldName + DOLLAR + "returnInd"), "PipeIn", true});
+                allocExpr(fieldName + DOLLAR + "returnInd"), pipeName, true});
         }
 #endif
         fprintf(OStrJ, "\n    ]\n}\n");

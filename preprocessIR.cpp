@@ -343,7 +343,6 @@ static void typeCleanMethod(MethodInfo *MI)
 
 static void typeCleanIR(ModuleIR *IR)
 {
-printf("[%s:%d]IRNANNA %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
     if (auto interface = lookupInterface(IR->interfaceName))
         typeCleanIR(interface);
     for (auto itemi = IR->interfaceConnect.begin(), iteme = IR->interfaceConnect.end(); itemi != iteme; itemi++)
@@ -453,15 +452,21 @@ printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__,
                 goto skipLab;
         }
 printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), field.fldName.c_str(), field.type.c_str());
+        bool replaced = false;
         for (auto mIR : irSeq) {
              for (auto item = mIR->fields.begin(), iteme = mIR->fields.end(); item != iteme; item++)
-                 if (item->type == (*IR)->name)
+                 if (item->type == (*IR)->name) {
                      item->type = field.type;
+                     replaced = true;
+                 }
         }
         // Since we replace all usages, no need to emit module definition
-        mapIndex.erase(mapIndex.find((*IR)->name));
-        IR = irSeq.erase(IR);
-        continue;
+        if (replaced) {
+            mapIndex.erase(mapIndex.find((*IR)->name));
+            mapAllModule.erase(mapAllModule.find((*IR)->name));
+            IR = irSeq.erase(IR);
+            continue;
+        }
         }
 skipLab:;
         IR++;
@@ -507,7 +512,12 @@ skipLab:;
             irName = genericIR->name;
             if (!IR->isExt && !IR->isInterface && !IR->isStruct)
                 irSeq.push_back(genericIR);
-            ModuleIR *paramIR = allocIR(irName+PERIOD+"PARAM", true);
+            int ind = irName.find("(");
+            if (ind > 0)
+                irName = irName.substr(0, ind) + PERIOD "PARAM" + irName.substr(ind);
+            else
+                irName += PERIOD "PARAM";
+            ModuleIR *paramIR = allocIR(irName, true);
             paramIR->isInterface = true;
             genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
             for (auto item: paramMap)
@@ -517,7 +527,7 @@ skipLab:;
     }
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
         if ((*IR)->transformGeneric) {
-            //printf("[%s:%d] delete generic %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str());
+            printf("[%s:%d] delete generic %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str());
             IR = irSeq.erase(IR);
         }
         else
@@ -553,9 +563,7 @@ skipLab:;
         for (auto item: IR->generateBody)
             preprocessMethod(IR, item.second, true);
     }
-    for (auto mapItem : mapIndex)
-        typeCleanIR(mapItem.second);   // normalize all 'PipeIn_xxx' and 'PipeOut_xxx'
-    for (auto mapItem : interfaceIndex)
+    for (auto mapItem : mapAllModule)
         typeCleanIR(mapItem.second);   // normalize all 'PipeIn_xxx' and 'PipeOut_xxx'
     for (auto item: typeCleanMap) {
         std::string name = item.second;
@@ -572,8 +580,9 @@ skipLab:;
             for (auto itemi = MI->params.begin(), iteme = MI->params.end(); itemi != iteme; itemi++)
                 updateCopyType(itemi->type);
         }
-        interfaceIndex[item.first] = IIR; // replace old with new
+        //interfaceIndex[item.first] = IIR; // replace old with new
     }
+#if 0
     for (auto IR : irSeq) {
         for (auto MI: IR->methods) {
             if (MI->type == "" && MI->params.size() == 0)
@@ -614,6 +623,7 @@ skipLab:;
             }
         }
     }
+#endif
 }
 
 /*
@@ -742,7 +752,7 @@ static void hoistVerilog(ModuleIR *top, ModuleIR *current, std::string prefix)
 void cleanupIR(std::list<ModuleIR *> &irSeq)
 {
     // preprocess 'isVerilog' items first -> changes interface
-    for (auto mapItem : mapIndex) {
+    for (auto mapItem : mapAllModule) {
         ModuleIR *IR = mapItem.second;
         ModuleIR *IIR = lookupInterface(IR->interfaceName);
         if (IR->isVerilog)

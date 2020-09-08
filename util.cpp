@@ -28,7 +28,8 @@ int trace_IR;//=1;
 static int trace_iter;//=1;
 static int traceLookup;//=1;
 static int trace_accessible;//=1;
-std::map<std::string, ModuleIR *> mapIndex, mapStripped, interfaceIndex, interfaceStripped;
+std::map<std::string, ModuleIR *> mapIndex, interfaceIndex, mapAllModule;
+static std::map<std::string, ModuleIR *> mapStripped, interfaceStripped;
 
 std::string baseMethodName(std::string pname)
 {
@@ -746,6 +747,7 @@ ModuleIR *allocIR(std::string name, bool isInterface)
         interfaceIndex[iname] = IR;
     else
         mapIndex[iname] = IR;
+    mapAllModule[iname] = IR;
     int i = iname.find("(");
     if (i > 0) {        // also insert without parameter instantiation
         iname = iname.substr(0,i);

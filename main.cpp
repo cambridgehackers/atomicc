@@ -238,7 +238,7 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     std::string defname = myName + "_GENERATED_";
     fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n", defname.c_str(), defname.c_str());
     fprintf(OStrVH, "`include \"atomicclib.vh\"\n\n");
-    for (auto item: mapIndex) {
+    for (auto item: mapAllModule) {
         ModuleIR *IR = item.second;
         if (shouldNotOuput(IR))
             continue;

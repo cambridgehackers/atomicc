@@ -191,7 +191,8 @@ printf("[%s:%d] create '%s'\n", __FUNCTION__, __LINE__, MInew->name.c_str());
     }
     MethodInfo *MInew = lookupMethod(IR, host + PERIOD + "enq");
     std::string sourceParam = baseMethodName(MInew->name) + DOLLAR + MInew->params.front().name;
-    std::string paramLen = convertType(instantiateType(MInew->params.front().type, mapValue));
+    //extract from enq param std::string paramLen = convertType(instantiateType(MInew->params.front().type, mapValue));
+    std::string paramLen = "(16 + 128)"; // TODO: hack replacement for __bitsize(NOCDataH)
     if (generateTrace) {
         ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
             allocExpr("\"DISPLAYP2M %x\""), allocExpr(sourceParam)));
