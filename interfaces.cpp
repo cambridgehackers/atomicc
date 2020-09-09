@@ -75,6 +75,7 @@ static void processM2P(ModuleIR *IR)
     for (auto inter: implements->interfaces) {
         if (inter.isPtr) {
             auto IIR = lookupInterface(inter.type);
+            assert(IIR);
             auto MI = IIR->methods.front();
             target = inter.fldName + PERIOD + MI->name;
             targetParam = baseMethodName(target) + DOLLAR + MI->params.front().name;
