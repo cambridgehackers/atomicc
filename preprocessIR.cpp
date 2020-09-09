@@ -404,26 +404,30 @@ static ModuleIR *copyInterface(std::string oldName, std::string newName, MapName
 
 void preprocessIR(std::list<ModuleIR *> &irSeq)
 {
+    int skipLine = 0;
     // Check/replace dummy intermediate classes that are only present for typechecking
     // e.g., Fifo1 -> Fifo1Base
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
+        bool replaced = false;
+        FieldElement field;
+        ModuleIR *fieldIR = nullptr;
         if ((*IR)->unionList.size()
          || (*IR)->params.size()
          || (*IR)->priority.size()
          || (*IR)->softwareName.size()
          || (*IR)->metaList.size()
          || (*IR)->fields.size() != 1)
-            {} // skip
-        else {
-        FieldElement field = (*IR)->fields.front();
-        ModuleIR *fieldIR = lookupIR(field.type);
-        if (fieldIR)
+            {skipLine = __LINE__; goto skipLab;};
+        field = (*IR)->fields.front();
+        fieldIR = lookupIR(field.type);
+        if (!fieldIR)
+            {skipLine = __LINE__; goto skipLab;};
         if (ModuleIR *fieldInterface = lookupInterface(fieldIR->interfaceName))
         if ((*IR)->interfaceConnect.size()) {
             if ((*IR)->interfaceConnect.size() != fieldInterface->interfaces.size())
-                goto skipLab;
+                {skipLine = __LINE__; goto skipLab;};
             if ((*IR)->methods.size())
-                goto skipLab;
+                {skipLine = __LINE__; goto skipLab;};
 //dumpModule("MASTER", lookupInterface((*IR)->interfaceName));
 //dumpModule("FIELD", lookupInterface(fieldIR->interfaceName));
             for (auto item: (*IR)->interfaceConnect) {
@@ -432,27 +436,26 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
 printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__, __LINE__, target.c_str(), source.c_str(), item.type.c_str(), item.isForward);
                  if ((target != field.fldName + DOLLAR + source)
                   && (source != field.fldName + DOLLAR + target)) {
-                     goto skipLab;
+                     {skipLine = __LINE__; goto skipLab;};
                  }
             }
         }
-        if (!fieldIR || field.vecCount != "" || field.isPtr || field.isInput
+        if (field.vecCount != "" || field.isPtr || field.isInput
           || field.isOutput || field.isInout || field.isParameter != "" || field.isLocalInterface)
-            goto skipLab;
+            {skipLine = __LINE__; goto skipLab;};
         for (auto MI: (*IR)->methods) {
             if (isRdyName(MI->name) && !MI->callList.size())
                continue;
             if (MI->rule || MI->storeList.size() || MI->callList.size() != 1
              || MI->alloca.size() || MI->letList.size() || MI->printfList.size())
-                goto skipLab;
+                {skipLine = __LINE__; goto skipLab;};
             CallListElement *call = MI->callList.front();
             std::string calltarget = replacePeriod(call->value->value);
             std::string fieldtarget = replacePeriod(field.fldName + DOLLAR + MI->name);
             if (call->cond || calltarget != fieldtarget)
-                goto skipLab;
+                {skipLine = __LINE__; goto skipLab;};
         }
 printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), field.fldName.c_str(), field.type.c_str());
-        bool replaced = false;
         for (auto mIR : irSeq) {
              for (auto item = mIR->fields.begin(), iteme = mIR->fields.end(); item != iteme; item++)
                  if (item->type == (*IR)->name) {
@@ -461,14 +464,15 @@ printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name
                  }
         }
         // Since we replace all usages, no need to emit module definition
+        // If we found no usages, generate verilog module
         if (replaced) {
             mapIndex.erase(mapIndex.find((*IR)->name));
             mapAllModule.erase(mapAllModule.find((*IR)->name));
             IR = irSeq.erase(IR);
             continue;
         }
-        }
 skipLab:;
+        printf("[%s:%d] skipped %s check line %d\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), skipLine);
         IR++;
     }
     // even convert 'EMODULE' items
