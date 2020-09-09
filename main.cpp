@@ -175,10 +175,10 @@ static bool shouldNotOuput(ModuleIR *IR)
     return false;
 }
 
-static void appendInterface(std::string name, std::string params)
+static void appendInterface(std::string orig, std::string params)
 {
     MapNameValue mapValue;
-    name = genericModuleParam(name, params, &mapValue); // if we inherit parameters, use them (unless we already had some)
+    std::string name = genericModuleParam(orig, params, &mapValue); // if we inherit parameters, use them (unless we already had some)
     std::string shortName = cleanupModuleType(name);
     int ind = shortName.find_first_of("(" "#");
     if (ind > 0)
@@ -188,14 +188,14 @@ static void appendInterface(std::string name, std::string params)
     if (interfaceSeen[shortName])
         return;
     interfaceSeen[shortName] = true;
-    ModuleIR *IR = lookupInterface(name);
+    ModuleIR *IR = lookupInterface(orig);
     assert(IR);
     if (shouldNotOuput(IR))
         return;
     for (auto item: IR->interfaces) {
         appendInterface(item.type, params);
     }
-    interfaceList.push_back(name);
+    interfaceList.push_back(orig);
 }
 
 int main(int argc, char **argv)

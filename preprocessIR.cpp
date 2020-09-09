@@ -151,13 +151,17 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
             walkToGeneric(item.incr, paramMap),
             walkToGeneric(item.sub, paramMap), item.body});
     //newMI->meta = MI->meta;
-    for (auto item : MI->params)
-        newMI->params.push_back(ParamElement{item.name, updateType(item.type, paramMap), ""});
+    for (auto item : MI->params) {
+        std::string type = updateType(item.type, paramMap);
+        newMI->params.push_back(ParamElement{item.name, type, ""});
+    }
 }
 
 static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface)
 {
 static int counter;
+    if (!(startswith(irName, "PipeIn(") || startswith(irName, "PipeInB(")
+     || startswith(irName, "PipeOut(")))
     if (isInterface) {
         std::string sub;
         int ind = irName.find("(");
@@ -466,6 +470,7 @@ printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name
         // Since we replace all usages, no need to emit module definition
         // If we found no usages, generate verilog module
         if (replaced) {
+            //printf("[%s:%d] erase %s/%p\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), (*IR));
             mapIndex.erase(mapIndex.find((*IR)->name));
             mapAllModule.erase(mapAllModule.find((*IR)->name));
             IR = irSeq.erase(IR);
@@ -526,12 +531,13 @@ skipLab:;
             genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
             for (auto item: paramMap)
                 paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", false, false, false, false, item.value, false, false, false});
+            //printf("[%s:%d]BEGOREGEN %s/%p -> %s/%p\n", __FUNCTION__, __LINE__, modName.c_str(), IR, genericIR->name.c_str(), genericIR);
             //dumpModule("GENERIC", genericIR);
         }
     }
     for (auto IR = irSeq.begin(), IRE = irSeq.end(); IR != IRE;) {
         if ((*IR)->transformGeneric) {
-            printf("[%s:%d] delete generic %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str());
+            printf("[%s:%d] delete generic %s/%p\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), (void *)(*IR));
             IR = irSeq.erase(IR);
         }
         else

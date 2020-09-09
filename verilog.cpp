@@ -177,7 +177,11 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
         bool out = instance ^ isPtr;
         std::list<ParamElement> params;
         for (auto pitem: MI->params)
-            params.push_back(ParamElement{pitem.name, instantiateType(pitem.type, mapValue), pitem.init});
+{
+            std::string type = instantiateType(pitem.type, mapValue);
+printf("[%s:%d] method %s pitem.type %s -> type %s\n", __FUNCTION__, __LINE__, name.c_str(), pitem.type.c_str(), type.c_str());
+            params.push_back(ParamElement{pitem.name, type, pitem.init});
+}
         pinPorts.push_back(PinInfo{PINI_METHOD, instantiateType(MI->type, mapValue), name, out, false, isLocal, params, ""/*not param*/, MI->action, vecCount});
     }
     if (!localInterface || pinPrefix != "")
@@ -271,8 +275,21 @@ static std::string moduleInstance(std::string name, std::string params)
 static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std::string instance, ModList &modParam, std::string params, std::string vecCount)
 {
     MapNameValue mapValue;
-    if (instance != "")
-    extractParam("SIGN_" + IR->name, instanceType, mapValue);
+    if (instance != "") {
+        extractParam("SIGN_" + IR->name, instanceType, mapValue);
+        extractParam("SIGNIFC_" + IR->name, IR->interfaceName, mapValue);
+    }
+    else {
+        // only substitute parameters in interface what were not present in original module definition
+        MapNameValue mapValueMod;
+        extractParam("SIGN_" + IR->name, IR->name, mapValueMod);
+        extractParam("SIGNIFC_" + IR->name, IR->interfaceName, mapValue);
+        for (auto item: mapValueMod) {
+             auto result = mapValue.find(item.first);
+             if (result != mapValue.end())
+                 mapValue.erase(result);
+        }
+    }
     std::string minst;
     if (instance != "")
         minst = instance.substr(0, instance.length()-1);
@@ -308,8 +325,10 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
     handleCLK = true;
     ModuleIR *implements = lookupInterface(IR->interfaceName);
     collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "", false);
-    if (instance == "")
+    if (instance == "") {
+        mapValue.clear();
         collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true);
+    }
     for (FieldElement item : IR->parameters) {
         //extractParam("PARAM_" + item.name, item.type, mapValue);
         std::string interfaceName = item.fldName;
@@ -922,7 +941,7 @@ static void connectMethods(ModuleIR *IR, std::string interfaceName, ACCExpr *tar
     bool targetIsVerilog = verilogInterface(IR, ICtarget);
     bool sourceIsVerilog = verilogInterface(IR, ICsource);
     if (trace_connect)
-        printf("%s: CONNECT target '%s' source '%s' forward %d\n", __FUNCTION__, ICtarget.c_str(), ICsource.c_str(), isForward);
+        printf("%s: CONNECT target '%s' source '%s' forward %d interfaceName %s\n", __FUNCTION__, ICtarget.c_str(), ICsource.c_str(), isForward, interfaceName.c_str());
     for (auto fld : IIR->fields) {
         ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
         if (target->value == "" || endswith(target->value, DOLLAR) || targetIsVerilog)
@@ -1209,7 +1228,7 @@ static ModList modLine;
     modLine.clear();
     syncPins.clear();     // pins from PipeInSync
 
-    printf("[%s:%d] STARTMODULE %s\n", __FUNCTION__, __LINE__, IR->name.c_str());
+    printf("[%s:%d] STARTMODULE %s/%p\n", __FUNCTION__, __LINE__, IR->name.c_str(), (void *)IR);
     //dumpModule("START", IR);
     generateModuleSignature(IR, "", "", modLineTop, "", "");
 

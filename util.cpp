@@ -179,7 +179,7 @@ std::string instantiateType(std::string arg, MapNameValue &mapValue) // also che
             newval = val->second;
         if (rets != "0" && rets != "1" && newval != "") { // don't translate trivial values
             if (trace_parameters)
-                printf("[%s:%d] INSTTTANTIATE %s -> %s\n", __FUNCTION__, __LINE__, arg.c_str(), newval.c_str());
+                printf("%s: INSTANTIATE %s -> %s\n", __FUNCTION__, arg.c_str(), newval.c_str());
             rets = newval;
         }
         if (hasAtSign)
