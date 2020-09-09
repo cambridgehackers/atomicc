@@ -178,6 +178,8 @@ static bool shouldNotOuput(ModuleIR *IR)
 static void appendInterface(std::string orig, std::string params)
 {
     MapNameValue mapValue;
+    MapNameValue mapValueExclude;
+    extractParam("APPEND_" + orig, orig, mapValueExclude);
     std::string name = genericModuleParam(orig, params, &mapValue); // if we inherit parameters, use them (unless we already had some)
     std::string shortName = cleanupModuleType(name);
     int ind = shortName.find_first_of("(" "#");
@@ -193,7 +195,15 @@ static void appendInterface(std::string orig, std::string params)
     if (shouldNotOuput(IR))
         return;
     for (auto item: IR->interfaces) {
+        MapNameValue mapValueInterface;
+        extractParam("APPENDI_" + item.type, item.type, mapValueInterface);
+        // if the value of any of the parameters in this instantiation depends on
+        // a parameter from the referencing module, do not generate (for example FunnelBase and PipeIn)
+        for (auto item: mapValueInterface)
+            if (mapValueExclude.find(item.second) != mapValueExclude.end())
+                goto nextItem;
         appendInterface(item.type, params);
+nextItem:;
     }
     interfaceList.push_back(orig);
 }
