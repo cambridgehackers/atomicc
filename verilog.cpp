@@ -55,6 +55,17 @@ static void traceZero(const char *label)
     }
 }
 
+static void setReference(std::string target, int count, std::string type, bool out = false, bool inout = false,
+    int pin = PIN_WIRE, bool done = false, std::string vecCount = "", bool isArgument = false)
+{
+bool isGenerated = false;
+    if (refList[target].pin) {
+        printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, target.c_str(), refList[target].pin, pin);
+    }
+    assert (!refList[target].pin);
+    refList[target] = RefItem{count, type, out, inout, pin, done, isGenerated, vecCount, isArgument};
+}
+
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
     fixupAccessible(target);
@@ -225,7 +236,7 @@ printf("[%s:%d] method %s pitem.type %s -> type %s\n", __FUNCTION__, __LINE__, n
                     std::string oldName = name + suffix;
                     fixupAccessible(oldName);
 printf("[%s:%d] SSSS oldname %s name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LINE__, oldName.c_str(), name.c_str(), out, isPtr, instance);
-                    syncPins[oldName] = SyncPinsInfo{name + "S" + suffix, out, isPtr, instance};
+                    syncPins[oldName] = SyncPinsInfo{"_" + name + "S" + suffix, out, isPtr, instance};
                 }
             }
             pinPorts.push_back(PinInfo{PINI_INTERFACE, type, methodPrefix + interfaceName, out, false, localFlag, params, ""/*not param*/, false, updatedVecCount});
@@ -294,17 +305,15 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
             vc = interfaceVecCount;   // HACKHACKHACK
         int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
         std::string instName = instance + name;
+        fixupAccessible(instName);
+        if (instName.find(PERIOD) == std::string::npos)
         if (!isLocal || instance == "") {
-        if (refList[instName].pin) {
-            printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, instName.c_str(), refList[instName].pin, refPin);
-        }
-        assert (!refList[instName].pin);
-        refList[instName] = RefItem{((dir != 0 || inout) && instance == "") || vc != "", type, dir != 0, inout, refPin, false, false, vc, isArgument};
+            setReference(instName, ((dir != 0 || inout) && instance == "") || vc != "", type, dir != 0, inout, refPin, false, vc, isArgument);
             if(instance == "" && interfaceVecCount != "")
                 refList[instName].done = true;  // prevent default blanket assignment generation
         }
         if (!isLocal)
-        modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
+            modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
         if (trace_assign || trace_ports || trace_interface)
             printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s' pin %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str(), refPin);
     };
@@ -380,9 +389,9 @@ printf("[%s:%d]befpin '%s' fldname '%s'\n", __FUNCTION__, __LINE__, interfaceNam
                 hasnRST = true;
         }
     if (!handleCLK && !hasCLK && vecCount == "")
-        refList["CLK"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, false, "", false};
+        setReference("CLK", 1, "Bit(1)", false, false, PIN_LOCAL);
     if (!handleCLK && !hasnRST && vecCount == "")
-        refList["nRST"] = RefItem{1, "Bit(1)", false, false, PIN_LOCAL, false, false, "", false};
+        setReference("nRST", 1, "Bit(1)", false, false, PIN_LOCAL);
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -1225,25 +1234,23 @@ static ModList modLine;
     //dumpModule("START", IR);
     generateModuleSignature(IR, "", "", modLineTop, "", "");
 
-    iterField(IR, CBAct {
+    for (auto item: IR->fields) {
+        fixupAccessible(item.fldName);
         ModuleIR *itemIR = lookupIR(item.type);
         if (!itemIR || item.isPtr || itemIR->isStruct) {
-            if (refList[item.fldName].pin) {
-                printf("[%s:%d] dupppp %s pin %d\n", __FUNCTION__, __LINE__, item.fldName.c_str(), refList[item.fldName].pin);
-            }
-            assert (!refList[item.fldName].pin);
-            refList[item.fldName] = RefItem{item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, false, item.vecCount, false};
+            if (item.fldName.find(PERIOD) == std::string::npos)
+            setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, item.vecCount);
         }
         else
             generateModuleSignature(itemIR, item.type, item.fldName + DOLLAR, modLine, IR->params[item.fldName], item.vecCount);
-        return nullptr; });
+    }
     for (auto item: syncPins) {
         if (item.second.name != "") {
             //bool out = item.second.out;
             //bool isPtr = item.second.isPtr;
             bool instance = item.second.instance;
             std::string sname = item.second.name;
-            refList[sname] = RefItem{4, "Bit(1)", false, false, PIN_LOCAL, false, false, "", false};
+            setReference(sname, 4, "Bit(1)", false, false, PIN_LOCAL);
             modLine.push_back(ModData{replacePeriod(item.first) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
             modLine.push_back(ModData{"out", instance ? item.first : sname, "Bit(1)", false, false, true/*out*/, false, "", ""});
             modLine.push_back(ModData{"in", instance ? sname : item.first, "Bit(1)", false, false, false /*out*/, false, "", ""});
@@ -1253,10 +1260,8 @@ static ModList modLine;
     }
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
-        if (MI->rule) {    // both RDY and ENA must be allocated for rules
-            assert (!refList[methodName].pin);
-            refList[methodName] = RefItem{0, MI->type, true, false, PIN_WIRE, false, false, "", false};
-        }
+        if (MI->rule)             // both RDY and ENA must be allocated for rules
+            setReference(methodName, 0, MI->type, true);
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
             value->value = "(";   // change from PARAMETER_MARKER
@@ -1270,12 +1275,10 @@ static ModList modLine;
             }
         }
         for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
-            if (refList[item.first].pin) {
-                printf("[%s:%d] error in alloca name '%s' pin %d type '%s'\n", __FUNCTION__, __LINE__, item.first.c_str(), refList[item.first].pin, item.second.type.c_str());
-            }
-            assert (!refList[item.first].pin);
+            std::string pinName = item.first;
             bool isStruct = lookupIR(item.second.type) != nullptr || lookupInterface(item.second.type) != nullptr;
-            refList[item.first] = RefItem{isStruct ? 2 : 0, item.second.type, true, false, PIN_WIRE, false, false, convertType(item.second.type, 2), false};
+            fixupAccessible(pinName);
+            setReference(pinName, isStruct ? 2 : 0, item.second.type, true, false, PIN_WIRE, false, convertType(item.second.type, 2));
         }
         for (auto item: MI->generateFor) {
             MethodInfo *MIb = IR->generateBody[item.body];
@@ -1328,8 +1331,8 @@ static ModList modLine;
                     // to that the subscripted 'setAssign' below compiles correctly
                     // (you can use 'foo[0]' if the declaration is 'wire [0:0] foo',
                     // but not if the declaration is 'wire foo').  Hmm...
-                    refList[name_or] = RefItem{99, "Bit( " + nameVec + ")", false, false, PIN_WIRE, false, false, "", false};
-                    refList[name_or1] = RefItem{99, "Bit(1)", false, false, PIN_WIRE, false, false, "", false};
+                    setReference(name_or, 99, "Bit( " + nameVec + ")");
+                    setReference(name_or1, 99, "Bit(1)");
                     setAssign(name_or1, allocExpr("@|", allocExpr(name_or)), "Bit(1)");
                     assignList[name_or1].noRecursion = true;
                     ACCExpr *var = allocExpr(GENVAR_NAME "1");

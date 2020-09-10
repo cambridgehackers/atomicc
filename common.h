@@ -115,7 +115,6 @@ typedef struct {
 } CondLineType;
 
 typedef ModuleIR *(^CBFun)(FieldElement &item);
-#define CBAct ^ ModuleIR * (FieldElement &item)
 
 typedef std::map<std::string, std::string> MapNameValue;
 
@@ -133,7 +132,6 @@ ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);
 std::string sizeProcess(std::string type);
 std::string typeDeclaration(std::string type);
-ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker);
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name);
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount, MapNameValue &mapValue);
 std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr);
@@ -155,6 +153,7 @@ void buildAccessible(ModuleIR *IR);
 void fixupAccessible(std::string &name);
 void walkAccessible(ACCExpr *expr);
 std::string cleanupModuleType(std::string type);
+void normalizeIdentifier(ACCExpr *expr);
 
 // expr.cpp
 bool bitOp(std::string s);

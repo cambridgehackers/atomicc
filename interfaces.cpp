@@ -118,31 +118,6 @@ assert(HIR);
         //}
         std::string paramPrefix = baseMethodName(methodName) + DOLLAR;
         int64_t dataLength = 32; // include length of tag
-#if 0
-        std::string call;
-        for (auto param: MI->params) {
-            MInew->params.push_back(param);
-            dataLength += atoi(convertType(instantiateType(param.type, mapValue)).c_str());
-            call += ", " + paramPrefix + param.name;
-        }
-        uint64_t vecLength = (dataLength + 31) / 32;
-        dataLength = vecLength * 32 - dataLength;
-        if (dataLength)
-            call = ", " + autostr(dataLength) + "'d0" + call;
-        dataLength = 128 - vecLength * 32;
-        if (dataLength > 0)
-            call += ", " + autostr(dataLength) + "'d0";
-        std::string sourceParam = "{ 16'd" + autostr(counter) + ", 16'd"
-            + autostr(PORTALNUM)+ call + ", 16'd" + autostr(vecLength) + "}";
-        MInew->callList.push_back(new CallListElement{
-            allocExpr(target, allocExpr(PARAMETER_MARKER,
-                allocExpr(sourceParam))), nullptr, true});
-        if (generateTrace) {
-            ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
-                allocExpr("\"DISPLAYM2P %x\""), allocExpr(sourceParam)));
-            MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
-        }
-#else
         ACCExpr *sourceParam = allocExpr(",");
         for (auto param: MI->params) {
             MInew->params.push_back(param);
@@ -167,7 +142,6 @@ assert(HIR);
                 allocExpr("\"DISPLAYM2P %x\""), allocExpr("{", sourceParam)));
             MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
         }
-#endif
         counter++;
     }
     if (trace_software)
@@ -259,26 +233,9 @@ assert(MInew);
                 //MInew->callList.push_back(new CallListElement{call, cond, true});
             }
             // when calling 'value' or 'actionValue' method, enqueue return value
-        int64_t dataLength = 32 + 16; // include length of tag and bitlength
         std::string target = "returnInd$enq__ENA";
-
-            dataLength += atoi(convertType(instantiateType(MI->type, mapValue)).c_str());
-#if 0
-            std::string call = ", " + callExpr->value;
-        call += ", 16'd" + autostr(10/* bitlength*/);
-        uint64_t vecLength = (dataLength + 31) / 32;
-        dataLength = vecLength * 32 - dataLength;
-        if (dataLength)
-            call = ", " + autostr(dataLength) + "'d0" + call;
-        dataLength = 128 - vecLength * 32;
-        if (dataLength > 0)
-            call += ", " + autostr(dataLength) + "'d0";
-        std::string sourceParam = "{ 16'd" + autostr(counter) + ", 16'd"
-            + autostr(PORTALNUM)+ call + ", 16'd" + autostr(vecLength) + "}";
-        MInew->callList.push_back(new CallListElement{
-            allocExpr(target, allocExpr(PARAMETER_MARKER,
-                allocExpr(sourceParam))), cond, true});
-#else
+        int64_t dataLength = 32 + 16; // include length of tag and bitlength
+        dataLength += atoi(convertType(instantiateType(MI->type, mapValue)).c_str());
         ACCExpr *sourceParam = allocExpr(",");
         sourceParam->operands.push_back(allocExpr(callExpr->value));
         sourceParam->operands.push_back(allocExpr("16'd" + autostr(10/* bitlength*/)));
@@ -287,16 +244,14 @@ assert(MInew);
         if (dataLength)
             sourceParam->operands.push_front(allocExpr(autostr(dataLength) + "'d0"));
         dataLength = 128 - vecLength * 32;
-        if (dataLength > 0) {
+        if (dataLength > 0)
             sourceParam->operands.push_back(allocExpr(autostr(dataLength) + "'d0"));
-        }
         sourceParam->operands.push_front(allocExpr("16'd" + autostr(PORTALNUM)));
         sourceParam->operands.push_front(allocExpr("16'd" + autostr(counter)));
         sourceParam->operands.push_back(allocExpr("16'd" + autostr(vecLength)));
         MInew->callList.push_back(new CallListElement{
             allocExpr(target, allocExpr(PARAMETER_MARKER,
                 allocExpr("{", sourceParam))), cond, true});
-#endif
         }
         else
         MInew->callList.push_back(new CallListElement{callExpr, cond, true});

@@ -385,28 +385,6 @@ std::string typeDeclaration(std::string type)
     return "logic " + sizeProcess(type);
 }
 
-ModuleIR *iterField(ModuleIR *IR, CBFun cbWorker)
-{
-    for (auto item: IR->fields) {
-        if (trace_iter)
-            printf("[%s:%d] item.fldname %s vec '%s'\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
-        if (auto ret = (cbWorker)(item))
-            return ret;
-    }
-    return nullptr;
-}
-
-ModuleIR *iterInterface(ModuleIR *IR, CBFun cbWorker)
-{
-    for (auto item: IR->interfaces) {
-        if (trace_iter)
-            printf("[%s:%d] item.fldname %s vec '%s'\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.vecCount.c_str());
-        if (auto ret = (cbWorker)(item))
-            return ret;
-    }
-    return nullptr;
-}
-
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name)
 {
     std::string nameENA = name + "__ENA";
@@ -462,12 +440,13 @@ std::string findAccessible(std::string aname)
 
 void fixupAccessible(std::string &name)
 {
+    std::string orig = name;
     name = replacePeriod(name);
     if (int len = findAccessible(name).length()) {
         std::string interface = name.substr(0, len), sub1, sub2;
         name = name.substr(len);
         if (trace_interface)
-            printf("[%s:%d] interface %s name %s pin %d count %d\n", __FUNCTION__, __LINE__, interface.c_str(), name.c_str(), refList[interface].pin, refList[interface].count);
+            printf("[%s:%d] orig %s len = %d interface %s name %s pin %d count %d\n", __FUNCTION__, __LINE__, orig.c_str(), len, interface.c_str(), name.c_str(), refList[interface].pin, refList[interface].count);
         if (name[0] == '[') {
             int ind = name.find("]");
             sub1 = name.substr(0, ind+1);
@@ -493,10 +472,26 @@ void fixupAccessible(std::string &name)
     }
 }
 
+void normalizeIdentifier(ACCExpr *expr)
+{
+    if (expr->value == PERIOD) {
+        std::string ret, sep;
+        for (auto item: expr->operands) {
+            if (!isIdChar(item->value[0]) || item->operands.size())
+                return;
+            ret += sep + item->value;
+            sep = PERIOD;
+        }
+        expr->value = ret;
+        expr->operands.clear();
+    }
+    fixupAccessible(expr->value);
+}
+
 static void foldSingle(ACCExpr *expr)
 {
-    if (!expr)
-        return;
+    //if (!expr)
+        //return;
     if (expr->value == PERIOD) {
         if (expr->operands.size() < 2) {
             dumpExpr("BADFIELDSPEC", expr);
@@ -539,7 +534,6 @@ void walkFixup(ACCExpr *expr)
 
 void walkRewrite (ACCExpr *expr)
 {
-    //foldMember(expr);
     if (!expr)
         return;
     if (isIdChar(expr->value[0]))
@@ -553,11 +547,7 @@ void walkAccessible(ACCExpr *expr)
     if (!expr)
         return;
     //foldSingle(expr);
-    if (expr->value == PERIOD)
-        foldMember(expr);
-    if (isIdChar(expr->value[0])) {
-        fixupAccessible(expr->value);
-    }
+    normalizeIdentifier(expr);
     for (auto item: expr->operands)
         walkAccessible(item);
 }
@@ -701,13 +691,16 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
         int ind = searchStr.find(PERIOD);
         fieldName = searchStr.substr(0, ind);
         searchStr = searchStr.substr(ind+1);
-        ModuleIR *nextIR = iterField(searchIR, CBAct {
-                std::string fldName = item.fldName;
-                if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
-                if (fieldName != "" && fldName == fieldName)
-                    return lookupIR(item.type);
-            return nullptr; });
+        ModuleIR *nextIR = nullptr;
+        for (auto item: searchIR->fields) {
+            std::string fldName = item.fldName;
+            if (trace_iter)
+                printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
+            if (fieldName != "" && fldName == fieldName) {
+                nextIR = lookupIR(item.type);
+                break;
+            }
+        }
         if (!nextIR)
             break;
         outName += fieldName + PERIOD;
@@ -720,13 +713,16 @@ std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
             fieldName = searchStr.substr(0, ind);
             searchStr = searchStr.substr(ind+1);
         }
-        ModuleIR *nextIR = iterInterface(searchIR, CBAct {
-                std::string fldName = item.fldName;
-                if (trace_iter)
-                    printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
-                if (fieldName != "" && fldName == fieldName)
-                    return lookupInterface(item.type);
-            return nullptr; });
+        ModuleIR *nextIR = nullptr;
+        for (auto item: searchIR->interfaces) {
+            std::string fldName = item.fldName;
+            if (trace_iter)
+                printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
+            if (fieldName != "" && fldName == fieldName) {
+                nextIR = lookupInterface(item.type);
+                break;
+            }
+        }
         if (!nextIR)
             break;
         outName += fieldName;
