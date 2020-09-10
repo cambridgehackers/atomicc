@@ -105,8 +105,13 @@ typedef struct {
 } SyncPinsInfo;
 
 typedef struct {
+    ACCExpr    *cond;
+    ACCExpr    *value;
+} AssertVerilog;
+
+typedef struct {
     std::map<std::string, CondGroup> always;
-    std::list<std::string>           assert;
+    std::list<AssertVerilog>         assert;
 } CondLineType;
 
 typedef ModuleIR *(^CBFun)(FieldElement &item);

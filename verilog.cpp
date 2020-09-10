@@ -135,18 +135,6 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
         addRead(MI->meta[MetaRead][fieldName], cond);
 }
 
-static bool walkSearch (ACCExpr *expr, std::string search)
-{
-    if (!expr)
-        return false;
-    if (expr->value == search)
-        return true;
-    for (auto item: expr->operands)
-        if (walkSearch(item, search))
-            return true;
-    return false;
-}
-
 enum {PINI_NONE, PINI_PORT, PINI_METHOD, PINI_PARAM, PINI_INTERFACE};
 typedef struct {
     int         variant;
@@ -161,7 +149,7 @@ std::list<PinInfo> pinPorts;
 
 
 static bool handleCLK;
-static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface)
+static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface, bool isVerilog)
 {
 //dumpModule("COLLECT", IR);
     assert(IR);
@@ -171,6 +159,7 @@ static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPre
     vecCount = instantiateType(vecCount, mapValue);
 //for (auto item: mapValue)
 //printf("[%s:%d] [%s] = %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
+//printf("[%s:%d] IR %s instance %d pinpref %s methpref %s isLocal %d ptr %d isVerilog %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance, pinPrefix.c_str(), methodPrefix.c_str(), isLocal, isPtr, isVerilog);
     if (!localInterface || methodPrefix != "")
     for (auto MI: IR->methods) {
         std::string name = methodPrefix + MI->name;
@@ -225,8 +214,8 @@ printf("[%s:%d] method %s pitem.type %s -> type %s\n", __FUNCTION__, __LINE__, n
         std::list<ParamElement> params;
         std::string updatedVecCount = instantiateType(item.vecCount, mapValue);
         bool localFlag = isLocal || item.isLocalInterface;
-        if (item.fldName == "")
-            collectInterfacePins(IIR, instance, pinPrefix + item.fldName, methodPrefix + interfaceName, localFlag, mapValue, ptrFlag, updatedVecCount, localInterface);
+        if (item.fldName == "" || isVerilog)
+            collectInterfacePins(IIR, instance, pinPrefix + item.fldName, methodPrefix + interfaceName + DOLLAR, localFlag, mapValue, ptrFlag, updatedVecCount, localInterface, isVerilog);
         else {
             if (startswith(type, "PipeInSync")) {
                 type = IIR->interfaces.front().type;   // rewrite to PipeIn type
@@ -324,10 +313,10 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
     pinPorts.clear();
     handleCLK = true;
     ModuleIR *implements = lookupInterface(IR->interfaceName);
-    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "", false);
+    collectInterfacePins(implements, instance != "", "", "", false, mapValue, false, "", false, IR->isVerilog);
     if (instance == "") {
         mapValue.clear();
-        collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true);
+        collectInterfacePins(IR, instance != "", "", "", false, mapValue, false, "", true, IR->isVerilog);
     }
     for (FieldElement item : IR->parameters) {
         //extractParam("PARAM_" + item.name, item.type, mapValue);
@@ -340,7 +329,7 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
         if (interfaceName != "")
             interfaceName += PERIOD;
 printf("[%s:%d]befpin '%s' fldname '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str(), item.fldName.c_str());
-        collectInterfacePins(IIR, instance != "", item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false);
+        collectInterfacePins(IIR, instance != "", item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, IR->isVerilog);
     }
     std::string moduleInstantiation = IR->name;
     int ind = moduleInstantiation.find("(");
@@ -1050,6 +1039,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         ACCExpr *tempCond = guard ? allocExpr("&&", guard, cond) : cond;
         tempCond = cleanupBool(tempCond);
         std::string calledName = value->value, calledEna = getEnaName(calledName);
+#if 0
         std::string sensitivity = "*";
         if (walkSearch(tempCond, "$past"))
             sensitivity = " posedge CLK";
@@ -1061,6 +1051,9 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             indent = "    ";
         }
         condLines[generateSection].assert.push_back("    " + indent + tree2str(value) + ";");
+#else
+        condLines[generateSection].assert.push_back(AssertVerilog{tempCond, value});
+#endif
     }
     for (auto info: MI->callList) {
         ACCExpr *subscript = nullptr;

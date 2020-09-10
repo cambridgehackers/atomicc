@@ -747,16 +747,21 @@ static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
     }
 }
 
-static void hoistVerilog(ModuleIR *top, ModuleIR *current, std::string prefix)
+static bool hoistVerilog(ModuleIR *top, ModuleIR *current, std::string prefix)
 {
+    bool keep = false;
     if (top != current)
     for (auto item: current->fields)
          top->fields.push_back(FieldElement{prefix + item.fldName, item.vecCount,
              item.type, item.isPtr, item.isInput, item.isOutput, item.isInout,
              item.isParameter, item.isShared, item.isLocalInterface, item.isExternal});
+    current->fields.clear();
     for (auto item: current->interfaces)
-         hoistVerilog(top, lookupInterface(item.type), prefix+item.fldName);
-    current->interfaces.clear();
+         keep |= hoistVerilog(top, lookupInterface(item.type), prefix+item.fldName);
+    keep |= current->methods.size();
+    if (!keep)
+        current->interfaces.clear();
+    return keep;
 }
 
 void cleanupIR(std::list<ModuleIR *> &irSeq)

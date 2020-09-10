@@ -47,6 +47,7 @@ ACCExpr *replacePins(ACCExpr *expr)
     if (!expr)
         return expr;
     normalizeIdentifier(expr);
+    fixupAccessible(expr->value);
     expr->value = finishString(expr->value);
     for (auto operand: expr->operands)
         replacePins(operand);
@@ -157,6 +158,18 @@ static std::string declareInstance(std::string type, std::string vecCountStr, st
     else
         return "";
     return genericModuleParam(type, params) + " " + vecCountStr + ret;
+}
+
+static bool walkSearch (ACCExpr *expr, std::string search)
+{
+    if (!expr)
+        return false;
+    if (expr->value == search)
+        return true;
+    for (auto item: expr->operands)
+        if (walkSearch(item, search))
+            return true;
+    return false;
 }
 
 void generateVerilogOutput(FILE *OStr)
@@ -361,8 +374,23 @@ next:;
     }
     if (ctop->second.assert.size())
         fprintf(OStr, "`ifdef	FORMAL\n");
-    for (auto item: ctop->second.assert)
-        fprintf(OStr, "    %s\n", item.c_str());
+    for (auto item: ctop->second.assert) {
+#if 0
+        fprintf(OStr, "    %s\n", finishExpr(str2tree(item)).c_str());
+#else
+        std::string sensitivity = "*";
+        if (walkSearch(item.cond, "$past"))
+            sensitivity = " posedge CLK";
+        fprintf(OStr, "    %s\n", ("always @(" + sensitivity + ")").c_str());
+        std::string indent;
+        std::string condStr = finishExpr(item.cond);
+        if (condStr != "" && condStr != "1") {
+            fprintf(OStr, "    %s\n", ("    if (" + condStr + ")").c_str());
+            indent = "    ";
+        }
+        fprintf(OStr, "    %s\n", ("    " + indent + finishExpr(item.value) + ";").c_str());
+#endif
+    }
     if (ctop->second.assert.size())
         fprintf(OStr, "`endif\n");
     }

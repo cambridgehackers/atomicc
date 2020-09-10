@@ -117,8 +117,9 @@ assert(HIR);
             //continue;
         //}
         std::string paramPrefix = baseMethodName(methodName) + DOLLAR;
-        std::string call;
         int64_t dataLength = 32; // include length of tag
+#if 0
+        std::string call;
         for (auto param: MI->params) {
             MInew->params.push_back(param);
             dataLength += atoi(convertType(instantiateType(param.type, mapValue)).c_str());
@@ -141,6 +142,32 @@ assert(HIR);
                 allocExpr("\"DISPLAYM2P %x\""), allocExpr(sourceParam)));
             MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
         }
+#else
+        ACCExpr *sourceParam = allocExpr(",");
+        for (auto param: MI->params) {
+            MInew->params.push_back(param);
+            dataLength += atoi(convertType(instantiateType(param.type, mapValue)).c_str());
+            sourceParam->operands.push_back(allocExpr(paramPrefix + param.name));
+        }
+        uint64_t vecLength = (dataLength + 31) / 32;
+        dataLength = vecLength * 32 - dataLength;
+        if (dataLength)
+            sourceParam->operands.push_front(allocExpr(autostr(dataLength) + "'d0"));
+        dataLength = 128 - vecLength * 32;
+        if (dataLength > 0)
+            sourceParam->operands.push_back(allocExpr(autostr(dataLength) + "'d0"));
+        sourceParam->operands.push_front(allocExpr("16'd" + autostr(PORTALNUM)));
+        sourceParam->operands.push_front(allocExpr("16'd" + autostr(counter)));
+        sourceParam->operands.push_back(allocExpr("16'd" + autostr(vecLength)));
+        MInew->callList.push_back(new CallListElement{
+            allocExpr(target, allocExpr(PARAMETER_MARKER,
+                allocExpr("{", sourceParam))), nullptr, true});
+        if (generateTrace) {
+            ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
+                allocExpr("\"DISPLAYM2P %x\""), allocExpr("{", sourceParam)));
+            MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
+        }
+#endif
         counter++;
     }
     if (trace_software)
@@ -236,6 +263,7 @@ assert(MInew);
         std::string target = "returnInd$enq__ENA";
 
             dataLength += atoi(convertType(instantiateType(MI->type, mapValue)).c_str());
+#if 0
             std::string call = ", " + callExpr->value;
         call += ", 16'd" + autostr(10/* bitlength*/);
         uint64_t vecLength = (dataLength + 31) / 32;
@@ -250,6 +278,25 @@ assert(MInew);
         MInew->callList.push_back(new CallListElement{
             allocExpr(target, allocExpr(PARAMETER_MARKER,
                 allocExpr(sourceParam))), cond, true});
+#else
+        ACCExpr *sourceParam = allocExpr(",");
+        sourceParam->operands.push_back(allocExpr(callExpr->value));
+        sourceParam->operands.push_back(allocExpr("16'd" + autostr(10/* bitlength*/)));
+        uint64_t vecLength = (dataLength + 31) / 32;
+        dataLength = vecLength * 32 - dataLength;
+        if (dataLength)
+            sourceParam->operands.push_front(allocExpr(autostr(dataLength) + "'d0"));
+        dataLength = 128 - vecLength * 32;
+        if (dataLength > 0) {
+            sourceParam->operands.push_back(allocExpr(autostr(dataLength) + "'d0"));
+        }
+        sourceParam->operands.push_front(allocExpr("16'd" + autostr(PORTALNUM)));
+        sourceParam->operands.push_front(allocExpr("16'd" + autostr(counter)));
+        sourceParam->operands.push_back(allocExpr("16'd" + autostr(vecLength)));
+        MInew->callList.push_back(new CallListElement{
+            allocExpr(target, allocExpr(PARAMETER_MARKER,
+                allocExpr("{", sourceParam))), cond, true});
+#endif
         }
         else
         MInew->callList.push_back(new CallListElement{callExpr, cond, true});

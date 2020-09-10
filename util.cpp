@@ -27,7 +27,7 @@ int trace_parameters;//=1;
 int trace_IR;//=1;
 static int trace_iter;//=1;
 static int traceLookup;//=1;
-static int trace_accessible;//=1;
+static int trace_accessible=1;
 std::map<std::string, ModuleIR *> mapIndex, interfaceIndex, mapAllModule;
 static std::map<std::string, ModuleIR *> mapStripped, interfaceStripped;
 
@@ -565,16 +565,19 @@ void walkAccessible(ACCExpr *expr)
 void buildAccessible(ModuleIR *IR)
 {
     accessibleInterfaces.clear();
+    if (!IR->isVerilog)
     addAccessible(IR->interfaceName, "", "", "", true);
     for (auto item: IR->fields) {
 //printf("[%s:%d] STRUCCUCUC %s type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.type.c_str());
         if (auto IIR = lookupIR(item.type)) {
+           if (!IR->isVerilog)
            addAccessible(IIR->interfaceName, item.fldName, item.vecCount, item.type, true);
 //printf("[%s:%d] STRUCCUCUC %s str %d type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), IIR->isStruct, item.type.c_str());
            if (IIR->isStruct)
                accessibleInterfaces[item.fldName] = AccessibleInfo{"", item.vecCount, item.type};
         }
     }
+    if (!IR->isVerilog)
     for (auto item: IR->interfaces) {
         addAccessible(item.type, item.fldName, item.vecCount, item.type, false);
     }
@@ -668,10 +671,18 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
                         searchIR = lookupInterface(IR->interfaceName);
                         searchStr = searchStr.substr(ind+1);
                     }
-                    break;
+                    goto finalLookup;
+                }
+            if (auto IIR = lookupInterface(searchIR->interfaceName))
+            for (auto item: IIR->interfaces)
+                if (fieldname == item.fldName) {
+                    searchIR = lookupInterface(item.type);
+                    searchStr = searchStr.substr(ind+1);
+                    goto finalLookup;
                 }
         }
     }
+finalLookup:;
     if (traceLookup) {
         printf("[%s:%d] searchIR %p search %s\n", __FUNCTION__, __LINE__, (void *)searchIR, searchStr.c_str());
         dumpModule("SEARCHIR", searchIR);
