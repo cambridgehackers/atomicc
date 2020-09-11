@@ -576,8 +576,12 @@ void buildAccessible(ModuleIR *IR)
               //if (refList[item.first].pin) {
             if (auto IIR = lookupIR(item.second.type))
             if (IIR->isStruct)
-               accessibleInterfaces[item.first] = AccessibleInfo{"", "", item.second.type};
+               accessibleInterfaces[item.first] = AccessibleInfo{item.second.type, "", ""};
         }
+    }
+    for (auto item: refList) {
+        if (lookupIR(item.second.type) || lookupInterface(item.second.type))
+            accessibleInterfaces[item.first] = AccessibleInfo{item.second.type, item.second.vecCount, ""};
     }
     if (trace_accessible || trace_interface) {
         printf("[%s:%d]LIST OF ACCESSIBLE INTERFACES\n", __FUNCTION__, __LINE__);
@@ -635,6 +639,10 @@ void buildAccessible(ModuleIR *IR)
 
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount, MapNameValue &mapValue)
 {
+    if (traceLookup) {
+        printf("[%s:%d] start searchIR %p search %s\n", __FUNCTION__, __LINE__, (void *)searchIR, searchStr.c_str());
+        //dumpModule("SEARCHIR", searchIR);
+    }
     int ind = searchStr.find("[");
     if (ind > 0) {
         std::string sub;
@@ -650,17 +658,24 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
         vecCount = info.vecCount;
         extractParam("lookupQualName", info.fieldType, mapValue);
         searchStr = searchStr.substr(prefix.length() + 1);
+        if (traceLookup)
+            printf("[%s:%d] prefix %s info.type %s\n", __FUNCTION__, __LINE__, prefix.c_str(), info.type.c_str());
     }
     else {
         ind = searchStr.find(DOLLAR);
         if (ind > 0) {
             std::string fieldname = searchStr.substr(0, ind);
+            if (traceLookup)
+                printf("[%s:%d] fieldname %s\n", __FUNCTION__, __LINE__, fieldname.c_str());
             for (auto item: searchIR->fields)
                 if (fieldname == item.fldName) {
-                    if (auto IR = lookupIR(item.type)) {
+                    auto IR = lookupIR(item.type);
+                    if (IR) {
                         searchIR = lookupInterface(IR->interfaceName);
                         searchStr = searchStr.substr(ind+1);
                     }
+                    if (traceLookup)
+                        printf("[%s:%d] found field %s IR %p type %s\n", __FUNCTION__, __LINE__, fieldname.c_str(), (void *)searchIR, item.type.c_str());
                     goto finalLookup;
                 }
             if (auto IIR = lookupInterface(searchIR->interfaceName))
@@ -668,6 +683,8 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
                 if (fieldname == item.fldName) {
                     searchIR = lookupInterface(item.type);
                     searchStr = searchStr.substr(ind+1);
+                    if (traceLookup)
+                        printf("[%s:%d] found interface %s IR %p type %s\n", __FUNCTION__, __LINE__, fieldname.c_str(), (void *)searchIR, item.type.c_str());
                     goto finalLookup;
                 }
         }
@@ -675,7 +692,7 @@ MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::strin
 finalLookup:;
     if (traceLookup) {
         printf("[%s:%d] searchIR %p search %s\n", __FUNCTION__, __LINE__, (void *)searchIR, searchStr.c_str());
-        dumpModule("SEARCHIR", searchIR);
+        //dumpModule("SEARCHIR", searchIR);
     }
     return lookupMethod(searchIR, searchStr);
     return nullptr;

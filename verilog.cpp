@@ -59,6 +59,10 @@ static void setReference(std::string target, int count, std::string type, bool o
     int pin = PIN_WIRE, bool done = false, std::string vecCount = "", bool isArgument = false)
 {
 bool isGenerated = false;
+    if (lookupIR(type) != nullptr || lookupInterface(type) != nullptr || vecCount != "") {
+        count += 1;
+printf("[%s:%d]STRUCT %s type %s\n", __FUNCTION__, __LINE__, target.c_str(), type.c_str());
+    }
     if (refList[target].pin) {
         printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, target.c_str(), refList[target].pin, pin);
     }
@@ -305,17 +309,17 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
             vc = interfaceVecCount;   // HACKHACKHACK
         int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
         std::string instName = instance + name;
+        if (trace_assign || trace_ports || trace_interface)
+            printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s' pin %d\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str(), refPin);
         fixupAccessible(instName);
         if (instName.find(PERIOD) == std::string::npos)
         if (!isLocal || instance == "") {
-            setReference(instName, ((dir != 0 || inout) && instance == "") || vc != "", type, dir != 0, inout, refPin, false, vc, isArgument);
+            setReference(instName, (dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, false, vc, isArgument);
             if(instance == "" && interfaceVecCount != "")
                 refList[instName].done = true;  // prevent default blanket assignment generation
         }
         if (!isLocal)
             modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
-        if (trace_assign || trace_ports || trace_interface)
-            printf("[%s:%d] iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s' pin %d\n", __FUNCTION__, __LINE__, instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str(), refPin);
     };
 //printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
 //dumpModule("PINS", IR);
@@ -1216,7 +1220,6 @@ static void interfaceMakeMap(std::string target, std::string source, std::string
 void generateModuleDef(ModuleIR *IR, ModList &modLineTop)
 {
 static ModList modLine;
-    buildAccessible(IR);
     generateSection = "";
     condAssignList.clear();
     refList.clear();
@@ -1237,13 +1240,19 @@ static ModList modLine;
     for (auto item: IR->fields) {
         fixupAccessible(item.fldName);
         ModuleIR *itemIR = lookupIR(item.type);
-        if (!itemIR || item.isPtr || itemIR->isStruct) {
-            if (item.fldName.find(PERIOD) == std::string::npos)
+        if (!itemIR || item.isPtr || itemIR->isStruct)
             setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, item.vecCount);
-        }
         else
             generateModuleSignature(itemIR, item.type, item.fldName + DOLLAR, modLine, IR->params[item.fldName], item.vecCount);
     }
+    for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
+        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
+            std::string pinName = item.first;
+            fixupAccessible(pinName);
+            setReference(pinName, 0, item.second.type, true, false, PIN_WIRE, false, convertType(item.second.type, 2));
+        }
+    }
+    buildAccessible(IR);
     for (auto item: syncPins) {
         if (item.second.name != "") {
             //bool out = item.second.out;
@@ -1273,12 +1282,6 @@ static ModList modLine;
                 if (endswith(listp->value, "\\n\""))
                     listp->value = listp->value.substr(0, listp->value.length()-3) + "\"";
             }
-        }
-        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
-            std::string pinName = item.first;
-            bool isStruct = lookupIR(item.second.type) != nullptr || lookupInterface(item.second.type) != nullptr;
-            fixupAccessible(pinName);
-            setReference(pinName, isStruct ? 2 : 0, item.second.type, true, false, PIN_WIRE, false, convertType(item.second.type, 2));
         }
         for (auto item: MI->generateFor) {
             MethodInfo *MIb = IR->generateBody[item.body];

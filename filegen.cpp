@@ -119,9 +119,12 @@ void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
     fprintf(OStr, ");\n");
 }
 
-static void genAssign(FILE *OStr, std::string target, ACCExpr *source)
+static void genAssign(FILE *OStr, std::string target, ACCExpr *source, std::string type)
 {
-    if (!refList[target].done) {
+    ModuleIR *IR = lookupInterface(type);
+    if (IR && IR->isStruct)
+        IR = nullptr;
+    if (!refList[target].done && !IR) {
         std::string tstr = finishString(target);
         std::string sstr = finishExpr(source);
         if (tstr != sstr)
@@ -263,7 +266,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
                         goto next;
             if (!refList[temp].done && refList[temp].count) {
                 if (assignList[item.first].value)
-                    genAssign(OStr, item.first, assignList[item.first].value);
+                    genAssign(OStr, item.first, assignList[item.first].value, refList[item.first].type);
                 else if (refList[temp].vecCount == "") {
                     if (!lookupInterface(refList[temp].type) && !lookupIR(refList[temp].type))
                     fprintf(OStr, "    assign %s = 0; //MISSING_ASSIGNMENT_FOR_OUTPUT_VALUE\n", finishString(item.first).c_str());
@@ -288,13 +291,13 @@ next:;
             if (!seen)
                 fprintf(OStr, "    // Extra assigments, not to output wires\n");
             seen = true;
-            genAssign(OStr, item.first, item.second.value);
+            genAssign(OStr, item.first, item.second.value, refList[temp].type);
         }
     }
     for (auto ctop: condAssignList) {
         fprintf(OStr, "%s\n", finishString(ctop.first).c_str());
         for (auto item: ctop.second) {
-            genAssign(OStr, item.first, item.second.value);
+            genAssign(OStr, item.first, item.second.value, item.second.type);
         }
         fprintf(OStr, "    end;\n");
     }
