@@ -188,7 +188,7 @@ printf("[%s:%d] method %s pitem.type %s -> type %s\n", __FUNCTION__, __LINE__, n
 }
         pinPorts.push_back(PinInfo{PINI_METHOD, instantiateType(MI->type, mapValue), name, out, false, isLocal, params, ""/*not param*/, MI->action, vecCount});
     }
-    if (!localInterface || pinPrefix != "")
+    if ((!localInterface || pinPrefix != "") && (pinPrefix == "" || !isVerilog))
     for (auto fld: IR->fields) {
         std::string name = pinPrefix + fld.fldName;
         std::string ftype = instantiateType(fld.type, mapValue);
@@ -243,6 +243,7 @@ printf("[%s:%d] SSSS oldname %s name %s out %d isPtr %d instance %d\n", __FUNCTI
                     syncPins[oldName] = SyncPinsInfo{"_" + name + "S" + suffix, out, isPtr, instance};
                 }
             }
+            if (pinPrefix != "" || !isVerilog)
             pinPorts.push_back(PinInfo{PINI_INTERFACE, type, methodPrefix + interfaceName, out, false, localFlag, params, ""/*not param*/, false, updatedVecCount});
         }
     }
@@ -321,7 +322,7 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
         if (!isLocal)
             modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vc});
     };
-//printf("[%s:%d] name %s instance %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str());
+//printf("[%s:%d] name %s instance %s interface %s isVerilog %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str(), IR->interfaceName.c_str(), IR->isVerilog);
 //dumpModule("PINS", IR);
     pinPorts.clear();
     handleCLK = true;

@@ -274,6 +274,7 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
                 params = IR->name.substr(ind);
 //printf("[%s:%d]////////////////////////////////////////////////////////////////////////////////////// %s params %s\n", __FUNCTION__, __LINE__, IR->interfaceName.c_str(), params.c_str());
 //dumpModule("INTERFACE", IR);
+            if (!IR->isVerilog)
             appendInterface(IR->interfaceName, params);
         }
     }
