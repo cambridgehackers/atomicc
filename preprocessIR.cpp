@@ -88,6 +88,14 @@ static ACCExpr *walkToGeneric (ACCExpr *expr, std::list<PARAM_MAP> &paramMap)
 
 static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
 {
+    if (startswith(type, "ARRAY_")) {
+        std::string arr = type.substr(6);
+        int ind = arr.find("_");
+        if (ind > 0) {
+            std::string post = arr.substr(ind);
+            type = "ARRAY_" + tree2str(walkToGeneric(str2tree(arr.substr(0, ind)), paramMap), false) + post;
+        }
+    }
     int ind = type.find("(");
     if (ind > 0 && type[type.length()-1] == ')') {
         std::string base = type.substr(0, ind+1);
@@ -774,15 +782,18 @@ void cleanupIR(std::list<ModuleIR *> &irSeq)
             hoistVerilog(IIR, IIR, "");
     }
     for (auto IR: irSeq) {
+#if 0
         for (auto items = IR->interfaces.begin(), iteme = IR->interfaces.end(); items != iteme; items++) {
             MapNameValue mapValue;
             extractParam("CLEANUP_" + items->fldName, items->type, mapValue);
             if (mapValue.size() > 0) {
                 std::string newName = CBEMangle(items->type);
+printf("[%s:%d] MANGLENEW %s old %s\n", __FUNCTION__, __LINE__, newName.c_str(), items->type.c_str());
                 copyInterface(items->type, newName, mapValue);
                 items->type = newName;
             }
         }
+#endif
         for (auto MI: IR->methods)
             postParseCleanup(IR, MI);
         for (auto item: IR->generateBody)

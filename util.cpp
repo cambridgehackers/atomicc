@@ -189,12 +189,12 @@ std::string instantiateType(std::string arg, MapNameValue &mapValue) // also che
     if (checkT("ARRAY_")) {
         std::string arr = bp;
         int ind = arr.find("_");
-        if (ind > 0)
+        if (ind > 0) {
             arr = arr.substr(0, ind);
-        while (isdigit(*bp) || *bp == '_')
-            bp++;
+            bp += ind+1;
+        }
+        arr = mapReturn(arr);
         std::string newtype = "ARRAY_" + arr + "_" + instantiateType(bp, mapValue);
-printf("[%s:%d] oldtype %s newtype %s\n", __FUNCTION__, __LINE__, arg.c_str(), newtype.c_str());
         return newtype;
     }
     if (arg == "" || arg == "void")
@@ -556,7 +556,7 @@ void buildAccessible(ModuleIR *IR)
 {
     accessibleInterfaces.clear();
     if (!IR->isVerilog)
-    addAccessible(IR->interfaceName, "", "", "", true);
+        addAccessible(IR->interfaceName, "", "", "", true);
     for (auto item: IR->fields) {
 //printf("[%s:%d] STRUCCUCUC %s type %s\n", __FUNCTION__, __LINE__, item.fldName.c_str(), item.type.c_str());
         if (auto IIR = lookupIR(item.type)) {
@@ -568,9 +568,9 @@ void buildAccessible(ModuleIR *IR)
         }
     }
     if (!IR->isVerilog)
-    for (auto item: IR->interfaces) {
-        addAccessible(item.type, item.fldName, item.vecCount, item.type, false);
-    }
+        for (auto item: IR->interfaces) {
+            addAccessible(item.type, item.fldName, item.vecCount, item.type, false);
+        }
     for (auto MI: IR->methods) {
         for (auto item: MI->alloca) {
               //if (refList[item.first].pin) {
