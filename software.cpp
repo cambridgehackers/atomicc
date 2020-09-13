@@ -89,7 +89,7 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
 int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName)
 {
     FILE *OStrJ = nullptr;
-    std::string pipeName = "PipeIn(" NOCDataH_SIZE ")";
+    std::string pipeName = "PipeIn(width=" NOCDataH_SIZE ")";
     for (auto IR: irSeq) {
         ModuleIR *implements = lookupInterface(IR->interfaceName);
         if (!implements) {
