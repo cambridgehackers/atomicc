@@ -459,7 +459,9 @@ printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__,
             if (isRdyName(MI->name) && !MI->callList.size())
                continue;
             if (MI->rule || MI->storeList.size() || MI->callList.size() != 1
-             || MI->alloca.size() || MI->letList.size() || MI->printfList.size())
+             || MI->letList.size() || MI->printfList.size())
+                {skipLine = __LINE__; goto skipLab;};
+            if (MI->alloca.size())
                 {skipLine = __LINE__; goto skipLab;};
             CallListElement *call = MI->callList.front();
             std::string calltarget = replacePeriod(call->value->value);
