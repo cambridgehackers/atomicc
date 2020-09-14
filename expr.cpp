@@ -54,15 +54,15 @@ static bool isParen(char ch)
 static std::string treePost(std::string val)
 {
     if (val == "[")
-        return " ]";
+        return "]";
     else if (val == "(")
-        return " )";
+        return ")";
     else if (val == "{")
-        return " }";
+        return "}";
     else if (val == SUBSCRIPT_MARKER)
-        return " " SUBSCRIPT_CLOSE;
+        return SUBSCRIPT_CLOSE;
     else if (val == PARAMETER_MARKER)
-        return " " PARAMETER_CLOSE;
+        return PARAMETER_CLOSE;
     return "";
 }
 
@@ -162,8 +162,8 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
         ret += sep;
         bool addParen = !topOp && !checkOperand(item->value) && item->value != "," && item->value != PERIOD && !isParen(item->value);
         if (addParen)
-            ret += "( ";
-        std::string val = tree2str(item);
+            ret += "(" + space;
+        std::string val = tree2str(item, addSpaces);
         if (ret.length() && val.length() && ret.substr(ret.length()-1) == PERIOD && val[0] == '[')
             ret = ret.substr(0, ret.length()-1);
         ret += val;
@@ -176,7 +176,9 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
         if (op == "?")
             op = ":";
     }
-    ret += treePost(orig);
+    std::string post = treePost(orig);
+    if (post != "")
+        ret += space + post;
     return ret;
 }
 
@@ -335,7 +337,7 @@ static ACCExpr *get1Token(void)
         std::string post = treePost(val);
         if (trace_expr)
             printf("[%s:%d] before subparse of '%s' post '%s' bufferlen %d\n", __FUNCTION__, __LINE__, ret->value.c_str(), post.c_str(), (int)strlen(&lexString[lexIndex]));
-        ret = getExprList(ret, post.substr(1), false, true);
+        ret = getExprList(ret, post, false, true);
         if (ret->value != val)
             ret = allocExpr(val, ret); // over optimization of '(<singleItem>)'
         if (trace_expr) {
@@ -477,6 +479,14 @@ ACCExpr *cleanupInteger(ACCExpr *expr)
         ret->operands.clear();
     }
     return ret;
+}
+
+ACCExpr *cleanupModuleParam(std::string param)
+{
+    ACCExpr *expr = cleanupExprBuiltin(str2tree(param));
+    if (expr->value != "(")
+        expr = allocExpr("(", expr);
+    return expr;
 }
 
 typedef struct {

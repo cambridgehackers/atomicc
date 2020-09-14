@@ -97,13 +97,8 @@ static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
         }
     }
     int ind = type.find("(");
-    if (ind > 0 && type[type.length()-1] == ')') {
-        std::string base = type.substr(0, ind+1);
-        type = type.substr(ind+1);
-        type = type.substr(0, type.length()-1);
-        // over
-        type = base + tree2str(walkToGeneric(str2tree(type), paramMap), false) + ")";
-    }
+    if (ind > 0)
+        type = type.substr(0, ind) + tree2str(walkToGeneric(cleanupModuleParam(type.substr(ind)), paramMap), false);
     return type;
 };
 
@@ -226,9 +221,9 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
 {
     std::string methodName = MI->name;
     std::map<std::string, int> localConnect;
-    for (auto item = IR->interfaces.begin(); item != IR->interfaces.end(); item++)
-        if (localConnect[item->fldName])
-            item->isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)
+    for (auto &item : IR->interfaces)
+        if (localConnect[item.fldName])
+            item.isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)
     // now replace __bitconcat, __bitsubstr, __phi
     MI->guard = cleanupExpr(MI->guard);
     for (auto info: MI->storeList) {
@@ -343,29 +338,28 @@ static std::string typeClean(std::string type)
 static void typeCleanMethod(MethodInfo *MI)
 {
     MI->type = typeClean(MI->type);
-    for (auto itemi = MI->params.begin(), iteme = MI->params.end(); itemi != iteme; itemi++)
-        itemi->type = typeClean(itemi->type);
-    for (auto itemi = MI->alloca.begin(), iteme = MI->alloca.end(); itemi != iteme; itemi++)
-        itemi->second.type = typeClean(itemi->second.type);
-    for (auto item: MI->letList)
+    for (auto &item : MI->params)
+        item.type = typeClean(item.type);
+    for (auto &item : MI->alloca)
+        item.second.type = typeClean(item.second.type);
+    for (auto &item: MI->letList)
         item->type = typeClean(item->type);
-    for (auto itemi = MI->interfaceConnect.begin(), iteme = MI->interfaceConnect.end(); itemi != iteme; itemi++)
-        itemi->type = typeClean(itemi->type);
+    for (auto &item : MI->interfaceConnect)
+        item.type = typeClean(item.type);
 }
 
 static void typeCleanIR(ModuleIR *IR)
 {
     if (auto interface = lookupInterface(IR->interfaceName))
         typeCleanIR(interface);
-    for (auto itemi = IR->interfaceConnect.begin(), iteme = IR->interfaceConnect.end(); itemi != iteme; itemi++)
-        itemi->type = typeClean(itemi->type);
-    for (auto itemi = IR->unionList.begin(), iteme = IR->unionList.end(); itemi != iteme; itemi++)
-        itemi->type = typeClean(itemi->type);
-    for (auto itemi = IR->fields.begin(), iteme = IR->fields.end(); itemi != iteme; itemi++)
-        itemi->type = typeClean(itemi->type);
-    for (auto itemi = IR->interfaces.begin(), iteme = IR->interfaces.end(); itemi != iteme; itemi++) {
-        itemi->type = typeClean(itemi->type);
-    }
+    for (auto item : IR->interfaceConnect)
+        item.type = typeClean(item.type);
+    for (auto item : IR->unionList)
+        item.type = typeClean(item.type);
+    for (auto item : IR->fields)
+        item.type = typeClean(item.type);
+    for (auto item : IR->interfaces)
+        item.type = typeClean(item.type);
     for (auto MI: IR->methods)
         typeCleanMethod(MI);
 }
@@ -471,9 +465,9 @@ printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__,
         }
 printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), field.fldName.c_str(), field.type.c_str());
         for (auto mIR : irSeq) {
-             for (auto item = mIR->fields.begin(), iteme = mIR->fields.end(); item != iteme; item++)
-                 if (item->type == (*IR)->name) {
-                     item->type = field.type;
+             for (auto &item : mIR->fields)
+                 if (item.type == (*IR)->name) {
+                     item.type = field.type;
                      replaced = true;
                  }
         }
@@ -481,8 +475,12 @@ printf("[%s:%d]WASOK %s field %s type %s\n", __FUNCTION__, __LINE__, (*IR)->name
         // If we found no usages, generate verilog module
         if (replaced) {
             //printf("[%s:%d] erase %s/%p\n", __FUNCTION__, __LINE__, (*IR)->name.c_str(), (*IR));
-            mapIndex.erase(mapIndex.find((*IR)->name));
-            mapAllModule.erase(mapAllModule.find((*IR)->name));
+            auto ptr = mapIndex.find((*IR)->name);
+            if (ptr != mapIndex.end())
+                mapIndex.erase(ptr);
+            ptr = mapAllModule.find((*IR)->name);
+            if (ptr != mapAllModule.end())
+                mapAllModule.erase(ptr);
             IR = irSeq.erase(IR);
             continue;
         }
@@ -503,31 +501,14 @@ skipLab:;
         int ind = modName.find("(");
         if (ind > 0) {
             std::string irName = modName;//.substr(0, ind);
-            std::string parg = modName.substr(ind + 1);
-            if(parg.substr(parg.length()-1) != ")") {
-                printf("[%s:%d] Error: argument without ')' modname '%s' irname '%s' parg '%s'\n", __FUNCTION__, __LINE__, modName.c_str(), irName.c_str(), parg.c_str());
-                exit(-1);
+            std::list<PARAM_MAP> pmap;
+            ACCExpr *param = cleanupModuleParam(modName.substr(ind));
+            for (auto item: param->operands) {
+                assert(item->value == "=");
+                if (item->value == "=")
+                    pmap.push_back({tree2str(item->operands.front(), false), tree2str(item->operands.back(), false)});
             }
-            parg = parg.substr(0, parg.length() - 1);
-            std::string pname;
-            std::list<PARAM_MAP> paramMap;
-//printf("[%s:%d]START %s was %s\n", __FUNCTION__, __LINE__, irName.c_str(), IR->name.c_str());
-            while (parg != "") {
-                int indVal = parg.find("=");
-                if (indVal <= 0)
-                    break;
-                pname = parg.substr(0, indVal);
-                std::string pvalue = parg.substr(indVal+1);
-                parg = "";
-                int indNext = pvalue.find(",");
-                if (indNext > 0) {
-                    parg = pvalue.substr(indNext + 1);
-                    pvalue = pvalue.substr(0, indNext);
-                }
-//printf("[%s:%d] name %s val %s\n", __FUNCTION__, __LINE__, pname.c_str(), pvalue.c_str());
-                paramMap.push_back(PARAM_MAP{pname, pvalue});
-            }
-            ModuleIR *genericIR = buildGeneric(IR, irName, paramMap, false);
+            ModuleIR *genericIR = buildGeneric(IR, irName, pmap, false);
             irName = genericIR->name;
             if (!IR->isExt && !IR->isInterface && !IR->isStruct)
                 irSeq.push_back(genericIR);
@@ -539,7 +520,7 @@ skipLab:;
             ModuleIR *paramIR = allocIR(irName, true);
             paramIR->isInterface = true;
             genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
-            for (auto item: paramMap)
+            for (auto item: pmap)
                 paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", false, false, false, false, item.value, false, false, false});
             //printf("[%s:%d]BEGOREGEN %s/%p -> %s/%p\n", __FUNCTION__, __LINE__, modName.c_str(), IR, genericIR->name.c_str(), genericIR);
             //dumpModule("GENERIC", genericIR);
@@ -574,9 +555,9 @@ skipLab:;
                 localConnect[tree2str(IC.source)] = 1;
             }
         }
-        for (auto item = IR->interfaces.begin(); item != IR->interfaces.end(); item++)
-            if (localConnect[item->fldName])
-                item->isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)
+        for (auto &item : IR->interfaces)
+            if (localConnect[item.fldName])
+                item.isLocalInterface = true; // interface declaration that is used to connect to local objects (does not appear in module signature)
         // expand all subscript calculations before processing the module
         for (auto MI: IR->methods)
             preprocessMethod(IR, MI, false);
@@ -597,53 +578,11 @@ skipLab:;
         ModuleIR *IIR = copyInterface(item.first, name, mapValue);
         for (auto MI: IIR->methods) {
             updateCopyType(MI->type);
-            for (auto itemi = MI->params.begin(), iteme = MI->params.end(); itemi != iteme; itemi++)
-                updateCopyType(itemi->type);
+            for (auto &item : MI->params)
+                updateCopyType(item.type);
         }
         //interfaceIndex[item.first] = IIR; // replace old with new
     }
-#if 0
-    for (auto IR : irSeq) {
-        for (auto MI: IR->methods) {
-            if (MI->type == "" && MI->params.size() == 0)
-                continue;
-            std::string name = MI->name;
-            std::string interface = IR->interfaceName;
-            auto IIR = lookupInterface(interface);
-            int ind = name.find_first_of(DOLLAR PERIOD);
-            std::string ifcname;
-            if (ind > 0) {
-                ifcname = name.substr(0, ind);
-                name = name.substr(ind+1);
-                for (auto item: IIR->interfaces) {
-                    if (item.fldName == ifcname) {
-                        interface = item.type;
-                        IIR = lookupInterface(interface);
-                        break;
-                    }
-                }
-            }
-            auto typeMI = lookupMethod(IIR, name);
-            //printf("[%s:%d] interface %s ifcname %s name %s typeMI %p\n", __FUNCTION__, __LINE__, interface.c_str(), ifcname.c_str(), name.c_str(), typeMI);
-            std::map<std::string, std::string> remapParam;
-            if (typeMI)
-            for (auto origp = MI->params.begin(), orige = MI->params.end(), typep = typeMI->params.begin(); origp != orige; origp++, typep++) {
-                //if (origp->type != typep->type)
-                if (startswith(interface, "PipeIn") && !startswith(origp->type, "Bit(")) {
-                    remapParam[origp->name] = origp->type;
-                    origp->type = "Bit(" + convertType(origp->type) + ")"; //typep->type;
-                }
-            }
-            for(auto item: remapParam) {
-                std::string param = baseMethodName(replacePeriod(MI->name)) + DOLLAR + item.first;
-                ACCExpr *replacement = allocExpr(TEMP_NAME DOLLAR + param);
-                MI->alloca[replacement->value] = AllocaItem{item.second, false};
-                replaceMethodExpr(MI, allocExpr(param + DOLLAR), replacement, false, true);  // replace prefixes on all expr values
-                MI->letList.push_back(new LetListElement{replacement, allocExpr(param), nullptr, item.second});
-            }
-        }
-    }
-#endif
 }
 
 /*
@@ -768,8 +707,63 @@ static void hoistVerilog(ModuleIR *top, ModuleIR *current, std::string prefix)
          hoistVerilog(top, lookupInterface(item.type), prefix+item.fldName);
 }
 
+static void updateModuleType(ModuleIR *IR, std::list<PARAM_MAP> &paramMap)
+{
+    IR->interfaceName = updateType(IR->interfaceName, paramMap);
+    for (auto &item : IR->fields)
+        item.type = updateType(item.type, paramMap);
+    for (auto &item : IR->interfaces)
+        item.type = updateType(item.type, paramMap);
+    for (auto &item : IR->interfaceConnect)
+        item.type = updateType(item.type, paramMap);
+    for (auto &item : IR->parameters)
+        item.type = updateType(item.type, paramMap);
+    for (auto &item : IR->unionList)
+        item.type = updateType(item.type, paramMap);
+    for (auto MI: IR->methods) {
+        MI->type = updateType(MI->type, paramMap);
+        for (auto item : MI->letList)
+            item->type = updateType(item->type, paramMap);
+        for (auto &item : MI->alloca)
+            item.second.type = updateType(item.second.type, paramMap);
+        for (auto &item : MI->params)
+            item.type = updateType(item.type, paramMap);
+        for (auto &item : MI->interfaceConnect)
+            item.type = updateType(item.type, paramMap);
+    }
+}
+
 void cleanupIR(std::list<ModuleIR *> &irSeq)
 {
+    std::list<PARAM_MAP> paramMap;
+    std::list<std::string> deleteList;
+    for (auto mapItem : mapAllModule) {
+        ModuleIR *IR = mapItem.second;
+        std::string newName = updateType(IR->name, paramMap);
+        if (newName != IR->name) {
+            deleteList.push_back(IR->name);
+            IR->name = newName;
+            if (IR->isInterface)
+                interfaceIndex[newName] = IR;
+            else
+                mapIndex[newName] = IR;
+        }
+        updateModuleType(IR, paramMap);
+    }
+    //for (auto mapItem : mapAllModule) {
+        //ModuleIR *IR = mapItem.second;
+//dumpModule("CLEAN", IR);
+    //}
+    for (auto name: deleteList) {
+        auto removeName = [&](std::map<std::string, ModuleIR *> &mapitem) -> void {
+            auto item = mapitem.find(name);
+            if (item != mapitem.end())
+                mapitem.erase(item);
+        };
+        removeName(interfaceIndex);
+        removeName(mapIndex);
+        removeName(mapAllModule);
+    }
     // preprocess 'isVerilog' items first -> changes interface
     for (auto mapItem : mapAllModule) {
         ModuleIR *IR = mapItem.second;
@@ -778,18 +772,6 @@ void cleanupIR(std::list<ModuleIR *> &irSeq)
             hoistVerilog(IIR, IIR, "");
     }
     for (auto IR: irSeq) {
-#if 0
-        for (auto items = IR->interfaces.begin(), iteme = IR->interfaces.end(); items != iteme; items++) {
-            MapNameValue mapValue;
-            extractParam("CLEANUP_" + items->fldName, items->type, mapValue);
-            if (mapValue.size() > 0) {
-                std::string newName = CBEMangle(items->type);
-printf("[%s:%d] MANGLENEW %s old %s\n", __FUNCTION__, __LINE__, newName.c_str(), items->type.c_str());
-                copyInterface(items->type, newName, mapValue);
-                items->type = newName;
-            }
-        }
-#endif
         for (auto MI: IR->methods)
             postParseCleanup(IR, MI);
         for (auto item: IR->generateBody)

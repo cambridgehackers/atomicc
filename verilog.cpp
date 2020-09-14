@@ -61,7 +61,7 @@ static void setReference(std::string target, int count, std::string type, bool o
 bool isGenerated = false;
     if (lookupIR(type) != nullptr || lookupInterface(type) != nullptr || vecCount != "") {
         count += 1;
-printf("[%s:%d]STRUCT %s type %s\n", __FUNCTION__, __LINE__, target.c_str(), type.c_str());
+printf("[%s:%d]STRUCT %s type %s vecCount %s\n", __FUNCTION__, __LINE__, target.c_str(), type.c_str(), vecCount.c_str());
     }
     if (refList[target].pin) {
         printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, target.c_str(), refList[target].pin, pin);
@@ -215,7 +215,7 @@ printf("[%s:%d] method %s pitem.type %s -> type %s\n", __FUNCTION__, __LINE__, n
     }
     for (FieldElement item : IR->interfaces) {
         std::string type = item.type;
-        //MapNameValue mapValue = parentMap;
+        MapNameValue mapValue;  // interface hoisting only deals with parameters for the interface itself (not containing module)
         if (instance)
         extractParam("FIELD_" + item.fldName, type, mapValue);
         std::string interfaceName = item.fldName;
@@ -228,6 +228,7 @@ printf("[%s:%d] method %s pitem.type %s -> type %s\n", __FUNCTION__, __LINE__, n
         }
         std::list<ParamElement> params;
         std::string updatedVecCount = instantiateType(item.vecCount, mapValue);
+        //printf("[%s:%d] type %s veccc %s updated %s\n", __FUNCTION__, __LINE__, type.c_str(), item.vecCount.c_str(), updatedVecCount.c_str());
         bool localFlag = isLocal || item.isLocalInterface;
         if (item.fldName == "" || isVerilog)
             collectInterfacePins(IIR, instance, pinPrefix + item.fldName, methodPrefix + interfaceName + DOLLAR, localFlag, mapValue, ptrFlag, updatedVecCount, localInterface, isVerilog);
@@ -251,7 +252,7 @@ printf("[%s:%d] SSSS oldname %s name %s out %d isPtr %d instance %d\n", __FUNCTI
 
 static std::string moduleInstance(std::string name, std::string params)
 {
-    std::string ret = genericModuleParam(name, params);
+    std::string ret = genericModuleParam(name, params, nullptr);
 //printf("[%s:%d] name %s ret %s params %s\n", __FUNCTION__, __LINE__, name.c_str(), ret.c_str(), params.c_str());
     if (params != "") {
         std::string actual, sep;
@@ -281,11 +282,11 @@ static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std:
 {
     MapNameValue mapValue;
     if (instance != "") {
-        extractParam("SIGN_" + IR->name, instanceType, mapValue);
         extractParam("SIGNIFC_" + IR->name, IR->interfaceName, mapValue);
+        extractParam("SIGN_" + IR->name, instanceType, mapValue);    // instance values overwrite duplicate interface values (if present)
     }
     else {
-        // only substitute parameters in interface what were not present in original module definition
+        // only substitute parameters from interface definition that were not present in original module definition
         MapNameValue mapValueMod;
         extractParam("SIGN_" + IR->name, IR->name, mapValueMod);
         extractParam("SIGNIFC_" + IR->name, IR->interfaceName, mapValue);
@@ -311,7 +312,7 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
         int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
         std::string instName = instance + name;
         if (trace_assign || trace_ports || trace_interface)
-            printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s' pin %d\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str(), refPin);
+            printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d vec '%s' pin %d vecCount %s interfaceVecCount %s\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, vc.c_str(), refPin, vecCount.c_str(), interfaceVecCount.c_str());
         fixupAccessible(instName);
         if (instName.find(PERIOD) == std::string::npos)
         if (!isLocal || instance == "") {
@@ -342,7 +343,6 @@ printf("[%s:%d] iinst %s ITYPE %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LI
         }
         if (interfaceName != "")
             interfaceName += PERIOD;
-printf("[%s:%d]befpin '%s' fldname '%s'\n", __FUNCTION__, __LINE__, interfaceName.c_str(), item.fldName.c_str());
         collectInterfacePins(IIR, instance != "", item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, IR->isVerilog);
     }
     std::string moduleInstantiation = IR->name;
@@ -1053,21 +1053,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         ACCExpr *tempCond = guard ? allocExpr("&&", guard, cond) : cond;
         tempCond = cleanupBool(tempCond);
         std::string calledName = value->value, calledEna = getEnaName(calledName);
-#if 0
-        std::string sensitivity = "*";
-        if (walkSearch(tempCond, "$past"))
-            sensitivity = " posedge CLK";
-        condLines[generateSection].assert.push_back("always @(" + sensitivity + ")");
-        std::string indent;
-        std::string condStr = tree2str(tempCond);
-        if (condStr != "" && condStr != "1") {
-            condLines[generateSection].assert.push_back("    if (" + condStr + ")");
-            indent = "    ";
-        }
-        condLines[generateSection].assert.push_back("    " + indent + tree2str(value) + ";");
-#else
         condLines[generateSection].assert.push_back(AssertVerilog{tempCond, value});
-#endif
     }
     for (auto info: MI->callList) {
         ACCExpr *subscript = nullptr;

@@ -92,20 +92,11 @@ void extractParam(std::string debugName, std::string replaceList, MapNameValue &
     std::string origList = replaceList;
     int ind = replaceList.find("(");
     if (ind > 0) {
-        replaceList = replaceList.substr(ind+1);
-        replaceList = replaceList.substr(0, replaceList.length()-1); // remove ')'
-        while ((ind = replaceList.find("=")) > 0) {
-            std::string name = trimSpace(replaceList.substr(0, ind));
-            replaceList = replaceList.substr(ind+1);
-            ind = replaceList.find(",");
-            std::string value = replaceList;
-            replaceList = "";
-            if (ind > 0) {
-                replaceList = value.substr(ind+1);
-                value = value.substr(0, ind);
-            }
-            if (mapValue.find(name) == mapValue.end())
-                mapValue[name] = trimSpace(value);
+        ACCExpr *expr = cleanupModuleParam(replaceList.substr(ind));
+        for (auto item: expr->operands) {
+            assert(item->value == "=");
+            if (item->value == "=")
+                mapValue[tree2str(item->operands.front(), false)] = tree2str(item->operands.back(), false);
         }
     }
     if (trace_parameters)
@@ -224,9 +215,9 @@ typedef struct {
 } ParamMapType;
 std::string genericModuleParam(std::string name, std::string param, MapNameValue *mapValue)
 {
-    name = cleanupModuleType(name);
     std::string orig = name;
     std::list<ParamMapType> pmap;
+    name = cleanupModuleType(name);
     std::string ret = name;
     int ind = name.find("(");
     if (ind > 0)
@@ -235,27 +226,13 @@ std::string genericModuleParam(std::string name, std::string param, MapNameValue
         name = param;
     ind = name.find("(");
     if (ind > 0) {
-        name = name.substr(ind+1);
-        ind = name.rfind(")");
-        if (ind > 0)
-            name = name.substr(0, ind);
-        std::string sep;
-        while (name.length() > 0) {
-            ind = name.find("=");
-            if (ind == -1)
-                break;
-            std::string pname = name.substr(0, ind);
-            name = name.substr(ind+1);
-            ind = name.find(",");
-            if (ind > 0) {
-                pmap.push_back({pname, str2tree(name.substr(0, ind))});
-                name = name.substr(ind+1);
-            }
-            else {
-                pmap.push_back({pname, str2tree(name)});
-                name = "";
-            }
+        ACCExpr *param = cleanupModuleParam(name.substr(ind));
+        for (auto item: param->operands) {
+            assert(item->value == "=");
+            if (item->value == "=")
+                pmap.push_back({tree2str(item->operands.front(), false), item->operands.back()});
         }
+        std::string sep;
         if (mapValue) {
             ret += "(";
             for (auto item: pmap) {
@@ -1084,6 +1061,13 @@ void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault)
         expr->value = "@" + op.substr(1, op.length() - 2);
         expr->operands.clear();
         expr->operands.push_back(getRHS(list, 1));
+    }
+    else if (expr->value == "__bitsize") {
+        ACCExpr *list = expr->operands.front();
+        assert(list->value == "(" && expr->operands.size() == 1);
+        list = list->operands.front();
+        expr->value = convertType(list->value);
+        expr->operands.clear();
     }
     else if (expr->value == "__bitconcat") {
         ACCExpr *list = expr->operands.front();

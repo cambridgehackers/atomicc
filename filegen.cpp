@@ -144,7 +144,7 @@ static std::string declareInstance(std::string type, std::string vecCountStr, st
     }
     else
         return "";
-    return genericModuleParam(type, params) + " " + vecCountStr + ret;
+    return genericModuleParam(type, params, nullptr) + " " + vecCountStr + ret;
 }
 
 static bool walkSearch (ACCExpr *expr, std::string search)
@@ -362,9 +362,6 @@ next:;
     if (ctop->second.assert.size())
         fprintf(OStr, "`ifdef	FORMAL\n");
     for (auto item: ctop->second.assert) {
-#if 0
-        fprintf(OStr, "    %s\n", finishExpr(str2tree(item)).c_str());
-#else
         std::string sensitivity = "*";
         if (walkSearch(item.cond, "$past"))
             sensitivity = " posedge CLK";
@@ -376,7 +373,6 @@ next:;
             indent = "    ";
         }
         fprintf(OStr, "    %s\n", ("    " + indent + finishExpr(item.value) + ";").c_str());
-#endif
     }
     if (ctop->second.assert.size())
         fprintf(OStr, "`endif\n");

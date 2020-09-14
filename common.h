@@ -126,7 +126,7 @@ bool isRdyName(std::string name);
 bool isEnaName(std::string name);
 void extractParam(std::string debugName, std::string replaceList, MapNameValue &mapValue);
 std::string instantiateType(std::string arg, MapNameValue &mapValue);
-std::string genericModuleParam(std::string name, std::string param, MapNameValue *mapValue = nullptr);
+std::string genericModuleParam(std::string name, std::string param, MapNameValue *mapValue);
 std::string convertType(std::string arg, int arrayProcess = 0);
 ModuleIR *lookupIR(std::string ind);
 ModuleIR *lookupInterface(std::string ind);
@@ -185,6 +185,7 @@ bool isConstExpr(ACCExpr *expr);
 std::string replacePeriod(std::string value);
 void walkFixup(ACCExpr *expr);
 void walkRewrite (ACCExpr *expr);
+ACCExpr *cleanupModuleParam(std::string param);
 extern int trace_expr, trace_interface;
 
 // readIR.cpp
