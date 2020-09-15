@@ -31,7 +31,7 @@ std::list<PrintfInfo> printfFormat;
 typedef std::list<ModData> ModList;
 ModList modNew;
 std::map<std::string, CondLineType> condLines;
-std::map<std::string, SyncPinsInfo> syncPins;    // SyncFF items needed for PipeInSync instances
+std::map<std::string, std::string> syncPins;    // SyncFF items needed for PipeInSync instances
 
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
@@ -162,6 +162,13 @@ typedef struct {
 } PinInfo;
 std::list<PinInfo> pinPorts;
 
+typedef struct {
+    std::string name;
+    bool        instance;
+    bool        out;
+    bool        isPtr;
+} PipeInSyncFixup;
+static std::list<PipeInSyncFixup> pipeInSyncFixup;
 
 static bool handleCLK;
 static void collectInterfacePins(ModuleIR *IR, bool instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface, bool isVerilog)
@@ -235,14 +242,8 @@ printf("[%s:%d] method %s pitem.type %s -> type %s\n", __FUNCTION__, __LINE__, n
         else {
             if (startswith(type, "PipeInSync")) {
                 type = IIR->interfaces.front().type;   // rewrite to PipeIn type
-                if (!localInterface) {
-                    std::string name = methodPrefix + interfaceName + DOLLAR "enq";
-                    std::string suffix = out ? "__RDY" : "__ENA";
-                    std::string oldName = name + suffix;
-                    fixupAccessible(oldName);
-printf("[%s:%d] SSSS oldname %s name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LINE__, oldName.c_str(), name.c_str(), out, isPtr, instance);
-                    syncPins[oldName] = SyncPinsInfo{"_" + name + "S" + suffix, out, isPtr, instance};
-                }
+                if (!localInterface)
+                    pipeInSyncFixup.push_back(PipeInSyncFixup{methodPrefix + interfaceName + DOLLAR "enq", instance, out, isPtr});
             }
             if (pinPrefix != "" || !isVerilog)
             pinPorts.push_back(PinInfo{PINI_INTERFACE, type, methodPrefix + interfaceName, out, false, localFlag, params, ""/*not param*/, false, updatedVecCount});
@@ -1000,7 +1001,7 @@ static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo
         std::string iname = IC.type;
         if (startswith(iname, "ARRAY_")) {
             iname = iname.substr(6);
-            int ind = iname.find("_");
+            int ind = iname.find(ARRAY_ELEMENT_MARKER);
             if (ind > 0)
                 iname = iname.substr(ind+1);
         }
@@ -1218,6 +1219,7 @@ static ModList modLine;
     // 'Mux' together parameter settings from all invocations of a method from this class
     muxValueList.clear();
     modLine.clear();
+    pipeInSyncFixup.clear();
     syncPins.clear();     // pins from PipeInSync
 
     printf("[%s:%d] STARTMODULE %s/%p\n", __FUNCTION__, __LINE__, IR->name.c_str(), (void *)IR);
@@ -1240,19 +1242,19 @@ static ModList modLine;
         }
     }
     buildAccessible(IR);
-    for (auto item: syncPins) {
-        if (item.second.name != "") {
-            //bool out = item.second.out;
-            //bool isPtr = item.second.isPtr;
-            bool instance = item.second.instance;
-            std::string sname = item.second.name;
-            setReference(sname, 4, "Bit(1)", false, false, PIN_LOCAL);
-            modLine.push_back(ModData{replacePeriod(item.first) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
-            modLine.push_back(ModData{"out", instance ? item.first : sname, "Bit(1)", false, false, true/*out*/, false, "", ""});
-            modLine.push_back(ModData{"in", instance ? sname : item.first, "Bit(1)", false, false, false /*out*/, false, "", ""});
-            refList[item.first].count++;
-            refList[sname].count++;
-        }
+    for (auto &item: pipeInSyncFixup) {
+        std::string suffix = item.out ? "__RDY" : "__ENA";
+        std::string oldName = item.name + suffix;
+        std::string newName = LOCAL_VARIABLE_PREFIX + item.name + "S" + suffix;
+        fixupAccessible(oldName);
+        printf("[%s:%d] PipeInSync oldname %s name %s out %d isPtr %d instance %d\n", __FUNCTION__, __LINE__, oldName.c_str(), item.name.c_str(), item.out, item.isPtr, item.instance);
+        syncPins[oldName] = newName;
+        setReference(newName, 4, "Bit(1)", false, false, PIN_LOCAL);
+        modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
+        modLine.push_back(ModData{"out", item.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, "", ""});
+        modLine.push_back(ModData{"in", item.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, "", ""});
+        refList[oldName].count++;
+        refList[newName].count++;
     }
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
@@ -1368,7 +1370,7 @@ static ModList modLine;
         std::string iname = IC.type;
         if (startswith(iname, "ARRAY_")) {
             iname = iname.substr(6);
-            int ind = iname.find("_");
+            int ind = iname.find(ARRAY_ELEMENT_MARKER);
             if (ind > 0)
                 iname = iname.substr(ind+1);
         }

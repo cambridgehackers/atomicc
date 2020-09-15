@@ -135,7 +135,7 @@ void metaGenerateModule(ModuleIR *IR, FILE *OStr)
         std::string iname = item.type;
         if (startswith(iname, "ARRAY_")) {
             iname = iname.substr(6);
-            int ind = iname.find("_");
+            int ind = iname.find(ARRAY_ELEMENT_MARKER);
             if (ind > 0)
                 iname = iname.substr(ind+1);
         }

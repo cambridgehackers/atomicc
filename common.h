@@ -32,6 +32,8 @@
 #define VARIANT "_OC_"
 #define VARIANTP "_IC_"
 #define SUFFIX_FOR_GENERIC VARIANT "__"
+#define LOCAL_VARIABLE_PREFIX "_"
+#define ARRAY_ELEMENT_MARKER "_"
 
 #define DOLLAR           "$"
 #define PERIOD           "."
@@ -97,12 +99,6 @@ typedef struct {
     std::string format;
     std::list<int> width;
 } PrintfInfo;
-typedef struct {
-    std::string name;
-    bool        out;
-    bool        isPtr;
-    bool        instance;
-} SyncPinsInfo;
 
 typedef struct {
     ACCExpr    *cond;
@@ -230,6 +226,6 @@ extern std::list<PrintfInfo> printfFormat;
 extern std::map<std::string, int> genericModule;
 extern int globalExprCleanup;
 extern int flagErrorsCleanup;
-extern std::map<std::string, SyncPinsInfo> syncPins;    // SyncFF items needed for PipeInSync instances
+extern std::map<std::string, std::string> syncPins;    // SyncFF items needed for PipeInSync instances
 extern int implementPrintf;
 extern std::string myGlobalName;

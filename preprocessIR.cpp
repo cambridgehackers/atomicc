@@ -90,7 +90,7 @@ static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
 {
     if (startswith(type, "ARRAY_")) {
         std::string arr = type.substr(6);
-        int ind = arr.find("_");
+        int ind = arr.find(ARRAY_ELEMENT_MARKER);
         if (ind > 0) {
             std::string post = arr.substr(ind);
             type = "ARRAY_" + tree2str(walkToGeneric(str2tree(arr.substr(0, ind)), paramMap), false) + post;

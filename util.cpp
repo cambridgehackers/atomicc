@@ -179,13 +179,13 @@ std::string instantiateType(std::string arg, MapNameValue &mapValue) // also che
     };
     if (checkT("ARRAY_")) {
         std::string arr = bp;
-        int ind = arr.find("_");
+        int ind = arr.find(ARRAY_ELEMENT_MARKER);
         if (ind > 0) {
             arr = arr.substr(0, ind);
             bp += ind+1;
         }
         arr = mapReturn(arr);
-        std::string newtype = "ARRAY_" + arr + "_" + instantiateType(bp, mapValue);
+        std::string newtype = "ARRAY_" + arr + ARRAY_ELEMENT_MARKER + instantiateType(bp, mapValue);
         return newtype;
     }
     if (arg == "" || arg == "void")
@@ -281,7 +281,7 @@ std::string convertType(std::string arg, int arrayProcess)
     };
     if (checkT("ARRAY_")) {
         std::string arr = bp;
-        int ind = arr.find("_");
+        int ind = arr.find(ARRAY_ELEMENT_MARKER);
         if (ind > 0) {
             arr = arr.substr(0, ind);
             bp += ind + 1;
