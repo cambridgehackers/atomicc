@@ -504,7 +504,7 @@ void walkFixup(ACCExpr *expr)
 {
     //if (!expr)
         //return;
-    foldMember(expr);
+    //foldMember(expr);
     //for (auto item: expr->operands)
         //walkFixup(item);
 }

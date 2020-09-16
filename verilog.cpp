@@ -1058,9 +1058,21 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
     }
     for (auto info: MI->callList) {
         ACCExpr *subscript = nullptr;
+        int ind = info->value->value.find("[");
         if (info->value->operands.size() > 1) {
             subscript = info->value->operands.front()->operands.front();
             info->value->operands.pop_front();
+printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\n", __FUNCTION__, __LINE__);
+exit(-1);
+        }
+        else if (ind > 0) {
+            std::string sub = info->value->value.substr(ind+1);
+            int rind = sub.find("]");
+            if (rind > 0) {
+                info->value->value = info->value->value.substr(0, ind) + sub.substr(rind+1);
+                sub = sub.substr(0, rind);
+                subscript = allocExpr(sub);
+            }
         }
         walkRewrite(info->cond);
         walkRewrite(info->value);
@@ -1306,13 +1318,13 @@ static ModList modLine;
             MapNameValue mapValue;
             lookupQualName(IR, name, nameVec, mapValue);
             if (isIdChar(name[0]) && nameVec != "") {
-                std::string newName = name;
-                int ind = newName.find("[");
+                int ind = name.find("[");
                     std::string sub;
                 if (ind > 0) {
-                    extractSubscript(newName, ind, sub);
+                    extractSubscript(name, ind, sub);
                 }
-                fixupAccessible(newName);
+                fixupAccessible(name);
+                std::string newName = name;
                 while ((ind = newName.find(PERIOD)) > 0)
                     newName = newName.substr(0, ind) + "__" + newName.substr(ind+1);  // to defeat the walkAccessible() processing, use "__"
                 std::string name_or = newName + "_or";       // convert unpacked array to vector

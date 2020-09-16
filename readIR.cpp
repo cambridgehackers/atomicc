@@ -246,6 +246,18 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *value = inputExpression(bufp), *subscript = nullptr, *param = nullptr;
                 // TODO: make this processing more general
+                if (value->value == PERIOD) {
+                    ACCExpr *last = value->operands.back();
+                    if (last->operands.size() == 1) {
+                        ACCExpr *arg = last->operands.front();
+                        if (arg->value == "{") {
+                            last->operands.clear();
+                            value->value = tree2str(value, false);
+                            value->operands.clear();
+                            value->operands.push_back(arg);
+                        }
+                    }
+                }
                 value->value = replacePeriod(value->value);
                 int ind = value->value.rfind(DOLLAR);
                 if (ind > 0)
