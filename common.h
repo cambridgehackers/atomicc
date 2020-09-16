@@ -154,7 +154,6 @@ void normalizeIdentifier(ACCExpr *expr);
 // expr.cpp
 bool bitOp(std::string s);
 bool plainInteger(std::string val);
-void foldMember(ACCExpr *expr);
 std::string tree2str(ACCExpr *expr, bool addSpaces = true);
 ACCExpr *allocExpr(std::string value, ACCExpr *argl = nullptr, ACCExpr *argr = nullptr, ACCExpr *argt = nullptr);
 bool isIdChar(char ch);
@@ -179,7 +178,6 @@ bool arithOp(std::string s);
 bool relationalOp(std::string s);
 bool isConstExpr(ACCExpr *expr);
 std::string replacePeriod(std::string value);
-void walkFixup(ACCExpr *expr);
 void walkRewrite (ACCExpr *expr);
 ACCExpr *cleanupModuleParam(std::string param);
 extern int trace_expr, trace_interface;

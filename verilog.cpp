@@ -1059,13 +1059,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
     for (auto info: MI->callList) {
         ACCExpr *subscript = nullptr;
         int ind = info->value->value.find("[");
-        if (info->value->operands.size() > 1) {
-            subscript = info->value->operands.front()->operands.front();
-            info->value->operands.pop_front();
-printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\n", __FUNCTION__, __LINE__);
-exit(-1);
-        }
-        else if (ind > 0) {
+        if (ind > 0) {
             std::string sub = info->value->value.substr(ind+1);
             int rind = sub.find("]");
             if (rind > 0) {

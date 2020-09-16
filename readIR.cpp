@@ -52,7 +52,6 @@ static std::string changeSeparator(std::string value)
 static ACCExpr *inputExpression(std::string inStr)
 {
     ACCExpr *expr = str2tree(inStr);
-    walkFixup(expr);
     return expr;
 }
 

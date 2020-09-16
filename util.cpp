@@ -465,50 +465,6 @@ void normalizeIdentifier(ACCExpr *expr)
     fixupAccessible(expr->value);
 }
 
-static void foldSingle(ACCExpr *expr)
-{
-    //if (!expr)
-        //return;
-    if (expr->value == PERIOD) {
-        if (expr->operands.size() < 2) {
-            dumpExpr("BADFIELDSPEC", expr);
-            return;
-        }
-        expr->value = "";
-        auto oplist = expr->operands;
-        expr->operands.clear();
-        std::string sep;
-        for (auto item: oplist) {
-            if (!isIdChar(item->value[0])) {
-                expr->operands.push_back(item);    // hack for now!!!! (subscript tree attached to '.' operator)
-                continue;
-            }
-            expr->value += sep + item->value; // fold member specifier into base name
-            for (auto op: item->operands)
-                expr->operands.push_back(op);
-            sep = PERIOD;
-        }
-    }
-}
-
-void foldMember(ACCExpr *expr)
-{
-    if (!expr)
-        return;
-    foldSingle(expr);
-    for (auto item: expr->operands)
-        foldSingle(item);
-}
-
-void walkFixup(ACCExpr *expr)
-{
-    //if (!expr)
-        //return;
-    //foldMember(expr);
-    //for (auto item: expr->operands)
-        //walkFixup(item);
-}
-
 void walkRewrite (ACCExpr *expr)
 {
     if (!expr)
@@ -523,7 +479,6 @@ void walkAccessible(ACCExpr *expr)
 {
     if (!expr)
         return;
-    //foldSingle(expr);
     normalizeIdentifier(expr);
     for (auto item: expr->operands)
         walkAccessible(item);
