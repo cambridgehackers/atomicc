@@ -224,6 +224,10 @@ extern std::list<PrintfInfo> printfFormat;
 extern std::map<std::string, int> genericModule;
 extern int globalExprCleanup;
 extern int flagErrorsCleanup;
-extern std::map<std::string, std::string> syncPins;    // SyncFF items needed for PipeInSync instances
+typedef struct {
+    std::string name;
+    bool        instance;
+} SyncPinInfo;
+extern std::map<std::string, SyncPinInfo> syncPins;    // SyncFF items needed for PipeInSync instances
 extern int implementPrintf;
 extern std::string myGlobalName;
