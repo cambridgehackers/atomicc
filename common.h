@@ -66,7 +66,7 @@ typedef struct {
     bool        noRecursion;
     int         size;
 } AssignItem;
-enum {PIN_NONE, PIN_MODULE, PIN_OBJECT, PIN_REG, PIN_WIRE, PIN_ALIAS, PIN_LOCAL};
+enum {PIN_MODULE=1, PIN_OBJECT, PIN_REG, PIN_WIRE};
 typedef struct {
     int         count;
     std::string type;

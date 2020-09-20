@@ -173,7 +173,7 @@ static void addModulePort (ModList &modParam, std::string name, std::string type
             //exit(-1);
             type = newtype;
         }
-        int refPin = instance != "" ? PIN_OBJECT: (isLocal ? PIN_LOCAL: PIN_MODULE);
+        int refPin = (instance != "" || isLocal) ? PIN_OBJECT: PIN_MODULE;
         std::string instName = instance + name;
         if (trace_assign || trace_ports || trace_interface)
             printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d pin %d vecCount %s\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, refPin, vecCount.c_str());
@@ -262,7 +262,7 @@ printf("[%s:%d] IR %s instance %s pinpref %s methpref %s isLocal %d ptr %d isVer
                 std::string oldName = itemname + PERIOD "enq" + suffix;
                 std::string newName = LOCAL_VARIABLE_PREFIX + itemname + DOLLAR "enq" "S" + suffix;
                 printf("[%s:%d] PipeInSync oldname %s newname %s out %d isPtr %d instance %d\n", __FUNCTION__, __LINE__, oldName.c_str(), newName.c_str(), out, isPtr, (instance != ""));
-                setReference(newName, 4, "Bit(1)", false, false, PIN_LOCAL);
+                setReference(newName, 4, "Bit(1)", false, false, PIN_OBJECT);
                 refList[oldName].count++;
                 refList[newName].count++;
                 syncPins[oldName] = {newName, instance != ""};
@@ -387,9 +387,9 @@ static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std:
                 hasnRST = true;
         }
     if (!handleCLK && !hasCLK && vecCount == "")
-        setReference("CLK", 1, "Bit(1)", false, false, PIN_LOCAL);
+        setReference("CLK", 1, "Bit(1)", false, false, PIN_WIRE);
     if (!handleCLK && !hasnRST && vecCount == "")
-        setReference("nRST", 1, "Bit(1)", false, false, PIN_LOCAL);
+        setReference("nRST", 1, "Bit(1)", false, false, PIN_WIRE);
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)

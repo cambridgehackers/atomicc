@@ -188,7 +188,7 @@ void generateVerilogOutput(FILE *OStr)
     }
     for (auto item: refList) {
         std::string temp = item.first;
-        if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL) {
+        if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT) {
         if (item.second.count) {
             if (item.second.vecCount == "")
                 item.second.vecCount = convertType(item.second.type, 2);
@@ -258,7 +258,7 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         int ind = temp.find('[');
         if (ind != -1)
             temp = temp.substr(0,ind);
-        if ((item.second.out || item.second.inout) && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL)) {
+        if ((item.second.out || item.second.inout) && (item.second.pin == PIN_MODULE || item.second.pin == PIN_OBJECT)) {
             if (!assignList[item.first].value)
                 for (auto alitem: assignList)
                     if (ACCExpr *val = alitem.second.value)
