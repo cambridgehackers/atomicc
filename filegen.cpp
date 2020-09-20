@@ -43,7 +43,7 @@ std::string finishExpr(ACCExpr *expr)
     return tree2str(cleanupExprBuiltin(replacePins(expr), "0", true));
 }
 
-void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine)
+void generateModuleHeader(FILE *OStr, ModList &modLine)
 {
     std::string sep;
     bool handleCLK = false;

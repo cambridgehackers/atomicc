@@ -41,7 +41,6 @@ typedef struct {
     std::string value;
     std::string type;
 } InterfaceMapType;
-typedef std::list<ModData> ModList;
 
 static int printfNumber = 1;
 std::list<PrintfInfo> printfFormat;
@@ -51,11 +50,11 @@ std::map<std::string, SyncPinInfo> syncPins;    // SyncFF items needed for PipeI
 
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
-std::map<std::string, std::map<std::string, MuxValueElement>> enableList, muxValueList; // used for 'generate' items
+static std::map<std::string, std::map<std::string, MuxValueElement>> enableList, muxValueList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 static std::map<std::string, std::string> mapParam;
 static bool handleCLK;
-static std::list<ModData>::iterator moduleParameter;
+static ModList::iterator moduleParameter;
 
 static void traceZero(const char *label)
 {
@@ -79,8 +78,8 @@ printf("[%s:%d]STRUCT %s type %s vecCount %s\n", __FUNCTION__, __LINE__, target.
     }
     if (refList[target].pin) {
         printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, target.c_str(), refList[target].pin, pin);
+        exit(-1);
     }
-    assert (!refList[target].pin);
     refList[target] = RefItem{count, type, out, inout, pin, false, vecCount, isArgument};
 }
 
@@ -110,39 +109,15 @@ if (0)
         }
     }
     updateWidth(value, convertType(type));
-    if (isIdChar(value->value[0])) {
-        if (trace_assign)
-        printf("[%s:%d] %s/%d = %s/%d\n", __FUNCTION__, __LINE__, target.c_str(), tDir, value->value.c_str(), sDir);
-    }
     if (assignList[target].type != "" && assignList[target].value->value != "{") { // aggregate alloca items always start with an expansion expr
-        if (isIdChar(value->value[0]) && assignList[valStr].type == "") {
-        printf("[%s:%d] warnduplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
-        printf("[%s:%d] warnduplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
-            value = allocExpr(target);
-            target = valStr;
-        }
-        else {
-//if (trace_assign) {
         printf("[%s:%d] duplicate start [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tree2str(value).c_str(), type.c_str());
         printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
-//}
-        if (target.find("[") == std::string::npos)
-        if (tree2str(assignList[target].value).find("[") == std::string::npos)
         exit(-1);
-        }
     }
     if (generateSection != "")
         condAssignList[generateSection][target] = AssignItem{value, type, false, 0};
-    else {
+    else
         assignList[target] = AssignItem{value, type, false, 0};
-        int ind = target.find('[');
-        if (ind != -1) {
-            std::string name = target.substr(0,ind);
-            refList[name].count++;
-            if (trace_assign)
-                printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, name.c_str(), refList[name].count);
-        }
-    }
 }
 
 static void addRead(MetaSet &list, ACCExpr *cond)
@@ -199,9 +174,9 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
     assert(IR);
     MapNameValue mapValue = parentMap;
     vecCount = instantiateType(vecCount, mapValue);
-for (auto item: mapValue)
-printf("[%s:%d] [%s] = %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
-printf("[%s:%d] IR %s instance %s pinpref %s methpref %s isLocal %d ptr %d isVerilog %d veccount %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str(), pinPrefix.c_str(), methodPrefix.c_str(), isLocal, isPtr, isVerilog, vecCount.c_str());
+//for (auto item: mapValue)
+//printf("[%s:%d] [%s] = %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
+//printf("[%s:%d] IR %s instance %s pinpref %s methpref %s isLocal %d ptr %d isVerilog %d veccount %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str(), pinPrefix.c_str(), methodPrefix.c_str(), isLocal, isPtr, isVerilog, vecCount.c_str());
     if (!localInterface || methodPrefix != "")
     for (auto MI: IR->methods) {
         std::string name = methodPrefix + MI->name;
@@ -772,20 +747,16 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
     showRef("source", source->value);
     if (sdir) {
         if (assignList[sstr].type == "")
-        setAssign(sstr, target, type);
+            setAssign(sstr, target, type);
         else
             printf("[%s:%d] skip assign to %s type %s\n", __FUNCTION__, __LINE__, sstr.c_str(), assignList[sstr].type.c_str());
-        //refList[tstr].count++;
-        //refList[sstr].count++;
         refList[tif].done = true;
     }
     else {
         if (assignList[tstr].type == "")
-        setAssign(tstr, source, type);
+            setAssign(tstr, source, type);
         else
             printf("[%s:%d] skip assign to %s type %s\n", __FUNCTION__, __LINE__, tstr.c_str(), assignList[tstr].type.c_str());
-        //refList[tstr].count++;
-        //refList[sstr].count++;
         refList[sif].done = true;
     }
 }
@@ -842,8 +813,15 @@ static bool verilogInterface(ModuleIR *searchIR, std::string searchStr)
     return false;
 }
 
-static void connectMethods(ModuleIR *IR, std::string interfaceName, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
+static void connectMethods(ModuleIR *IR, std::string ainterfaceName, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward)
 {
+    std::string interfaceName = ainterfaceName;
+    if (startswith(interfaceName, "ARRAY_")) {
+        interfaceName = interfaceName.substr(6);
+        int ind = interfaceName.find(ARRAY_ELEMENT_MARKER);
+        if (ind > 0)
+            interfaceName = interfaceName.substr(ind+1);
+    }
     ModuleIR *IIR = lookupInterface(interfaceName);
     assert(IIR);
     std::string ICtarget = tree2str(targetTree);
@@ -910,16 +888,8 @@ static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo
             setAssign(getEnaName(methodName), allocExpr(getRdyName(methodName)), "Bit(1)");
     }
     setAssign(methodName, MI->guard, MI->type); // collect the text of the return value into a single 'assign'
-    for (auto IC : MI->interfaceConnect) {
-        std::string iname = IC.type;
-        if (startswith(iname, "ARRAY_")) {
-            iname = iname.substr(6);
-            int ind = iname.find(ARRAY_ELEMENT_MARKER);
-            if (ind > 0)
-                iname = iname.substr(ind+1);
-        }
-        connectMethods(IR, iname, IC.target, IC.source, IC.isForward);
-    }
+    for (auto IC : MI->interfaceConnect)
+        connectMethods(IR, IC.type, IC.target, IC.source, IC.isForward);
 }
 static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
 {
@@ -1099,23 +1069,6 @@ static void interfaceAssign(std::string target, ACCExpr *source, std::string typ
     }
 }
 
-static void interfaceMakeMap(std::string target, std::string source, std::string type)
-{
-    if (auto IIR = lookupInterface(type)) {
-        for (auto MI : IIR->methods) {
-            std::string tstr = replacePeriod(target + PERIOD + MI->name);
-            std::string sstr = replacePeriod(source + PERIOD + MI->name);
-            fixupAccessible(tstr);
-            fixupAccessible(sstr);
-            mapParam[tstr] = sstr;
-            tstr = baseMethodName(tstr) + DOLLAR;
-            sstr = baseMethodName(sstr) + DOLLAR;
-            for (auto info: MI->params)
-                mapParam[tstr+info.name] = sstr+info.name;
-        }
-    }
-}
-
 static void prepareMethodGuards(ModuleIR *IR)
 {
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
@@ -1264,18 +1217,27 @@ static void fixupModuleInstantiations(ModList &modLine)
                 newValue = interfaceMap[val].value;
             if (trace_interface)
                 printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' mapParam '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), mapParam[val].c_str(), newValue.c_str());
-            if (newValue == "" && refList[val].count == 0) {
-                int ind = val.find_first_of(PERIOD DOLLAR);
-                if (ind > 1) {
-                    std::string prefix = val.substr(0, ind);
-                    std::string post = val.substr(ind);
-                    auto look = interfaceMap.find(prefix);
-                    if (look != interfaceMap.end()) {
-                        if (trace_interface)
-                            printf("[%s:%d] find prefix %s post %s lookvalue %s looktype %s\n", __FUNCTION__, __LINE__, prefix.c_str(), post.c_str(), look->second.value.c_str(), look->second.type.c_str());
-                        refList[look->first].done = true;
-                        refList[look->second.value].done = true;
-                        interfaceMakeMap(prefix, look->second.value, look->second.type);
+            int ind = val.find_first_of(PERIOD DOLLAR);
+            if (newValue == "" && refList[val].count == 0 && ind > 1) {
+                std::string prefix = val.substr(0, ind);
+                std::string post = val.substr(ind);
+                auto look = interfaceMap.find(prefix);
+                if (look != interfaceMap.end()) {
+                    if (trace_interface)
+                        printf("[%s:%d] find prefix %s post %s lookvalue %s looktype %s\n", __FUNCTION__, __LINE__, prefix.c_str(), post.c_str(), look->second.value.c_str(), look->second.type.c_str());
+                    refList[look->first].done = true;
+                    refList[look->second.value].done = true;
+                    auto IIR = lookupInterface(look->second.type);
+                    for (auto MI : IIR->methods) {
+                        std::string tstr = replacePeriod(prefix + PERIOD + MI->name);
+                        std::string sstr = replacePeriod(look->second.value + PERIOD + MI->name);
+                        fixupAccessible(tstr);
+                        fixupAccessible(sstr);
+                        mapParam[tstr] = sstr;
+                        tstr = baseMethodName(tstr) + DOLLAR;
+                        sstr = baseMethodName(sstr) + DOLLAR;
+                        for (auto info: MI->params)
+                            mapParam[tstr+info.name] = sstr+info.name;
                     }
                 }
             }
@@ -1288,10 +1250,8 @@ static void fixupModuleInstantiations(ModList &modLine)
                     refList[val].count++;
                     refList[val].done = true;
                 }
-                else if (refList[val].out && !refList[val].inout)
-                    val = "0";
                 else
-                    val = "";
+                    val = (refList[val].out && !refList[val].inout) ? "0" : "";
             }
             else if (mapPort[val] != "") {
                 val = mapPort[val];
@@ -1359,16 +1319,8 @@ static ModList modLine;
 
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
-    for (auto IC : IR->interfaceConnect) {
-        std::string iname = IC.type;
-        if (startswith(iname, "ARRAY_")) {
-            iname = iname.substr(6);
-            int ind = iname.find(ARRAY_ELEMENT_MARKER);
-            if (ind > 0)
-                iname = iname.substr(ind+1);
-        }
-        connectMethods(IR, iname, IC.target, IC.source, IC.isForward);
-    }
+    for (auto IC : IR->interfaceConnect)
+        connectMethods(IR, IC.type, IC.target, IC.source, IC.isForward);
     traceZero("AFTCONNECT");
     generateMethodGroup(IR, generateMethodGuard);
     generateMethodGroup(IR, generateMethod);
@@ -1376,17 +1328,17 @@ static ModList modLine;
     for (auto top: muxValueList) {
         generateSection = top.first;
         for (auto item: top.second) {
-        setAssign(item.first, cleanupExprBuiltin(item.second.phi, item.second.defaultValue), refList[item.first].type);
-        if (startswith(item.first, BLOCK_NAME))
-            assignList[item.first].size = walkCount(assignList[item.first].value);
+            setAssign(item.first, cleanupExprBuiltin(item.second.phi, item.second.defaultValue), refList[item.first].type);
+            if (startswith(item.first, BLOCK_NAME))
+                assignList[item.first].size = walkCount(assignList[item.first].value);
         }
     }
     for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY
         generateSection = top.first;
         for (auto item: top.second) {
-        if (trace_assign)
-            printf("[%s:%d] ENABLELIST section %s first %s second %s\n", __FUNCTION__, __LINE__, generateSection.c_str(), item.first.c_str(), tree2str(item.second.phi).c_str());
-        setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first), true), "Bit(1)");
+            if (trace_assign)
+                printf("[%s:%d] ENABLELIST section %s first %s second %s\n", __FUNCTION__, __LINE__, generateSection.c_str(), item.first.c_str(), tree2str(item.second.phi).c_str());
+            setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first), true), "Bit(1)");
         }
     }
     generateSection = "";

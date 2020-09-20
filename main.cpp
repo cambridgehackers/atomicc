@@ -31,7 +31,7 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
     if (ind > 0)
         baseDir = baseDir.substr(0, ind+1);
     for (auto IR : irSeq) {
-        static std::list<ModData> modLineTop;
+        static ModList modLineTop;
         modLineTop.clear();
         generateModuleDef(IR, modLineTop);         // Collect/process verilog info
 

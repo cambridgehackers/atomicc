@@ -53,6 +53,7 @@ typedef struct {
     std::string isparam;     // initial value for parameters
     std::string vecCount;
 } ModData;
+typedef std::list<ModData> ModList;
 typedef struct {
     std::string name;
     std::string base;
@@ -198,12 +199,12 @@ void preprocessIR(std::list<ModuleIR *> &irSeq);
 void cleanupIR(std::list<ModuleIR *> &irSeq);
 
 // verilog.cpp
-void generateModuleDef(ModuleIR *IR, std::list<ModData> &modLineTop);
+void generateModuleDef(ModuleIR *IR, ModList &modLineTop);
 void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward);
 
 // filegen.cpp
 extern std::map<std::string, int> genvarMap;
-void generateModuleHeader(FILE *OStr, std::list<ModData> &modLine);
+void generateModuleHeader(FILE *OStr, ModList &modLine);
 void generateVerilogOutput(FILE *OStr);
 
 // kami.cpp
@@ -217,7 +218,7 @@ extern std::map<std::string, AssignItem> assignList;
 extern std::map<std::string, std::map<std::string, AssignItem>> condAssignList;
 extern std::map<std::string, ModuleIR *> mapIndex, interfaceIndex, mapAllModule;
 extern std::map<std::string, int> replaceBlock;
-extern std::list<ModData> modNew;
+extern ModList modNew;
 extern std::map<std::string, CondLineType> condLines;
 extern std::list<PrintfInfo> printfFormat;
 extern std::map<std::string, int> genericModule;
