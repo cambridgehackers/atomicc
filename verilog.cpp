@@ -114,10 +114,11 @@ if (0)
         printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
         exit(-1);
     }
+    bool noRecursion = (target == "CLK" || target == "nRST");
     if (generateSection != "")
-        condAssignList[generateSection][target] = AssignItem{value, type, false, 0};
+        condAssignList[generateSection][target] = AssignItem{value, type, noRecursion, 0};
     else
-        assignList[target] = AssignItem{value, type, false, 0};
+        assignList[target] = AssignItem{value, type, noRecursion, 0};
 }
 
 static void addRead(MetaSet &list, ACCExpr *cond)
@@ -362,9 +363,9 @@ static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std:
                 hasnRST = true;
         }
     if (!handleCLK && !hasCLK && vecCount == "")
-        setReference("CLK", 1, "Bit(1)", false, false, PIN_WIRE);
+        setReference("CLK", 2, "Bit(1)", false, false, PIN_WIRE);
     if (!handleCLK && !hasnRST && vecCount == "")
-        setReference("nRST", 1, "Bit(1)", false, false, PIN_WIRE);
+        setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -481,25 +482,6 @@ static ACCExpr *replaceAssign(ACCExpr *expr, std::string guardName = "", bool en
     return newExpr;
 }
 
-static bool checkRecursion(ACCExpr *expr)
-{
-    std::string item = expr->value;
-    if (isIdChar(item[0]) && !expr->operands.size()) {
-        if (replaceBlock[item]) // flag multiple expansions of an item
-            return false;
-        if (!assignList[item].noRecursion)
-        if (ACCExpr *res = assignList[item].value) {
-            replaceBlock[item] = tree2str(res).length();
-            if (!checkRecursion(res))
-                return false;
-        }
-    }
-    for (auto item: expr->operands)
-        if (!checkRecursion(item))
-            return false;
-    return true;
-}
-
 static ACCExpr *simpleReplace(ACCExpr *expr)
 {
     if (!expr)
@@ -543,34 +525,6 @@ static void setAssignRefCount(ModuleIR *IR)
             assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
         else
             assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
-    }
-    for (auto item: assignList) {
-        int i = 0;
-        if (!item.second.value)
-            continue;
-        while (true) {
-            replaceBlock.clear();
-            if (checkRecursion(item.second.value))
-                break;
-            std::string name;
-            int length = 0;
-            for (auto rep: replaceBlock) {
-                 if (rep.second > length && !isRdyName(rep.first) && !isEnaName(rep.first)) {
-                     name = rep.first;
-                     length = rep.second;
-                 }
-            }
-            if (name == "")
-                break;
-printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LINE__, name.c_str());
-            assignList[name].noRecursion = true;
-            if (i++ > 1000) {
-                printf("[%s:%d]checkRecursion loop; exit\n", __FUNCTION__, __LINE__);
-                for (auto rep: replaceBlock)
-                    printf("[%s:%d] name %s length %d\n", __FUNCTION__, __LINE__, rep.first.c_str(), rep.second);
-                exit(-1);
-            }
-        }
     }
     for (auto &ctop : condLines) // process all generate sections
     for (auto &tcond : ctop.second.always) {
@@ -624,10 +578,6 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
         if (aitem.second.value)
             printf("[%s:%d] ASSIGN %s = %s size %d count %d[%d] pin %d type %s\n", __FUNCTION__, __LINE__, aitem.first.c_str(), tree2str(aitem.second.value).c_str(), walkCount(aitem.second.value), refList[aitem.first].count, refList[temp].count, refList[temp].pin, refList[temp].type.c_str());
     }
-    for (auto item: refList)
-        if (item.second.count) {
-         std::string type = findType(item.first);
-        }
 }
 
 static ACCExpr *printfArgs(ACCExpr *listp)
@@ -690,7 +640,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
     condLines[generateSection].always[methodName].info[tree2str(cond)].info.push_back(CondInfo{dest, value});
 }
 
-void showRef(const char *label, std::string name)
+static void showRef(const char *label, std::string name)
 {
     if (trace_connect)
     printf("%s: %s count %d pin %d type %s out %d inout %d done %d veccount %s isArgument %d\n",
@@ -700,7 +650,7 @@ void showRef(const char *label, std::string name)
         refList[name].vecCount.c_str(), refList[name].isArgument);
 }
 
-bool getDirection(std::string &name)
+static bool getDirection(std::string &name)
 {
     std::string orig = name;
     bool ret = refList[name].out;
@@ -865,7 +815,7 @@ static void connectMethods(ModuleIR *IR, std::string ainterfaceName, ACCExpr *ta
         connectTarget(targetTree, sourceTree, interfaceName, isForward);
 }
 
-void appendMux(std::string section, std::string name, ACCExpr *cond, ACCExpr *value, std::string defaultValue)
+static void appendMux(std::string section, std::string name, ACCExpr *cond, ACCExpr *value, std::string defaultValue)
 {
     ACCExpr *phi = muxValueList[section][name].phi;
     if (!phi) {
@@ -1031,7 +981,7 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
             appendLine(methodName, info->cond, nullptr, info->value);
 }
 
-void generateMethodGroup(ModuleIR *IR, void (*generateMethod)(ModuleIR *IR, std::string methodName, MethodInfo *MI))
+static void generateMethodGroup(ModuleIR *IR, void (*generateMethod)(ModuleIR *IR, std::string methodName, MethodInfo *MI))
 {
     for (auto MI : IR->methods)
         if (MI->generateSection == "")
