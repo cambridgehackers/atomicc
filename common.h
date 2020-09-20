@@ -74,7 +74,6 @@ typedef struct {
     bool        inout;
     int         pin;
     bool        done;
-    bool        isGenerated;
     std::string vecCount;
     bool        isArgument;
 } RefItem;

@@ -27,20 +27,35 @@ int trace_ports;//= 1;
 int trace_connect;//= 1;
 int trace_skipped;//= 1;
 
-std::list<PrintfInfo> printfFormat;
+#define PRINTF_PORT 0x7fff
+//////////////////HACKHACK /////////////////
+#define IfcNames_EchoIndicationH2S 5
+#define PORTALNUM IfcNames_EchoIndicationH2S
+//////////////////HACKHACK /////////////////
+
+typedef struct {
+    ACCExpr *phi;
+    std::string defaultValue;
+} MuxValueElement;
+typedef struct {
+    std::string value;
+    std::string type;
+} InterfaceMapType;
 typedef std::list<ModData> ModList;
+
+static int printfNumber = 1;
+std::list<PrintfInfo> printfFormat;
 ModList modNew;
 std::map<std::string, CondLineType> condLines;
 std::map<std::string, SyncPinInfo> syncPins;    // SyncFF items needed for PipeInSync instances
 
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
-typedef struct {
-    ACCExpr *phi;
-    std::string defaultValue;
-} MuxValueElement;
 std::map<std::string, std::map<std::string, MuxValueElement>> enableList, muxValueList; // used for 'generate' items
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
+static std::map<std::string, std::string> mapParam;
+static bool handleCLK;
+static std::list<ModData>::iterator moduleParameter;
 
 static void traceZero(const char *label)
 {
@@ -56,9 +71,8 @@ static void traceZero(const char *label)
 }
 
 static void setReference(std::string target, int count, std::string type, bool out = false, bool inout = false,
-    int pin = PIN_WIRE, bool done = false, std::string vecCount = "", bool isArgument = false)
+    int pin = PIN_WIRE, std::string vecCount = "", bool isArgument = false)
 {
-bool isGenerated = false;
     if (lookupIR(type) != nullptr || lookupInterface(type) != nullptr || vecCount != "") {
         count += 1;
 printf("[%s:%d]STRUCT %s type %s vecCount %s\n", __FUNCTION__, __LINE__, target.c_str(), type.c_str(), vecCount.c_str());
@@ -67,7 +81,7 @@ printf("[%s:%d]STRUCT %s type %s vecCount %s\n", __FUNCTION__, __LINE__, target.
         printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, target.c_str(), refList[target].pin, pin);
     }
     assert (!refList[target].pin);
-    refList[target] = RefItem{count, type, out, inout, pin, done, isGenerated, vecCount, isArgument};
+    refList[target] = RefItem{count, type, out, inout, pin, false, vecCount, isArgument};
 }
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
@@ -150,9 +164,6 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
         addRead(MI->meta[MetaRead][fieldName], cond);
 }
 
-static bool handleCLK;
-
-std::list<ModData>::iterator moduleParameter;
 static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance)
 {
         std::string newtype = instantiateType(type, mapValue);
@@ -168,7 +179,7 @@ static void addModulePort (ModList &modParam, std::string name, std::string type
             printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d pin %d vecCount %s\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, refPin, vecCount.c_str());
         fixupAccessible(instName);
         if (!isLocal || instance == "") {
-            setReference(instName, (dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, false, vecCount, isArgument);
+            setReference(instName, (dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, vecCount, isArgument);
             if(instance == "" && vecCount != "")
                 refList[instName].done = true;  // prevent default blanket assignment generation
         }
@@ -263,6 +274,7 @@ printf("[%s:%d] IR %s instance %s pinpref %s methpref %s isLocal %d ptr %d isVer
             addModulePort(modParam, methodPrefix + item.fldName, type, out, false, ""/*not param*/, localFlag, false/*isArgument*/, updatedVecCount, mapValue, instance);
     }
 }
+
 static void findCLK(ModuleIR *IR, std::string pinPrefix, bool isVerilog)
 {
     if (pinPrefix == "" || !isVerilog)
@@ -494,45 +506,6 @@ static ACCExpr *replaceAssign(ACCExpr *expr, std::string guardName = "", bool en
     return newExpr;
 }
 
-static void optimizeBitAssigns(void)
-{
-    std::map<std::string, std::map<uint64_t, BitfieldPart>> bitfieldList;
-    // gather bitfield assigns together
-    for (auto item: assignList) {
-        int ind = item.first.find('[');
-        uint64_t lower;
-        if (ind != -1) {
-            lower = atol(item.first.substr(ind+1).c_str());
-            std::string temp = item.first.substr(0, ind);
-            ind = item.first.find(':');
-            if (ind != -1 && item.second.value)
-                bitfieldList[temp][lower] = BitfieldPart{
-                    atol(item.first.substr(ind+1).c_str()), item.second.value, item.second.type};
-        }
-    }
-    // concatenate bitfield assigns
-    for (auto item: bitfieldList) {
-        std::string type = refList[item.first].type;
-        std::string size = convertType(type);
-        uint64_t current = 0;
-printf("[%s:%d] BBBSTART %s type %s\n", __FUNCTION__, __LINE__, item.first.c_str(), type.c_str());
-        ACCExpr *newVal = allocExpr("{");
-        for (auto bitem: item.second) {
-            uint64_t diff = bitem.first - current;
-            if (diff > 0)
-                newVal->operands.push_back(allocExpr(autostr(diff) + "'d0"));
-            newVal->operands.push_back(bitem.second.value);
-            current = bitem.second.upper + 1;
-printf("[%s:%d] BBB lower %d upper %d val %s\n", __FUNCTION__, __LINE__, (int)bitem.first, (int)bitem.second.upper, tree2str(bitem.second.value).c_str());
-            assignList[item.first + "[" + autostr(bitem.second.upper) + ":" + autostr(bitem.first) + "]"].value = nullptr;
-        }
-        size = "(" + size + " - " + autostr(current) + ")";
-        if (isdigit(size[0]))
-            newVal->operands.push_back(allocExpr(size + "'d0"));
-        setAssign(item.first, newVal, type);
-    }
-}
-
 static bool checkRecursion(ACCExpr *expr)
 {
     std::string item = expr->value;
@@ -682,41 +655,6 @@ printf("[%s:%d] set [%s] noRecursion RRRRRRRRRRRRRRRRRRR\n", __FUNCTION__, __LIN
         }
 }
 
-static void walkCSE (ACCExpr *expr)
-{
-    if (!expr)
-        return;
-    if (0)
-    if (walkCount(expr) > 3)
-    for (auto item: assignList) {
-        if (item.second.value != expr && matchExpr(expr, item.second.value)) {
-printf("[%s:%d]MMMMMMMAAAAAAAAAAAATTTTTTTCCCCCCCCHHHHHHHH %s\n", __FUNCTION__, __LINE__, item.first.c_str());
-            expr->value = item.first;
-            expr->operands.clear();
-            refList[item.first].count++;
-            if (trace_assign)
-                printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, item.first.c_str(), refList[item.first].count);
-        }
-    }
-    for (auto item: expr->operands)
-        walkCSE(item);
-}
-
-static void collectCSE(void)
-{
-//printf("[%s:%d] START\n", __FUNCTION__, __LINE__);
-    for (auto &item : assignList) {
-         walkCSE(item.second.value);
-    }
-//printf("[%s:%d] END\n", __FUNCTION__, __LINE__);
-}
-
-static int printfNumber = 1;
-#define PRINTF_PORT 0x7fff
-//////////////////HACKHACK /////////////////
-#define IfcNames_EchoIndicationH2S 5
-#define PORTALNUM IfcNames_EchoIndicationH2S
-//////////////////HACKHACK /////////////////
 static ACCExpr *printfArgs(ACCExpr *listp)
 {
     int pipeArgSize = 128;
@@ -780,10 +718,10 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
 void showRef(const char *label, std::string name)
 {
     if (trace_connect)
-    printf("%s: %s count %d pin %d type %s out %d inout %d done %d isGenerated %d veccount %s isArgument %d\n",
+    printf("%s: %s count %d pin %d type %s out %d inout %d done %d veccount %s isArgument %d\n",
         label, name.c_str(), refList[name].count, refList[name].pin,
         refList[name].type.c_str(), refList[name].out,
-        refList[name].inout, refList[name].done, refList[name].isGenerated,
+        refList[name].inout, refList[name].done,
         refList[name].vecCount.c_str(), refList[name].isArgument);
 }
 
@@ -1161,11 +1099,6 @@ static void interfaceAssign(std::string target, ACCExpr *source, std::string typ
     }
 }
 
-typedef struct {
-    std::string value;
-    std::string type;
-} InterfaceMapType;
-static std::map<std::string, std::string> mapParam;
 static void interfaceMakeMap(std::string target, std::string source, std::string type)
 {
     if (auto IIR = lookupInterface(type)) {
@@ -1183,54 +1116,8 @@ static void interfaceMakeMap(std::string target, std::string source, std::string
     }
 }
 
-/*
- * Generate *.sv and *.vh for a Verilog module
- */
-void generateModuleDef(ModuleIR *IR, ModList &modLineTop)
+static void prepareMethodGuards(ModuleIR *IR)
 {
-static ModList modLine;
-    generateSection = "";
-    condAssignList.clear();
-    refList.clear();
-    assignList.clear();
-    modNew.clear();
-    condLines.clear();
-    genvarMap.clear();
-    enableList.clear();
-    // 'Mux' together parameter settings from all invocations of a method from this class
-    muxValueList.clear();
-    modLine.clear();
-    syncPins.clear();     // pins from PipeInSync
-
-    printf("[%s:%d] STARTMODULE %s/%p\n", __FUNCTION__, __LINE__, IR->name.c_str(), (void *)IR);
-    //dumpModule("START", IR);
-    generateModuleSignature(IR, "", "", modLineTop, "", "");
-
-    for (auto item: IR->fields) {
-        fixupAccessible(item.fldName);
-        ModuleIR *itemIR = lookupIR(item.type);
-        if (!itemIR || item.isPtr || itemIR->isStruct)
-            setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, false, item.vecCount);
-        else {
-//printf("[%s:%d] INSTANTIATEFIELD type %s fldName %s veccount %s\n", __FUNCTION__, __LINE__, item.type.c_str(), item.fldName.c_str(), item.vecCount.c_str());
-            generateModuleSignature(itemIR, item.type, item.fldName + DOLLAR, modLine, IR->params[item.fldName], item.vecCount);
-        }
-    }
-    for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
-        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
-            std::string pinName = item.first;
-            fixupAccessible(pinName);
-            setReference(pinName, 0, item.second.type, true, false, PIN_WIRE, false, convertType(item.second.type, 2));
-        }
-    }
-    buildAccessible(IR);
-    for (auto item : syncPins) {
-        std::string oldName = item.first;
-        std::string newName = item.second.name;
-        modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
-        modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, "", ""});
-        modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, "", ""});
-    }
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
         if (MI->rule)             // both RDY and ENA must be allocated for rules
@@ -1338,6 +1225,137 @@ static ModList modLine;
         }
         }
     }
+}
+
+static void fixupModuleInstantiations(ModList &modLine)
+{
+    // last chance to optimize out single assigns to output ports
+    std::map<std::string, std::string> mapPort;
+    std::map<std::string, InterfaceMapType> interfaceMap;
+    for (auto item: assignList) {
+        if ((refList[item.first].out || refList[item.first].inout) && refList[item.first].pin == PIN_MODULE
+          && item.second.value && isIdChar(item.second.value->value[0]) && !item.second.value->operands.size()
+          && refList[item.second.value->value].pin != PIN_MODULE) {
+            mapPort[item.second.value->value] = item.first;
+        }
+        if (lookupInterface(item.second.type)) {
+            std::string value = tree2str(item.second.value);
+            interfaceMap[item.first] = InterfaceMapType{value, item.second.type};
+            interfaceMap[value] = InterfaceMapType{item.first, item.second.type};
+            if (trace_interface)
+                printf("[%s:%d] interfacemap %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), value.c_str());
+        }
+    }
+
+    bool skipReplace = false;
+    std::string modname;
+    for (auto mitem: modLine) {
+        std::string val = mitem.value;
+        if (mitem.moduleStart) {
+            skipReplace = mitem.vecCount != "" || val == "SyncFF";
+            modname = mitem.value;
+            mapParam.clear();
+        }
+        else if (!skipReplace) {
+            std::string newValue = tree2str(assignList[val].value);
+            if (newValue == "")
+                newValue = mapParam[val];
+            if (newValue == "")
+                newValue = interfaceMap[val].value;
+            if (trace_interface)
+                printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' mapParam '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), mapParam[val].c_str(), newValue.c_str());
+            if (newValue == "" && refList[val].count == 0) {
+                int ind = val.find_first_of(PERIOD DOLLAR);
+                if (ind > 1) {
+                    std::string prefix = val.substr(0, ind);
+                    std::string post = val.substr(ind);
+                    auto look = interfaceMap.find(prefix);
+                    if (look != interfaceMap.end()) {
+                        if (trace_interface)
+                            printf("[%s:%d] find prefix %s post %s lookvalue %s looktype %s\n", __FUNCTION__, __LINE__, prefix.c_str(), post.c_str(), look->second.value.c_str(), look->second.type.c_str());
+                        refList[look->first].done = true;
+                        refList[look->second.value].done = true;
+                        interfaceMakeMap(prefix, look->second.value, look->second.type);
+                    }
+                }
+            }
+            std::string oldVal = val;
+            if (mapParam[val] != "")
+                val = mapParam[val];
+            else if (refList[val].count == 0) {
+                if (interfaceMap[val].value != "") {
+                    val = interfaceMap[val].value;
+                    refList[val].count++;
+                    refList[val].done = true;
+                }
+                else if (refList[val].out && !refList[val].inout)
+                    val = "0";
+                else
+                    val = "";
+            }
+            else if (mapPort[val] != "") {
+                val = mapPort[val];
+                decRef(mitem.value);
+            }
+            else
+                val = tree2str(replaceAssign(allocExpr(val)));
+            if (oldVal != val)
+                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
+            if (trace_interface)
+                printf("[%s:%d] newval %s\n", __FUNCTION__, __LINE__, val.c_str());
+        }
+        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, ""/*not param*/, mitem.vecCount});
+    }
+}
+
+/*
+ * Generate *.sv and *.vh for a Verilog module
+ */
+void generateModuleDef(ModuleIR *IR, ModList &modLineTop)
+{
+static ModList modLine;
+    generateSection = "";
+    condAssignList.clear();
+    refList.clear();
+    assignList.clear();
+    modNew.clear();
+    condLines.clear();
+    genvarMap.clear();
+    enableList.clear();
+    // 'Mux' together parameter settings from all invocations of a method from this class
+    muxValueList.clear();
+    modLine.clear();
+    syncPins.clear();     // pins from PipeInSync
+
+    printf("[%s:%d] STARTMODULE %s/%p\n", __FUNCTION__, __LINE__, IR->name.c_str(), (void *)IR);
+    //dumpModule("START", IR);
+    generateModuleSignature(IR, "", "", modLineTop, "", "");
+
+    for (auto item: IR->fields) {
+        fixupAccessible(item.fldName);
+        ModuleIR *itemIR = lookupIR(item.type);
+        if (!itemIR || item.isPtr || itemIR->isStruct)
+            setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount);
+        else {
+//printf("[%s:%d] INSTANTIATEFIELD type %s fldName %s veccount %s\n", __FUNCTION__, __LINE__, item.type.c_str(), item.fldName.c_str(), item.vecCount.c_str());
+            generateModuleSignature(itemIR, item.type, item.fldName + DOLLAR, modLine, IR->params[item.fldName], item.vecCount);
+        }
+    }
+    for (auto item : syncPins) {
+        std::string oldName = item.first;
+        std::string newName = item.second.name;
+        modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
+        modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, "", ""});
+        modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, "", ""});
+    }
+
+    for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
+        for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
+            setReference(item.first, 0, item.second.type, true, false, PIN_WIRE, convertType(item.second.type, 2));
+        }
+    }
+    buildAccessible(IR);
+    prepareMethodGuards(IR);
 
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method
@@ -1399,88 +1417,11 @@ static ModList modLine;
     }
 
     setAssignRefCount(IR);
-    collectCSE();
-    optimizeBitAssigns();
 
     // recursively process all replacements internal to the list of 'setAssign' items
     for (auto &item : assignList)
         item.second.value = replaceAssign(item.second.value);
 
-    // last chance to optimize out single assigns to output ports
-    std::map<std::string, std::string> mapPort;
-    std::map<std::string, InterfaceMapType> interfaceMap;
-    for (auto item: assignList) {
-        if ((refList[item.first].out || refList[item.first].inout) && refList[item.first].pin == PIN_MODULE
-          && item.second.value && isIdChar(item.second.value->value[0]) && !item.second.value->operands.size()
-          && refList[item.second.value->value].pin != PIN_MODULE) {
-            mapPort[item.second.value->value] = item.first;
-        }
-        if (lookupInterface(item.second.type)) {
-            std::string value = tree2str(item.second.value);
-            interfaceMap[item.first] = InterfaceMapType{value, item.second.type};
-            interfaceMap[value] = InterfaceMapType{item.first, item.second.type};
-            if (trace_interface)
-                printf("[%s:%d] interfacemap %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), value.c_str());
-        }
-    }
     // process assignList replacements, mark referenced items
-    bool skipReplace = false;
-    std::string modname;
-    for (auto mitem: modLine) {
-        std::string val = mitem.value;
-        if (mitem.moduleStart) {
-            skipReplace = mitem.vecCount != "" || val == "SyncFF";
-            modname = mitem.value;
-            mapParam.clear();
-        }
-        else if (!skipReplace) {
-            std::string newValue = tree2str(assignList[val].value);
-            if (newValue == "")
-                newValue = mapParam[val];
-            if (newValue == "")
-                newValue = interfaceMap[val].value;
-            if (trace_interface)
-                printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' mapParam '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), mapParam[val].c_str(), newValue.c_str());
-            if (newValue == "" && refList[val].count == 0) {
-                int ind = val.find_first_of(PERIOD DOLLAR);
-                if (ind > 1) {
-                    std::string prefix = val.substr(0, ind);
-                    std::string post = val.substr(ind);
-                    auto look = interfaceMap.find(prefix);
-                    if (look != interfaceMap.end()) {
-                        if (trace_interface)
-                            printf("[%s:%d] find prefix %s post %s lookvalue %s looktype %s\n", __FUNCTION__, __LINE__, prefix.c_str(), post.c_str(), look->second.value.c_str(), look->second.type.c_str());
-                        refList[look->first].done = true;
-                        refList[look->second.value].done = true;
-                        interfaceMakeMap(prefix, look->second.value, look->second.type);
-                    }
-                }
-            }
-            std::string oldVal = val;
-            if (mapParam[val] != "")
-                val = mapParam[val];
-            else if (refList[val].count == 0) {
-                if (interfaceMap[val].value != "") {
-                    val = interfaceMap[val].value;
-                    refList[val].count++;
-                    refList[val].done = true;
-                }
-                else if (refList[val].out && !refList[val].inout)
-                    val = "0";
-                else
-                    val = "";
-            }
-            else if (mapPort[val] != "") {
-                val = mapPort[val];
-                decRef(mitem.value);
-            }
-            else
-                val = tree2str(replaceAssign(allocExpr(val)));
-            if (oldVal != val)
-                refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
-            if (trace_interface)
-                printf("[%s:%d] newval %s\n", __FUNCTION__, __LINE__, val.c_str());
-        }
-        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, ""/*not param*/, mitem.vecCount});
-    }
+    fixupModuleInstantiations(modLine);
 }

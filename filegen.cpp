@@ -189,7 +189,7 @@ void generateVerilogOutput(FILE *OStr)
     for (auto item: refList) {
         std::string temp = item.first;
         if (item.second.pin == PIN_WIRE || item.second.pin == PIN_OBJECT || item.second.pin == PIN_LOCAL) {
-        if (item.second.count && !item.second.isGenerated) {
+        if (item.second.count) {
             if (item.second.vecCount == "")
                 item.second.vecCount = convertType(item.second.type, 2);
             std::string vecCountStr = " [" + item.second.vecCount + " - 1:0]";
