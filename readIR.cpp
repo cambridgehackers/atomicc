@@ -49,9 +49,22 @@ static std::string changeSeparator(std::string value)
     return value;
 }
 
+static void rewriteExpr(ACCExpr *expr)
+{
+    if (!expr)
+        return;
+    if (expr->value == "[")
+        expr->value = SUBSCRIPT_MARKER;
+    else if (expr->value == "{")
+        expr->value = PARAMETER_MARKER;
+    for (auto item: expr->operands)
+        rewriteExpr(item);
+}
+
 static ACCExpr *inputExpression(std::string inStr)
 {
     ACCExpr *expr = str2tree(inStr);
+    rewriteExpr(expr);
     return expr;
 }
 
@@ -169,7 +182,7 @@ static void walkRemoveParameterMarker (ACCExpr *expr)
 {
     if (!expr)
         return;
-    if (expr->value == "{")
+    if (expr->value == PARAMETER_MARKER)
         expr->value = "(";   // change from PARAMETER_MARKER
     for (auto item: expr->operands)
         walkRemoveParameterMarker(item);
@@ -249,7 +262,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                     ACCExpr *last = value->operands.back();
                     if (last->operands.size() == 1) {
                         ACCExpr *arg = last->operands.front();
-                        if (arg->value == "{") {
+                        if (arg->value == PARAMETER_MARKER) {
                             last->operands.clear();
                             value->value = tree2str(value, false);
                             value->operands.clear();
@@ -262,9 +275,9 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 if (ind > 0)
                     value->value = value->value.substr(0, ind) + PERIOD + value->value.substr(ind+1);
                 for (auto item: value->operands) {
-                     if (item->value == "[")
+                     if (item->value == SUBSCRIPT_MARKER)
                          subscript = item;
-                     else if (item->value == "{")
+                     else if (item->value == PARAMETER_MARKER)
                          param = item;
                      else if (isIdChar(item->value[0]) && item->operands.size() == 0)
                          value->value += DOLLAR + item->value;
