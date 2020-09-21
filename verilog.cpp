@@ -69,6 +69,26 @@ static void traceZero(const char *label)
     }
 }
 
+static void showRef(const char *label, std::string name)
+{
+    if (trace_connect)
+    printf("%s: %s count %d pin %d type %s out %d inout %d done %d veccount %s isArgument %d\n",
+        label, name.c_str(), refList[name].count, refList[name].pin,
+        refList[name].type.c_str(), refList[name].out,
+        refList[name].inout, refList[name].done,
+        refList[name].vecCount.c_str(), refList[name].isArgument);
+}
+
+static void decRef(std::string name)
+{
+//return;
+    if (refList[name].count > 0 && refList[name].pin != PIN_MODULE) {
+        refList[name].count--;
+        if (trace_assign)
+            printf("[%s:%d] dec count[%s]=%d\n", __FUNCTION__, __LINE__, name.c_str(), refList[name].count);
+    }
+}
+
 static void setReference(std::string target, int count, std::string type, bool out = false, bool inout = false,
     int pin = PIN_WIRE, std::string vecCount = "", bool isArgument = false)
 {
@@ -430,22 +450,12 @@ static void walkRef (ACCExpr *expr)
         walkRef(item);
 }
 
-static void decRef(std::string name)
-{
-//return;
-    if (refList[name].count > 0 && refList[name].pin != PIN_MODULE) {
-        refList[name].count--;
-        if (trace_assign)
-            printf("[%s:%d] dec count[%s]=%d\n", __FUNCTION__, __LINE__, name.c_str(), refList[name].count);
-    }
-}
-
-static ACCExpr *replaceAssign(ACCExpr *expr, std::string guardName = "", bool enableListProcessing = false)
+static ACCExpr *replaceAssign(ACCExpr *expr, std::string guardName = "")
 {
     if (!expr)
         return expr;
     if (trace_assign)
-    printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
+        printf("[%s:%d] start %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(expr).c_str());
     std::string item = expr->value;
     if (item == PERIOD)
         item = tree2str(expr);
@@ -456,26 +466,24 @@ static ACCExpr *replaceAssign(ACCExpr *expr, std::string guardName = "", bool en
     }
     if (expr->value == PERIOD || (isIdChar(item[0]) && !expr->operands.size())) {
         if (trace_interface)
-            printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, enableListProcessing, tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
-        if (!assignList[item].noRecursion || enableListProcessing)
+            printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, guardName != "", tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
+        if (!assignList[item].noRecursion || guardName != "")
         if (ACCExpr *assignValue = assignList[item].value)
-        if (assignValue->value[0] != '@') {   // hack to prevent propagation of __reduce operators
-        if (assignValue->value == "{" || walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
-        decRef(item);
-        walkRef(assignValue);
-        assignList[tree2str(assignValue)].noRecursion = true; // to prevent ping/pong
-        if (trace_interface)
-            printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
-        return replaceAssign(assignValue, guardName, enableListProcessing);
-        }
+        if (walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
+            decRef(item);
+            walkRef(assignValue);
+            assignList[tree2str(assignValue)].noRecursion = true; // to prevent ping/pong
+            if (trace_interface)
+                printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
+            return replaceAssign(assignValue, guardName);
         }
     }
     ACCExpr *newExpr = allocExpr(expr->value);
     for (auto item: expr->operands)
-        if (expr->value == PERIOD)
+        if (expr->value == PERIOD) // cannot replace just part of a member specification
             newExpr->operands.push_back(item);
         else
-            newExpr->operands.push_back(replaceAssign(item, guardName, enableListProcessing));
+            newExpr->operands.push_back(replaceAssign(item, guardName));
     newExpr = cleanupExpr(newExpr, true);
     if (trace_assign)
     printf("[%s:%d] end %s expr %s\n", __FUNCTION__, __LINE__, guardName.c_str(), tree2str(newExpr).c_str());
@@ -630,24 +638,15 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
 {
     dest = replaceAssign(dest);
     value = replaceAssign(value);
-    for (auto &CI : condLines[generateSection].always[methodName].info)
+    auto &element = condLines[generateSection].always[methodName];
+    for (auto &CI : element.info)
         if (matchExpr(cond, CI.second.cond)) {
             CI.second.info.push_back(CondInfo{dest, value});
             return;
         }
-    condLines[generateSection].always[methodName].guard = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
-    condLines[generateSection].always[methodName].info[tree2str(cond)].cond = cond;
-    condLines[generateSection].always[methodName].info[tree2str(cond)].info.push_back(CondInfo{dest, value});
-}
-
-static void showRef(const char *label, std::string name)
-{
-    if (trace_connect)
-    printf("%s: %s count %d pin %d type %s out %d inout %d done %d veccount %s isArgument %d\n",
-        label, name.c_str(), refList[name].count, refList[name].pin,
-        refList[name].type.c_str(), refList[name].out,
-        refList[name].inout, refList[name].done,
-        refList[name].vecCount.c_str(), refList[name].isArgument);
+    element.guard = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
+    element.info[tree2str(cond)].cond = cond;
+    element.info[tree2str(cond)].info.push_back(CondInfo{dest, value});
 }
 
 static bool getDirection(std::string &name)
@@ -792,18 +791,15 @@ static void connectMethods(ModuleIR *IR, std::string ainterfaceName, ACCExpr *ta
         if (target->value == "" || endswith(target->value, DOLLAR) || targetIsVerilog)
             target->value += fld.fldName;
         else
-            //target->value += DOLLAR + fld.fldName;
             target = allocExpr(PERIOD, target, allocExpr(fld.fldName));
         if (source->value == "" || endswith(source->value, DOLLAR) || sourceIsVerilog)
             source->value += fld.fldName;
         else
-            //source->value += DOLLAR + fld.fldName;
             source = allocExpr(PERIOD, source, allocExpr(fld.fldName));
-        if (ModuleIR *IR = lookupIR(fld.type)) {
+        if (ModuleIR *IR = lookupIR(fld.type))
             connectMethods(IR, IR->interfaceName, target, source, isForward);
-            continue;
-        }
-        connectTarget(target, source, fld.type, isForward);
+        else
+            connectTarget(target, source, fld.type, isForward);
     }
     for (auto fld : IIR->interfaces) {
         ACCExpr *target = dupExpr(targetTree), *source = dupExpr(sourceTree);
@@ -932,7 +928,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         if (subscript) {
             std::string sub;
             tempCond = simpleReplace(tempCond);
-            tempCond = replaceAssign(tempCond, getRdyName(calledEna), true); // remove __RDY before adding subscript!
+            tempCond = replaceAssign(tempCond, getRdyName(calledEna)); // remove __RDY before adding subscript!
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
             section = makeSection(var->value, allocExpr("0"),
                 allocExpr("<", var, allocExpr(vecCount)), allocExpr("+", var, allocExpr("1")));
@@ -960,6 +956,7 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
             break;
         }
         if (!enableList[section][calledEna].phi) {
+            refList[calledEna].type = "Bit(1)";
             enableList[section][calledEna].phi = allocExpr("|");
             enableList[section][calledEna].defaultValue = "1'd0";
         }
@@ -1274,6 +1271,7 @@ static ModList modLine;
     traceZero("AFTCONNECT");
     generateMethodGroup(IR, generateMethodGuard);
     generateMethodGroup(IR, generateMethod);
+
     // combine mux'ed assignments into a single 'assign' statement
     for (auto top: muxValueList) {
         generateSection = top.first;
@@ -1288,7 +1286,7 @@ static ModList modLine;
         for (auto item: top.second) {
             if (trace_assign)
                 printf("[%s:%d] ENABLELIST section %s first %s second %s\n", __FUNCTION__, __LINE__, generateSection.c_str(), item.first.c_str(), tree2str(item.second.phi).c_str());
-            setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first), true), "Bit(1)");
+            setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first)), refList[item.first].type); //"Bit(1)"
         }
     }
     generateSection = "";

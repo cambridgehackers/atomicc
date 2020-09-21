@@ -489,18 +489,11 @@ skipLab:;
         IR++;
     }
     // even convert 'EMODULE' items
-#if 1
     for (auto mapItem : mapIndex) {
         ModuleIR *IR = mapItem.second;
-#else
-    for (auto IR : irSeq)
-#endif
         std::string modName = IR->name;
-        if (modName.find(SUFFIX_FOR_GENERIC) != std::string::npos)
-            continue;
         int ind = modName.find("(");
-        if (ind > 0) {
-            std::string irName = modName;//.substr(0, ind);
+        if (modName.find(SUFFIX_FOR_GENERIC) == std::string::npos && ind > 0) {
             std::list<PARAM_MAP> pmap;
             ACCExpr *param = cleanupModuleParam(modName.substr(ind));
             for (auto item: param->operands) {
@@ -508,16 +501,16 @@ skipLab:;
                 if (item->value == "=")
                     pmap.push_back({tree2str(item->operands.front(), false), tree2str(item->operands.back(), false)});
             }
-            ModuleIR *genericIR = buildGeneric(IR, irName, pmap, false);
-            irName = genericIR->name;
+            ModuleIR *genericIR = buildGeneric(IR, modName, pmap, false);
+            modName = genericIR->name;
             if (!IR->isExt && !IR->isInterface && !IR->isStruct)
                 irSeq.push_back(genericIR);
-            int ind = irName.find("(");
+            int ind = modName.find("(");
             if (ind > 0)
-                irName = irName.substr(0, ind) + PERIOD "PARAM" + irName.substr(ind);
+                modName = modName.substr(0, ind) + PERIOD "PARAM" + modName.substr(ind);
             else
-                irName += PERIOD "PARAM";
-            ModuleIR *paramIR = allocIR(irName, true);
+                modName += PERIOD "PARAM";
+            ModuleIR *paramIR = allocIR(modName, true);
             paramIR->isInterface = true;
             genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
             for (auto item: pmap)
@@ -546,10 +539,6 @@ skipLab:;
         for (auto IC : IR->interfaceConnect) {
             walkSubscript(IR, IC.target, false);
             walkSubscript(IR, IC.source, false);
-            //walkSubst(IR, info->target);
-            //walkSubst(IR, info->source);
-            //info->target = cleanupExprBuiltin(info->target);
-            //info->source = cleanupExprBuiltin(info->source);
             if (!IC.isForward) {
                 localConnect[tree2str(IC.target)] = 1;
                 localConnect[tree2str(IC.source)] = 1;
