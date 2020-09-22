@@ -469,22 +469,6 @@ static void replaceMethodExpr(MethodInfo *MI, ACCExpr *pattern, ACCExpr *replace
     }
 }
 
-static void postParseCleanup(ModuleIR *IR, MethodInfo *MI)
-{
-    for (auto item = MI->letList.begin(), iteme = MI->letList.end(); item != iteme;) {
-        std::string dest = tree2str((*item)->dest);
-        std::string guard = tree2str(MI->guard);
-        if (!(*item)->cond && MI->alloca.find(dest) != MI->alloca.end() && !MI->alloca[dest].noReplace
-          && dest == guard && !MI->storeList.size() && !MI->generateFor.size() && !MI->instantiateFor.size()) {
-            replaceMethodExpr(MI, (*item)->dest, (*item)->value);
-            MI->alloca.erase(dest);
-            item = MI->letList.erase(item);
-            continue;
-        }
-        item++;
-    }
-}
-
 static void hoistVerilog(ModuleIR *top, ModuleIR *current, std::string prefix)
 {
     if (top != current)
@@ -559,11 +543,5 @@ void cleanupIR(std::list<ModuleIR *> &irSeq)
         ModuleIR *IIR = lookupInterface(IR->interfaceName);
         if (IR->isVerilog)
             hoistVerilog(IIR, IIR, "");
-    }
-    for (auto IR: irSeq) {
-        for (auto MI: IR->methods)
-            postParseCleanup(IR, MI);
-        for (auto item: IR->generateBody)
-            postParseCleanup(IR, item.second);
     }
 }
