@@ -25,6 +25,9 @@
 #define IfcNames_EchoIndicationH2S 5
 #define PORTALNUM IfcNames_EchoIndicationH2S
 //////////////////HACKHACK /////////////////
+#define PRINTF_PORT 0x7fff
+
+static int printfNumber = 1;
 int trace_software;//= 1;
 int generateTrace;//=1;
 static void processSerialize(ModuleIR *IR)
@@ -259,6 +262,52 @@ assert(MInew);
     }
     if (trace_software)
     dumpModule("P2M", IR);
+}
+
+ACCExpr *printfArgs(ACCExpr *listp)
+{
+    int pipeArgSize = 128;
+    ACCExpr *fitem = listp->operands.front();
+    listp->operands.pop_front();
+    std::string format = fitem->value;
+    std::list<int> width;
+    unsigned index = 0;
+    ACCExpr *next = allocExpr("{");
+    int total_length = 0;
+    for (auto item: listp->operands) {
+        while (format[index] != '%' && index < format.length())
+            index++;
+        std::string val = item->value;
+        if (index < format.length()-1) {
+            if (format[index + 1] == 's' && val[0] == '"') {
+                val = val.substr(1, val.length()-2);
+                format = format.substr(0, index) + val + format.substr(index + 2);
+                index += val.length();
+                continue;
+            }
+            if (format[index + 1] == 'd' && isdigit(val[0])) {
+                format = format.substr(0, index) + val + format.substr(index + 2);
+                index += val.length();
+                continue;
+            }
+        }
+        int size = atoi(exprWidth(item).c_str());
+        total_length += size;
+        width.push_back(size);
+        next->operands.push_back(item);
+    }
+    next->operands.push_back(allocExpr("16'd" + autostr(printfNumber++)));
+    next->operands.push_back(allocExpr("16'd" + autostr(PRINTF_PORT)));
+    next->operands.push_back(allocExpr("16'd" + autostr(PORTALNUM)));
+    total_length += 3 * 16;
+    listp->operands.clear();
+    listp->operands = next->operands;
+    if (pipeArgSize > total_length)
+        next->operands.push_front(allocExpr(autostr(pipeArgSize - total_length) + "'d0"));
+    printfFormat.push_back(PrintfInfo{format, width});
+    ACCExpr *ret = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next,
+        allocExpr("16'd" + autostr((total_length + 31)/32))));
+    return ret;
 }
 
 void processInterfaces(std::list<ModuleIR *> &irSeq)

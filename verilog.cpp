@@ -27,12 +27,6 @@ int trace_ports;//= 1;
 int trace_connect;//= 1;
 int trace_skipped;//= 1;
 
-#define PRINTF_PORT 0x7fff
-//////////////////HACKHACK /////////////////
-#define IfcNames_EchoIndicationH2S 5
-#define PORTALNUM IfcNames_EchoIndicationH2S
-//////////////////HACKHACK /////////////////
-
 typedef struct {
     ACCExpr *phi;
     std::string defaultValue;
@@ -42,7 +36,6 @@ typedef struct {
     std::string type;
 } InterfaceMapType;
 
-static int printfNumber = 1;
 std::list<PrintfInfo> printfFormat;
 ModList modNew;
 std::map<std::string, CondLineType> condLines;
@@ -122,10 +115,8 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         if (ind > 0)
             base = base.substr(0, ind);
         if (!refList[base].pin) {
-        printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), valStr.c_str(), type.c_str());
-if (0)
-        if (target.find("[") == std::string::npos)
-        exit(-1);
+            printf("[%s:%d] missing target [%s] = %s type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), valStr.c_str(), type.c_str());
+            exit(-1);
         }
     }
     updateWidth(value, convertType(type));
@@ -162,32 +153,32 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
 
 static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance)
 {
-        std::string newtype = instantiateType(type, mapValue);
-        vecCount = instantiateType(vecCount, mapValue);
-        if (newtype != type) {
-            printf("[%s:%d] iinst %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LINE__, instance.c_str(), type.c_str(), newtype.c_str());
-            //exit(-1);
-            type = newtype;
+    std::string newtype = instantiateType(type, mapValue);
+    vecCount = instantiateType(vecCount, mapValue);
+    if (newtype != type) {
+        printf("[%s:%d] iinst %s CHECKTYPE %s newtype %s\n", __FUNCTION__, __LINE__, instance.c_str(), type.c_str(), newtype.c_str());
+        //exit(-1);
+        type = newtype;
+    }
+    int refPin = (instance != "" || isLocal) ? PIN_OBJECT: PIN_MODULE;
+    std::string instName = instance + name;
+    if (trace_assign || trace_ports || trace_interface)
+        printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d pin %d vecCount %s\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, refPin, vecCount.c_str());
+    fixupAccessible(instName);
+    if (!isLocal || instance == "") {
+        setReference(instName, (dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, vecCount, isArgument);
+        if(instance == "" && vecCount != "")
+            refList[instName].done = true;  // prevent default blanket assignment generation
+    }
+    if (!isLocal) {
+        if (isparam != "")
+            modParam.insert(moduleParameter, ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
+        else {
+            modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
+            if (moduleParameter == modParam.end())
+                moduleParameter--;
         }
-        int refPin = (instance != "" || isLocal) ? PIN_OBJECT: PIN_MODULE;
-        std::string instName = instance + name;
-        if (trace_assign || trace_ports || trace_interface)
-            printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d pin %d vecCount %s\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, refPin, vecCount.c_str());
-        fixupAccessible(instName);
-        if (!isLocal || instance == "") {
-            setReference(instName, (dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, vecCount, isArgument);
-            if(instance == "" && vecCount != "")
-                refList[instName].done = true;  // prevent default blanket assignment generation
-        }
-        if (!isLocal) {
-            if (isparam != "")
-                modParam.insert(moduleParameter, ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
-            else {
-                modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
-                if (moduleParameter == modParam.end())
-                    moduleParameter--;
-            }
-        }
+    }
 }
 
 static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface, bool isVerilog)
@@ -588,52 +579,6 @@ static void setAssignRefCount(ModuleIR *IR)
     }
 }
 
-static ACCExpr *printfArgs(ACCExpr *listp)
-{
-    int pipeArgSize = 128;
-    ACCExpr *fitem = listp->operands.front();
-    listp->operands.pop_front();
-    std::string format = fitem->value;
-    std::list<int> width;
-    unsigned index = 0;
-    ACCExpr *next = allocExpr("{");
-    int total_length = 0;
-    for (auto item: listp->operands) {
-        while (format[index] != '%' && index < format.length())
-            index++;
-        std::string val = item->value;
-        if (index < format.length()-1) {
-            if (format[index + 1] == 's' && val[0] == '"') {
-                val = val.substr(1, val.length()-2);
-                format = format.substr(0, index) + val + format.substr(index + 2);
-                index += val.length();
-                continue;
-            }
-            if (format[index + 1] == 'd' && isdigit(val[0])) {
-                format = format.substr(0, index) + val + format.substr(index + 2);
-                index += val.length();
-                continue;
-            }
-        }
-        int size = atoi(exprWidth(item).c_str());
-        total_length += size;
-        width.push_back(size);
-        next->operands.push_back(item);
-    }
-    next->operands.push_back(allocExpr("16'd" + autostr(printfNumber++)));
-    next->operands.push_back(allocExpr("16'd" + autostr(PRINTF_PORT)));
-    next->operands.push_back(allocExpr("16'd" + autostr(PORTALNUM)));
-    total_length += 3 * 16;
-    listp->operands.clear();
-    listp->operands = next->operands;
-    if (pipeArgSize > total_length)
-        next->operands.push_front(allocExpr(autostr(pipeArgSize - total_length) + "'d0"));
-    printfFormat.push_back(PrintfInfo{format, width});
-    ACCExpr *ret = allocExpr("printfp$enq__ENA", allocExpr(PARAMETER_MARKER, next,
-        allocExpr("16'd" + autostr((total_length + 31)/32))));
-    return ret;
-}
-
 static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value)
 {
     dest = replaceAssign(dest);
@@ -845,8 +790,6 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
     for (auto info: MI->storeList) {
         walkRead(MI, info->cond, nullptr);
         walkRead(MI, info->value, info->cond);
-        walkRewrite(info->cond);
-        walkRewrite(info->value);
         std::string dest = info->dest->value;
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
             ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond));
@@ -856,8 +799,6 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             appendLine(methodName, info->cond, info->dest, info->value);
     }
     for (auto info: MI->letList) {
-        walkRewrite(info->cond);
-        walkRewrite(info->value);
         ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getRdyName(methodName)), info->cond));
         ACCExpr *value = info->value;
         updateWidth(value, convertType(info->type));
@@ -866,8 +807,6 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         appendMux(generateSection, tree2str(info->dest), cond, value, "0");
     }
     for (auto info: MI->assertList) {
-        walkRewrite(info->cond);
-        walkRewrite(info->value);
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
         auto par = value->operands.front()->operands;
@@ -897,8 +836,6 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
                 subscript = allocExpr(sub);
             }
         }
-        walkRewrite(info->cond);
-        walkRewrite(info->value);
         std::string section = generateSection;
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;

@@ -465,16 +465,6 @@ void normalizeIdentifier(ACCExpr *expr)
     fixupAccessible(expr->value);
 }
 
-void walkRewrite (ACCExpr *expr)
-{
-    if (!expr)
-        return;
-    if (isIdChar(expr->value[0]))
-        fixupAccessible(expr->value);
-    for (auto item: expr->operands)
-        walkRewrite(item);
-}
-
 void walkAccessible(ACCExpr *expr)
 {
     if (!expr)

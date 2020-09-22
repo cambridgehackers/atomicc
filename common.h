@@ -178,17 +178,17 @@ bool arithOp(std::string s);
 bool relationalOp(std::string s);
 bool isConstExpr(ACCExpr *expr);
 std::string replacePeriod(std::string value);
-void walkRewrite (ACCExpr *expr);
 ACCExpr *cleanupModuleParam(std::string param);
 extern int trace_expr, trace_interface;
 
 // readIR.cpp
 void readIR(std::list<ModuleIR *> &irSeq, std::list<std::string> &fileList, std::string OutputDir);
 
-// processInterfaces
+// interfaces.cpp
 void processInterfaces(std::list<ModuleIR *> &irSeq);
+ACCExpr *printfArgs(ACCExpr *listp);
 
-// generateSoftware
+// software.cpp
 int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName);
 
 // metaGen.cpp
