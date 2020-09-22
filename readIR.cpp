@@ -463,7 +463,9 @@ interface, isStruct, isSerialize, ext);
                     rule = true;
                 if (checkItem("/Action"))
                     action = true;
-                std::string methodName = changeSeparator(getToken());
+                std::string methodName = getToken();
+                if (!IR->isVerilog)
+                    methodName = changeSeparator(methodName);
                 MethodInfo *MI = allocMethod(methodName), *MIRdy = nullptr;
                 MI->rule = rule;
                 MI->action = action;

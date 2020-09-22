@@ -62,19 +62,8 @@ static void traceZero(const char *label)
     }
 }
 
-static void showRef(const char *label, std::string name)
-{
-    if (trace_connect)
-    printf("%s: %s count %d pin %d type %s out %d inout %d done %d veccount %s isArgument %d\n",
-        label, name.c_str(), refList[name].count, refList[name].pin,
-        refList[name].type.c_str(), refList[name].out,
-        refList[name].inout, refList[name].done,
-        refList[name].vecCount.c_str(), refList[name].isArgument);
-}
-
 static void decRef(std::string name)
 {
-//return;
     if (refList[name].count > 0 && refList[name].pin != PIN_MODULE) {
         refList[name].count--;
         if (trace_assign)
@@ -98,7 +87,6 @@ printf("[%s:%d]STRUCT %s type %s vecCount %s\n", __FUNCTION__, __LINE__, target.
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
-    fixupAccessible(target);
     bool tDir = refList[target].out;
     if (!value)
         return;
@@ -637,8 +625,6 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
     bool sdir = getDirection(sif) ^ endswith(sstr, "__RDY");
     if (trace_assign || trace_connect || trace_interface || (!tdir && !sdir))
         printf("%s: IFCCC '%s'/%d/%d pin %d '%s'/%d/%d pin %d\n", __FUNCTION__, tstr.c_str(), tdir, refList[target->value].out, refList[tif].pin, sstr.c_str(), sdir, refList[source->value].out, refList[sif].pin);
-    showRef("target", target->value);
-    showRef("source", source->value);
     if (sdir) {
         if (assignList[sstr].type == "")
             setAssign(sstr, target, type);
