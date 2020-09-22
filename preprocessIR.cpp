@@ -248,6 +248,7 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
         }
         MIb->generateSection = makeSection(item.var, item.init, item.limit, item.incr);
     }
+    // this processing is used for subscripted interface method definitions
     for (auto item: MI->instantiateFor) {
         MethodInfo *MIb = IR->generateBody[item.body];
         std::string methodName = baseMethodName(MI->name) + PERIOD;
@@ -480,63 +481,8 @@ static void hoistVerilog(ModuleIR *top, ModuleIR *current, std::string prefix)
          hoistVerilog(top, lookupInterface(item.type), prefix+item.fldName);
 }
 
-static void updateModuleType(ModuleIR *IR, std::list<PARAM_MAP> &paramMap)
-{
-    IR->interfaceName = updateType(IR->interfaceName, paramMap);
-    for (auto &item : IR->fields)
-        item.type = updateType(item.type, paramMap);
-    for (auto &item : IR->interfaces)
-        item.type = updateType(item.type, paramMap);
-    for (auto &item : IR->interfaceConnect)
-        item.type = updateType(item.type, paramMap);
-    for (auto &item : IR->parameters)
-        item.type = updateType(item.type, paramMap);
-    for (auto &item : IR->unionList)
-        item.type = updateType(item.type, paramMap);
-    for (auto MI: IR->methods) {
-        MI->type = updateType(MI->type, paramMap);
-        for (auto item : MI->letList)
-            item->type = updateType(item->type, paramMap);
-        for (auto &item : MI->alloca)
-            item.second.type = updateType(item.second.type, paramMap);
-        for (auto &item : MI->params)
-            item.type = updateType(item.type, paramMap);
-        for (auto &item : MI->interfaceConnect)
-            item.type = updateType(item.type, paramMap);
-    }
-}
-
 void cleanupIR(std::list<ModuleIR *> &irSeq)
 {
-    std::list<PARAM_MAP> paramMap;
-    std::list<std::string> deleteList;
-    for (auto mapItem : mapAllModule) {
-        ModuleIR *IR = mapItem.second;
-        std::string newName = updateType(IR->name, paramMap);
-        if (newName != IR->name) {
-            deleteList.push_back(IR->name);
-            IR->name = newName;
-            if (IR->isInterface)
-                interfaceIndex[newName] = IR;
-            else
-                mapIndex[newName] = IR;
-        }
-        updateModuleType(IR, paramMap);
-    }
-    //for (auto mapItem : mapAllModule) {
-        //ModuleIR *IR = mapItem.second;
-//dumpModule("CLEAN", IR);
-    //}
-    for (auto name: deleteList) {
-        auto removeName = [&](std::map<std::string, ModuleIR *> &mapitem) -> void {
-            auto item = mapitem.find(name);
-            if (item != mapitem.end())
-                mapitem.erase(item);
-        };
-        removeName(interfaceIndex);
-        removeName(mapIndex);
-        removeName(mapAllModule);
-    }
     // preprocess 'isVerilog' items first -> changes interface
     for (auto mapItem : mapAllModule) {
         ModuleIR *IR = mapItem.second;
