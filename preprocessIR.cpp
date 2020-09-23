@@ -69,9 +69,13 @@ static std::string updateType(std::string type, std::list<PARAM_MAP> &paramMap)
         std::string arr = type.substr(6);
         int ind = arr.find(ARRAY_ELEMENT_MARKER);
         if (ind > 0) {
-            std::string post = arr.substr(ind);
-            type = "ARRAY_" + tree2str(walkToGeneric(str2tree(arr.substr(0, ind)), paramMap), false) + post;
+            std::string post = updateType(arr.substr(ind+1), paramMap);
+            return "ARRAY_" + tree2str(walkToGeneric(str2tree(arr.substr(0, ind)), paramMap), false) + ARRAY_ELEMENT_MARKER + post;
         }
+    }
+    if (startswith(type, "Bit(")) {
+        std::string val = type.substr(4, type.length()-5);
+        return "Bit(" + tree2str(walkToGeneric(str2tree(val), paramMap), false) + ")";
     }
     int ind = type.find("(");
     if (ind > 0)
@@ -366,11 +370,8 @@ skipLab:;
         if (modName.find(SUFFIX_FOR_GENERIC) == std::string::npos && ind > 0) {
             std::list<PARAM_MAP> pmap;
             ACCExpr *param = cleanupModuleParam(modName.substr(ind));
-            for (auto item: param->operands) {
-                assert(item->value == "=");
-                if (item->value == "=")
-                    pmap.push_back({tree2str(item->operands.front(), false), tree2str(item->operands.back(), false)});
-            }
+            for (auto item: param->operands) // list of '=' assignments
+                pmap.push_back({tree2str(item->operands.front(), false), tree2str(item->operands.back(), false)});
             ModuleIR *genericIR = buildGeneric(IR, modName, pmap, false);
             modName = genericIR->name;
             if (!IR->isExt && !IR->isInterface && !IR->isStruct)

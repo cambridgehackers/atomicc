@@ -486,6 +486,8 @@ ACCExpr *cleanupModuleParam(std::string param)
     ACCExpr *expr = cleanupExprBuiltin(str2tree(param));
     if (expr->value != "(")
         expr = allocExpr("(", expr);
+    for (auto item: expr->operands)
+        assert(item->value == "=");
     return expr;
 }
 

@@ -82,11 +82,8 @@ void extractParam(std::string debugName, std::string replaceList, MapNameValue &
     int ind = replaceList.find("(");
     if (ind > 0) {
         ACCExpr *expr = cleanupModuleParam(replaceList.substr(ind));
-        for (auto item: expr->operands) {
-            assert(item->value == "=");
-            if (item->value == "=")
-                mapValue[tree2str(item->operands.front(), false)] = tree2str(item->operands.back(), false);
-        }
+        for (auto item: expr->operands) // list of '=' assignments
+            mapValue[tree2str(item->operands.front(), false)] = tree2str(item->operands.back(), false);
     }
     if (trace_parameters)
         for (auto item: mapValue)
@@ -189,12 +186,11 @@ std::string instantiateType(std::string arg, MapNameValue &mapValue) // also che
 //printf("[%s:%d] PARAMETER %s\n", __FUNCTION__, __LINE__, bp);
         return mapReturn(arg);
     }
-    if (auto IR = lookupIR(bp)) {
+    auto IR = lookupIR(bp);
+    if (!IR)
+        IR = lookupInterface(bp);
+    if (IR)
         return mapReturn(genericModuleParam(bp, "", &mapValue));
-    }
-    if (auto IR = lookupInterface(bp)) {
-        return mapReturn(genericModuleParam(bp, "", &mapValue));
-    }
     return mapReturn(bp);
 }
 
@@ -216,11 +212,8 @@ std::string genericModuleParam(std::string name, std::string param, MapNameValue
     ind = name.find("(");
     if (ind > 0) {
         ACCExpr *param = cleanupModuleParam(name.substr(ind));
-        for (auto item: param->operands) {
-            assert(item->value == "=");
-            if (item->value == "=")
-                pmap.push_back({tree2str(item->operands.front(), false), item->operands.back()});
-        }
+        for (auto item: param->operands) // list of '=' assignments
+            pmap.push_back({tree2str(item->operands.front(), false), item->operands.back()});
         std::string sep;
         if (mapValue) {
             ret += "(";
@@ -248,7 +241,7 @@ std::string genericModuleParam(std::string name, std::string param, MapNameValue
             ret += "#(";
             for (auto item: pmap) {
                 ret += sep + PERIOD + item.name + "(";
-                ret += tree2str(item.value);
+                ret += tree2str(item.value, false);
                 ret += ")";
                 sep = ",";
             }
