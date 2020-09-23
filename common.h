@@ -130,7 +130,6 @@ std::string sizeProcess(std::string type);
 std::string typeDeclaration(std::string type);
 MethodInfo *lookupMethod(ModuleIR *IR, std::string name);
 MethodInfo *lookupQualName(ModuleIR *searchIR, std::string searchStr, std::string &vecCount, MapNameValue &mapValue);
-std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr);
 ModuleIR *allocIR(std::string name, bool isInterface = false);
 MethodInfo *allocMethod(std::string name);
 bool addMethod(ModuleIR *IR, MethodInfo *MI);

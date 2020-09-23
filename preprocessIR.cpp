@@ -36,8 +36,6 @@ static void walkSubst (ModuleIR *IR, ACCExpr *expr)
         return;
     if (expr->value == "__clog2" || expr->value == "__builtin_clog2")
         expr->value = "$clog2";
-    if (isIdChar(expr->value[0]))
-         expr->value = fixupQualPin(IR, expr->value);  // fixup interface names
     for (auto item: expr->operands)
         walkSubst(IR, item);
 }

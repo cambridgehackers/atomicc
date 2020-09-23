@@ -25,7 +25,6 @@ int trace_interface;//=1;
 int trace_expand;//=1;
 int trace_parameters;//=1;
 int trace_IR;//=1;
-static int trace_iter;//=1;
 static int traceLookup;//=1;
 static int trace_accessible;//=1;
 std::map<std::string, ModuleIR *> mapIndex, interfaceIndex, mapAllModule;
@@ -551,64 +550,6 @@ finalLookup:;
     }
     return lookupMethod(searchIR, searchStr);
     return nullptr;
-}
-
-std::string fixupQualPin(ModuleIR *searchIR, std::string searchStr)
-{
-    std::string fieldName, origName = searchStr;
-    std::string outName;
-    bool found = false;
-    //printf("[%s:%d] start %s\n", __FUNCTION__, __LINE__, searchStr.c_str());
-    while (1) {
-        int ind = searchStr.find(PERIOD);
-        fieldName = searchStr.substr(0, ind);
-        searchStr = searchStr.substr(ind+1);
-        ModuleIR *nextIR = nullptr;
-        for (auto item: searchIR->fields) {
-            std::string fldName = item.fldName;
-            if (trace_iter)
-                printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
-            if (fieldName != "" && fldName == fieldName) {
-                nextIR = lookupIR(item.type);
-                break;
-            }
-        }
-        if (!nextIR)
-            break;
-        outName += fieldName + PERIOD;
-        searchIR = nextIR;
-    };
-    //printf("[%s:%d] out %s field %s search %s\n", __FUNCTION__, __LINE__, outName.c_str(), fieldName.c_str(), searchStr.c_str());
-    while (1) {
-        if (found) {
-            int ind = searchStr.find(PERIOD);
-            fieldName = searchStr.substr(0, ind);
-            searchStr = searchStr.substr(ind+1);
-        }
-        ModuleIR *nextIR = nullptr;
-        for (auto item: searchIR->interfaces) {
-            std::string fldName = item.fldName;
-            if (trace_iter)
-                printf("[%s:%d] fldname %s item.fldname %s\n", __FUNCTION__, __LINE__, fldName.c_str(), item.fldName.c_str());
-            if (fieldName != "" && fldName == fieldName) {
-                nextIR = lookupInterface(item.type);
-                break;
-            }
-        }
-        if (!nextIR)
-            break;
-        outName += fieldName;
-        searchIR = nextIR;
-        found = true;
-    };
-    outName += fieldName;
-    if (found)
-    for (auto item: searchIR->fields)
-        if (item.fldName == fieldName) {
-            //printf("[%s:%d] found %s\n", __FUNCTION__, __LINE__, outName.c_str());
-            return outName;
-        }
-    return origName;
 }
 
 ModuleIR *allocIR(std::string name, bool isInterface)
