@@ -147,7 +147,6 @@ std::string getBoundedString(CCharPointer *bufpp, char terminator = 0);
 void extractSubscript(std::string &source, int index, std::string &sub);
 void buildAccessible(ModuleIR *IR);
 void fixupAccessible(std::string &name);
-void walkAccessible(ACCExpr *expr);
 std::string cleanupModuleType(std::string type);
 void normalizeIdentifier(ACCExpr *expr);
 

@@ -76,16 +76,6 @@ bool isEnaName(std::string name)
     return name == rname;
 }
 
-std::string trimSpace(std::string arg)
-{
-    int beg = 0, end = arg.length();
-    while (arg[beg] == ' ')
-        beg++;
-    while (arg[end-1] == ' ')
-        end--;
-    return arg.substr(beg, end);
-}
-
 void extractParam(std::string debugName, std::string replaceList, MapNameValue &mapValue)
 {
     int count = 0;
@@ -465,15 +455,6 @@ void normalizeIdentifier(ACCExpr *expr)
     fixupAccessible(expr->value);
 }
 
-void walkAccessible(ACCExpr *expr)
-{
-    if (!expr)
-        return;
-    normalizeIdentifier(expr);
-    for (auto item: expr->operands)
-        walkAccessible(item);
-}
-
 void buildAccessible(ModuleIR *IR)
 {
     accessibleInterfaces.clear();
@@ -495,7 +476,6 @@ void buildAccessible(ModuleIR *IR)
         }
     for (auto MI: IR->methods) {
         for (auto item: MI->alloca) {
-              //if (refList[item.first].pin) {
             if (auto IIR = lookupIR(item.second.type))
             if (IIR->isStruct)
                accessibleInterfaces[item.first] = AccessibleInfo{item.second.type, "", ""};
@@ -509,53 +489,6 @@ void buildAccessible(ModuleIR *IR)
         printf("[%s:%d]LIST OF ACCESSIBLE INTERFACES\n", __FUNCTION__, __LINE__);
         for (auto item: accessibleInterfaces)
             printf("[%s:%d] %s %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.type.c_str());
-    }
-
-    for (auto item: IR->interfaceConnect) {
-        walkAccessible(item.target);
-        walkAccessible(item.source);
-    }
-    for (auto MI: IR->methods) {
-        walkAccessible(MI->guard);
-        for (auto info: MI->storeList) {
-            walkAccessible(info->dest);
-            walkAccessible(info->cond);
-            walkAccessible(info->value);
-        }
-        for (auto info: MI->printfList) {
-            walkAccessible(info->cond);
-            walkAccessible(info->value);
-        }
-        for (auto info: MI->assertList) {
-            walkAccessible(info->cond);
-            walkAccessible(info->value);
-        }
-        for (auto info: MI->callList) {
-            walkAccessible(info->cond);
-            walkAccessible(info->value);
-        }
-        for (auto info: MI->letList) {
-            walkAccessible(info->dest);
-            walkAccessible(info->cond);
-            walkAccessible(info->value);
-        }
-        for (auto item: MI->interfaceConnect) {
-            walkAccessible(item.target);
-            walkAccessible(item.source);
-        }
-        for (auto item: MI->generateFor) {
-            walkAccessible(item.cond);
-            walkAccessible(item.init);
-            walkAccessible(item.limit);
-            walkAccessible(item.incr);
-        }
-        for (auto item: MI->instantiateFor) {
-            walkAccessible(item.cond);
-            walkAccessible(item.init);
-            walkAccessible(item.limit);
-            walkAccessible(item.incr);
-            walkAccessible(item.sub);
-        }
     }
 }
 
@@ -1024,6 +957,10 @@ void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault)
     else if (expr->value == "__bitsubstr") {
         ACCExpr *list = expr->operands.front();
         ACCExpr *bitem = list->operands.front();
+        if (bitem->value == PERIOD) {
+            bitem->value = tree2str(bitem);
+            bitem->operands.clear();
+        }
         if (!isIdChar(bitem->value[0])) {  // can only do bit select on net or reg (not expressions)
             printf("[%s:%d] can only do __bitsubstr on elementary items '%s'\n", __FUNCTION__, __LINE__, bitem->value.c_str());
             dumpExpr("BITSUB", expr);

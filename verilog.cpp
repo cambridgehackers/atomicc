@@ -134,9 +134,11 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
         return;
     for (auto item: expr->operands)
         walkRead(MI, item, cond);
-    std::string fieldName = expr->value;
-    if (isIdChar(fieldName[0]) && cond && (!expr->operands.size() || expr->operands.front()->value != PARAMETER_MARKER))
-        addRead(MI->meta[MetaRead][fieldName], cond);
+    if (isIdChar(expr->value[0])) {
+        fixupAccessible(expr->value);
+        if (cond && (!expr->operands.size() || expr->operands.front()->value != PARAMETER_MARKER))
+            addRead(MI->meta[MetaRead][expr->value], cond);
+    }
 }
 
 static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance)
@@ -787,20 +789,20 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
     for (auto info: MI->letList) {
         ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getRdyName(methodName)), info->cond));
         ACCExpr *value = info->value;
-        updateWidth(value, convertType(info->type));
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
+        updateWidth(value, convertType(info->type));
         appendMux(generateSection, tree2str(info->dest), cond, value, "0");
     }
     for (auto info: MI->assertList) {
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
+        walkRead(MI, cond, nullptr);
+        walkRead(MI, value, cond);
         auto par = value->operands.front()->operands;
         ACCExpr *param = cleanupBool(par.front());
         par.clear();
         par.push_back(param);
-        walkRead(MI, cond, nullptr);
-        walkRead(MI, value, cond);
         ACCExpr *guard = nullptr;
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName))) {
             guard = cleanupBool(MIRdy->guard);
@@ -825,6 +827,8 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         std::string section = generateSection;
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
+        walkRead(MI, cond, nullptr);
+        walkRead(MI, value, cond);
         ACCExpr *param = nullptr;
         if (!(isIdChar(value->value[0]) && value->operands.size()
          && (param = value->operands.back()) && param->value == PARAMETER_MARKER)) {
@@ -843,8 +847,6 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             dumpExpr("CALL", value);
             exit(-1);
         }
-        walkRead(MI, cond, nullptr);
-        walkRead(MI, value, cond);
         if (!info->isAction)
             continue;
         ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName)), cond));
@@ -986,6 +988,7 @@ static void prepareMethodGuards(ModuleIR *IR)
             std::string name = item->value->value;
             if (name == "__finish" || name == "$past")
                 return;
+            fixupAccessible(name);
             name = getRdyName(name);
             std::string nameVec = refList[name].vecCount;
             MapNameValue mapValue;
@@ -996,7 +999,6 @@ static void prepareMethodGuards(ModuleIR *IR)
                 if (ind > 0) {
                     extractSubscript(name, ind, sub);
                 }
-                fixupAccessible(name);
                 std::string newName = name;
                 while ((ind = newName.find(PERIOD)) > 0)
                     newName = newName.substr(0, ind) + "__" + newName.substr(ind+1);  // to defeat the walkAccessible() processing, use "__"
@@ -1056,10 +1058,11 @@ static void fixupModuleInstantiations(ModList &modLine)
     std::map<std::string, std::string> mapPort;
     std::map<std::string, InterfaceMapType> interfaceMap;
     for (auto item: assignList) {
+        std::string val = tree2str(item.second.value);
         if ((refList[item.first].out || refList[item.first].inout) && refList[item.first].pin == PIN_MODULE
           && item.second.value && isIdChar(item.second.value->value[0]) && !item.second.value->operands.size()
           && refList[item.second.value->value].pin != PIN_MODULE) {
-            mapPort[item.second.value->value] = item.first;
+            mapPort[val] = item.first;
         }
         if (lookupInterface(item.second.type)) {
             std::string value = tree2str(item.second.value);
@@ -1114,21 +1117,20 @@ static void fixupModuleInstantiations(ModList &modLine)
             std::string oldVal = val;
             if (mapParam[val] != "")
                 val = mapParam[val];
-            else if (refList[val].count == 0) {
-                if (interfaceMap[val].value != "") {
-                    val = interfaceMap[val].value;
-                    refList[val].count++;
-                    refList[val].done = true;
-                }
-                else
-                    val = (refList[val].out && !refList[val].inout) ? "0" : "";
+            else if (refList[val].count == 0 && interfaceMap[val].value != "") {
+                val = interfaceMap[val].value;
+                refList[val].count++;
+                refList[val].done = true;
             }
             else if (mapPort[val] != "") {
                 val = mapPort[val];
                 decRef(mitem.value);
             }
-            else
+            else if (refList[val].count) {
                 val = tree2str(replaceAssign(allocExpr(val)));
+            }
+            else
+                val = (refList[val].out && !refList[val].inout) ? "0" : "";
             if (oldVal != val)
                 refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
             if (trace_interface)
