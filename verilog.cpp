@@ -1102,10 +1102,8 @@ static void fixupModuleInstantiations(ModList &modLine)
                     refList[look->second.value].done = true;
                     auto IIR = lookupInterface(look->second.type);
                     for (auto MI : IIR->methods) {
-                        std::string tstr = replacePeriod(prefix + PERIOD + MI->name);
-                        std::string sstr = replacePeriod(look->second.value + PERIOD + MI->name);
-                        fixupAccessible(tstr);
-                        fixupAccessible(sstr);
+                        std::string tstr = replacePeriod(prefix + DOLLAR + MI->name);
+                        std::string sstr = replacePeriod(look->second.value + DOLLAR + MI->name);
                         mapParam[tstr] = sstr;
                         tstr = baseMethodName(tstr) + DOLLAR;
                         sstr = baseMethodName(sstr) + DOLLAR;
@@ -1164,7 +1162,6 @@ static ModList modLine;
     generateModuleSignature(IR, "", "", modLineTop, "", "");
 
     for (auto item: IR->fields) {
-        fixupAccessible(item.fldName);
         ModuleIR *itemIR = lookupIR(item.type);
         if (!itemIR || item.isPtr || itemIR->isStruct)
             setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount);
