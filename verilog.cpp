@@ -274,37 +274,34 @@ static void findCLK(ModuleIR *IR, std::string pinPrefix, bool isVerilog)
 static void generateModuleSignature(std::string moduleName, std::string instance, ModList &modParam, std::string moduleParams, std::string vecCount)
 {
     ModuleIR *IR = lookupIR(moduleName);
-    bool hasCLK = false, hasnRST = false;
-    MapNameValue mapValue;
-    if (instance != "") {
-        extractParam("SIGNIFC_" + IR->name + ":" + instance, IR->interfaceName, mapValue);
-        extractParam("SIGN_" + IR->name + ":" + instance, moduleName, mapValue);    // instance values overwrite duplicate interface values (if present)
-    }
-    else {
-        // only substitute parameters from interface definition that were not present in original module definition
-        MapNameValue mapValueMod;
-        extractParam("SIGN_" + IR->name, moduleName, mapValueMod);
-        extractParam("SIGNIFC_" + IR->name, IR->interfaceName, mapValue);
-        for (auto item: mapValueMod) {
-             auto result = mapValue.find(item.first);
-             if (result != mapValue.end())
-                 mapValue.erase(result);
-        }
-    }
+    ModuleIR *implements = lookupInterface(IR->interfaceName);
     std::string minst;
     if (instance != "")
         minst = instance.substr(0, instance.length()-1);
-//printf("[%s:%d] name %s instance %s interface %s isVerilog %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str(), IR->interfaceName.c_str(), IR->isVerilog);
-//dumpModule("PINS", IR);
-    handleCLK = true;
-    ModuleIR *implements = lookupInterface(IR->interfaceName);
-    findCLK(implements, "", IR->isVerilog);
     std::string moduleInstantiation = IR->name;
     int ind = moduleInstantiation.find("(");
     if (ind > 0)
         moduleInstantiation = moduleInstantiation.substr(0, ind);
     if (instance != "")
         moduleInstantiation = genericModuleParam(moduleName, "(" + moduleParams + ")", nullptr);
+    MapNameValue mapValue, mapValueMod;
+    extractParam("SIGNIFC_" + IR->name + ":" + instance, IR->interfaceName, mapValue);
+    if (instance != "") {
+        extractParam("SIGN_" + IR->name + ":" + instance, moduleName, mapValue);    // instance values overwrite duplicate interface values (if present)
+    }
+    else {
+        // only substitute parameters from interface definition that were not present in original module definition
+        extractParam("SIGN_" + IR->name, moduleName, mapValueMod);
+        for (auto item: mapValueMod) {
+             auto result = mapValue.find(item.first);
+             if (result != mapValue.end())
+                 mapValue.erase(result);
+        }
+    }
+//printf("[%s:%d] name %s instance %s interface %s isVerilog %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str(), IR->interfaceName.c_str(), IR->isVerilog);
+//dumpModule("PINS", IR);
+    handleCLK = true;
+    findCLK(implements, "", IR->isVerilog);
     modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, !handleCLK, 0, false, ""/*not param*/, vecCount});
     moduleParameter = modParam.end();
 
@@ -325,24 +322,6 @@ static void generateModuleSignature(std::string moduleName, std::string instance
             interfaceName += PERIOD;
         collectInterfacePins(IIR, modParam, instance, item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, IR->isVerilog);
     }
-    if (instance != "")
-        return;
-    for (auto mitem: modParam)
-        if (!mitem.moduleStart && mitem.isparam == "") {
-            if (handleCLK) {
-                hasCLK = true;
-                hasnRST = true;
-                handleCLK = false;
-            }
-            if (mitem.value == "CLK")
-                hasCLK = true;
-            if (mitem.value == "nRST")
-                hasnRST = true;
-        }
-    if (!handleCLK && !hasCLK && vecCount == "")
-        setReference("CLK", 2, "Bit(1)", false, false, PIN_WIRE);
-    if (!handleCLK && !hasnRST && vecCount == "")
-        setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
 }
 
 static ACCExpr *walkRemoveParam (ACCExpr *expr)
@@ -1136,6 +1115,23 @@ static ModList modLine;
     printf("[%s:%d] STARTMODULE %s/%p\n", __FUNCTION__, __LINE__, IR->name.c_str(), (void *)IR);
     //dumpModule("START", IR);
     generateModuleSignature(IR->name, "", modLineTop, "", "");
+    bool hasCLK = false, hasnRST = false;
+    for (auto mitem: modLineTop)
+        if (!mitem.moduleStart && mitem.isparam == "") {
+            if (handleCLK) {
+                hasCLK = true;
+                hasnRST = true;
+                handleCLK = false;
+            }
+            if (mitem.value == "CLK")
+                hasCLK = true;
+            if (mitem.value == "nRST")
+                hasnRST = true;
+        }
+    if (!handleCLK && !hasCLK)
+        setReference("CLK", 2, "Bit(1)", false, false, PIN_WIRE);
+    if (!handleCLK && !hasnRST)
+        setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
 
     for (auto item: IR->fields) {
         ModuleIR *itemIR = lookupIR(item.type);
