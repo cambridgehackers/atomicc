@@ -43,7 +43,7 @@ std::map<std::string, SyncPinInfo> syncPins;    // SyncFF items needed for PipeI
 
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
-static std::map<std::string, std::map<std::string, MuxValueElement>> enableList, muxValueList; // used for 'generate' items
+static std::map<std::string, std::map<std::string, MuxValueElement>> muxValueList; // used to calculate __phi for multiple assignments
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 static std::map<std::string, std::string> mapParam;
 static bool handleCLK;
@@ -278,49 +278,38 @@ static void generateModuleSignature(std::string moduleName, std::string instance
     std::string minst;
     if (instance != "")
         minst = instance.substr(0, instance.length()-1);
-    std::string moduleInstantiation = IR->name;
+    std::string moduleInstantiation = moduleName;
     int ind = moduleInstantiation.find("(");
     if (ind > 0)
         moduleInstantiation = moduleInstantiation.substr(0, ind);
     if (instance != "")
-        moduleInstantiation = genericModuleParam(moduleName, "(" + moduleParams + ")", nullptr);
-    MapNameValue mapValue, mapValueMod;
-    extractParam("SIGNIFC_" + IR->name + ":" + instance, IR->interfaceName, mapValue);
-    if (instance != "") {
-        extractParam("SIGN_" + IR->name + ":" + instance, moduleName, mapValue);    // instance values overwrite duplicate interface values (if present)
-    }
-    else {
-        // only substitute parameters from interface definition that were not present in original module definition
-        extractParam("SIGN_" + IR->name, moduleName, mapValueMod);
-        for (auto item: mapValueMod) {
-             auto result = mapValue.find(item.first);
-             if (result != mapValue.end())
-                 mapValue.erase(result);
-        }
-    }
-//printf("[%s:%d] name %s instance %s interface %s isVerilog %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str(), IR->interfaceName.c_str(), IR->isVerilog);
-//dumpModule("PINS", IR);
+        moduleInstantiation = genericModuleParam(moduleName, moduleParams, nullptr);
     handleCLK = true;
     findCLK(implements, "", IR->isVerilog);
     modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, !handleCLK, 0, false, ""/*not param*/, vecCount});
     moduleParameter = modParam.end();
 
+    MapNameValue mapValue, mapValueMod;
+    extractParam("SIGNIFC_" + moduleName + ":" + instance, IR->interfaceName, mapValue);
+    if (instance != "")
+        extractParam("SIGN_" + moduleName + ":" + instance, moduleName, mapValue);    // instance values overwrite duplicate interface values (if present)
+    else // only substitute parameters from interface definition that were not present in original module definition
+        extractParam("SIGN_" + moduleName, moduleName, mapValueMod);
+    for (auto item: mapValueMod) {
+         auto result = mapValue.find(item.first);
+         if (result != mapValue.end())
+             mapValue.erase(result);
+    }
     collectInterfacePins(implements, modParam, instance, "", "", false, mapValue, false, vecCount, false, IR->isVerilog);
     if (instance == "") {
         mapValue.clear();
         collectInterfacePins(IR, modParam, instance, "", "", false, mapValue, false, vecCount, true, IR->isVerilog);
     }
     for (FieldElement item : IR->parameters) {
-        //extractParam("PARAM_" + item.name, item.type, mapValue);
         std::string interfaceName = item.fldName;
-        ModuleIR *IIR = lookupInterface(item.type);
-        if (!IIR) {
-            printf("%s: in module '%s', interface lookup '%s' name '%s' failed\n", __FUNCTION__, IR->name.c_str(), item.type.c_str(), interfaceName.c_str());
-            exit(-1);
-        }
         if (interfaceName != "")
             interfaceName += PERIOD;
-        collectInterfacePins(IIR, modParam, instance, item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, IR->isVerilog);
+        collectInterfacePins(lookupInterface(item.type), modParam, instance, item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, IR->isVerilog);
     }
 }
 
@@ -835,12 +824,12 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
             appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"));
             break;
         }
-        if (!enableList[section][calledEna].phi) {
+        if (!muxValueList[section][calledEna].phi) {
             refList[calledEna].type = "Bit(1)";
-            enableList[section][calledEna].phi = allocExpr("|");
-            enableList[section][calledEna].defaultValue = "1'd0";
+            muxValueList[section][calledEna].phi = allocExpr("|");
+            muxValueList[section][calledEna].defaultValue = "1'd0";
         }
-        enableList[section][calledEna].phi->operands.push_back(tempCond);
+        muxValueList[section][calledEna].phi->operands.push_back(tempCond);
         auto AI = CI->params.begin();
         std::string pname = baseMethodName(calledEna) + DOLLAR;
         int argCount = CI->params.size();
@@ -1106,7 +1095,6 @@ static ModList modLine;
     modNew.clear();
     condLines.clear();
     genvarMap.clear();
-    enableList.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
     muxValueList.clear();
     modLine.clear();
@@ -1116,22 +1104,19 @@ static ModList modLine;
     //dumpModule("START", IR);
     generateModuleSignature(IR->name, "", modLineTop, "", "");
     bool hasCLK = false, hasnRST = false;
-    for (auto mitem: modLineTop)
-        if (!mitem.moduleStart && mitem.isparam == "") {
-            if (handleCLK) {
-                hasCLK = true;
-                hasnRST = true;
-                handleCLK = false;
+    if (!handleCLK) {
+        for (auto mitem: modLineTop)
+            if (!mitem.moduleStart && mitem.isparam == "") {
+                if (mitem.value == "CLK")
+                    hasCLK = true;
+                if (mitem.value == "nRST")
+                    hasnRST = true;
             }
-            if (mitem.value == "CLK")
-                hasCLK = true;
-            if (mitem.value == "nRST")
-                hasnRST = true;
-        }
-    if (!handleCLK && !hasCLK)
-        setReference("CLK", 2, "Bit(1)", false, false, PIN_WIRE);
-    if (!handleCLK && !hasnRST)
-        setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
+        if (!hasCLK)
+            setReference("CLK", 2, "Bit(1)", false, false, PIN_WIRE);
+        if (!hasnRST)
+            setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
+    }
 
     for (auto item: IR->fields) {
         ModuleIR *itemIR = lookupIR(item.type);
@@ -1139,7 +1124,7 @@ static ModList modLine;
             setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount);
         else {
 //printf("[%s:%d] INSTANTIATEFIELD type %s fldName %s veccount %s\n", __FUNCTION__, __LINE__, item.type.c_str(), item.fldName.c_str(), item.vecCount.c_str());
-            generateModuleSignature(item.type, item.fldName + DOLLAR, modLine, IR->moduleParams[item.fldName], item.vecCount);
+            generateModuleSignature(item.type, item.fldName + DOLLAR, modLine, "(" + IR->moduleParams[item.fldName] + ")", item.vecCount);
         }
     }
     for (auto item : syncPins) {
@@ -1170,17 +1155,14 @@ static ModList modLine;
     for (auto top: muxValueList) {
         generateSection = top.first;
         for (auto item: top.second) {
-            setAssign(item.first, cleanupExprBuiltin(item.second.phi, item.second.defaultValue), refList[item.first].type);
+            ACCExpr *expr;
+            if (refList[item.first].type == "Bit(1)")
+                expr = replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first));
+            else
+                expr = cleanupExprBuiltin(item.second.phi, item.second.defaultValue);
+            setAssign(item.first, expr, refList[item.first].type);
             if (startswith(item.first, BLOCK_NAME))
                 assignList[item.first].size = walkCount(assignList[item.first].value);
-        }
-    }
-    for (auto top: enableList) { // remove dependancy of the __ENA line on the __RDY
-        generateSection = top.first;
-        for (auto item: top.second) {
-            if (trace_assign)
-                printf("[%s:%d] ENABLELIST section %s first %s second %s\n", __FUNCTION__, __LINE__, generateSection.c_str(), item.first.c_str(), tree2str(item.second.phi).c_str());
-            setAssign(item.first, replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first)), refList[item.first].type); //"Bit(1)"
         }
     }
     generateSection = "";
