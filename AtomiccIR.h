@@ -168,7 +168,7 @@ typedef struct ModuleIR {
     std::map<std::string, MethodInfo *> generateBody;
     std::map<std::string, std::string> priority; // indexed by rulename, result is 'high'/etc
     std::list<FieldElement>           fields;
-    std::map<std::string, std::string> params;
+    std::map<std::string, std::string> moduleParams;
     std::list<UnionItem>              unionList;
     std::list<FieldElement>           interfaces;
     std::list<FieldElement>           parameters;

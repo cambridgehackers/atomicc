@@ -268,46 +268,22 @@ static void findCLK(ModuleIR *IR, std::string pinPrefix, bool isVerilog)
     }
 }
 
-static std::string moduleInstance(std::string name, std::string params)
-{
-    std::string ret = genericModuleParam(name, params, nullptr);
-//printf("[%s:%d] name %s ret %s params %s\n", __FUNCTION__, __LINE__, name.c_str(), ret.c_str(), params.c_str());
-    if (params != "") {
-        std::string actual, sep;
-        const char *p = params.c_str();
-        p++;
-        char ch = ';';
-        while (ch == ';') {
-            const char *start = p;
-            while (*p++ != ':')
-                ;
-            std::string temp(start, p-1);
-            start = p;
-            while ((ch = *p++) && ch != ';' && ch != '>')
-                ;
-            actual += sep + PERIOD + temp + "(" + std::string(start, p-1) + ")";
-            sep = ",";
-        }
-        ret += "#(" + actual + ")";
-    }
-    return ret;
-}
-
 /*
  * Generate verilog module header for class definition or reference
  */
-static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std::string instance, ModList &modParam, std::string params, std::string vecCount)
+static void generateModuleSignature(std::string moduleName, std::string instance, ModList &modParam, std::string moduleParams, std::string vecCount)
 {
+    ModuleIR *IR = lookupIR(moduleName);
     bool hasCLK = false, hasnRST = false;
     MapNameValue mapValue;
     if (instance != "") {
         extractParam("SIGNIFC_" + IR->name + ":" + instance, IR->interfaceName, mapValue);
-        extractParam("SIGN_" + IR->name + ":" + instance, instanceType, mapValue);    // instance values overwrite duplicate interface values (if present)
+        extractParam("SIGN_" + IR->name + ":" + instance, moduleName, mapValue);    // instance values overwrite duplicate interface values (if present)
     }
     else {
         // only substitute parameters from interface definition that were not present in original module definition
         MapNameValue mapValueMod;
-        extractParam("SIGN_" + IR->name, IR->name, mapValueMod);
+        extractParam("SIGN_" + IR->name, moduleName, mapValueMod);
         extractParam("SIGNIFC_" + IR->name, IR->interfaceName, mapValue);
         for (auto item: mapValueMod) {
              auto result = mapValue.find(item.first);
@@ -328,7 +304,7 @@ static void generateModuleSignature(ModuleIR *IR, std::string instanceType, std:
     if (ind > 0)
         moduleInstantiation = moduleInstantiation.substr(0, ind);
     if (instance != "")
-        moduleInstantiation = moduleInstance(instanceType, params);
+        moduleInstantiation = genericModuleParam(moduleName, "(" + moduleParams + ")", nullptr);
     modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, !handleCLK, 0, false, ""/*not param*/, vecCount});
     moduleParameter = modParam.end();
 
@@ -1159,7 +1135,7 @@ static ModList modLine;
 
     printf("[%s:%d] STARTMODULE %s/%p\n", __FUNCTION__, __LINE__, IR->name.c_str(), (void *)IR);
     //dumpModule("START", IR);
-    generateModuleSignature(IR, "", "", modLineTop, "", "");
+    generateModuleSignature(IR->name, "", modLineTop, "", "");
 
     for (auto item: IR->fields) {
         ModuleIR *itemIR = lookupIR(item.type);
@@ -1167,7 +1143,7 @@ static ModList modLine;
             setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount);
         else {
 //printf("[%s:%d] INSTANTIATEFIELD type %s fldName %s veccount %s\n", __FUNCTION__, __LINE__, item.type.c_str(), item.fldName.c_str(), item.vecCount.c_str());
-            generateModuleSignature(itemIR, item.type, item.fldName + DOLLAR, modLine, IR->params[item.fldName], item.vecCount);
+            generateModuleSignature(item.type, item.fldName + DOLLAR, modLine, IR->moduleParams[item.fldName], item.vecCount);
         }
     }
     for (auto item : syncPins) {

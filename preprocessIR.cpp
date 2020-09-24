@@ -168,7 +168,7 @@ static int counter;
     genericIR->metaList = IR->metaList;
     genericIR->softwareName = IR->softwareName;
     genericIR->priority = IR->priority;
-    genericIR->params = IR->params;
+    genericIR->moduleParams = IR->moduleParams;
     genericIR->unionList = IR->unionList;
     genericIR->interfaceConnect = IR->interfaceConnect;
     genericIR->genvarCount = IR->genvarCount;
@@ -292,7 +292,7 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
         FieldElement field;
         ModuleIR *fieldIR = nullptr;
         if ((*IR)->unionList.size()
-         || (*IR)->params.size()
+         || (*IR)->moduleParams.size()
          || (*IR)->priority.size()
          || (*IR)->softwareName.size()
          || (*IR)->metaList.size()

@@ -349,7 +349,7 @@ static std::string CBEUnmangle(std::string S)
 {
     std::string Result;
     for (unsigned i = 0, e = S.size(); i != e; ++i)
-        if (S[i] == '_' && i + 3 < S.size() && S[i+3] == '_') {
+        if (S[i] == '_') {
             i++;
             char ch = S[i++] - 'A';
             ch |= (S[i++] - 'A') << 4;
@@ -443,7 +443,7 @@ interface, isStruct, isSerialize, ext);
             }
             else if (checkItem("PARAMS")) {
                 std::string fldName = getToken();
-                IR->params[fldName] = bufp;
+                IR->moduleParams[fldName] = bufp;
             }
             else if (checkItem("INTERFACE")) {
                 std::string vecCount;

@@ -210,7 +210,7 @@ std::string genericModuleParam(std::string name, std::string param, MapNameValue
     else
         name = param;
     ind = name.find("(");
-    if (ind > 0) {
+    if (ind >= 0) {
         ACCExpr *param = cleanupModuleParam(name.substr(ind));
         for (auto item: param->operands) // list of '=' assignments
             pmap.push_back({tree2str(item->operands.front(), false), item->operands.back()});
@@ -237,7 +237,7 @@ std::string genericModuleParam(std::string name, std::string param, MapNameValue
             }
             ret += ")";
         }
-        else {
+        else if (pmap.size()) {
             ret += "#(";
             for (auto item: pmap) {
                 ret += sep + PERIOD + item.name + "(";
@@ -706,7 +706,7 @@ std::string CBEMangle(const std::string &S)
 {
     std::string Result;
     for (unsigned i = 0, e = S.size(); i != e; ++i)
-        if (isalnum(S[i]) || S[i] == '_' || S[i] == '$')
+        if (isalnum(S[i]) || S[i] == '$')
             Result += S[i];
         else {
             Result += '_';
