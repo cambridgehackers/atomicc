@@ -21,8 +21,6 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
-#define NOCDataH_SIZE    "(16+128)"
-
 typedef struct {
     FieldElement field;
     ModuleIR *IR; // containing Module
@@ -70,14 +68,12 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
                 psep.c_str(), pitem.name.c_str(), convertType(pitem.type).c_str());
             psep = ",";
         }
-#if 1
         if (MI->type != "") {
             char buffer[1000];
             sprintf(buffer, ", \"rtype\": { \"name\": \"Bit\", \"params\": [ { "
                  "\"name\": \"%s\" } ] }", convertType(MI->type).c_str());
             retType = buffer;
         }
-#endif
         fprintf(OStrJ, "\n                    ]%s }", retType.c_str());
         msep = ",";
     }
@@ -89,7 +85,7 @@ static void jsonGenerate(FILE *OStrJ, std::string aname, SoftwareItem &swInfo)
 int generateSoftware(std::list<ModuleIR *> &irSeq, const char *exename, std::string outName)
 {
     FILE *OStrJ = nullptr;
-    std::string pipeName = "PipeIn(width=" NOCDataH_SIZE ")";
+    std::string pipeName = "PipeIn(width=" + convertType("NOCDataH") + ")";
     for (auto IR: irSeq) {
         ModuleIR *implements = lookupInterface(IR->interfaceName);
         if (!implements) {
@@ -108,99 +104,83 @@ exit(-1);
     if (softwareNameList.size() > 0) {
         int counter = 5;
         std::string enumList, sep;
+        ModuleIR *IRifc = allocIR("l_top___IFC", true);
         ModuleIR *IR = allocIR("l_top");
-        IR->interfaceName = "l_top___IFC";
-        ModuleIR *IRifc = allocIR(IR->interfaceName, true);
-        IR->isInterface = false;
+        IR->interfaceName = IRifc->name;
         irSeq.push_back(IR);
-        std::string dutType;
+        std::list<std::string> pipeUser;
+        OStrJ = fopen((outName + ".json").c_str(), "w");
+        std::map<std::string, bool> dutPresent;
         for (auto item: softwareNameList) {
-            ModuleIR *implements = lookupInterface(item.second.IR->interfaceName);
-            assert(implements);
-            dutType = item.second.IR->name;
+            assert(lookupInterface(item.second.IR->interfaceName));
             std::string name = "IfcNames_" + item.first + (item.second.field.isPtr ? "H2S" : "S2H");
             enumList += sep + "[ \"" + name + "\", \"" + autostr(counter++) + "\" ]";
             sep = ", ";
         }
-        OStrJ = fopen((outName + ".json").c_str(), "w");
         fprintf(OStrJ, jsonPrefix, enumList.c_str());
-        std::string localName = "DUT__" + dutType;
-        std::string muxName = "mux";
-        std::string muxTypeName = "MuxPipe";
-        IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false, false});
-        localName += DOLLAR;
-        muxName += DOLLAR;
-        std::string fieldName;
-        IRifc->interfaces.push_back(FieldElement{"request", "", pipeName, false/*in*/, false, false, false, ""/*not param*/, false, false, false});
-        std::list<std::string> pipeUser;
         for (auto item: softwareNameList) {
             jsonGenerate(OStrJ, item.first, item.second);
+            std::string dutType = item.second.IR->name;
+            std::string localName = "DUT__" + dutType;
             bool outcall = item.second.field.isPtr;
             std::string userTypeName = item.second.inter;
             std::string userInterface = item.second.field.fldName;
-            fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
-            std::string type = (outcall ? "___M2P" : "___P2M") + userTypeName;
-            std::string interfaceName = fieldName + "___IFC";
-            ModuleIR *ifcIR = allocIR(type);
-            ifcIR->interfaceName = interfaceName;
-            ModuleIR *ifcIRinterface = allocIR(interfaceName, true);
-            ifcIRinterface->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
-            ifcIRinterface->interfaces.push_back(FieldElement{"pipe", "", pipeName, outcall, false, false, false, ""/*not param*/, false, false, false});
-            IR->fields.push_back(FieldElement{fieldName, "", type, false, false, false, false, ""/*not param*/, false, false, false});
+            std::string fieldName = (outcall ? "M2P" : "P2M") + ("__" + userInterface);
+            ModuleIR *elementinterface = allocIR(fieldName + "___IFC", true);
+            ModuleIR *element = allocIR((outcall ? "___M2P" : "___P2M") + userTypeName);
+            element->interfaceName = elementinterface->name;
+printf("[%s:%d] outcall %d usertname %s fieldname %s type %s\n", __FUNCTION__, __LINE__, outcall, userTypeName.c_str(), fieldName.c_str(), element->name.c_str());
+            elementinterface->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
+            elementinterface->interfaces.push_back(FieldElement{"pipe", "", pipeName, outcall, false, false, false, ""/*not param*/, false, false, false});
+            IR->fields.push_back(FieldElement{fieldName, "", element->name, false, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
-                allocExpr(localName + userInterface),
+                allocExpr(localName + DOLLAR + userInterface),
                 allocExpr(fieldName + DOLLAR + "method"), userTypeName, true});
-            if (!outcall) // see if the request deserialization can generate an indication
-            if (auto userIR = lookupInterface(userTypeName)) {
-                for (auto MI: userIR->methods) {
-                    std::string methodName = MI->name;
-                    if (!isRdyName(methodName) && !isEnaName(methodName)) {
-                        // actionValue methods get a callback for value
-                        ifcIRinterface->interfaces.push_back(FieldElement{"returnInd", "", pipeName, true, false, false, false, ""/*not param*/, false, false, false});
-                        pipeUser.push_back(fieldName + DOLLAR + "returnInd");
-                        break;
+            if (!dutPresent[dutType]) {
+                dutPresent[dutType] = true;
+                IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false, false});
+                IRifc->interfaces.push_back(FieldElement{"request", "", pipeName, false/*in*/, false, false, false, ""/*not param*/, false, false, false});
+            }
+            if (outcall)
+                pipeUser.push_back(fieldName + DOLLAR + "pipe");
+            else {
+                if (auto userIR = lookupInterface(userTypeName)) {
+                    for (auto MI: userIR->methods) {
+                        std::string methodName = MI->name;
+                        if (!isRdyName(methodName) && !isEnaName(methodName)) {
+                            // see if the request deserialization can generate an indication
+                            // actionValue methods get a callback for value
+                            elementinterface->interfaces.push_back(FieldElement{"returnInd", "", pipeName, true, false, false, false, ""/*not param*/, false, false, false});
+                            pipeUser.push_back(fieldName + DOLLAR + "returnInd");
+                            break;
+                        }
                     }
                 }
-            }
-printf("[%s:%d] outcall %d usertname %s userif %s fieldname %s type %s\n", __FUNCTION__, __LINE__, outcall, userTypeName.c_str(), userInterface.c_str(), fieldName.c_str(), type.c_str());
-            if (outcall) {
-                pipeUser.push_back(fieldName + DOLLAR + "pipe");
-            }
-            else
                 IR->interfaceConnect.push_back(InterfaceConnectType{
                     allocExpr(fieldName + DOLLAR + "pipe"),
                     allocExpr("request"), pipeName, true});
-            //dumpModule("SWIFC", ifcIR);
+            }
         }
-        if (int size = pipeUser.size()) {
-        IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
-        if (size == 1) {
-            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
-                allocExpr(pipeUser.front()), pipeName, true});
-        }
-        else {
-        IR->fields.push_back(FieldElement{"funnel", "", "FunnelBufferedBase(funnelWidth="
-           + autostr(pipeUser.size()) + ",dataWidth=" + convertType("NOCDataH") + ")", false, false, false, false, ""/*not param*/, false, false, false});
-        int ind = 0;
-        for (auto inter: pipeUser) {
-            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(inter),
-                str2tree("funnel$in[" + autostr(ind) + "]"), pipeName, true});
-            ind++;
-        }
-        IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
-            allocExpr("funnel$out"), pipeName, true});
-        }
-        }
-#if 0
-        if (!hasIndication) {
-            IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName,
-                true/*outcall*/, false, false, false, ""/*not param*/, false, false, false});
-            IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
-                allocExpr(fieldName + DOLLAR + "returnInd"), pipeName, true});
-        }
-#endif
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
+        if (int size = pipeUser.size()) {
+            IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
+            if (size == 1)
+                IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
+                    allocExpr(pipeUser.front()), pipeName, true});
+            else {
+                IR->fields.push_back(FieldElement{"funnel", "", "FunnelBufferedBase(funnelWidth="
+                   + autostr(pipeUser.size()) + ",dataWidth=" + convertType("NOCDataH") + ")", false, false, false, false, ""/*not param*/, false, false, false});
+                int ind = 0;
+                for (auto inter: pipeUser) {
+                    IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(inter),
+                        str2tree("funnel$in[" + autostr(ind) + "]"), pipeName, true});
+                    ind++;
+                }
+                IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
+                    allocExpr("funnel$out"), pipeName, true});
+            }
+        }
         //dumpModule("TOP", IR);
         std::string commandLine(exename);
         int ind = commandLine.rfind("/");
