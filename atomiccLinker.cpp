@@ -77,7 +77,7 @@ printf("[%s:%d] NAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), it
             externMap[fieldName].type = item.type;
         }
         if (auto IIR = lookupIR(item.type)) {
-printf("[%s:%d] JNAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), item.fldName.c_str());
+//printf("[%s:%d] JNAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), item.fldName.c_str());
             recurseObject(name + item.fldName, IIR, item.vecCount);
         }
     }
