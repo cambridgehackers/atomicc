@@ -460,7 +460,8 @@ static void setAssignRefCount(ModuleIR *IR)
             assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
     }
     for (auto &ctop : condLines) // process all generate sections
-    for (auto &tcond : ctop.second.always) {
+    for (auto &alwaysGroup : ctop.second.always)
+    for (auto &tcond : alwaysGroup.second.cond) {
         std::string methodName = tcond.first;
         walkRef(tcond.second.guard);
         tcond.second.guard = cleanupBool(replaceAssign(tcond.second.guard));
@@ -517,7 +518,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
 {
     dest = replaceAssign(dest);
     value = replaceAssign(value);
-    auto &element = condLines[generateSection].always[methodName];
+    auto &element = condLines[generateSection].always[ALWAYS_CLOCKED].cond[methodName];
     for (auto &CI : element.info)
         if (matchExpr(cond, CI.second.cond)) {
             CI.second.info.push_back(CondInfo{dest, value});

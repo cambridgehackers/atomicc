@@ -176,6 +176,7 @@ void generateVerilogOutput(FILE *OStr)
             if (item.second.vecCount == "") {
                 vecCountStr = "";
                 resetList.push_back(item.first);
+                (void) condLines[""].always[ALWAYS_CLOCKED].cond[""].guard;  // dummy to ensure 'always' generation loop is executed at least once
             }
             vecCountStr = item.first + vecCountStr;
             std::string inst = declareInstance(item.second.type, vecCountStr, ""); //std::string params; //IR->params[item.fldName]
@@ -303,69 +304,69 @@ next:;
     }
 
     // generate clocked updates to state elements
-    auto ctop = condLines.begin(), ctopEnd = condLines.end();
-    for (; ctop != ctopEnd || resetList.size(); ctop++) { // process all generate sections
-    if (resetList.size() || ctop->second.always.size()) {
-        std::string ctopLoop = ctop != ctopEnd ? ctop->first : "";
-        if (ctopLoop != "")
-            fprintf(OStr, "\n    %s\n", finishString(ctopLoop).c_str());
-        fprintf(OStr, "\n    always @( posedge CLK) begin\n      if (!nRST) begin\n");
+    for (auto &ctop : condLines) { // process all generate sections
+    for (auto &alwaysGroup: ctop.second.always) {
+        std::list<std::string> alwaysLines;
+        bool hasElse = false;
+        if (ctop.first != "")
+            fprintf(OStr, "\n    %s\n", finishString(ctop.first).c_str());
+        fprintf(OStr, "\n    %s begin\n      if (!nRST) begin\n", alwaysGroup.first.c_str());
         for (auto item: resetList)
             fprintf(OStr, "        %s <= 0;\n", item.c_str());
         resetList.clear();
         fprintf(OStr, "      end // nRST\n");
-        if (ctop != ctopEnd && ctop->second.always.size() > 0) {
-            fprintf(OStr, "      else begin\n");
-            std::list<std::string> alwaysLines;
-            for (auto tcond: ctop->second.always) {
-                std::string methodName = tcond.first, endStr;
-                if (checkInteger(tcond.second.guard, "1"))
-                    alwaysLines.push_back("// " + methodName);
-                else {
-                    alwaysLines.push_back("if (" + finishExpr(tcond.second.guard) + ") begin // " + methodName);
-                    endStr = "end; ";
-                }
-                for (auto item: tcond.second.info) {
-                    std::string endStr;
-                    std::string temp;
-                    if (item.second.cond && !checkInteger(item.second.cond, "1")) {
-                        temp = "    if (" + finishExpr(item.second.cond) + ")";
-                        if (item.second.info.size() > 1) {
-                            temp += " begin";
-                            endStr = "    end;";
-                        }
-                        alwaysLines.push_back(temp);
-                    }
-                    for (auto citem: item.second.info) {
-                        if (citem.dest) // dest non-null -> assignment statement, otherwise call statement
-                            alwaysLines.push_back("    " + finishExpr(citem.dest) + " <= " + finishExpr(citem.value) + ";");
-                        else if (citem.value->value == "$finish;")
-                            alwaysLines.push_back("    $finish;");
-                        else
-                            alwaysLines.push_back("    $display" + finishExpr(citem.value->operands.front()) + ";");
-                    }
-                    if (endStr != "")
-                        alwaysLines.push_back(endStr);
-                }
-                alwaysLines.push_back(endStr + "// End of " + methodName);
+        for (auto tcond: alwaysGroup.second.cond) {
+            std::string methodName = tcond.first, endStr;
+            if (!tcond.second.guard)
+                continue;
+            if (!hasElse)
+                fprintf(OStr, "      else begin\n");
+            hasElse = true;
+            if (checkInteger(tcond.second.guard, "1"))
+                alwaysLines.push_back("// " + methodName);
+            else {
+                alwaysLines.push_back("if (" + finishExpr(tcond.second.guard) + ") begin // " + methodName);
+                endStr = "end; ";
             }
-            for (auto info: alwaysLines)
-                fprintf(OStr, "        %s\n", info.c_str());
-            fprintf(OStr, "      end\n");
+            for (auto item: tcond.second.info) {
+                std::string endStr;
+                std::string temp;
+                if (item.second.cond && !checkInteger(item.second.cond, "1")) {
+                    temp = "    if (" + finishExpr(item.second.cond) + ")";
+                    if (item.second.info.size() > 1) {
+                        temp += " begin";
+                        endStr = "    end;";
+                    }
+                    alwaysLines.push_back(temp);
+                }
+                for (auto citem: item.second.info) {
+                    if (citem.dest) // dest non-null -> assignment statement, otherwise call statement
+                        alwaysLines.push_back("    " + finishExpr(citem.dest) + " <= " + finishExpr(citem.value) + ";");
+                    else if (citem.value->value == "$finish;")
+                        alwaysLines.push_back("    $finish;");
+                    else
+                        alwaysLines.push_back("    $display" + finishExpr(citem.value->operands.front()) + ";");
+                }
+                if (endStr != "")
+                    alwaysLines.push_back(endStr);
+            }
+            alwaysLines.push_back(endStr + "// End of " + methodName);
         }
+        for (auto info: alwaysLines)
+            fprintf(OStr, "        %s\n", info.c_str());
+        if (hasElse)
+            fprintf(OStr, "      end\n");
         fprintf(OStr, "    end // always @ (posedge CLK)\n");
-        if (ctopLoop != "")
+        if (ctop.first != "")
             fprintf(OStr, "   end // end of forloop\n");
-        if (ctop == ctopEnd)
-            break;
     }
-    if (ctop->second.assert.size())
+    if (ctop.second.assert.size())
         fprintf(OStr, "`ifdef	FORMAL\n");
-    for (auto item: ctop->second.assert) {
-        std::string sensitivity = "*";
+    for (auto item: ctop.second.assert) {
+        std::string sensitivity = ALWAYS_STAR;
         if (walkSearch(item.cond, "$past"))
-            sensitivity = " posedge CLK";
-        fprintf(OStr, "    %s\n", ("always @(" + sensitivity + ")").c_str());
+            sensitivity = ALWAYS_CLOCKED;
+        fprintf(OStr, "    %s\n", sensitivity.c_str());
         std::string indent;
         std::string condStr = finishExpr(item.cond);
         if (condStr != "" && condStr != "1") {
@@ -374,7 +375,7 @@ next:;
         }
         fprintf(OStr, "    %s\n", ("    " + indent + finishExpr(item.value) + ";").c_str());
     }
-    if (ctop->second.assert.size())
+    if (ctop.second.assert.size())
         fprintf(OStr, "`endif\n");
     }
 }

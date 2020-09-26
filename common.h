@@ -106,9 +106,16 @@ typedef struct {
 } AssertVerilog;
 
 typedef struct {
-    std::map<std::string, CondGroup> always;
+    std::map<std::string, CondGroup> cond;
+} AlwaysGroup;
+
+typedef struct {
+    std::map<std::string, AlwaysGroup> always;  // index is 'always variety'
     std::list<AssertVerilog>         assert;
 } CondLineType;
+#define ALWAYS_CLOCKED  "always @( posedge CLK)"
+#define ALWAYS_STAR  "always @(*)"
+#define ALWAYS_COMB  "always_comb"
 
 typedef ModuleIR *(^CBFun)(FieldElement &item);
 
