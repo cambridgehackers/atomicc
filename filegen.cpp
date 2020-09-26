@@ -201,7 +201,7 @@ void generateVerilogOutput(FILE *OStr)
                 fprintf(OStr, "    %s;\n", inst.c_str());
             }
             else
-            fprintf(OStr, "    wire %s;\n", (sizeProcess(item.second.type) + vecCountStr).c_str());
+            fprintf(OStr, "    logic %s;\n", (sizeProcess(item.second.type) + vecCountStr).c_str());
 if (trace_assign && item.second.out) {
 printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str());
 //exit(-1);
