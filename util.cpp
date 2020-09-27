@@ -907,14 +907,28 @@ void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault)
     else if (expr->value == "__phi") {
         ACCExpr *list = expr->operands.front(); // get "(" list of [":", cond, value] items
         int size = list->operands.size();
+        //std::string valSize;
+        //bool firstSize = true;
+        //for (auto item: list->operands) {
+             //std::string size = exprWidth(getRHS(item));
+             //if (firstSize)
+                 //valSize = size;
+             //else if (valSize != size)
+                 //valSize = "";
+             //firstSize = false;
+        //}
         ACCExpr *firstInList = getRHS(list, 0), *secondInList = getRHS(list);
         ACCExpr *newe = nullptr;
         if (size == 2 && matchExpr(getRHS(firstInList, 0), invertExpr(getRHS(secondInList, 0))))
             newe = allocExpr("?", getRHS(firstInList, 0), getRHS(firstInList), getRHS(secondInList));
         else if (size == 2 && getRHS(firstInList, 0)->value == "__default" && exprWidth(getRHS(secondInList)) == "1")
-            newe = allocExpr("&&", getRHS(secondInList, 0), getRHS(secondInList));
+            newe = cleanupBool(allocExpr("&&", getRHS(secondInList, 0), getRHS(secondInList)));
+        else if (size == 1 && exprWidth(getRHS(firstInList)) == "1")
+            newe = cleanupBool(allocExpr("&&", getRHS(firstInList, 0), getRHS(firstInList)));
         else if (size == 1)
             newe = getRHS(firstInList);
+        else if (size == 0)
+            newe = allocExpr(phiDefault);
         else {
             //dumpExpr("PHI", list);
             newe = allocExpr("|");

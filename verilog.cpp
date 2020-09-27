@@ -28,10 +28,6 @@ int trace_connect;//= 1;
 int trace_skipped;//= 1;
 
 typedef struct {
-    ACCExpr *phi;
-    std::string defaultValue;
-} MuxValueElement;
-typedef struct {
     std::string value;
     std::string type;
 } InterfaceMapType;
@@ -43,7 +39,8 @@ std::map<std::string, SyncPinInfo> syncPins;    // SyncFF items needed for PipeI
 
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
-static std::map<std::string, std::map<std::string, MuxValueElement>> muxValueList; // used to calculate __phi for multiple assignments
+std::map<std::string, std::map<std::string, MuxValueElement>> muxValueList; // used to calculate __phi for multiple assignments
+static std::map<std::string, std::map<std::string, MuxValueElement>> enableList;
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 static std::map<std::string, std::string> mapParam;
 static bool handleCLK;
@@ -95,7 +92,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     }
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
-    if (trace_interface)
+    //if (trace_interface)
         printf("[%s:%d] start [%s/%d]count[%d] = %s vdir %d type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, valStr.c_str(), sDir, type.c_str());
     if (!refList[target].pin && generateSection == "") {
         std::string base = target;
@@ -486,6 +483,9 @@ static void setAssignRefCount(ModuleIR *IR)
             }
         }
     }
+    for (auto &top: muxValueList)
+        for (auto &item: top.second)
+            walkRef(item.second.phi);
 
     for (auto item: assignList)
         if (item.second.value && refList[item.first].pin == PIN_OBJECT) {
@@ -697,7 +697,8 @@ static void appendMux(std::string section, std::string name, ACCExpr *cond, ACCE
         muxValueList[section][name].phi = phi;
         muxValueList[section][name].defaultValue = defaultValue;
     }
-    phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
+    if (!checkInteger(value, "0") || refList[name].type != "Bit(1)")
+        phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
 }
 
 static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo *MI)
@@ -825,12 +826,11 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
             appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"));
             break;
         }
-        if (!muxValueList[section][calledEna].phi) {
-            refList[calledEna].type = "Bit(1)";
-            muxValueList[section][calledEna].phi = allocExpr("|");
-            muxValueList[section][calledEna].defaultValue = "1'd0";
+        if (!enableList[section][calledEna].phi) {
+            enableList[section][calledEna].phi = allocExpr("|");
+            enableList[section][calledEna].defaultValue = "1'd0";
         }
-        muxValueList[section][calledEna].phi->operands.push_back(tempCond);
+        enableList[section][calledEna].phi->operands.push_back(tempCond);
         auto AI = CI->params.begin();
         std::string pname = baseMethodName(calledEna) + DOLLAR;
         int argCount = CI->params.size();
@@ -1098,6 +1098,7 @@ static ModList modLine;
     genvarMap.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
     muxValueList.clear();
+    enableList.clear();
     modLine.clear();
     syncPins.clear();     // pins from PipeInSync
 
@@ -1153,17 +1154,37 @@ static ModList modLine;
     generateMethodGroup(IR, generateMethod);
 
     // combine mux'ed assignments into a single 'assign' statement
-    for (auto top: muxValueList) {
+    for (auto &top: enableList) {
         generateSection = top.first;
-        for (auto item: top.second) {
-            ACCExpr *expr;
-            if (refList[item.first].type == "Bit(1)")
-                expr = replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first));
-            else
-                expr = cleanupExprBuiltin(item.second.phi, item.second.defaultValue);
-            setAssign(item.first, expr, refList[item.first].type);
+        for (auto &item: top.second) {
+            setAssign(item.first,
+               cleanupBool(replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first))),
+               "Bit(1)");
             if (startswith(item.first, BLOCK_NAME))
                 assignList[item.first].size = walkCount(assignList[item.first].value);
+        }
+    }
+    for (auto &top: muxValueList) {
+        generateSection = top.first;
+        for (auto &item: top.second) {
+            item.second.phi = replaceAssign(item.second.phi);
+            if (refList[item.first].type == "Bit(1)")
+                item.second.phi = cleanupBool(replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first)));
+            else
+                item.second.phi = cleanupExpr(item.second.phi);
+            //item.second.phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
+            if (item.second.phi && (!item.second.phi->operands.size() || item.second.phi->operands.front()->operands.size() < 2 || refList[item.first].type == "Bit(1)")) {
+                if (refList[item.first].type != "Bit(1)")
+                    item.second.phi = cleanupExprBuiltin(item.second.phi, item.second.defaultValue);
+                setAssign(item.first, item.second.phi, refList[item.first].type);
+                if (startswith(item.first, BLOCK_NAME))
+                    assignList[item.first].size = walkCount(assignList[item.first].value);
+                item.second.phi = nullptr;
+            }
+            else {
+                refList[item.first].count++;
+                refList[item.first].done = true;
+            }
         }
     }
     generateSection = "";
@@ -1198,6 +1219,9 @@ static ModList modLine;
     // recursively process all replacements internal to the list of 'setAssign' items
     for (auto &item : assignList)
         item.second.value = replaceAssign(item.second.value);
+    for (auto &top: muxValueList)
+        for (auto &item: top.second)
+            item.second.phi = replaceAssign(item.second.phi);
 
     // process assignList replacements, mark referenced items
     fixupModuleInstantiations(modLine);

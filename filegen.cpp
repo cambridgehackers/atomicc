@@ -124,7 +124,7 @@ static void genAssign(FILE *OStr, std::string target, ACCExpr *source, std::stri
     ModuleIR *IR = lookupInterface(type);
     if (IR && IR->isStruct)
         IR = nullptr;
-    if (!refList[target].done && !IR) {
+    if (!refList[target].done && !IR && source) {
         std::string tstr = finishString(target);
         std::string sstr = finishExpr(source);
         if (tstr != sstr)
@@ -301,6 +301,23 @@ next:;
             genAssign(OStr, item.first, item.second.value, item.second.type);
         }
         fprintf(OStr, "    end;\n");
+    }
+
+    // combine mux'ed assignments into a single 'assign' statement
+    for (auto &top: muxValueList) {
+        bool endFlag = false;
+        for (auto &item: top.second) {
+            if (top.first != "" && item.second.phi) {
+                fprintf(OStr, "%s\n", finishString(top.first).c_str());
+                endFlag = true;
+            }
+            refList[item.first].done = false;
+            genAssign(OStr, item.first, item.second.phi, refList[item.first].type);
+            if (startswith(item.first, BLOCK_NAME))
+                assignList[item.first].size = walkCount(assignList[item.first].value);
+        }
+        if (endFlag)
+            fprintf(OStr, "    end;\n");
     }
 
     // generate clocked updates to state elements

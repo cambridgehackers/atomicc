@@ -117,6 +117,11 @@ typedef struct {
 #define ALWAYS_STAR  "always @(*)"
 #define ALWAYS_COMB  "always_comb"
 
+typedef struct {
+    ACCExpr *phi;
+    std::string defaultValue;
+} MuxValueElement;
+
 typedef ModuleIR *(^CBFun)(FieldElement &item);
 
 typedef std::map<std::string, std::string> MapNameValue;
@@ -236,3 +241,4 @@ typedef struct {
 extern std::map<std::string, SyncPinInfo> syncPins;    // SyncFF items needed for PipeInSync instances
 extern int implementPrintf;
 extern std::string myGlobalName;
+extern std::map<std::string, std::map<std::string, MuxValueElement>> muxValueList;
