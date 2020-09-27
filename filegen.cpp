@@ -312,9 +312,16 @@ next:;
                 endFlag = true;
             }
             refList[item.first].done = false;
+            if (item.second.phi) {
+#if 0
             genAssign(OStr, item.first, item.second.phi, refList[item.first].type);
-            if (startswith(item.first, BLOCK_NAME))
-                assignList[item.first].size = walkCount(assignList[item.first].value);
+#else
+            fprintf(OStr, "    always_comb begin\n    %s = 0;\n    unique case(1'b1)\n", item.first.c_str());
+            for (auto param: item.second.phi->operands.front()->operands)
+                fprintf(OStr, "    %s: %s = %s;\n", tree2str(getRHS(param, 0)).c_str(), item.first.c_str(), tree2str(getRHS(param, 1)).c_str());
+            fprintf(OStr, "    endcase\n    end\n");
+#endif
+            }
         }
         if (endFlag)
             fprintf(OStr, "    end;\n");
