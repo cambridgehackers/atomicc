@@ -154,7 +154,7 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
         ret += op;
     else if (op == "!" || !expr->operands.size())
         ret += op;
-    bool topOp = checkOperand(expr->value) || expr->value == "," || expr->value == "[" || expr->value == PARAMETER_MARKER;
+    bool topOp = checkOperand(expr->value) || expr->value == "," || isParen(expr->value);
     if (expr->value == "$past" && expr->operands.size()) { // runtime functions actually 'called' in generated code
         expr->operands.front()->value = "(";
     }
@@ -432,6 +432,8 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
         expr = expr->operands.front();
     if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
         expr->operands = expr->operands.front()->operands;
+    if (expr->value == "|" && expr->operands.size() == 1)
+        expr = expr->operands.front();
     ACCExpr *ret = allocExpr(expr->value);
     bool booleanCond = expr->value == "?";
     for (auto item: expr->operands) {
@@ -449,6 +451,8 @@ ACCExpr *cleanupExpr(ACCExpr *expr, bool preserveParen)
                  ret->operands.push_back(oitem);
          }
     }
+    if (ret->value == "|" && !ret->operands.size())
+        ret->value = "0";
     if (ret->value == "?" && checkInteger(getRHS(ret, 0), "1"))
         return getRHS(ret, 1);
     if (ret->value == "&&" && checkInteger(getRHS(ret, 0), "1")) {
@@ -602,6 +606,10 @@ ACCExpr *cleanupBool(ACCExpr *expr)
     inBool++; // can be invoked recursively!
     walkReplaceBuiltin(expr, "0");
     inBool--;
+//#define MAX_EXPR_COMPLEXITY 40
+//if (walkCount(expr) > MAX_EXPR_COMPLEXITY) {
+    //return expr;
+//}
     int varIndex = 0;
     VarMap varMap;
     DdManager * mgr = Cudd_Init(MAX_NAME_COUNT,0,CUDD_UNIQUE_SLOTS,CUDD_CACHE_SLOTS,0);
@@ -755,9 +763,13 @@ ACCExpr *str2tree(std::string arg, bool allowRangeParam)
 {
     if (trace_expr)
         printf("[%s:%d] arg '%s' allowRangeParam '%d'\n", __FUNCTION__, __LINE__, arg.c_str(), allowRangeParam);
+std::string orig = arg;
     lexString = arg;
     lexIndex = 0;
     lexChar = lexString[lexIndex++];
     lexAllowRange = allowRangeParam;
-    return getExprList(get1Token(), "", true, false);
+    auto ret = getExprList(get1Token(), "", true, false);
+//printf("[%s:%d] in '%s'\n", __FUNCTION__, __LINE__, orig.c_str());
+//dumpExpr("OUTEX", ret);
+    return ret;
 }

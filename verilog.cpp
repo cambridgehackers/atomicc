@@ -26,6 +26,7 @@ int trace_declare;//= 1;
 int trace_ports;//= 1;
 int trace_connect;//= 1;
 int trace_skipped;//= 1;
+int trace_mux;//= 1;
 
 typedef struct {
     std::string value;
@@ -85,15 +86,21 @@ printf("[%s:%d]STRUCT %s type %s vecCount %s\n", __FUNCTION__, __LINE__, target.
 static void setAssign(std::string target, ACCExpr *value, std::string type)
 {
     bool tDir = refList[target].out;
+    int tPin = refList[target].pin;
     if (!value)
         return;
-    if (type == "Bit(1)") {
-        value = cleanupBool(value);
-    }
+    //if (type == "Bit(1)") {
+        //value = cleanupBool(value);
+    //}
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
-    //if (trace_interface)
-        printf("[%s:%d] start [%s/%d]count[%d] = %s vdir %d type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, refList[target].count, valStr.c_str(), sDir, type.c_str());
+    int sPin = refList[valStr].pin;
+    if (trace_interface)
+        printf("[%s:%d] start [%s/%d/%d]count[%d] = %s/%d/%d type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tPin, refList[target].count, valStr.c_str(), sDir, sPin, type.c_str());
+    if (sPin == PIN_OBJECT && tPin != PIN_OBJECT) {
+        value = allocExpr(target);
+        target = valStr;
+    }
     if (!refList[target].pin && generateSection == "") {
         std::string base = target;
         int ind = base.find_first_of(PERIOD "[");
@@ -391,10 +398,13 @@ static ACCExpr *replaceAssign(ACCExpr *expr, std::string guardName = "")
             printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, guardName != "", tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
         if (!assignList[item].noRecursion || guardName != "")
         if (ACCExpr *assignValue = assignList[item].value)
-        if (walkCount(assignValue) < ASSIGN_SIZE_LIMIT) {
+        if (walkCount(assignValue) < ASSIGN_SIZE_LIMIT || guardName != "") {
             decRef(item);
             walkRef(assignValue);
-            assignList[tree2str(assignValue)].noRecursion = true; // to prevent ping/pong
+            std::string val = tree2str(assignValue);
+            std::string valContents = tree2str(assignList[val].value);
+            //if (!isdigit(valContents[0]))
+                //assignList[val].noRecursion = true; // to prevent ping/pong
             if (trace_interface)
                 printf("[%s:%d] replace %s norec %d with %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignValue).c_str());
             return replaceAssign(assignValue, guardName);
@@ -419,12 +429,17 @@ static ACCExpr *simpleReplace(ACCExpr *expr)
     ACCExpr *newExpr = allocExpr(expr->value);
     std::string item = expr->value;
     if (isIdChar(item[0]) && !expr->operands.size()) {
+//printf("[%s:%d] item %s norec %d val %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignList[item].value).c_str());
+        ACCExpr *assignValue = assignList[item].value;
         if (!assignList[item].noRecursion)
-        if (ACCExpr *assignValue = assignList[item].value)
+        if (assignValue)
         if (refList[item].pin != PIN_MODULE
              && (checkOperand(assignValue->value) || isRdyName(item) || isEnaName(item)
                 || (startswith(item, BLOCK_NAME) && assignList[item].size < COUNT_LIMIT))) {
-            assignList[tree2str(assignValue)].noRecursion = true; // to prevent ping/pong
+            std::string val = tree2str(assignValue);
+            std::string valContents = tree2str(assignList[val].value);
+            //if (!isdigit(valContents[0]))
+            //assignList[val].noRecursion = true; // to prevent ping/pong
             if (trace_interface)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
             decRef(item);
@@ -445,16 +460,13 @@ static void setAssignRefCount(ModuleIR *IR)
     // before doing the rest, clean up block guards
     for (auto &item : assignList) {
         if (item.second.type == "Bit(1)" && startswith(item.first, BLOCK_NAME)) {
-            item.second.value = cleanupBool(simpleReplace(item.second.value));
+            item.second.value = simpleReplace(item.second.value);
             item.second.size = walkCount(item.second.value);
         }
     }
     for (auto item: assignList) {
 //printf("[%s:%d] ref[%s].norec %d value %s\n", __FUNCTION__, __LINE__, item.first.c_str(), assignList[item.first].noRecursion, tree2str(item.second.value).c_str());
-        if (item.second.type == "Bit(1)")
-            assignList[item.first].value = cleanupBool(simpleReplace(item.second.value));
-        else
-            assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
+        assignList[item.first].value = cleanupExpr(simpleReplace(item.second.value));
     }
     for (auto &ctop : condLines) // process all generate sections
     for (auto &alwaysGroup : ctop.second.always)
@@ -697,8 +709,13 @@ static void appendMux(std::string section, std::string name, ACCExpr *cond, ACCE
         muxValueList[section][name].phi = phi;
         muxValueList[section][name].defaultValue = defaultValue;
     }
+    if (trace_mux) {
+        printf("[%s:%d] name %s \n", __FUNCTION__, __LINE__, name.c_str());
+        dumpExpr("COND", cond);
+        dumpExpr("VALUE", value);
+    }
     if (!checkInteger(value, "0") || refList[name].type != "Bit(1)")
-        phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
+        phi->operands.front()->operands.push_back(allocExpr(":", cond ? cond : allocExpr("1"), value));
 }
 
 static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo *MI)
@@ -712,7 +729,11 @@ static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo
         if (MI->rule)
             setAssign(getEnaName(methodName), allocExpr(getRdyName(methodName)), "Bit(1)");
     }
-    setAssign(methodName, MI->guard, MI->type); // collect the text of the return value into a single 'assign'
+    ACCExpr *guard = MI->guard;
+    if (MI->type == "Bit(1)") {
+        guard = cleanupBool(guard);
+    }
+    setAssign(methodName, guard, MI->type); // collect the text of the return value into a single 'assign'
     for (auto IC : MI->interfaceConnect)
         connectMethods(IR, IC.type, IC.target, IC.source, IC.isForward);
 }
@@ -733,12 +754,23 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             appendLine(methodName, info->cond, info->dest, info->value);
     }
     for (auto info: MI->letList) {
-        ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getRdyName(methodName)), info->cond));
+        ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
+        std::string dest = tree2str(info->dest);
+        std::string root = dest;
+        int ind = root.find(PERIOD);
+        if (ind > 0)
+            root = root.substr(0,ind);
+        auto alloca = MI->alloca.find(root);
+        if (alloca == MI->alloca.end()) {
+//printf("[%s:%d] LEEEEEEEEEEEEETTTTTTTTTTTTTTTTTTTTTTTTTTTTT not alloca %s\n", __FUNCTION__, __LINE__, root.c_str());
+            cond = allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond);
+        }
+        cond = cleanupBool(cond);
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         updateWidth(value, convertType(info->type));
-        appendMux(generateSection, tree2str(info->dest), cond, value, "0");
+        appendMux(generateSection, dest, cond, value, "0");
     }
     for (auto info: MI->assertList) {
         ACCExpr *cond = info->cond;
@@ -795,29 +827,25 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         }
         if (!info->isAction)
             continue;
-        ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName)), cond));
+        ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), //allocExpr(getRdyName(methodName)),
+ cond));
+        tempCond = cleanupBool(replaceAssign(simpleReplace(tempCond), getRdyName(calledEna))); // remove __RDY before adding subscript!
         if (subscript) {
-            std::string sub;
-            tempCond = simpleReplace(tempCond);
-            tempCond = replaceAssign(tempCond, getRdyName(calledEna)); // remove __RDY before adding subscript!
+            std::string sub, post;
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
             section = makeSection(var->value, allocExpr("0"),
                 allocExpr("<", var, allocExpr(vecCount)), allocExpr("+", var, allocExpr("1")));
             sub = "[" + var->value + "]";
             int ind = calledEna.find_last_of(DOLLAR PERIOD);
             if (ind > 0) {
-                std::string post = calledEna.substr(ind);
+                post = calledEna.substr(ind);
                 calledEna = calledEna.substr(0, ind);
                 ind = post.rfind(DOLLAR);
 printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), ind);
                 if (ind > 1)
                     post = post.substr(0, ind) + PERIOD + post.substr(ind+1);
-                //if (post[0] == DOLLAR[0])
-                    //post = PERIOD + post.substr(1);
-                calledEna += sub + post;
             }
-            else
-                calledEna += sub;
+            calledEna += sub + post;
             tempCond = allocExpr("&&", tempCond, allocExpr("==", subscript, var));
         }
 //printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
@@ -940,10 +968,20 @@ static void prepareMethodGuards(ModuleIR *IR)
             lookupQualName(IR, name, nameVec, mapValue);
             if (isIdChar(name[0]) && nameVec != "") {
                 int ind = name.find("[");
-                    std::string sub;
+                std::string orig = name;
+                std::string sub;
+                ACCExpr *subExpr = nullptr;
                 if (ind > 0) {
                     extractSubscript(name, ind, sub);
+                    subExpr = str2tree(sub);
+                    subExpr = (subExpr && subExpr->operands.size() == 1) ? subExpr->operands.front() : nullptr;
+//dumpExpr("SUBB", subExpr);
                 }
+//printf("[%s:%d] orig %s name %s sub %s namevec %s\n", __FUNCTION__, __LINE__, orig.c_str(), name.c_str(), sub.c_str(), nameVec.c_str());
+                if (subExpr && isdigit(subExpr->value[0])) {
+                    name = orig;
+                }
+                else {
                 std::string newName = name;
                 while ((ind = newName.find(PERIOD)) > 0)
                     newName = newName.substr(0, ind) + "__" + newName.substr(ind+1);  // to defeat the walkAccessible() processing, use "__"
@@ -962,16 +1000,17 @@ static void prepareMethodGuards(ModuleIR *IR)
                     ACCExpr *var = allocExpr(GENVAR_NAME "1");
                     generateSection = makeSection(var->value, allocExpr("0"),
                         allocExpr("<", var, allocExpr(nameVec)), allocExpr("+", var, allocExpr("1")));
-                    std::string sub = "[" + var->value + "]";
+                    std::string newSub = "[" + var->value + "]";
                     ind = name.find(PERIOD);
                     if (ind > 0)
-                        name = name.substr(0, ind) + sub + name.substr(ind);
+                        name = name.substr(0, ind) + newSub + name.substr(ind);
                     else
-                        name = name + sub;
-                    setAssign(name_or + sub, allocExpr(name), "Bit(1)");
+                        name = name + newSub;
+                    setAssign(name_or + newSub, allocExpr(name), "Bit(1)");
                     generateSection = "";
                 }
                 name = name_or1;
+                }
             }
             ACCExpr *tempCond = allocExpr(name);
             if (item->cond)
@@ -1157,9 +1196,8 @@ static ModList modLine;
     for (auto &top: enableList) {
         generateSection = top.first;
         for (auto &item: top.second) {
-            setAssign(item.first,
-               cleanupBool(replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first))),
-               "Bit(1)");
+            ACCExpr *expr = replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first));
+            setAssign(item.first, expr, "Bit(1)");
             if (startswith(item.first, BLOCK_NAME))
                 assignList[item.first].size = walkCount(assignList[item.first].value);
         }
@@ -1167,15 +1205,14 @@ static ModList modLine;
     for (auto &top: muxValueList) {
         generateSection = top.first;
         for (auto &item: top.second) {
-            item.second.phi = replaceAssign(item.second.phi);
+            item.second.phi = replaceAssign(simpleReplace(item.second.phi));
             if (refList[item.first].type == "Bit(1)")
-                item.second.phi = cleanupBool(replaceAssign(simpleReplace(item.second.phi), getRdyName(item.first)));
+                item.second.phi = cleanupBool(item.second.phi);
             else
                 item.second.phi = cleanupExpr(item.second.phi);
-            //item.second.phi->operands.front()->operands.push_back(allocExpr(":", cond, value));
             if (item.second.phi && (!item.second.phi->operands.size() || item.second.phi->operands.front()->operands.size() < 2 || refList[item.first].type == "Bit(1)")) {
-                if (refList[item.first].type != "Bit(1)")
-                    item.second.phi = cleanupExprBuiltin(item.second.phi, item.second.defaultValue);
+                //if (refList[item.first].type != "Bit(1)")
+                item.second.phi = cleanupExprBuiltin(item.second.phi, item.second.defaultValue);
                 setAssign(item.first, item.second.phi, refList[item.first].type);
                 if (startswith(item.first, BLOCK_NAME))
                     assignList[item.first].size = walkCount(assignList[item.first].value);

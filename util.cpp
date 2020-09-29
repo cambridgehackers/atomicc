@@ -797,7 +797,8 @@ std::string exprWidth(ACCExpr *expr, bool forceNumeric)
             else if (isdigit(first->value[0]))
                 return "1";
         }
-        return convertType(refList[op].type);
+        else
+            return convertType(refList[op].type);
     }
     if (op == "?") {
         std::string len = exprWidth(getRHS(expr, 1), forceNumeric);
@@ -925,8 +926,6 @@ void walkReplaceBuiltin(ACCExpr *expr, std::string phiDefault)
             newe = cleanupBool(allocExpr("&&", getRHS(secondInList, 0), getRHS(secondInList)));
         else if (size == 1 && exprWidth(getRHS(firstInList)) == "1")
             newe = cleanupBool(allocExpr("&&", getRHS(firstInList, 0), getRHS(firstInList)));
-        else if (size == 1)
-            newe = getRHS(firstInList);
         else if (size == 0)
             newe = allocExpr(phiDefault);
         else {

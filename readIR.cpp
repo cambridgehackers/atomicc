@@ -57,6 +57,8 @@ static void rewriteExpr(ACCExpr *expr)
         expr->value = SUBSCRIPT_MARKER;
     else if (expr->value == "{")
         expr->value = PARAMETER_MARKER;
+    //if (isParen(expr->value) && expr->operands.size() == 1 && expr->operands.front()->value == ",")
+        //expr->operands = expr->operands.front()->operands;
     for (auto item: expr->operands)
         rewriteExpr(item);
 }
