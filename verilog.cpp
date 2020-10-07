@@ -278,7 +278,9 @@ static void findCLK(ModuleIR *IR, std::string pinPrefix, bool isVerilog)
 static void generateModuleSignature(std::string moduleName, std::string instance, ModList &modParam, std::string moduleParams, std::string vecCount)
 {
     ModuleIR *IR = lookupIR(moduleName);
+    assert(IR);
     ModuleIR *implements = lookupInterface(IR->interfaceName);
+    assert(implements);
     std::string minst;
     if (instance != "")
         minst = instance.substr(0, instance.length()-1);
@@ -1158,6 +1160,41 @@ static ModList modLine;
         if (!hasnRST)
             setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
     }
+    std::string traceDataGather, traceDataType;
+    if (IR->isTrace) {
+        ACCExpr *gather = allocExpr(","), *length = allocExpr("+");
+        for (auto mitem: modLineTop) {
+            std::string name = mitem.value;
+            if (mitem.moduleStart || mitem.isparam != "" || name == "CLK" || name == "nRST")
+                continue;
+            std::string prefix = mitem.value + PERIOD;
+            if (ModuleIR *IIR = lookupInterface(mitem.type)) {
+                for (auto method : IIR->methods) {
+                    gather->operands.push_back(allocExpr(prefix + method->name));
+                    std::string mprefix = prefix + baseMethodName(method->name) + DOLLAR;
+                    length->operands.push_back(allocExpr((method->type == "") ? "1" : convertType(method->type)));
+                    for (auto &param: method->params) {
+                        gather->operands.push_back(allocExpr(mprefix + param.name));
+                        length->operands.push_back(allocExpr(convertType(param.type)));
+                    }
+                }
+            }
+            else {
+                gather->operands.push_back(allocExpr(name));
+                length->operands.push_back(allocExpr(convertType(mitem.type)));
+            }
+        }
+        traceDataGather = "{32'd0," + tree2str(gather) + "}";
+        std::string totalLength = tree2str(length);
+        length->value = ",";
+        std::string interpretString = tree2str(length);
+        traceDataType = "Trace(width=(" + totalLength + "+32), depth=" + autostr(IR->isTrace) + ")";
+        IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
+printf("gather %s\n", traceDataGather.c_str());
+printf("interpret %s\n", interpretString.c_str());
+printf("total %s\n", totalLength.c_str());
+printf("traceDataType %s\n", traceDataType.c_str());
+    }
 
     for (auto item: IR->fields) {
         ModuleIR *itemIR = lookupIR(item.type);
@@ -1174,6 +1211,12 @@ static ModList modLine;
         modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
         modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, "", ""});
         modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, "", ""});
+    }
+    if (traceDataGather != "") {
+       setAssign("__traceMemory$CLK", allocExpr("CLK"), "Bit(1)");
+       setAssign("__traceMemory$nRST", allocExpr("nRST"), "Bit(1)");
+       setAssign("__traceMemory$data", allocExpr(traceDataGather), traceDataType);
+       setAssign("__traceMemory$enable", allocExpr("1"), "Bit(1)");
     }
 
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above

@@ -174,11 +174,13 @@ typedef struct ModuleIR {
     std::list<FieldElement>           parameters;
     std::list<InterfaceConnectType>   interfaceConnect;
     int                               genvarCount;
+    int                               isTrace;
     bool                              isExt;
     bool                              isInterface;
     bool                              isStruct;
     bool                              isSerialize;
     bool                              isVerilog;
+    bool                              isPrintf;
     bool                              transformGeneric;
     std::string                       interfaceVecCount;
     std::string                       interfaceName;
