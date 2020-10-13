@@ -605,6 +605,7 @@ ACCExpr *cleanupBool(ACCExpr *expr)
         return expr;
     inBool++; // can be invoked recursively!
     walkReplaceBuiltin(expr, "0");
+    updateWidth(expr, "1");
     inBool--;
 //#define MAX_EXPR_COMPLEXITY 40
 //if (walkCount(expr) > MAX_EXPR_COMPLEXITY) {

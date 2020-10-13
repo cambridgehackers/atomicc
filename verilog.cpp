@@ -302,9 +302,9 @@ static void generateModuleSignature(std::string moduleName, std::string instance
     else // only substitute parameters from interface definition that were not present in original module definition
         extractParam("SIGN_" + moduleName, moduleName, mapValueMod);
     for (auto item: mapValueMod) {
-         auto result = mapValue.find(item.first);
-         if (result != mapValue.end())
-             mapValue.erase(result);
+        auto result = mapValue.find(item.first);
+        if (result != mapValue.end())
+            mapValue.erase(result);
     }
     collectInterfacePins(implements, modParam, instance, "", "", false, mapValue, false, vecCount, false, IR->isVerilog);
     if (instance == "") {
