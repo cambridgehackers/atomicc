@@ -72,7 +72,7 @@ static ACCExpr *makeIndication(std::string target, int counter, ACCExpr *sourceP
         sourceParam->operands.push_back(allocExpr(autostr(dataLength) + "'d0"));
     sourceParam->operands.push_front(allocExpr("16'd" + autostr(PORTALNUM)));
     sourceParam->operands.push_front(allocExpr("16'd" + autostr(counter)));
-    sourceParam->operands.push_back(allocExpr("16'd" + autostr(vecLength)));
+    sourceParam->operands.push_back(allocExpr("16'd" + autostr(vecLength * 32)));
     return allocExpr(target, allocExpr(PARAMETER_MARKER,
             allocExpr("{", sourceParam)));
 }
