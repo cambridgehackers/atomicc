@@ -823,8 +823,16 @@ nextand:;
 
 void updateWidth(ACCExpr *expr, std::string clen)
 {
-    if (!expr || clen == "" || !isdigit(clen[0]) || clen.find(" ") != std::string::npos)
+    if (!expr || clen == "" || clen.find(" ") != std::string::npos)
         return;
+    if (!isdigit(clen[0]))
+        return;
+    if (isIdChar(expr->value[0]) && !expr->operands.size()) {
+        if (refList[expr->value].pin == PIN_CONSTANT) {
+            expr->value = "(" + clen + "'(" + expr->value + "))";
+            return;
+        }
+    }
     int len = atoi(clen.c_str());
     std::string cilen = exprWidth(expr);
     int ilen = atoi(cilen.c_str());
@@ -850,6 +858,34 @@ printf("[%s:%d] expr %s clen %s conv %s\n", __FUNCTION__, __LINE__, tree2str(exp
     else if (expr->value == "?") {
         updateWidth(getRHS(expr), clen);
         updateWidth(getRHS(expr, 2), clen);
+    }
+    else if (expr->value == "!" || expr->value == "^") {
+        for (auto item: expr->operands)
+            updateWidth(item, clen);
+    }
+    else if (expr->value == "||" || expr->value == "&&") {
+        for (auto item: expr->operands)
+            updateWidth(item, "1");
+    }
+    else if (relationalOp(expr->value)) {
+        std::string width;
+        bool performUpdate = true;
+        for (auto item: expr->operands) {
+            std::string val = tree2str(item);
+            int pin = refList[val].pin;
+            std::string size = exprWidth(item);
+            if (pin != PIN_CONSTANT) {
+                if (width == "")
+                    width = size;
+                if (width != size)
+                    performUpdate = false;
+            }
+        }
+        if (performUpdate && width != "")
+        for (auto item: expr->operands) {
+            if (width != exprWidth(item))
+                updateWidth(item, width);
+        }
     }
     else if (arithOp(expr->value) || expr->value == "(" || expr->value == "@-") {
         if (expr->value == "@-"

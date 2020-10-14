@@ -289,6 +289,7 @@ static ACCExpr *get1Token(void)
             getNext();
         } while (isdigit(lexChar) || lexChar == '.' || lexChar == '\'' || lexChar == 'b'
             || lexChar == 'h' || lexChar == 'd' || lexChar == 'o');
+        if (lexToken[lexToken.length()-1] == '\'') {
         if (lexChar == 'x') {
             do {
                 getNext();
@@ -300,8 +301,14 @@ static ACCExpr *get1Token(void)
             lexToken = lexToken.substr(2);
             lexToken = autostr(4 * lexToken.length()) + "'h" + lexToken;
         }
-        if (lexChar == 'U') // unsigned
+        else if (lexChar == 'U') // unsigned
             lexChar = lexString[lexIndex++]; // skip 'U'
+        else if (lexChar == '(') {
+            while(lexChar != ')')
+                getNext();
+            getNext();
+        }
+        }
     }
     else if (lexChar == '+' || lexChar == '-' || lexChar == '*' || lexChar == '&' || lexChar == '|')
         do {

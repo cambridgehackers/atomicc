@@ -95,7 +95,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
     int sPin = refList[valStr].pin;
-    if (trace_interface)
+    //if (trace_interface)
         printf("[%s:%d] start [%s/%d/%d]count[%d] = %s/%d/%d type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tPin, refList[target].count, valStr.c_str(), sDir, sPin, type.c_str());
     if (sPin == PIN_OBJECT && tPin != PIN_OBJECT) {
         value = allocExpr(target);
@@ -145,7 +145,7 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
     }
 }
 
-static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance)
+static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance, bool isParam)
 {
     std::string newtype = instantiateType(type, mapValue);
     vecCount = instantiateType(vecCount, mapValue);
@@ -155,6 +155,8 @@ static void addModulePort (ModList &modParam, std::string name, std::string type
         type = newtype;
     }
     int refPin = (instance != "" || isLocal) ? PIN_OBJECT: PIN_MODULE;
+    if (isParam)
+        refPin = PIN_CONSTANT;
     std::string instName = instance + name;
     if (trace_assign || trace_ports || trace_interface)
         printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d pin %d vecCount %s\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, refPin, vecCount.c_str());
@@ -187,13 +189,13 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
     for (auto MI: IR->methods) {
         std::string name = methodPrefix + MI->name;
         bool out = (instance != "") ^ isPtr;
-        addModulePort(modParam, name, MI->type, out ^ (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance);
+        addModulePort(modParam, name, MI->type, out ^ (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false);
         if (MI->action && !isEnaName(name))
-            addModulePort(modParam, name + "__ENA", "", out ^ (0), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance);
+            addModulePort(modParam, name + "__ENA", "", out ^ (0), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false);
         if (trace_ports)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), name.c_str(), MI->type.c_str());
         for (auto pitem: MI->params)
-            addModulePort(modParam, baseMethodName(name) + DOLLAR + pitem.name, pitem.type, out, false, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance);
+            addModulePort(modParam, baseMethodName(name) + DOLLAR + pitem.name, pitem.type, out, false, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, true);
     }
     if ((!localInterface || pinPrefix != "") && (pinPrefix == "" || !isVerilog))
     for (auto fld: IR->fields) {
@@ -212,10 +214,10 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
                     init = "0";
             }
             if (instance == "")
-                addModulePort(modParam, name, fld.isPtr ? "POINTER" : fld.type, out, fld.isInout, init, isLocal, true/*isArgument*/, vecCount, mapValue, instance);
+                addModulePort(modParam, name, fld.isPtr ? "POINTER" : fld.type, out, fld.isInout, init, isLocal, true/*isArgument*/, vecCount, mapValue, instance, true);
         }
         else
-            addModulePort(modParam, name, fld.type, out, fld.isInout, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance);
+            addModulePort(modParam, name, fld.type, out, fld.isInout, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, false);
     }
     for (FieldElement item : IR->interfaces) {
         MapNameValue imapValue;  // interface hoisting only deals with parameters for the interface itself (not containing module)
@@ -252,7 +254,7 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
         if (item.fldName == "" || isVerilog)
             collectInterfacePins(IIR, modParam, instance, pinPrefix + item.fldName, methodPrefix + item.fldName + DOLLAR, localFlag, imapValue, ptrFlag, updatedVecCount, localInterface, isVerilog);
         else
-            addModulePort(modParam, methodPrefix + item.fldName, type, out, false, ""/*not param*/, localFlag, false/*isArgument*/, updatedVecCount, mapValue, instance);
+            addModulePort(modParam, methodPrefix + item.fldName, type, out, false, ""/*not param*/, localFlag, false/*isArgument*/, updatedVecCount, mapValue, instance, false);
     }
 }
 
@@ -745,15 +747,18 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         methodName += "[" + tree2str(MI->subscript) + "]";
     generateSection = MI->generateSection;
     for (auto info: MI->storeList) {
-        walkRead(MI, info->cond, nullptr);
-        walkRead(MI, info->value, info->cond);
         std::string dest = info->dest->value;
+        ACCExpr *cond = info->cond;
+        ACCExpr *value = info->value;
+        walkRead(MI, cond, nullptr);
+        walkRead(MI, value, cond);
+        updateWidth(value, convertType(refList[dest].type));
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
-            ACCExpr *cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond));
-            appendMux(generateSection, dest, cond, info->value, "0");
+            cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), cond));
+            appendMux(generateSection, dest, cond, value, "0");
         }
         else
-            appendLine(methodName, info->cond, info->dest, info->value);
+            appendLine(methodName, cleanupBool(cond), info->dest, value);
     }
     for (auto info: MI->letList) {
         ACCExpr *cond = info->cond;
