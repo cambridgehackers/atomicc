@@ -21,12 +21,12 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+static int trace_accessible;//=1;
 int trace_interface;//=1;
 int trace_expand;//=1;
 int trace_parameters;//=1;
 int trace_IR;//=1;
 static int traceLookup;//=1;
-static int trace_accessible;//=1;
 std::map<std::string, ModuleIR *> mapIndex, interfaceIndex, mapAllModule;
 static std::map<std::string, ModuleIR *> mapStripped, interfaceStripped;
 
@@ -823,9 +823,7 @@ nextand:;
 
 void updateWidth(ACCExpr *expr, std::string clen)
 {
-    if (!expr || clen == "" || clen.find(" ") != std::string::npos)
-        return;
-    if (!isdigit(clen[0]))
+    if (!expr || clen == "" || !isdigit(clen[0]) || clen == "0" || clen.find(" ") != std::string::npos)
         return;
     if (isIdChar(expr->value[0]) && !expr->operands.size()) {
         if (refList[expr->value].pin == PIN_CONSTANT) {

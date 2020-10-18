@@ -21,6 +21,7 @@
 #include "AtomiccIR.h"
 #include "common.h"
 
+int trace_global;//= 1;
 int trace_assign;//= 1;
 int trace_declare;//= 1;
 int trace_ports;//= 1;
@@ -72,6 +73,8 @@ static void decRef(std::string name)
 static void setReference(std::string target, int count, std::string type, bool out = false, bool inout = false,
     int pin = PIN_WIRE, std::string vecCount = "", bool isArgument = false)
 {
+    if (trace_global)
+        printf("%s: target %s pin %d out %d inout %d type %s veccount %s count %d isArgument %d\n", __FUNCTION__, target.c_str(), pin, out, inout, type.c_str(), vecCount.c_str(), count, isArgument);
     if (lookupIR(type) != nullptr || lookupInterface(type) != nullptr || vecCount != "") {
         count += 1;
 printf("[%s:%d]STRUCT %s type %s vecCount %s\n", __FUNCTION__, __LINE__, target.c_str(), type.c_str(), vecCount.c_str());
@@ -89,14 +92,11 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     int tPin = refList[target].pin;
     if (!value)
         return;
-    //if (type == "Bit(1)") {
-        //value = cleanupBool(value);
-    //}
     std::string valStr = tree2str(value);
     bool sDir = refList[valStr].out;
     int sPin = refList[valStr].pin;
-    //if (trace_interface)
-        printf("[%s:%d] start [%s/%d/%d]count[%d] = %s/%d/%d type '%s'\n", __FUNCTION__, __LINE__, target.c_str(), tDir, tPin, refList[target].count, valStr.c_str(), sDir, sPin, type.c_str());
+    if (trace_interface || trace_global)
+        printf("%s: [%s/%d/%d]count[%d] = %s/%d/%d type '%s'\n", __FUNCTION__, target.c_str(), tDir, tPin, refList[target].count, valStr.c_str(), sDir, sPin, type.c_str());
     if (sPin == PIN_OBJECT && tPin != PIN_OBJECT) {
         value = allocExpr(target);
         target = valStr;
@@ -352,9 +352,17 @@ printf("[%s:%d] removedope %s relational %d operator %s orig %s\n", __FUNCTION__
 
 static void walkRef (ACCExpr *expr)
 {
+    bool skipRecursion = false;
     if (!expr)
         return;
     std::string item = expr->value;
+    if (item == PERIOD) {
+        item = tree2str(expr);
+        skipRecursion = true;
+    }
+bool foo = item == "bram$read__RDY" || item == "readMem.enq__RDY";
+if (foo)
+printf("[%s:%d]FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF %s %d\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].count);
     if (isIdChar(item[0])) {
         if (!startswith(item, "__inst$Genvar") && item != "$past") {
         std::string base = item;
@@ -363,8 +371,8 @@ static void walkRef (ACCExpr *expr)
             base = base.substr(0, ind);
         if (!refList[item].pin) {
             if (base != item) {
-                if (trace_assign)
-                    printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), item.c_str());
+                if (foo || trace_assign)
+                    printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, base.c_str(), item.c_str());
                 if(!refList[base].pin) {
                     printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
                     //exit(-1);
@@ -373,12 +381,13 @@ static void walkRef (ACCExpr *expr)
         }
         }
         refList[item].count++;
-        if (trace_assign)
-            printf("[%s:%d] inc count[%s]=%d\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].count);
         ACCExpr *temp = assignList[item].value;
+        if (foo || trace_assign)
+            printf("[%s:%d] inc count[%s]=%d temp '%s'\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].count, tree2str(temp).c_str());
         if (temp && refList[item].count == 1)
             walkRef(temp);
     }
+    if (!skipRecursion)
     for (auto item: expr->operands)
         walkRef(item);
 }
@@ -482,6 +491,7 @@ static void setAssignRefCount(ModuleIR *IR)
             printf("[%s:%d] %s: guard %s\n", __FUNCTION__, __LINE__, methodName.c_str(), tree2str(tcond.second.guard).c_str());
         auto info = tcond.second.info;
         tcond.second.info.clear();
+        walkRef(tcond.second.guard);
         for (auto &item : info) {
             ACCExpr *cond = cleanupBool(replaceAssign(item.second.cond));
             tcond.second.info[tree2str(cond)] = CondGroupInfo{cond, item.second.info};
@@ -666,6 +676,9 @@ static void connectMethods(ModuleIR *IR, std::string ainterfaceName, ACCExpr *ta
             interfaceName = interfaceName.substr(ind+1);
     }
     ModuleIR *IIR = lookupInterface(interfaceName);
+    if (!IIR) {
+        printf("[%s:%d] interface not found '%s' target %s source %s\n", __FUNCTION__, __LINE__, interfaceName.c_str(), tree2str(targetTree).c_str(), tree2str(sourceTree).c_str());
+    }
     assert(IIR);
     std::string ICtarget = tree2str(targetTree);
     std::string ICsource = tree2str(sourceTree);
@@ -812,7 +825,6 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         std::string section = generateSection;
         ACCExpr *cond = info->cond;
         ACCExpr *value = info->value;
-        walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         ACCExpr *param = nullptr;
         if (!(isIdChar(value->value[0]) && value->operands.size()
@@ -837,6 +849,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), //allocExpr(getRdyName(methodName)),
  cond));
         tempCond = cleanupBool(replaceAssign(simpleReplace(tempCond), getRdyName(calledEna))); // remove __RDY before adding subscript!
+        walkRead(MI, tempCond, nullptr);
         if (subscript) {
             std::string sub, post;
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
@@ -1074,13 +1087,14 @@ static void fixupModuleInstantiations(ModList &modLine)
             mapParam.clear();
         }
         else if (!skipReplace) {
-            std::string newValue = tree2str(assignList[val].value);
+            std::string assignValue = tree2str(assignList[val].value);
+            std::string newValue = assignValue;
             if (newValue == "")
                 newValue = mapParam[val];
             if (newValue == "")
                 newValue = interfaceMap[val].value;
-            if (trace_interface)
-                printf("[%s:%d] replaceParam %s: '%s' count %d done %d mapPort '%s' mapParam '%s' assign '%s'\n", __FUNCTION__, __LINE__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), mapParam[val].c_str(), newValue.c_str());
+            if (trace_interface || trace_global)
+                printf("%s: replaceParam %s: '%s' count %d done %d mapPort '%s' interfaceMap '%s' mapParam '%s' assign '%s'\n", __FUNCTION__, modname.c_str(), val.c_str(), refList[val].count, refList[val].done, mapPort[val].c_str(), interfaceMap[val].value.c_str(), mapParam[val].c_str(), newValue.c_str());
             int ind = val.find_first_of(PERIOD DOLLAR);
             if (newValue == "" && refList[val].count == 0 && ind > 1) {
                 std::string prefix = val.substr(0, ind);
@@ -1104,7 +1118,11 @@ static void fixupModuleInstantiations(ModList &modLine)
                 }
             }
             std::string oldVal = val;
-            if (mapParam[val] != "")
+            if (assignValue != "") {
+                val = assignValue;
+                decRef(mitem.value);
+            }
+            else if (mapParam[val] != "")
                 val = mapParam[val];
             else if (refList[val].count == 0 && interfaceMap[val].value != "") {
                 val = interfaceMap[val].value;
