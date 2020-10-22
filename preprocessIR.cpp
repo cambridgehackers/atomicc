@@ -144,8 +144,8 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
 static ModuleIR *buildGeneric(ModuleIR *IR, std::string irName, std::list<PARAM_MAP> &paramMap, bool isInterface)
 {
 static int counter;
-    if (!(startswith(irName, "PipeIn(") || startswith(irName, "PipeInB(")
-     || startswith(irName, "PipeOut(")))
+    //if (!(startswith(irName, "PipeIn(") || startswith(irName, "PipeInLast(") || startswith(irName, "PipeInLength(")
+     //|| startswith(irName, "PipeOut(")))
     if (isInterface) {
         std::string sub;
         int ind = irName.find("(");
