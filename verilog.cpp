@@ -1186,6 +1186,7 @@ static ModList modLine;
     std::string traceDataGather, traceDataType;
     if (IR->isTrace) {
         ACCExpr *gather = allocExpr(","), *length = allocExpr("+");
+        ACCExpr *gatherp = allocExpr(","), *lengthp = allocExpr("+");
         for (auto mitem: modLineTop) {
             std::string name = mitem.value;
             if (mitem.moduleStart || mitem.isparam != "" || name == "CLK" || name == "nRST")
@@ -1197,8 +1198,8 @@ static ModList modLine;
                     std::string mprefix = prefix + baseMethodName(method->name) + DOLLAR;
                     length->operands.push_back(allocExpr((method->type == "") ? "1" : convertType(method->type)));
                     for (auto &param: method->params) {
-                        gather->operands.push_back(allocExpr(mprefix + param.name));
-                        length->operands.push_back(allocExpr(convertType(param.type)));
+                        gatherp->operands.push_back(allocExpr(mprefix + param.name));
+                        lengthp->operands.push_back(allocExpr(convertType(param.type)));
                     }
                 }
             }
@@ -1207,16 +1208,34 @@ static ModList modLine;
                 length->operands.push_back(allocExpr(convertType(mitem.type)));
             }
         }
-        traceDataGather = "{32'd0," + tree2str(gather) + "}";
-        std::string totalLength = tree2str(length);
+        std::string sensitivity = tree2str(length, false);
+        for (auto item: lengthp->operands)
+            length->operands.push_back(item);
+        for (auto item: gatherp->operands)
+            gather->operands.push_back(item);
+        traceDataGather = "{32'd0," + tree2str(gather, false) + "}";
+        std::string totalLength = tree2str(length, false);
         length->value = ",";
-        std::string interpretString = tree2str(length);
-        traceDataType = "Trace(width=(" + totalLength + "+32), depth=" + autostr(IR->isTrace) + ")";
+        std::string interpretString = tree2str(length, false);
+        traceDataType = "Trace(width=(" + totalLength + "+32), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
         IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
 printf("gather %s\n", traceDataGather.c_str());
 printf("interpret %s\n", interpretString.c_str());
 printf("total %s\n", totalLength.c_str());
 printf("traceDataType %s\n", traceDataType.c_str());
+        std::string filename = IR->name;
+        int ind = filename.find("(");
+        if (ind > 0)
+            filename = filename.substr(0, ind);
+        FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
+        fprintf(traceDataFile, "\nstatic int width[] = {32,\n");
+        for (auto item: length->operands)
+            fprintf(traceDataFile, " %s,", item->value.c_str());
+        fprintf(traceDataFile, "-1};\nstatic const char *fullname[] = {\"TIME\",\n");
+        for (auto item: gather->operands)
+            fprintf(traceDataFile, " \"%s\",", item->value.c_str());
+        fprintf(traceDataFile, "};\n");
+        fclose(traceDataFile);
     }
 
     for (auto item: IR->fields) {
