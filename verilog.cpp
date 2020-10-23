@@ -1228,13 +1228,14 @@ printf("traceDataType %s\n", traceDataType.c_str());
         if (ind > 0)
             filename = filename.substr(0, ind);
         FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
-        fprintf(traceDataFile, "\nstatic int width[] = {32,\n");
-        for (auto item: length->operands)
-            fprintf(traceDataFile, " %s,", item->value.c_str());
-        fprintf(traceDataFile, "-1};\nstatic const char *fullname[] = {\"TIME\",\n");
-        for (auto item: gather->operands)
-            fprintf(traceDataFile, " \"%s\",", item->value.c_str());
-        fprintf(traceDataFile, "};\n");
+        fprintf(traceDataFile, "%d\nTIME 32\n", (int)length->operands.size()+1);
+        auto litem = length->operands.begin();
+        auto gitem = gather->operands.begin();
+        while (litem != length->operands.end()) {
+            fprintf(traceDataFile, "%s %s\n", (*gitem)->value.c_str(), (*litem)->value.c_str());
+            litem++;
+            gitem++;
+        }
         fclose(traceDataFile);
     }
 
