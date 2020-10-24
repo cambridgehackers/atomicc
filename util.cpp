@@ -553,7 +553,7 @@ ModuleIR *allocIR(std::string name, bool isInterface)
         {}/*generateBody*/, {}/*priority*/, {}/*fields*/,
         {}/*params*/, {}/*unionList*/, {}/*interfaces*/, {}/*parameters*/,
         {}/*interfaceConnect*/, 0/*genvarCount*/, 0/*isTrace*/, false/*isExt*/, isInterface,
-        false/*isStruct*/, false/*isSerialize*/, false/*isVerilog*/, false/*isPrintf*/, false/*transformGeneric*/,
+        false/*isStruct*/, false/*isSerialize*/, false/*isVerilog*/, false/*isPrintf*/, false/*isTopModule*/, false/*transformGeneric*/,
         "" /*interfaceVecCount*/, "" /*interfaceName*/, ""/*sourceFilename*/};
 
     if (isInterface)

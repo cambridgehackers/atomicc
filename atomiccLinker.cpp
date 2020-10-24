@@ -66,7 +66,7 @@ static void recurseObject(std::string name, ModuleIR *IR, std::string vecCount)
     if (name != "")
         name += PERIOD;
     for (auto item: IR->fields) {
-        if (item.type == "Printf") {
+        if (item.type == "Printf" || startswith(item.type, "Trace") ) {
 printf("[%s:%d] NAMEMEM %s FIELD %s\n", __FUNCTION__, __LINE__, name.c_str(), item.fldName.c_str());
             std::string fieldName = item.fldName;
             //if (startswith(fieldName, "printfp"))

@@ -1217,7 +1217,7 @@ static ModList modLine;
         std::string totalLength = tree2str(length, false);
         length->value = ",";
         std::string interpretString = tree2str(length, false);
-        traceDataType = "Trace(width=(" + totalLength + "+32), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
+        traceDataType = "Trace(width=(32+" + totalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
         IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
 printf("gather %s\n", traceDataGather.c_str());
 printf("interpret %s\n", interpretString.c_str());
@@ -1228,7 +1228,7 @@ printf("traceDataType %s\n", traceDataType.c_str());
         if (ind > 0)
             filename = filename.substr(0, ind);
         FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
-        fprintf(traceDataFile, "%d\nTIME 32\n", (int)length->operands.size()+1);
+        fprintf(traceDataFile, "COUNT %d\nTIME 32\n", (int)length->operands.size()+1);
         auto litem = length->operands.begin();
         auto gitem = gather->operands.begin();
         while (litem != length->operands.end()) {
@@ -1260,6 +1260,7 @@ printf("traceDataType %s\n", traceDataType.c_str());
        setAssign("__traceMemory$nRST", allocExpr("nRST"), "Bit(1)");
        setAssign("__traceMemory$data", allocExpr(traceDataGather), traceDataType);
        setAssign("__traceMemory$enable", allocExpr("1"), "Bit(1)");
+       refList["__traceMemory$out"].count++;  // force allocation so that we can hierarchically reference later
     }
 
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above

@@ -181,6 +181,7 @@ typedef struct ModuleIR {
     bool                              isSerialize;
     bool                              isVerilog;
     bool                              isPrintf;
+    bool                              isTopModule;
     bool                              transformGeneric;
     std::string                       interfaceVecCount;
     std::string                       interfaceName;
