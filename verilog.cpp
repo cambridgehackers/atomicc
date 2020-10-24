@@ -1214,10 +1214,10 @@ static ModList modLine;
         for (auto item: gatherp->operands)
             gather->operands.push_back(item);
         traceDataGather = "{32'd0," + tree2str(gather, false) + "}";
-        std::string totalLength = tree2str(length, false);
+        std::string totalLength = "32+" + tree2str(length, false);
         length->value = ",";
         std::string interpretString = tree2str(length, false);
-        traceDataType = "Trace(width=(32+" + totalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
+        traceDataType = "Trace(width=(" + totalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
         IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
 printf("gather %s\n", traceDataGather.c_str());
 printf("interpret %s\n", interpretString.c_str());
@@ -1228,6 +1228,7 @@ printf("traceDataType %s\n", traceDataType.c_str());
         if (ind > 0)
             filename = filename.substr(0, ind);
         FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
+        fprintf(traceDataFile, "WIDTH %s\nDEPTH %d\n", totalLength.c_str(), IR->isTrace);
         fprintf(traceDataFile, "COUNT %d\nTIME 32\n", (int)length->operands.size()+1);
         auto litem = length->operands.begin();
         auto gitem = gather->operands.begin();
