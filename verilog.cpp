@@ -1229,7 +1229,7 @@ printf("traceDataType %s\n", traceDataType.c_str());
             filename = filename.substr(0, ind);
         FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
         fprintf(traceDataFile, "WIDTH %s\nDEPTH %d\n", totalLength.c_str(), IR->isTrace);
-        fprintf(traceDataFile, "COUNT %d\nTIME 32\n", (int)length->operands.size()+1);
+        fprintf(traceDataFile, "COUNT %d\n------------\nTIME 32\n", (int)length->operands.size()+1);
         auto litem = length->operands.begin();
         auto gitem = gather->operands.begin();
         while (litem != length->operands.end()) {
