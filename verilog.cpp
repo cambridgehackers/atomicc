@@ -549,7 +549,10 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
             CI.second.info.push_back(CondInfo{dest, value});
             return;
         }
-    element.guard = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), allocExpr(getRdyName(methodName))));
+    ACCExpr * econd = allocExpr("&&", allocExpr(getRdyName(methodName)));
+    if (isEnaName(methodName))
+        econd->operands.push_back(allocExpr(methodName));
+    element.guard = cleanupBool(econd);
     element.info[tree2str(cond)].cond = cond;
     element.info[tree2str(cond)].info.push_back(CondInfo{dest, value});
 }
@@ -766,7 +769,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         walkRead(MI, value, cond);
         updateWidth(value, convertType(refList[dest].type));
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
-            cond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), cond));
+            cond = cleanupBool(allocExpr("&&", allocExpr(methodName), cond));
             appendMux(generateSection, dest, cond, value, "0");
         }
         else
@@ -783,7 +786,8 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         auto alloca = MI->alloca.find(root);
         if (alloca == MI->alloca.end()) {
 //printf("[%s:%d] LEEEEEEEEEEEEETTTTTTTTTTTTTTTTTTTTTTTTTTTTT not alloca %s\n", __FUNCTION__, __LINE__, root.c_str());
-            cond = allocExpr("&&", allocExpr(getEnaName(methodName)), info->cond);
+            if (isEnaName(methodName))
+                cond = allocExpr("&&", allocExpr(methodName), cond);
         }
         cond = cleanupBool(cond);
         walkRead(MI, cond, nullptr);
@@ -845,7 +849,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         }
         if (!info->isAction)
             continue;
-        ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(getEnaName(methodName)), //allocExpr(getRdyName(methodName)),
+        ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(methodName), //allocExpr(getRdyName(methodName)),
  cond));
         tempCond = cleanupBool(replaceAssign(simpleReplace(tempCond), getRdyName(calledEna))); // remove __RDY before adding subscript!
         walkRead(MI, tempCond, nullptr);
@@ -1242,11 +1246,15 @@ static ModList modLine;
                 continue;
             std::string prefix = mitem.value + PERIOD;
             if (ModuleIR *IIR = lookupInterface(mitem.type)) {
-                for (auto method : IIR->methods) {
-                    gather->operands.push_back(allocExpr(prefix + method->name));
-                    std::string mprefix = prefix + baseMethodName(method->name) + DOLLAR;
-                    length->operands.push_back(allocExpr((method->type == "") ? "1" : convertType(method->type)));
-                    for (auto &param: method->params) {
+                for (auto MI : IIR->methods) {
+                    std::string mname = MI->name;
+                    if (isEnaName(mname) || isRdyName(mname))
+                        gather->operands.push_back(allocExpr(prefix + MI->name));
+                    else
+                        lengthp->operands.push_back(allocExpr(prefix + MI->name));
+                    std::string mprefix = prefix + baseMethodName(MI->name) + DOLLAR;
+                    length->operands.push_back(allocExpr((MI->type == "") ? "1" : convertType(MI->type)));
+                    for (auto &param: MI->params) {
                         gatherp->operands.push_back(allocExpr(mprefix + param.name));
                         lengthp->operands.push_back(allocExpr(convertType(param.type)));
                     }
