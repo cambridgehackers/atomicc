@@ -360,9 +360,7 @@ static void walkRef (ACCExpr *expr)
         item = tree2str(expr);
         skipRecursion = true;
     }
-bool foo = item == "bram$read__RDY" || item == "readMem.enq__RDY";
-if (foo)
-printf("[%s:%d]FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF %s %d\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].count);
+//printf("[%s:%d]FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF %s count %d pin %d\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].count, refList[item].pin);
     if (isIdChar(item[0])) {
         if (!startswith(item, "__inst$Genvar") && item != "$past") {
         std::string base = item;
@@ -371,7 +369,7 @@ printf("[%s:%d]FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
             base = base.substr(0, ind);
         if (!refList[item].pin) {
             if (base != item) {
-                if (foo || trace_assign)
+                if (trace_assign)
                     printf("[%s:%d] RRRRREFFFF %s -> %s\n", __FUNCTION__, __LINE__, base.c_str(), item.c_str());
                 if(!refList[base].pin) {
                     printf("[%s:%d] refList[%s] definition missing\n", __FUNCTION__, __LINE__, item.c_str());
@@ -382,7 +380,7 @@ printf("[%s:%d]FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         }
         refList[item].count++;
         ACCExpr *temp = assignList[item].value;
-        if (foo || trace_assign)
+        if (trace_assign)
             printf("[%s:%d] inc count[%s]=%d temp '%s'\n", __FUNCTION__, __LINE__, item.c_str(), refList[item].count, tree2str(temp).c_str());
         if (temp && refList[item].count == 1)
             walkRef(temp);
@@ -456,6 +454,7 @@ static ACCExpr *simpleReplace(ACCExpr *expr)
             if (trace_interface)
             printf("[%s:%d] replace %s with %s\n", __FUNCTION__, __LINE__, item.c_str(), tree2str(assignValue).c_str());
             decRef(item);
+            walkRef(assignValue);
             return simpleReplace(assignValue);
         }
     }
@@ -934,7 +933,98 @@ static void interfaceAssign(std::string target, ACCExpr *source, std::string typ
     }
 }
 
-static void prepareMethodGuards(ModuleIR *IR)
+static void generateField(ModuleIR *IR, ModList &modLine, FieldElement &item)
+{
+    ModuleIR *itemIR = lookupIR(item.type);
+    if (!itemIR || item.isPtr || itemIR->isStruct)
+        setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount);
+    else {
+//printf("[%s:%d] INSTANTIATEFIELD type %s fldName %s veccount %s\n", __FUNCTION__, __LINE__, item.type.c_str(), item.fldName.c_str(), item.vecCount.c_str());
+        generateModuleSignature(item.type, item.fldName + DOLLAR, modLine, "(" + IR->moduleParams[item.fldName] + ")", item.vecCount);
+    }
+}
+
+static ACCExpr *generateSubscriptReference(ModuleIR *IR, ModList &modLine, std::string name)
+{
+    fixupAccessible(name);
+    std::string type, nameVec = refList[name].vecCount;
+    std::string orig = name;
+    ACCExpr *subExpr = nullptr;
+    MapNameValue mapValue;
+    MethodInfo *MI = lookupQualName(IR, name, nameVec, mapValue);
+    if (MI)
+        type = MI->type;
+    if (isIdChar(name[0]) && nameVec != "" && type != "") {
+        int ind = name.find("[");
+        std::string sub;
+        if (ind > 0) {
+            extractSubscript(name, ind, sub);
+            subExpr = str2tree(sub);
+            subExpr = (subExpr && subExpr->operands.size() == 1) ? subExpr->operands.front() : nullptr;
+//dumpExpr("SUBB", subExpr);
+        }
+//printf("[%s:%d] name %s sub %s namevec %s\n", __FUNCTION__, __LINE__, name.c_str(), sub.c_str(), nameVec.c_str());
+        if (subExpr && isdigit(subExpr->value[0]))
+            return nullptr; //allocExpr(orig);
+    }
+    else
+        return nullptr; //allocExpr(orig);
+    int ind;
+    std::string newName = name;
+    while ((ind = newName.find(PERIOD)) > 0)
+        newName = newName.substr(0, ind) + "__" + newName.substr(ind+1);  // to defeat the walkAccessible() processing, use "__"
+    std::string name_or = newName + "_or";       // convert unpacked array to vector
+    std::string name_or1 = name_or + "1";
+    if (!refList[name_or].pin) {
+        // adding a space to the 'name_or' declaration forces the
+        // code generator to emit bitvector dimensions explicitly,
+        // to that the subscripted 'setAssign' below compiles correctly
+        // (you can use 'foo[0]' if the declaration is 'wire [0:0] foo',
+        // but not if the declaration is 'wire foo').  Hmm...
+        setReference(name_or, 99, type, false, false, PIN_WIRE, nameVec);
+        setReference(name_or1, 99, type);
+        std::string objectName = name_or + "CC";
+        IR->fields.push_back(FieldElement{objectName, "", "SelectIndex(width=" + convertType(type) + ",funnelWidth=" + nameVec + ")", false, false, false, false, "", false, false, false});
+        generateField(IR, modLine, IR->fields.back());
+        objectName += DOLLAR;
+        setAssign(objectName + "out", allocExpr(name_or1), type);
+        setAssign(objectName + "in", allocExpr(name_or), type);
+        setAssign(objectName + "index", subExpr, "Bit(32)");
+        ACCExpr *var = allocExpr(GENVAR_NAME "1");
+        genvarMap[var->value] = 1;
+        generateSection = makeSection(var->value, allocExpr("0"),
+            allocExpr("<", var, allocExpr(nameVec)), allocExpr("+", var, allocExpr("1")));
+        std::string newSub = "[" + var->value + "]";
+        ind = name.find(PERIOD);
+        if (ind > 0)
+            name = name.substr(0, ind) + newSub + name.substr(ind);
+        else
+            name = name + newSub;
+        setAssign(name_or + newSub, allocExpr(name), "Bit(1)");
+        generateSection = "";
+    }
+    return allocExpr(name_or1);
+}
+
+static ACCExpr *walkSubscriptReference(ModuleIR *IR, ModList &modLine, ACCExpr *expr)
+{
+    std::string value = expr->value;
+    bool recurse = true;
+    if (value == PERIOD) {
+        value = tree2str(expr);
+        recurse = false;
+    }
+printf("[%s:%d] exprval %s value %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), value.c_str());
+    ACCExpr *ret = generateSubscriptReference(IR, modLine, value);
+    if (!ret)
+        return expr;
+    if (recurse)
+        for (auto item: expr->operands)
+            ret->operands.push_back(walkSubscriptReference(IR, modLine, item));
+    return ret;
+}
+
+static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
 {
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
@@ -981,61 +1071,13 @@ static void prepareMethodGuards(ModuleIR *IR)
             std::string name = item->value->value;
             if (name == "__finish" || name == "$past")
                 return;
-            fixupAccessible(name);
+            //ACCExpr *value = generateSubscriptReference(IR, modLine, getRdyName(name));
             name = getRdyName(name);
-            std::string nameVec = refList[name].vecCount;
-            MapNameValue mapValue;
-            lookupQualName(IR, name, nameVec, mapValue);
-            if (isIdChar(name[0]) && nameVec != "") {
-                int ind = name.find("[");
-                std::string orig = name;
-                std::string sub;
-                ACCExpr *subExpr = nullptr;
-                if (ind > 0) {
-                    extractSubscript(name, ind, sub);
-                    subExpr = str2tree(sub);
-                    subExpr = (subExpr && subExpr->operands.size() == 1) ? subExpr->operands.front() : nullptr;
-//dumpExpr("SUBB", subExpr);
-                }
-//printf("[%s:%d] orig %s name %s sub %s namevec %s\n", __FUNCTION__, __LINE__, orig.c_str(), name.c_str(), sub.c_str(), nameVec.c_str());
-                if (subExpr && isdigit(subExpr->value[0])) {
-                    name = orig;
-                }
-                else {
-                std::string newName = name;
-                while ((ind = newName.find(PERIOD)) > 0)
-                    newName = newName.substr(0, ind) + "__" + newName.substr(ind+1);  // to defeat the walkAccessible() processing, use "__"
-                std::string name_or = newName + "_or";       // convert unpacked array to vector
-                std::string name_or1 = name_or + "1";
-                if (!refList[name_or].pin) {
-                    // adding a space to the 'name_or' declaration forces the
-                    // code generator to emit bitvector dimensions explicitly,
-                    // to that the subscripted 'setAssign' below compiles correctly
-                    // (you can use 'foo[0]' if the declaration is 'wire [0:0] foo',
-                    // but not if the declaration is 'wire foo').  Hmm...
-                    setReference(name_or, 99, "Bit( " + nameVec + ")");
-                    setReference(name_or1, 99, "Bit(1)");
-                    setAssign(name_or1, allocExpr("@|", allocExpr(name_or)), "Bit(1)");
-                    assignList[name_or1].noRecursion = true;
-                    ACCExpr *var = allocExpr(GENVAR_NAME "1");
-                    generateSection = makeSection(var->value, allocExpr("0"),
-                        allocExpr("<", var, allocExpr(nameVec)), allocExpr("+", var, allocExpr("1")));
-                    std::string newSub = "[" + var->value + "]";
-                    ind = name.find(PERIOD);
-                    if (ind > 0)
-                        name = name.substr(0, ind) + newSub + name.substr(ind);
-                    else
-                        name = name + newSub;
-                    setAssign(name_or + newSub, allocExpr(name), "Bit(1)");
-                    generateSection = "";
-                }
-                name = name_or1;
-                }
-            }
-            ACCExpr *tempCond = allocExpr(name);
+            fixupAccessible(name);
+            ACCExpr *value = allocExpr(name);
             if (item->cond)
-                tempCond = allocExpr("|", walkRemoveParam(invertExpr(item->cond)), tempCond);
-            MIRdy->guard = cleanupBool(allocExpr("&&", MIRdy->guard, tempCond));
+                value = allocExpr("|", walkRemoveParam(invertExpr(item->cond)), value);
+            MIRdy->guard = cleanupBool(allocExpr("&&", MIRdy->guard, value));
         };
         for (auto item: MI->callList)
             appendGuard(item);
@@ -1052,6 +1094,10 @@ static void prepareMethodGuards(ModuleIR *IR)
             for (auto item: MIb->callList)
                 appendGuard(item);
         }
+        }
+
+        if (MI->type != "") {
+            MI->guard = walkSubscriptReference(IR, modLine, MI->guard);
         }
     }
 }
@@ -1087,7 +1133,8 @@ static void fixupModuleInstantiations(ModList &modLine)
             mapParam.clear();
         }
         else if (!skipReplace) {
-            std::string assignValue = tree2str(assignList[val].value);
+            ACCExpr *assignExpr = assignList[val].value;
+            std::string assignValue = tree2str(assignExpr);
             std::string newValue = assignValue;
             if (newValue == "")
                 newValue = mapParam[val];
@@ -1121,6 +1168,7 @@ static void fixupModuleInstantiations(ModList &modLine)
             if (assignValue != "") {
                 val = assignValue;
                 decRef(mitem.value);
+                walkRef(assignExpr);
             }
             else if (mapParam[val] != "")
                 val = mapParam[val];
@@ -1132,6 +1180,7 @@ static void fixupModuleInstantiations(ModList &modLine)
             else if (mapPort[val] != "") {
                 val = mapPort[val];
                 decRef(mitem.value);
+                walkRef(str2tree(val));
             }
             else if (refList[val].count) {
                 val = tree2str(replaceAssign(allocExpr(val)));
@@ -1240,14 +1289,8 @@ printf("traceDataType %s\n", traceDataType.c_str());
         fclose(traceDataFile);
     }
 
-    for (auto item: IR->fields) {
-        ModuleIR *itemIR = lookupIR(item.type);
-        if (!itemIR || item.isPtr || itemIR->isStruct)
-            setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount);
-        else {
-//printf("[%s:%d] INSTANTIATEFIELD type %s fldName %s veccount %s\n", __FUNCTION__, __LINE__, item.type.c_str(), item.fldName.c_str(), item.vecCount.c_str());
-            generateModuleSignature(item.type, item.fldName + DOLLAR, modLine, "(" + IR->moduleParams[item.fldName] + ")", item.vecCount);
-        }
+    for (auto &item: IR->fields) {
+        generateField(IR, modLine, item);
     }
     for (auto item : syncPins) {
         std::string oldName = item.first;
@@ -1270,7 +1313,7 @@ printf("traceDataType %s\n", traceDataType.c_str());
         }
     }
     buildAccessible(IR);
-    prepareMethodGuards(IR);
+    prepareMethodGuards(IR, modLine);
 
     // generate wires for internal methods RDY/ENA.  Collect state element assignments
     // from each method

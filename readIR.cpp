@@ -436,6 +436,7 @@ interface, isStruct, isSerialize, ext);
             }
             else if (checkItem("FIELD")) {
                 std::string vecCount;
+                bool        isPtr = checkItem("/Ptr");
                 bool        isInput = checkItem("/input");
                 bool        isOutput = checkItem("/output");
                 bool        isInout = checkItem("/inout");
@@ -446,7 +447,6 @@ interface, isStruct, isSerialize, ext);
                     vecCount = tree2str(getExpression(' '));
                     IR->genvarCount = 1;
                 }
-                bool        isPtr = checkItem("/Ptr");
                 std::string type = getType();
                 std::string fldName = getToken();
                 IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter ? " " : "", isShared, false, isExternal});
