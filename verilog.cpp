@@ -145,7 +145,7 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
     }
 }
 
-static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance, bool isParam)
+static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance, bool isParam, bool isTrigger = false)
 {
     std::string newtype = instantiateType(type, mapValue);
     vecCount = instantiateType(vecCount, mapValue);
@@ -168,9 +168,9 @@ static void addModulePort (ModList &modParam, std::string name, std::string type
     }
     if (!isLocal) {
         if (isparam != "")
-            modParam.insert(moduleParameter, ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
+            modParam.insert(moduleParameter, ModData{name, instName, type, false, false, dir, inout, isTrigger, isparam, vecCount});
         else {
-            modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isparam, vecCount});
+            modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isTrigger, isparam, vecCount});
             if (moduleParameter == modParam.end())
                 moduleParameter--;
         }
@@ -189,13 +189,13 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
     for (auto MI: IR->methods) {
         std::string name = methodPrefix + MI->name;
         bool out = (instance != "") ^ isPtr;
-        addModulePort(modParam, name, MI->type, out ^ (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false);
+        addModulePort(modParam, name, MI->type, out ^ (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, MI->action || isEnaName(name) || isRdyName(name));
         if (MI->action && !isEnaName(name))
-            addModulePort(modParam, name + "__ENA", "", out ^ (0), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false);
+            addModulePort(modParam, name + "__ENA", "", out ^ (0), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, true);
         if (trace_ports)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), name.c_str(), MI->type.c_str());
         for (auto pitem: MI->params)
-            addModulePort(modParam, baseMethodName(name) + DOLLAR + pitem.name, pitem.type, out, false, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, true);
+            addModulePort(modParam, baseMethodName(name) + DOLLAR + pitem.name, pitem.type, out, false, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, true, false);
     }
     if ((!localInterface || pinPrefix != "") && (pinPrefix == "" || !isVerilog))
     for (auto fld: IR->fields) {
@@ -217,7 +217,7 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
                 addModulePort(modParam, name, fld.isPtr ? "POINTER" : fld.type, out, fld.isInout, init, isLocal, true/*isArgument*/, vecCount, mapValue, instance, true);
         }
         else
-            addModulePort(modParam, name, fld.type, out, fld.isInout, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, false);
+            addModulePort(modParam, name, fld.type, out, fld.isInout, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, false, true);
     }
     for (FieldElement item : IR->interfaces) {
         MapNameValue imapValue;  // interface hoisting only deals with parameters for the interface itself (not containing module)
@@ -294,7 +294,7 @@ static void generateModuleSignature(std::string moduleName, std::string instance
         moduleInstantiation = genericModuleParam(moduleName, moduleParams, nullptr);
     handleCLK = true;
     findCLK(implements, "", IR->isVerilog);
-    modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, !handleCLK, 0, false, ""/*not param*/, vecCount});
+    modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, !handleCLK, 0, false, false, ""/*not param*/, vecCount});
     moduleParameter = modParam.end();
 
     MapNameValue mapValue, mapValueMod;
@@ -1196,7 +1196,7 @@ static void fixupModuleInstantiations(ModList &modLine)
             if (trace_interface)
                 printf("[%s:%d] newval %s\n", __FUNCTION__, __LINE__, val.c_str());
         }
-        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, ""/*not param*/, mitem.vecCount});
+        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, mitem.trigger, ""/*not param*/, mitem.vecCount});
     }
 }
 
@@ -1236,7 +1236,7 @@ static ModList modLine;
         if (!hasnRST)
             setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
     }
-    std::string traceDataGather, traceDataType;
+    std::string traceDataGather, traceDataType, traceTotalLength;
     if (IR->isTrace) {
         ACCExpr *gather = allocExpr(","), *length = allocExpr("+");
         ACCExpr *gatherp = allocExpr(","), *lengthp = allocExpr("+");
@@ -1248,12 +1248,16 @@ static ModList modLine;
             if (ModuleIR *IIR = lookupInterface(mitem.type)) {
                 for (auto MI : IIR->methods) {
                     std::string mname = MI->name;
-                    if (isEnaName(mname) || isRdyName(mname))
+                    ACCExpr *len = allocExpr((MI->type == "") ? "1" : convertType(MI->type));
+                    if (isEnaName(mname) || isRdyName(mname)) {
                         gather->operands.push_back(allocExpr(prefix + MI->name));
-                    else
-                        lengthp->operands.push_back(allocExpr(prefix + MI->name));
+                        length->operands.push_back(len);
+                    }
+                    else {
+                        gatherp->operands.push_back(allocExpr(prefix + MI->name));
+                        lengthp->operands.push_back(len);
+                    }
                     std::string mprefix = prefix + baseMethodName(MI->name) + DOLLAR;
-                    length->operands.push_back(allocExpr((MI->type == "") ? "1" : convertType(MI->type)));
                     for (auto &param: MI->params) {
                         gatherp->operands.push_back(allocExpr(mprefix + param.name));
                         lengthp->operands.push_back(allocExpr(convertType(param.type)));
@@ -1261,8 +1265,16 @@ static ModList modLine;
                 }
             }
             else {
-                gather->operands.push_back(allocExpr(name));
-                length->operands.push_back(allocExpr(convertType(mitem.type)));
+                ACCExpr *len = allocExpr((mitem.type == "") ? "1" : convertType(mitem.type));
+                ACCExpr *nexpr = allocExpr(name);
+                if (mitem.trigger) {
+                    gather->operands.push_back(nexpr);
+                    length->operands.push_back(len);
+                }
+                else {
+                    gatherp->operands.push_back(nexpr);
+                    lengthp->operands.push_back(len);
+                }
             }
         }
         std::string sensitivity = tree2str(length, false);
@@ -1271,21 +1283,21 @@ static ModList modLine;
         for (auto item: gatherp->operands)
             gather->operands.push_back(item);
         traceDataGather = "{32'd0," + tree2str(gather, false) + "}";
-        std::string totalLength = "32+" + tree2str(length, false);
+        std::string traceTotalLength = "32+" + tree2str(length, false);
         length->value = ",";
         std::string interpretString = tree2str(length, false);
-        traceDataType = "Trace(width=(" + totalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
+        traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
         IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
 printf("gather %s\n", traceDataGather.c_str());
 printf("interpret %s\n", interpretString.c_str());
-printf("total %s\n", totalLength.c_str());
+printf("total %s\n", traceTotalLength.c_str());
 printf("traceDataType %s\n", traceDataType.c_str());
         std::string filename = IR->name;
         int ind = filename.find("(");
         if (ind > 0)
             filename = filename.substr(0, ind);
         FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
-        fprintf(traceDataFile, "WIDTH %s\nDEPTH %d\n", totalLength.c_str(), IR->isTrace);
+        fprintf(traceDataFile, "WIDTH %s\nDEPTH %d\n", traceTotalLength.c_str(), IR->isTrace);
         fprintf(traceDataFile, "COUNT %d\n------------\nTIME 32\n", (int)length->operands.size()+1);
         auto litem = length->operands.begin();
         auto gitem = gather->operands.begin();
@@ -1303,14 +1315,14 @@ printf("traceDataType %s\n", traceDataType.c_str());
     for (auto item : syncPins) {
         std::string oldName = item.first;
         std::string newName = item.second.name;
-        modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, "", ""});
-        modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, "", ""});
-        modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, "", ""});
+        modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, false, "", ""});
+        modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, false, "", ""});
+        modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, false, "", ""});
     }
     if (traceDataGather != "") {
        setAssign("__traceMemory$CLK", allocExpr("CLK"), "Bit(1)");
        setAssign("__traceMemory$nRST", allocExpr("nRST"), "Bit(1)");
-       setAssign("__traceMemory$data", allocExpr(traceDataGather), traceDataType);
+       setAssign("__traceMemory$data", allocExpr(traceDataGather), "Bit(" + traceTotalLength + ")");
        setAssign("__traceMemory$enable", allocExpr("1"), "Bit(1)");
        refList["__traceMemory$out"].count++;  // force allocation so that we can hierarchically reference later
     }

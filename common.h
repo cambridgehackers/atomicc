@@ -49,7 +49,7 @@ typedef struct {
     bool        noDefaultClock;
     int         out;
     bool        inout;
-    //bool        isparam;
+    bool        trigger;
     std::string isparam;     // initial value for parameters
     std::string vecCount;
 } ModData;
