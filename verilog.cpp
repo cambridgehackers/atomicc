@@ -145,7 +145,7 @@ static void walkRead (MethodInfo *MI, ACCExpr *expr, ACCExpr *cond)
     }
 }
 
-static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance, bool isParam, bool isTrigger = false)
+static void addModulePort (ModList &modParam, std::string name, std::string type, int dir, bool inout, std::string isparam, bool isLocal, bool isArgument, std::string vecCount, MapNameValue &mapValue, std::string instance, bool isParam, bool isTrigger)
 {
     std::string newtype = instantiateType(type, mapValue);
     vecCount = instantiateType(vecCount, mapValue);
@@ -159,7 +159,7 @@ static void addModulePort (ModList &modParam, std::string name, std::string type
         refPin = PIN_CONSTANT;
     std::string instName = instance + name;
     if (trace_assign || trace_ports || trace_interface)
-        printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d pin %d vecCount %s\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, refPin, vecCount.c_str());
+        printf("[%s:%d] instance '%s' iName %s name %s type %s dir %d io %d ispar '%s' isLoc %d pin %d vecCount %s isParam %d\n", __FUNCTION__, __LINE__, instance.c_str(), instName.c_str(), name.c_str(), type.c_str(), dir, inout, isparam.c_str(), isLocal, refPin, vecCount.c_str(), isParam);
     fixupAccessible(instName);
     if (!isLocal || instance == "") {
         setReference(instName, (dir != 0 || inout) && instance == "", type, dir != 0, inout, refPin, vecCount, isArgument);
@@ -195,7 +195,7 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
         if (trace_ports)
             printf("[%s:%d] instance %s name '%s' type %s\n", __FUNCTION__, __LINE__, instance.c_str(), name.c_str(), MI->type.c_str());
         for (auto pitem: MI->params)
-            addModulePort(modParam, baseMethodName(name) + DOLLAR + pitem.name, pitem.type, out, false, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, true, false);
+            addModulePort(modParam, baseMethodName(name) + DOLLAR + pitem.name, pitem.type, out, false, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, false, false);
     }
     if ((!localInterface || pinPrefix != "") && (pinPrefix == "" || !isVerilog))
     for (auto fld: IR->fields) {
@@ -214,7 +214,7 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
                     init = "0";
             }
             if (instance == "")
-                addModulePort(modParam, name, fld.isPtr ? "POINTER" : fld.type, out, fld.isInout, init, isLocal, true/*isArgument*/, vecCount, mapValue, instance, true);
+                addModulePort(modParam, name, fld.isPtr ? "POINTER" : fld.type, out, fld.isInout, init, isLocal, true/*isArgument*/, vecCount, mapValue, instance, true, false);
         }
         else
             addModulePort(modParam, name, fld.type, out, fld.isInout, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, false, true);
@@ -254,7 +254,7 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
         if (item.fldName == "" || isVerilog)
             collectInterfacePins(IIR, modParam, instance, pinPrefix + item.fldName, methodPrefix + item.fldName + DOLLAR, localFlag, imapValue, ptrFlag, updatedVecCount, localInterface, isVerilog);
         else
-            addModulePort(modParam, methodPrefix + item.fldName, type, out, false, ""/*not param*/, localFlag, false/*isArgument*/, updatedVecCount, mapValue, instance, false);
+            addModulePort(modParam, methodPrefix + item.fldName, type, out, false, ""/*not param*/, localFlag, false/*isArgument*/, updatedVecCount, mapValue, instance, false, false);
     }
 }
 
@@ -1325,6 +1325,8 @@ printf("traceDataType %s\n", traceDataType.c_str());
        setAssign("__traceMemory$data", allocExpr(traceDataGather), "Bit(" + traceTotalLength + ")");
        setAssign("__traceMemory$enable", allocExpr("1"), "Bit(1)");
        refList["__traceMemory$out"].count++;  // force allocation so that we can hierarchically reference later
+       refList["__traceMemory$clear__ENA"].count++;  // force allocation so that we can hierarchically reference later
+       refList["__traceMemory$clear__ENA"].done = true;  // prevent dummy assign to '0'
     }
 
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
