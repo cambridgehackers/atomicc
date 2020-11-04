@@ -117,7 +117,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
         printf("[%s:%d] duplicate was      = %s type '%s'\n", __FUNCTION__, __LINE__, tree2str(assignList[target].value).c_str(), assignList[target].type.c_str());
         exit(-1);
     }
-    bool noRecursion = (target == "CLK" || target == "nRST");
+    bool noRecursion = (target == "CLK" || target == "nRST" || isEnaName(target));
     if (generateSection != "")
         condAssignList[generateSection][target] = AssignItem{value, type, noRecursion, 0};
     else
@@ -405,10 +405,11 @@ static ACCExpr *replaceAssign(ACCExpr *expr, std::string guardName = "")
         return allocExpr("1");
     }
     if (expr->value == PERIOD || (isIdChar(item[0]) && !expr->operands.size())) {
+        ACCExpr *assignValue = assignList[item].value;
         if (trace_interface)
-            printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, guardName != "", tree2str(assignList[item].value).c_str(), walkCount(assignList[item].value));
-        if (!assignList[item].noRecursion || guardName != "")
-        if (ACCExpr *assignValue = assignList[item].value)
+            printf("[%s:%d]item %s norec %d enableList %d value %s walkcount %d\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, guardName != "", tree2str(assignValue).c_str(), walkCount(assignValue));
+        if (assignValue)
+        if (!assignList[item].noRecursion || isdigit(assignValue->value[0]) || guardName != "")
         if (walkCount(assignValue) < ASSIGN_SIZE_LIMIT || guardName != "") {
             decRef(item);
             walkRef(assignValue);
@@ -442,8 +443,8 @@ static ACCExpr *simpleReplace(ACCExpr *expr)
     if (isIdChar(item[0]) && !expr->operands.size()) {
 //printf("[%s:%d] item %s norec %d val %s\n", __FUNCTION__, __LINE__, item.c_str(), assignList[item].noRecursion, tree2str(assignList[item].value).c_str());
         ACCExpr *assignValue = assignList[item].value;
-        if (!assignList[item].noRecursion)
         if (assignValue)
+        if (!assignList[item].noRecursion || isdigit(assignValue->value[0]))
         if (refList[item].pin != PIN_MODULE
              && (checkOperand(assignValue->value) || isRdyName(item) || isEnaName(item)
                 || (startswith(item, BLOCK_NAME) && assignList[item].size < COUNT_LIMIT))) {
@@ -1384,9 +1385,15 @@ printf("traceDataType %s\n", traceDataType.c_str());
         interfaceAssign(item.first, item.second.value, item.second.type);
     }
 #endif
-    for (auto ctop: condAssignList) {
-        for (auto item: ctop.second) {
+
+    // recursively process all replacements internal to the list of 'setAssign' items
+    for (auto &item : assignList)
+        item.second.value = replaceAssign(item.second.value);
+
+    for (auto &ctop: condAssignList) {
+        for (auto &item: ctop.second) {
             generateSection = ctop.first;
+            item.second.value = replaceAssign(simpleReplace(item.second.value));
             interfaceAssign(item.first, item.second.value, item.second.type);
         }
     }
@@ -1406,9 +1413,6 @@ printf("traceDataType %s\n", traceDataType.c_str());
 
     setAssignRefCount(IR);
 
-    // recursively process all replacements internal to the list of 'setAssign' items
-    for (auto &item : assignList)
-        item.second.value = replaceAssign(item.second.value);
     for (auto &top: muxValueList)
         for (auto &item: top.second)
             item.second.phi = replaceAssign(item.second.phi);

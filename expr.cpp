@@ -606,6 +606,69 @@ static DdNode *tree2BDD(DdManager *mgr, ACCExpr *expr, VarMap &varMap)
     return ret;
 }
 
+ACCExpr *finalBool(ACCExpr *expr)
+{
+    ACCExpr *ret = allocExpr(expr->value);
+    if (ret->value == "!") {
+        ACCExpr *op = getRHS(expr, 0);
+        if (op->value == "!") {
+            return finalBool(getRHS(op, 0));
+        }
+        if (op->value == "^" && checkInteger(getRHS(op, 1), "1")) {
+            return finalBool(getRHS(op, 0));
+        }
+        if (op->value == "||" || op->value == "&&") {
+            ret->value = (op->value == "||") ? "&&" : "||";
+            for (auto item: op->operands)
+                ret->operands.push_back(allocExpr("!", item));
+            return finalBool(ret);
+        }
+        if (op->value == "==") {
+            ret->value = "!=";
+            for (auto item: op->operands)
+                ret->operands.push_back(item);
+            return finalBool(ret);
+        }
+    }
+    if (ret->value == "==" || ret->value == "!=") {
+        ACCExpr *opl = getRHS(expr, 0);
+        ACCExpr *opr = getRHS(expr, 1);
+        if (isdigit(opl->value[0]) && !isdigit(opr->value[0])) {
+            ret->operands.push_back(opr);
+            ret->operands.push_back(opl);
+            return finalBool(ret);
+        }
+        if (checkInteger(opr, "0")) {
+        if (opl->value == "^") {
+            ACCExpr *argl = getRHS(opl, 0);
+            ACCExpr *argr = getRHS(opl, 1);
+            if (checkInteger(argr, "1")) {
+                if (ret->value == "==")
+                    return finalBool(argl);
+                else
+                    return finalBool(allocExpr("!", argl));
+            }
+        }
+        else if (convertType(refList[opl->value].type) == "1" || isRdyName(opl->value) || isEnaName(opl->value)) {
+            if (ret->value == "==")
+                return finalBool(allocExpr("!", opl));
+            else
+                return finalBool(opl);
+        }
+        }
+    }
+    for (auto item: expr->operands) {
+        item = finalBool(item);
+        if ((ret->value == "||" || ret->value == "&&") && ret->value == item->value) {
+            for (auto iitem: item->operands)
+                ret->operands.push_back(iitem);
+            continue;
+        }
+        ret->operands.push_back(item);
+    }
+    return ret;
+}
+
 ACCExpr *cleanupBool(ACCExpr *expr)
 {
     if (!expr)
@@ -636,6 +699,7 @@ ACCExpr *cleanupBool(ACCExpr *expr)
     ACCExpr *ret = str2tree(fform);
     free(fform);
     Cudd_Quit(mgr);
+    ret = finalBool(ret);
     return ret;
 }
 
