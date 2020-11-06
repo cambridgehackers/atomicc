@@ -1069,13 +1069,23 @@ static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
                 }
             }
         }
-        // lift guards from called method interfaces
+        // lift/hoist/gather guards from called method interfaces
         if (!isRdyName(methodName))
         if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName))) {
+        typedef struct {
+            ACCExpr    *cond;
+            std::string method;
+        } OverInfo;
+        std::map<std::string, OverInfo> overExpr;
         auto appendGuard = [&] (CallListElement *item) -> void {
             std::string name = item->value->value;
             if (name == "__finish" || name == "$past")
                 return;
+            auto overMethod = overExpr.find(overExpr[name].method);
+            if (overMethod != overExpr.end()) {
+                //printf("[%s:%d] %s was overridden by %s\n", __FUNCTION__, __LINE__, name.c_str(), overMethod->first.c_str());
+                return;
+            }
             //ACCExpr *value = generateSubscriptReference(IR, modLine, getRdyName(name));
             name = getRdyName(name);
             fixupAccessible(name);
@@ -1084,6 +1094,24 @@ static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
                 value = allocExpr("|", walkRemoveParam(invertExpr(item->cond)), value);
             MIRdy->guard = cleanupBool(allocExpr("&&", MIRdy->guard, value));
         };
+        for (auto item: MI->callList) {
+            std::string callee = item->value->value;
+            overExpr[callee] = OverInfo{item->cond, ""};
+            int ind = callee.find_first_of(PERIOD DOLLAR);
+            if (ind > 0) {
+                std::string fieldname = callee.substr(0, ind);
+                std::string fmethod = callee.substr(ind+1);
+                for (auto fitem: IR->fields)
+                    if (fieldname == fitem.fldName) {
+                        if (auto calledIR = lookupIR(fitem.type)) {
+                            auto overm = calledIR->overTable.find(fmethod);
+                            if (overm != calledIR->overTable.end())
+                                overExpr[callee].method = callee.substr(0, ind+1) + overm->second;
+                        }
+                        break;
+                    }
+            }
+        }
         for (auto item: MI->callList)
             appendGuard(item);
         for (auto item: MI->generateFor) {

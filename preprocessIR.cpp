@@ -179,6 +179,7 @@ static int counter;
     genericIR->isVerilog = IR->isVerilog;
     genericIR->isTrace = IR->isTrace;
     genericIR->isPrintf = IR->isPrintf;
+    genericIR->overTable = IR->overTable;
     genericIR->sourceFilename = IR->sourceFilename;
     for (auto item : IR->fields)
         genericIR->fields.push_back(FieldElement{item.fldName,

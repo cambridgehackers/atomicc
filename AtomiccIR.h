@@ -173,6 +173,7 @@ typedef struct ModuleIR {
     std::list<FieldElement>           interfaces;
     std::list<FieldElement>           parameters;
     std::list<InterfaceConnectType>   interfaceConnect;
+    std::map<std::string, std::string> overTable;
     int                               genvarCount;
     int                               isTrace;
     bool                              isExt;

@@ -423,6 +423,10 @@ interface, isStruct, isSerialize, ext);
                 std::string rule = getToken();
                 IR->priority[rule] = getToken();
             }
+            else if (checkItem("OVERRIDE")) {
+                std::string first = changeSeparator(getToken());
+                IR->overTable[getEnaName(first)] = getEnaName(changeSeparator(getToken()));
+            }
             else if (checkItem("INTERFACECONNECT")) {
                 bool        isForward = checkItem("/Forward");
                 ACCExpr *target = cleanInterface(getExpression(' '));
@@ -490,6 +494,12 @@ interface, isStruct, isSerialize, ext);
             }
             else
                 ParseCheck(false, "unknown module item");
+        }
+        for (auto item: IR->overTable) {
+            // We cannot put this clause into the RDY line, in case there are multiple callers from different rules and we get a loop
+            // e.g., FifoPipeline enq and lpm 'enter' and 'recirc' rules
+            //if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(item.first)))
+                //MIRdy->guard = cleanupBool(allocExpr("||", MIRdy->guard, allocExpr(item.second)));
         }
         if (trace_readIR)
             dumpModule("finishread", IR);
