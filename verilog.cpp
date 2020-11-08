@@ -1228,7 +1228,7 @@ static void fixupModuleInstantiations(ModList &modLine)
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, mitem.trigger, ""/*not param*/, mitem.vecCount});
     }
 }
-static ACCExpr *generateTrace(ModuleIR *IR, ModList &modLineTop, std::string traceTotalLength)
+static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
 {
     ACCExpr *gather = allocExpr(","), *length = allocExpr("+");
     ACCExpr *gatherp = allocExpr(","), *lengthp = allocExpr("+");
@@ -1281,11 +1281,12 @@ printf("[%s:%d] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT %s\n", __FUNCTIO
         length->operands.push_back(item);
     for (auto item: gatherp->operands)
         gather->operands.push_back(item);
-    traceTotalLength = "32+" + tree2str(length, false);
+    std::string traceTotalLength = "32+" + tree2str(length, false);
     length->value = ",";
     std::string interpretString = tree2str(length, false);
     std::string traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
     IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
+    generateField(IR, modLine, IR->fields.back());
     std::string filename = IR->name;
     int ind = filename.find("(");
     if (ind > 0)
@@ -1310,7 +1311,14 @@ printf("gather %s\n", tree2str(traceDataGather).c_str());
 printf("interpret %s\n", interpretString.c_str());
 printf("total %s\n", traceTotalLength.c_str());
 printf("traceDataType %s\n", traceDataType.c_str());
-    return traceDataGather;
+    setAssign("__traceMemory$CLK", allocExpr("CLK"), "Bit(1)");
+    setAssign("__traceMemory$nRST", allocExpr("nRST"), "Bit(1)");
+    setAssign("__traceMemory$data", traceDataGather, "Bit(" + traceTotalLength + ")");
+    setAssign("__traceMemory$enable", allocExpr("1"), "Bit(1)");
+    refList["__traceMemory$out"].count++;  // force allocation so that we can hierarchically reference later
+    refList["__traceMemory$clear__ENA"].count++;  // force allocation so that we can hierarchically reference later
+    refList["__traceMemory$clear__ENA"].done = true;  // prevent dummy assign to '0'
+    //return traceDataGather;
 }
 
 /*
@@ -1349,10 +1357,6 @@ static ModList modLine;
         if (!hasnRST)
             setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
     }
-    std::string traceTotalLength;
-    ACCExpr *traceDataGather = nullptr;
-    if (IR->isTrace)
-        traceDataGather = generateTrace(IR, modLineTop, traceTotalLength);
 
     for (auto &item: IR->fields) {
         generateField(IR, modLine, item);
@@ -1364,15 +1368,8 @@ static ModList modLine;
         modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, false, "", ""});
         modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, false, "", ""});
     }
-    if (traceDataGather) {
-       setAssign("__traceMemory$CLK", allocExpr("CLK"), "Bit(1)");
-       setAssign("__traceMemory$nRST", allocExpr("nRST"), "Bit(1)");
-       setAssign("__traceMemory$data", traceDataGather, "Bit(" + traceTotalLength + ")");
-       setAssign("__traceMemory$enable", allocExpr("1"), "Bit(1)");
-       refList["__traceMemory$out"].count++;  // force allocation so that we can hierarchically reference later
-       refList["__traceMemory$clear__ENA"].count++;  // force allocation so that we can hierarchically reference later
-       refList["__traceMemory$clear__ENA"].done = true;  // prevent dummy assign to '0'
-    }
+    if (IR->isTrace)
+        generateTrace(IR, modLineTop, modLine);
 
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
