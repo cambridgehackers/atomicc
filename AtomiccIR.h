@@ -130,7 +130,7 @@ typedef struct {
     ACCExpr                   *subscript;
     std::string                generateSection;
     std::string                name;
-    bool                       rule;
+    bool                       isRule;
     bool                       action;
     std::list<StoreListElement *> storeList;
     std::list<LetListElement *> letList;

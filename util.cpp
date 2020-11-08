@@ -579,7 +579,7 @@ MethodInfo *allocMethod(std::string name)
 {
     MethodInfo *MI = new MethodInfo{nullptr/*guard*/,
         nullptr/*subscript*/, ""/*generateSection*/,
-        name/*name*/, false/*rule*/, false/*action*/,
+        name/*name*/, false/*isRule*/, false/*action*/,
         {}/*storeList*/, {}/*letList*/, {}/*assertList*/, {}/*callList*/, {}/*printfList*/,
         ""/*type*/, {}/*params*/, {}/*generateFor*/, {}/*instantiateFor*/,
         {}/*alloca*/, {}/*interfaceConnect*/, {{}}/*meta*/};
@@ -604,7 +604,7 @@ void dumpMethod(std::string name, MethodInfo *MI)
     if (!MI)
         return;
     std::string methodName = MI->name;
-    printf("%s    METHOD%s %s(", name.c_str(), MI->rule ? "/Rule" : "", methodName.c_str());
+    printf("%s    METHOD%s %s(", name.c_str(), MI->isRule ? "/Rule" : "", methodName.c_str());
     std::string sep;
     for (auto param: MI->params) {
         printf("%s%s %s", sep.c_str(), param.type.c_str(), param.name.c_str());

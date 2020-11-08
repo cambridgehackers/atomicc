@@ -183,7 +183,7 @@ static void generateModule(FILE *OStrV, ModuleIR *IR)
              continue;
          MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName));
          fprintf(OStrV, "    %s %s instancePrefix--\"%s\" :=\n    (\n", sep.c_str(),
-             MI->rule ? "Rule" : "Method", methodName.c_str());
+             MI->isRule ? "Rule" : "Method", methodName.c_str());
          for (auto pitem: MI->params) {
               fprintf(OStrV, "        Read %s_v: %s <- (instancePrefix--\"%s\") ;\n",
              pitem.name.c_str(), kamiType(pitem.type).c_str(), pitem.name.c_str());
@@ -211,7 +211,7 @@ static void generateModule(FILE *OStrV, ModuleIR *IR)
              fprintf(OStrV, "        Write (instancePrefix--\"%s\") : %s <- %s ;\n",
                  dest.c_str(), kamiType(dtype).c_str(), kamiValue(sitem->value, kamiWidth(dtype)).c_str());
          }
-         if (MI->rule)
+         if (MI->isRule)
              fprintf(OStrV, "        Retv ) (* rule %s *)\n", methodName.c_str());
          else
              fprintf(OStrV, "        Retv    )\n");

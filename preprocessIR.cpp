@@ -91,7 +91,7 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
     newMI->guard = walkToGeneric(MI->guard, paramMap);
     newMI->subscript = MI->subscript;
     newMI->generateSection = MI->generateSection;
-    newMI->rule = MI->rule;
+    newMI->isRule = MI->isRule;
     newMI->action = MI->action;
     newMI->interfaceConnect = MI->interfaceConnect;
     for (auto item : MI->storeList)
@@ -329,7 +329,7 @@ printf("[%s:%d]CONNNECT target %s source %s type %s forward %d\n", __FUNCTION__,
         for (auto MI: (*IR)->methods) {
             if (isRdyName(MI->name) && !MI->callList.size())
                continue;
-            if (MI->rule || MI->storeList.size() || MI->callList.size() != 1
+            if (MI->isRule || MI->storeList.size() || MI->callList.size() != 1
              || MI->letList.size() || MI->printfList.size())
                 {skipLine = __LINE__; goto skipLab;};
             if (MI->alloca.size())

@@ -124,7 +124,7 @@ void metaGenerateModule(ModuleIR *IR, FILE *OStr)
     std::string ruleNames;
     for (auto MI : IR->methods) {
         std::string methodName = MI->name;
-        if (MI->rule && MI->action)
+        if (MI->isRule && MI->action)
             ruleNames += "; " + baseMethodName(methodName);
     }
     if (ruleNames != "")

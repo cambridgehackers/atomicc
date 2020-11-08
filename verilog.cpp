@@ -746,7 +746,7 @@ static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo
     MI->guard = cleanupExpr(MI->guard);
     if (!isRdyName(methodName)) {
         walkRead(MI, MI->guard, nullptr);
-        if (MI->rule)
+        if (MI->isRule)
             setAssign(getEnaName(methodName), allocExpr(getRdyName(methodName)), "Bit(1)");
     }
     ACCExpr *guard = MI->guard;
@@ -1033,7 +1033,7 @@ static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
 {
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         std::string methodName = MI->name;
-        if (MI->rule)             // both RDY and ENA must be allocated for rules
+        if (MI->isRule)             // both RDY and ENA must be allocated for rules
             setReference(methodName, 0, MI->type, true);
         for (auto info: MI->printfList) {
             ACCExpr *value = info->value->operands.front();
@@ -1228,6 +1228,90 @@ static void fixupModuleInstantiations(ModList &modLine)
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, mitem.trigger, ""/*not param*/, mitem.vecCount});
     }
 }
+static ACCExpr *generateTrace(ModuleIR *IR, ModList &modLineTop, std::string traceTotalLength)
+{
+    ACCExpr *gather = allocExpr(","), *length = allocExpr("+");
+    ACCExpr *gatherp = allocExpr(","), *lengthp = allocExpr("+");
+    for (auto MI: IR->methods) {
+        if (MI->isRule) {
+printf("[%s:%d] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT %s\n", __FUNCTION__, __LINE__, MI->name.c_str());
+            gather->operands.push_back(allocExpr(MI->name));
+            length->operands.push_back(allocExpr("1"));
+        }
+    }
+    for (auto mitem: modLineTop) {
+        std::string name = mitem.value;
+        if (mitem.moduleStart || mitem.isparam != "" || name == "CLK" || name == "nRST")
+            continue;
+        std::string prefix = mitem.value + PERIOD;
+        if (ModuleIR *IIR = lookupInterface(mitem.type)) {
+            for (auto MI : IIR->methods) {
+                std::string mname = MI->name;
+                ACCExpr *len = allocExpr((MI->type == "") ? "1" : convertType(MI->type));
+                if (isEnaName(mname) || isRdyName(mname)) {
+                    gather->operands.push_back(allocExpr(prefix + MI->name));
+                    length->operands.push_back(len);
+                }
+                else {
+                    gatherp->operands.push_back(allocExpr(prefix + MI->name));
+                    lengthp->operands.push_back(len);
+                }
+                std::string mprefix = prefix + baseMethodName(MI->name) + DOLLAR;
+                for (auto &param: MI->params) {
+                    gatherp->operands.push_back(allocExpr(mprefix + param.name));
+                    lengthp->operands.push_back(allocExpr(convertType(param.type)));
+                }
+            }
+        }
+        else {
+            ACCExpr *len = allocExpr((mitem.type == "") ? "1" : convertType(mitem.type));
+            ACCExpr *nexpr = allocExpr(name);
+            if (mitem.trigger) {
+                gather->operands.push_back(nexpr);
+                length->operands.push_back(len);
+            }
+            else {
+                gatherp->operands.push_back(nexpr);
+                lengthp->operands.push_back(len);
+            }
+        }
+    }
+    std::string sensitivity = tree2str(length, false);
+    for (auto item: lengthp->operands)
+        length->operands.push_back(item);
+    for (auto item: gatherp->operands)
+        gather->operands.push_back(item);
+    traceTotalLength = "32+" + tree2str(length, false);
+    length->value = ",";
+    std::string interpretString = tree2str(length, false);
+    std::string traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
+    IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
+    std::string filename = IR->name;
+    int ind = filename.find("(");
+    if (ind > 0)
+        filename = filename.substr(0, ind);
+    FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
+    fprintf(traceDataFile, "WIDTH %s\nDEPTH %d\n", traceTotalLength.c_str(), IR->isTrace);
+    fprintf(traceDataFile, "COUNT %d\n------------\nTIME 32\n", (int)length->operands.size()+1);
+    auto litem = length->operands.begin();
+    auto gitem = gather->operands.begin();
+    while (litem != length->operands.end()) {
+        std::string name = (*gitem)->value;
+        if (startswith(name, "RULE$"))
+            name = "RULE__" + name.substr(5);
+        fprintf(traceDataFile, "%s %s\n", name.c_str(), (*litem)->value.c_str());
+        litem++;
+        gitem++;
+    }
+    fclose(traceDataFile);
+    gather->operands.push_front(allocExpr("32'd0"));
+    ACCExpr *traceDataGather = allocExpr("{", gather);
+printf("gather %s\n", tree2str(traceDataGather).c_str());
+printf("interpret %s\n", interpretString.c_str());
+printf("total %s\n", traceTotalLength.c_str());
+printf("traceDataType %s\n", traceDataType.c_str());
+    return traceDataGather;
+}
 
 /*
  * Generate *.sv and *.vh for a Verilog module
@@ -1265,78 +1349,10 @@ static ModList modLine;
         if (!hasnRST)
             setReference("nRST", 2, "Bit(1)", false, false, PIN_WIRE);
     }
-    std::string traceDataGather, traceDataType, traceTotalLength;
-    if (IR->isTrace) {
-        ACCExpr *gather = allocExpr(","), *length = allocExpr("+");
-        ACCExpr *gatherp = allocExpr(","), *lengthp = allocExpr("+");
-        for (auto mitem: modLineTop) {
-            std::string name = mitem.value;
-            if (mitem.moduleStart || mitem.isparam != "" || name == "CLK" || name == "nRST")
-                continue;
-            std::string prefix = mitem.value + PERIOD;
-            if (ModuleIR *IIR = lookupInterface(mitem.type)) {
-                for (auto MI : IIR->methods) {
-                    std::string mname = MI->name;
-                    ACCExpr *len = allocExpr((MI->type == "") ? "1" : convertType(MI->type));
-                    if (isEnaName(mname) || isRdyName(mname)) {
-                        gather->operands.push_back(allocExpr(prefix + MI->name));
-                        length->operands.push_back(len);
-                    }
-                    else {
-                        gatherp->operands.push_back(allocExpr(prefix + MI->name));
-                        lengthp->operands.push_back(len);
-                    }
-                    std::string mprefix = prefix + baseMethodName(MI->name) + DOLLAR;
-                    for (auto &param: MI->params) {
-                        gatherp->operands.push_back(allocExpr(mprefix + param.name));
-                        lengthp->operands.push_back(allocExpr(convertType(param.type)));
-                    }
-                }
-            }
-            else {
-                ACCExpr *len = allocExpr((mitem.type == "") ? "1" : convertType(mitem.type));
-                ACCExpr *nexpr = allocExpr(name);
-                if (mitem.trigger) {
-                    gather->operands.push_back(nexpr);
-                    length->operands.push_back(len);
-                }
-                else {
-                    gatherp->operands.push_back(nexpr);
-                    lengthp->operands.push_back(len);
-                }
-            }
-        }
-        std::string sensitivity = tree2str(length, false);
-        for (auto item: lengthp->operands)
-            length->operands.push_back(item);
-        for (auto item: gatherp->operands)
-            gather->operands.push_back(item);
-        traceDataGather = "{32'd0," + tree2str(gather, false) + "}";
-        std::string traceTotalLength = "32+" + tree2str(length, false);
-        length->value = ",";
-        std::string interpretString = tree2str(length, false);
-        traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
-        IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
-printf("gather %s\n", traceDataGather.c_str());
-printf("interpret %s\n", interpretString.c_str());
-printf("total %s\n", traceTotalLength.c_str());
-printf("traceDataType %s\n", traceDataType.c_str());
-        std::string filename = IR->name;
-        int ind = filename.find("(");
-        if (ind > 0)
-            filename = filename.substr(0, ind);
-        FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
-        fprintf(traceDataFile, "WIDTH %s\nDEPTH %d\n", traceTotalLength.c_str(), IR->isTrace);
-        fprintf(traceDataFile, "COUNT %d\n------------\nTIME 32\n", (int)length->operands.size()+1);
-        auto litem = length->operands.begin();
-        auto gitem = gather->operands.begin();
-        while (litem != length->operands.end()) {
-            fprintf(traceDataFile, "%s %s\n", (*gitem)->value.c_str(), (*litem)->value.c_str());
-            litem++;
-            gitem++;
-        }
-        fclose(traceDataFile);
-    }
+    std::string traceTotalLength;
+    ACCExpr *traceDataGather = nullptr;
+    if (IR->isTrace)
+        traceDataGather = generateTrace(IR, modLineTop, traceTotalLength);
 
     for (auto &item: IR->fields) {
         generateField(IR, modLine, item);
@@ -1348,10 +1364,10 @@ printf("traceDataType %s\n", traceDataType.c_str());
         modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, false, "", ""});
         modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, false, "", ""});
     }
-    if (traceDataGather != "") {
+    if (traceDataGather) {
        setAssign("__traceMemory$CLK", allocExpr("CLK"), "Bit(1)");
        setAssign("__traceMemory$nRST", allocExpr("nRST"), "Bit(1)");
-       setAssign("__traceMemory$data", allocExpr(traceDataGather), "Bit(" + traceTotalLength + ")");
+       setAssign("__traceMemory$data", traceDataGather, "Bit(" + traceTotalLength + ")");
        setAssign("__traceMemory$enable", allocExpr("1"), "Bit(1)");
        refList["__traceMemory$out"].count++;  // force allocation so that we can hierarchically reference later
        refList["__traceMemory$clear__ENA"].count++;  // force allocation so that we can hierarchically reference later

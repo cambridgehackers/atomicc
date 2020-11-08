@@ -481,13 +481,13 @@ interface, isStruct, isSerialize, ext);
                 if (!IR->isVerilog)
                     methodName = changeSeparator(methodName);
                 MethodInfo *MI = allocMethod(methodName), *MIRdy = nullptr;
-                MI->rule = rule;
+                MI->isRule = rule;
                 MI->action = action;
                 if (addMethod(IR, MI)) {
                     std::string rdyName = getRdyName(methodName);
                     MIRdy = allocMethod(rdyName);
                     addMethod(IR, MIRdy);
-                    MIRdy->rule = MI->rule;
+                    MIRdy->isRule = MI->isRule;
                     MIRdy->type = "Bit(1)";
                 }
                 readMethodInfo(IR, MI, MIRdy);
