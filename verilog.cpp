@@ -1233,8 +1233,9 @@ static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
     ACCExpr *gather = allocExpr(","), *length = allocExpr("+");
     ACCExpr *gatherp = allocExpr(","), *lengthp = allocExpr("+");
     for (auto MI: IR->methods) {
-        if (MI->isRule) {
-printf("[%s:%d] TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT %s\n", __FUNCTION__, __LINE__, MI->name.c_str());
+        ACCExpr *val = assignList[MI->name].value;
+        if (MI->isRule && isEnaName(MI->name)) // only trace __ENA items
+        if (!isdigit(val->value[0])) {  // don't trace constant values
             gather->operands.push_back(allocExpr(MI->name));
             length->operands.push_back(allocExpr("1"));
         }
@@ -1368,8 +1369,6 @@ static ModList modLine;
         modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, false, "", ""});
         modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, false, "", ""});
     }
-    if (IR->isTrace)
-        generateTrace(IR, modLineTop, modLine);
 
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
@@ -1451,6 +1450,8 @@ static ModList modLine;
              prevCount = item.second.count;
          }
     }
+    if (IR->isTrace)
+        generateTrace(IR, modLineTop, modLine);
 
     setAssignRefCount(IR);
 
