@@ -1228,16 +1228,24 @@ static void fixupModuleInstantiations(ModList &modLine)
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, mitem.trigger, ""/*not param*/, mitem.vecCount});
     }
 }
+static bool checkConstant(std::string name)
+{
+    ACCExpr *val = assignList[name].value;
+    if (!val)
+        return false;
+    return isdigit(val->value[0]);
+}
+
 static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
 {
     ACCExpr *gather = allocExpr(","), *length = allocExpr("+");
     ACCExpr *gatherp = allocExpr(","), *lengthp = allocExpr("+");
     for (auto MI: IR->methods) {
-        ACCExpr *val = assignList[MI->name].value;
         if (MI->isRule && isEnaName(MI->name)) // only trace __ENA items
-        if (!isdigit(val->value[0])) {  // don't trace constant values
+        if (!checkConstant(MI->name)) {  // don't trace constant values
             gather->operands.push_back(allocExpr(MI->name));
             length->operands.push_back(allocExpr("1"));
+            assignList[MI->name].noRecursion = true;
         }
     }
     for (auto mitem: modLineTop) {
@@ -1247,18 +1255,23 @@ static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
         std::string prefix = mitem.value + PERIOD;
         if (ModuleIR *IIR = lookupInterface(mitem.type)) {
             for (auto MI : IIR->methods) {
-                std::string mname = MI->name;
+                std::string mname = prefix + MI->name;
                 ACCExpr *len = allocExpr((MI->type == "") ? "1" : convertType(MI->type));
+                if (!checkConstant(mname)) {  // don't trace constant values
+                assignList[mname].noRecursion = true;
                 if (isEnaName(mname) || isRdyName(mname)) {
-                    gather->operands.push_back(allocExpr(prefix + MI->name));
+                    gather->operands.push_back(allocExpr(mname));
                     length->operands.push_back(len);
                 }
                 else {
-                    gatherp->operands.push_back(allocExpr(prefix + MI->name));
+                    gatherp->operands.push_back(allocExpr(mname));
                     lengthp->operands.push_back(len);
                 }
-                std::string mprefix = prefix + baseMethodName(MI->name) + DOLLAR;
+                }
+                std::string mprefix = baseMethodName(mname) + DOLLAR;
                 for (auto &param: MI->params) {
+                    if (checkConstant(mprefix + param.name))
+                        continue;
                     gatherp->operands.push_back(allocExpr(mprefix + param.name));
                     lengthp->operands.push_back(allocExpr(convertType(param.type)));
                 }
@@ -1267,6 +1280,7 @@ static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
         else {
             ACCExpr *len = allocExpr((mitem.type == "") ? "1" : convertType(mitem.type));
             ACCExpr *nexpr = allocExpr(name);
+            if (!checkConstant(name)) {  // don't trace constant values
             if (mitem.trigger) {
                 gather->operands.push_back(nexpr);
                 length->operands.push_back(len);
@@ -1274,6 +1288,7 @@ static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
             else {
                 gatherp->operands.push_back(nexpr);
                 lengthp->operands.push_back(len);
+            }
             }
         }
     }
@@ -1285,15 +1300,19 @@ static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
     std::string traceTotalLength = "32+" + tree2str(length, false);
     length->value = ",";
     std::string interpretString = tree2str(length, false);
-    std::string traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + autostr(IR->isTrace) + ", sensitivity=" + sensitivity + ")";
+    std::string depth = IR->isTrace;
+    int ind = depth.find(":");
+    std::string head = depth.substr(ind + 1);
+    depth = depth.substr(0, ind);
+    std::string traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + depth + ",head=" + head + ", sensitivity=" + sensitivity + ")";
     IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
     generateField(IR, modLine, IR->fields.back());
     std::string filename = IR->name;
-    int ind = filename.find("(");
+    ind = filename.find("(");
     if (ind > 0)
         filename = filename.substr(0, ind);
     FILE *traceDataFile = fopen (("generated/" + filename + ".trace").c_str(), "w");
-    fprintf(traceDataFile, "WIDTH %s\nDEPTH %d\n", traceTotalLength.c_str(), IR->isTrace);
+    fprintf(traceDataFile, "WIDTH %s\nDEPTH %s\n", traceTotalLength.c_str(), depth.c_str());
     fprintf(traceDataFile, "COUNT %d\n------------\nTIME 32\n", (int)length->operands.size()+1);
     auto litem = length->operands.begin();
     auto gitem = gather->operands.begin();
@@ -1450,7 +1469,7 @@ static ModList modLine;
              prevCount = item.second.count;
          }
     }
-    if (IR->isTrace)
+    if (IR->isTrace != "")
         generateTrace(IR, modLineTop, modLine);
 
     setAssignRefCount(IR);

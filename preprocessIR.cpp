@@ -299,6 +299,7 @@ void preprocessIR(std::list<ModuleIR *> &irSeq)
          || (*IR)->priority.size()
          || (*IR)->softwareName.size()
          || (*IR)->metaList.size()
+         || (*IR)->isTrace != ""
          || (*IR)->fields.size() != 1)
             {skipLine = __LINE__; goto skipLab;};
         field = (*IR)->fields.front();

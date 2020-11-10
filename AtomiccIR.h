@@ -175,7 +175,7 @@ typedef struct ModuleIR {
     std::list<InterfaceConnectType>   interfaceConnect;
     std::map<std::string, std::string> overTable;
     int                               genvarCount;
-    int                               isTrace;
+    std::string                       isTrace;
     bool                              isExt;
     bool                              isInterface;
     bool                              isStruct;
