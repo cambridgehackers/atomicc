@@ -214,7 +214,7 @@ void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, 
 
 // filegen.cpp
 extern std::map<std::string, int> genvarMap;
-void generateModuleHeader(FILE *OStr, ModList &modLine);
+void generateModuleHeader(FILE *OStr, ModList &modLine, bool isTopModule);
 void generateVerilogOutput(FILE *OStr);
 
 // kami.cpp

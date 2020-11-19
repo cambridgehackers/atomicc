@@ -43,7 +43,7 @@ std::string finishExpr(ACCExpr *expr)
     return tree2str(cleanupExprBuiltin(replacePins(expr), "0", true));
 }
 
-void generateModuleHeader(FILE *OStr, ModList &modLine)
+void generateModuleHeader(FILE *OStr, ModList &modLine, bool isTopModule)
 {
     std::string sep;
     bool handleCLK = false;
@@ -116,6 +116,8 @@ void generateModuleHeader(FILE *OStr, ModList &modLine)
     }
     if (handleCLK)
         fprintf(OStr, "%sinput CLK, input nRST", sep.c_str());
+    if (isTopModule)
+        fprintf(OStr, "\n    `TopAppendPort ");
     fprintf(OStr, ");\n");
 }
 
