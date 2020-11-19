@@ -25,49 +25,33 @@ SOURCES = main.cpp verilog.cpp util.cpp interfaces.cpp \
     expr.cpp filegen.cpp readIR.cpp software.cpp metaGen.cpp preprocessIR.cpp kami.cpp
 KAMI_SOURCES = kmain.cpp kami.cpp util.cpp readIR.cpp expr.cpp preprocessIR.cpp
 LINKER_SOURCES = atomiccLinker.cpp util.cpp readIR.cpp expr.cpp
+IMPORT_SOURCES := atomiccImport.cpp util.cpp readIR.cpp expr.cpp
 CUDDINC = -I../cudd/cudd
 CUDDLIB = ../cudd/cudd/.libs/libcudd.a
+CFLAGS := -std=c++11 \
+            -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
+            -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
+            -pedantic \
+            -Wall -W \
+            -Werror=date-time -Wno-long-long -Wno-unused-parameter \
+            -Wwrite-strings -Wcovered-switch-default -Wcast-qual \
+            -Wmissing-field-initializers -Wstring-conversion    \
+            -Wnon-virtual-dtor -Wdelete-non-virtual-dtor \
+            -I. $(CUDDINC) 
 
 all: veriloggen kamigen atomiccImport atomiccLinker
 
 veriloggen: $(SOURCES) *.h
-	$(Q)clang++ -o veriloggen -g -std=c++11 \
-            -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
-            -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
-            -pedantic \
-            -Wall -W \
-            -Werror=date-time -Wno-long-long -Wno-unused-parameter \
-            -Wwrite-strings -Wcovered-switch-default -Wcast-qual \
-            -Wmissing-field-initializers -Wstring-conversion    \
-            -Wnon-virtual-dtor -Wdelete-non-virtual-dtor \
-            -I. $(CUDDINC) $(SOURCES) -lBlocksRuntime $(CUDDLIB)
+	$(Q)clang++ -g -o veriloggen $(CFLAGS) $(SOURCES) -lBlocksRuntime $(CUDDLIB)
 
 kamigen: $(KAMI_SOURCES) *.h
-	$(Q)clang++ -o kamigen -g -std=c++11 \
-            -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
-            -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
-            -pedantic \
-            -Wall -W \
-            -Werror=date-time -Wno-long-long -Wno-unused-parameter \
-            -Wwrite-strings -Wcovered-switch-default -Wcast-qual \
-            -Wmissing-field-initializers -Wstring-conversion    \
-            -Wnon-virtual-dtor -Wdelete-non-virtual-dtor \
-            -I. $(CUDDINC) $(KAMI_SOURCES) -lBlocksRuntime $(CUDDLIB)
+	$(Q)clang++ -g -o kamigen $(CFLAGS) $(KAMI_SOURCES) -lBlocksRuntime $(CUDDLIB)
 
 atomiccLinker: $(LINKER_SOURCES) *.h
-	$(Q)clang++ -o atomiccLinker -g -std=c++11 \
-            -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
-            -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS \
-            -pedantic \
-            -Wall -W \
-            -Werror=date-time -Wno-long-long -Wno-unused-parameter \
-            -Wwrite-strings -Wcovered-switch-default -Wcast-qual \
-            -Wmissing-field-initializers -Wstring-conversion    \
-            -Wnon-virtual-dtor -Wdelete-non-virtual-dtor \
-            -I. $(CUDDINC) $(LINKER_SOURCES) -lBlocksRuntime $(CUDDLIB)
+	$(Q)clang++ -g -o atomiccLinker $(CFLAGS) $(LINKER_SOURCES) -lBlocksRuntime $(CUDDLIB)
 
-atomiccImport: atomiccImport.cpp
-	clang++ -g -std=c++11 -o atomiccImport atomiccImport.cpp
+atomiccImport: $(IMPORT_SOURCES) *.h
+	clang++ -g -o atomiccImport $(CFLAGS) $(IMPORT_SOURCES) $(CUDDLIB)
 
 clean:
 	rm -f veriloggen atomiccImport
