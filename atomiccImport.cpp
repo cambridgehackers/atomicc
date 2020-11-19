@@ -26,6 +26,8 @@
 #include <list>
 #include <string>
 #include <algorithm>
+#include "common.h"
+#include "AtomiccIR.h"
 
 //
 // parser for .lib files
@@ -71,7 +73,7 @@ typedef struct {
     std::string type;
 } VPInfo;
 std::map<std::string, VPInfo> vinfo;
-
+#if 0
 static inline std::string autostr(uint64_t X, bool isNeg = false) {
   char Buffer[21];
   char *BufPtr = std::end(Buffer);
@@ -96,6 +98,7 @@ static bool inline startswith(std::string str, std::string suffix)
 {
     return str.substr(0, suffix.length()) == suffix;
 }
+#endif
 static std::string ljust(std::string str, int len)
 {
     int size = len - str.length();
@@ -282,7 +285,7 @@ void parse_lib(std::string filename)
         printf("[%s:%d] unable to open '%s'\n", __FUNCTION__, __LINE__, filename.c_str());
         exit(-1);
     }
-    int len = read(inpfile, buffer, sizeof(buffer));
+    unsigned len = read(inpfile, buffer, sizeof(buffer));
     if (len >= sizeof(buffer) - 1) {
         printf("[%s:%d] incomplete read of '%s'\n", __FUNCTION__, __LINE__, filename.c_str());
         exit(-1);
@@ -323,13 +326,48 @@ void parse_verilator(std::string filename)
     int rc = system(commandLine.c_str());
 printf("[%s:%d] calling '%s' returned %d\n", __FUNCTION__, __LINE__, commandLine.c_str(), rc);
 
-    std::string tempFile = "obj_dir/V" + options.cell + ".atomicc";
+    //std::string tempFile = "obj_dir/V" + options.cell + ".atomicc";
+    std::string tempFile = "obj_dir/linker.generated.IR";
     int inpfile = open(tempFile.c_str(), O_RDONLY);
     if (inpfile == -1) {
         printf("[%s:%d] unable to open '%s'\n", __FUNCTION__, __LINE__, tempFile.c_str());
         exit(-1);
     }
-    int len = read(inpfile, buffer, sizeof(buffer));
+    std::list<ModuleIR *> irSeq;
+    std::list<std::string> fileList;
+    readIR(irSeq, fileList, "obj_dir/linker.generated");
+    for (auto IR: irSeq) {
+printf("[%s:%d] IRSEQ %s cell %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), options.cell.c_str());
+        if (IR->name == options.cell) {
+printf("[%s:%d] found\n", __FUNCTION__, __LINE__);
+            auto IIR = lookupInterface(IR->interfaceName);
+            dumpModule("INTERFACE", IIR);
+            for (auto &field: IIR->fields) {
+                std::string dir;
+                if (field.isInput)
+                    dir = "input";
+                else if (field.isOutput)
+                    dir = "output";
+                else if (field.isParameter != "") {
+                    dir = "parameter";
+printf("[%s:%d] param %s val %s\n", __FUNCTION__, __LINE__, field.fldName.c_str(), field.isParameter.c_str());
+                }
+                else {
+printf("[%s:%d] unknown dir %s\n", __FUNCTION__, __LINE__, field.fldName.c_str());
+                }
+                std::string type = field.type;
+                if (startswith(type, "Bit("))
+                    type = "__uint" + type.substr(3);
+                else {
+printf("[%s:%d] unknown type %s %s\n", __FUNCTION__, __LINE__, field.fldName.c_str(), type.c_str());
+                }
+                vinfo[field.fldName] = VPInfo{dir, type};
+            }
+            break;
+        }
+    }
+#if 0
+    unsigned len = read(inpfile, buffer, sizeof(buffer));
     if (len >= sizeof(buffer) - 1) {
         printf("[%s:%d] incomplete read of '%s'\n", __FUNCTION__, __LINE__, tempFile.c_str());
         exit(-1);
@@ -341,6 +379,7 @@ printf("[%s:%d] calling '%s' returned %d\n", __FUNCTION__, __LINE__, commandLine
         vinfo[name] = VPInfo{dir, type};
         getVline();
     }
+#endif
     for (auto item: vinfo)
         pinList.push_back(PinInfo{item.second.dir, item.second.type, item.first, ""});
 }
