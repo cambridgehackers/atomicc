@@ -179,18 +179,22 @@ static void addModulePort (ModList &modParam, std::string name, std::string type
 
 static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface, bool isVerilog, bool addInterface, bool aout, MapNameValue &interfaceMap, std::string atype)
 {
-    if (addInterface) {
-        addModulePort(modParam, methodPrefix.substr(0, methodPrefix.length()-1), atype, aout, false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, interfaceMap, instance, false, false);
-        return;
-    }
+    bool forceInterface = false;
+    std::string topVecCount = vecCount;
     assert(IR);
     MapNameValue mapValue = parentMap;
     vecCount = instantiateType(vecCount, mapValue);
+    if (addInterface)
+        pinPrefix += DOLLAR;
 //for (auto item: mapValue)
 //printf("[%s:%d] [%s] = %s\n", __FUNCTION__, __LINE__, item.first.c_str(), item.second.c_str());
 //printf("[%s:%d] IR %s instance %s pinpref %s methpref %s isLocal %d ptr %d isVerilog %d veccount %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str(), pinPrefix.c_str(), methodPrefix.c_str(), isLocal, isPtr, isVerilog, vecCount.c_str());
     if (!localInterface || methodPrefix != "")
     for (auto MI: IR->methods) {
+        if (addInterface) {
+            forceInterface = true;
+            continue;
+        }
         std::string name = methodPrefix + MI->name;
         bool out = (instance != "") ^ isPtr;
         addModulePort(modParam, name, MI->type, out ^ (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, MI->action || isEnaName(name) || isRdyName(name));
@@ -203,6 +207,10 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
     }
     if ((!localInterface || pinPrefix != "") && (pinPrefix == "" || !isVerilog))
     for (auto fld: IR->fields) {
+        if (addInterface && !fld.isInout) {
+            forceInterface = true;
+            continue;
+        }
         std::string name = pinPrefix + fld.fldName;
 //printf("[%s:%d] name %s ftype %s local %d\n", __FUNCTION__, __LINE__, name.c_str(), fld.type.c_str(), isLocal);
         bool out = (instance != "") ^ fld.isOutput;
@@ -224,6 +232,10 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
             addModulePort(modParam, name, fld.type, out, fld.isInout, ""/*not param*/, isLocal, instance==""/*isArgument*/, vecCount, mapValue, instance, false, true);
     }
     for (FieldElement item : IR->interfaces) {
+        if (addInterface) {
+            forceInterface = true;
+            continue;
+        }
         MapNameValue imapValue;  // interface hoisting only deals with parameters for the interface itself (not containing module)
 //printf("[%s:%d] INTERFACES instance %s type %s name %s\n", __FUNCTION__, __LINE__, instance.c_str(), item.type.c_str(), item.fldName.c_str());
         if (instance != "")
@@ -256,6 +268,9 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
             }
         }
         collectInterfacePins(IIR, modParam, instance, pinPrefix + item.fldName, methodPrefix + item.fldName + DOLLAR, localFlag, imapValue, ptrFlag, updatedVecCount, localInterface, isVerilog, item.fldName != "" && !isVerilog, out, mapValue, type);
+    }
+    if (forceInterface) {
+        addModulePort(modParam, methodPrefix.substr(0, methodPrefix.length()-1), atype, aout, false, ""/*not param*/, isLocal, false/*isArgument*/, topVecCount, interfaceMap, instance, false, false);
     }
 }
 
@@ -1088,7 +1103,6 @@ static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
                 //printf("[%s:%d] %s was overridden by %s\n", __FUNCTION__, __LINE__, name.c_str(), overMethod->first.c_str());
                 return;
             }
-            //ACCExpr *value = generateSubscriptReference(IR, modLine, getRdyName(name));
             name = getRdyName(name);
             fixupAccessible(name);
             ACCExpr *value = allocExpr(name);

@@ -51,7 +51,7 @@ atomiccLinker: $(LINKER_SOURCES) *.h
 	$(Q)clang++ -g -o atomiccLinker $(CFLAGS) $(LINKER_SOURCES) -lBlocksRuntime $(CUDDLIB)
 
 atomiccImport: $(IMPORT_SOURCES) *.h
-	clang++ -g -o atomiccImport $(CFLAGS) $(IMPORT_SOURCES) $(CUDDLIB)
+	$(Q)clang++ -g -o atomiccImport $(CFLAGS) $(IMPORT_SOURCES) $(CUDDLIB)
 
 clean:
 	rm -f veriloggen atomiccImport

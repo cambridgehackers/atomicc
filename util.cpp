@@ -373,9 +373,18 @@ void addAccessible(std::string interfaceType, std::string name, std::string vecC
     std::string prefix = name;
     if (prefix != "")
         prefix += DOLLAR;
-    for (auto item: IR->interfaces)
-        if (item.fldName != "")
+    for (auto item: IR->interfaces) {
+        bool forceInterface = false;
+        if (auto IIR = lookupInterface(item.type)) {
+            if (IIR->methods.size() || IIR->interfaces.size())
+                forceInterface = true;
+            for (auto fitem: IIR->fields)
+                if (!fitem.isInout)
+                    forceInterface = true;
+        }
+        if (item.fldName != "" && forceInterface)
         addAccessible(item.type, prefix + item.fldName, vecCount, fieldType, false);
+    }
     if (IR->methods.size() || IR->fields.size() || startswith(interfaceType, "PipeInSync")) {
         if (name[name.length()-1] == DOLLAR[0] || name[name.length()-1] == PERIOD[0])
             name = name.substr(0, name.length()-1);
