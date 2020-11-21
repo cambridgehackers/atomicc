@@ -177,8 +177,12 @@ static void addModulePort (ModList &modParam, std::string name, std::string type
     }
 }
 
-static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface, bool isVerilog)
+static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string instance, std::string pinPrefix, std::string methodPrefix, bool isLocal, MapNameValue &parentMap, bool isPtr, std::string vecCount, bool localInterface, bool isVerilog, bool addInterface, bool aout, MapNameValue &interfaceMap, std::string atype)
 {
+    if (addInterface) {
+        addModulePort(modParam, methodPrefix.substr(0, methodPrefix.length()-1), atype, aout, false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, interfaceMap, instance, false, false);
+        return;
+    }
     assert(IR);
     MapNameValue mapValue = parentMap;
     vecCount = instantiateType(vecCount, mapValue);
@@ -251,10 +255,7 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
                 syncPins[oldName] = {newName, instance != ""};
             }
         }
-        if (item.fldName == "" || isVerilog)
-            collectInterfacePins(IIR, modParam, instance, pinPrefix + item.fldName, methodPrefix + item.fldName + DOLLAR, localFlag, imapValue, ptrFlag, updatedVecCount, localInterface, isVerilog);
-        else
-            addModulePort(modParam, methodPrefix + item.fldName, type, out, false, ""/*not param*/, localFlag, false/*isArgument*/, updatedVecCount, mapValue, instance, false, false);
+        collectInterfacePins(IIR, modParam, instance, pinPrefix + item.fldName, methodPrefix + item.fldName + DOLLAR, localFlag, imapValue, ptrFlag, updatedVecCount, localInterface, isVerilog, item.fldName != "" && !isVerilog, out, mapValue, type);
     }
 }
 
@@ -308,16 +309,16 @@ static void generateModuleSignature(std::string moduleName, std::string instance
         if (result != mapValue.end())
             mapValue.erase(result);
     }
-    collectInterfacePins(implements, modParam, instance, "", "", false, mapValue, false, vecCount, false, IR->isVerilog);
+    collectInterfacePins(implements, modParam, instance, "", "", false, mapValue, false, vecCount, false, IR->isVerilog, false, false, mapValue, "");
     if (instance == "") {
         mapValue.clear();
-        collectInterfacePins(IR, modParam, instance, "", "", false, mapValue, false, vecCount, true, IR->isVerilog);
+        collectInterfacePins(IR, modParam, instance, "", "", false, mapValue, false, vecCount, true, IR->isVerilog, false, false, mapValue, "");
     }
     for (FieldElement item : IR->parameters) {
         std::string interfaceName = item.fldName;
         if (interfaceName != "")
             interfaceName += PERIOD;
-        collectInterfacePins(lookupInterface(item.type), modParam, instance, item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, IR->isVerilog);
+        collectInterfacePins(lookupInterface(item.type), modParam, instance, item.fldName, interfaceName, item.isLocalInterface, mapValue, item.isPtr, item.vecCount, false, IR->isVerilog, false, false, mapValue, "");
     }
 }
 
@@ -1019,10 +1020,11 @@ static ACCExpr *walkSubscriptReference(ModuleIR *IR, ModList &modLine, ACCExpr *
         value = tree2str(expr);
         recurse = false;
     }
-printf("[%s:%d] exprval %s value %s\n", __FUNCTION__, __LINE__, expr->value.c_str(), value.c_str());
     ACCExpr *ret = generateSubscriptReference(IR, modLine, value);
-    if (!ret)
-        return expr;
+    if (!ret) {
+        ret = allocExpr(expr->value);
+        recurse = true;
+    }
     if (recurse)
         for (auto item: expr->operands)
             ret->operands.push_back(walkSubscriptReference(IR, modLine, item));
