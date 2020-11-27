@@ -22,8 +22,10 @@ std::map<std::string, int> genvarMap;
 
 std::string finishString(std::string arg)
 {
-    if (syncPins.find(arg) != syncPins.end())
-        return syncPins[arg].name;
+    auto item = syncPins.find(arg);
+    if (item != syncPins.end())
+        if (!item->second.out)
+            return item->second.name;
     return arg;
 }
 

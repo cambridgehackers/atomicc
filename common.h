@@ -128,7 +128,7 @@ typedef std::map<std::string, std::string> MapNameValue;
 
 // util.cpp
 std::string baseMethodName(std::string pname);
-std::string getRdyName(std::string basename);
+std::string getRdyName(std::string basename, bool isAsync = false);
 std::string getEnaName(std::string basename);
 bool isRdyName(std::string name);
 bool isEnaName(std::string name);
@@ -236,7 +236,9 @@ extern int globalExprCleanup;
 extern int flagErrorsCleanup;
 typedef struct {
     std::string name;
-    bool        instance;
+    std::string instance;
+    bool        out;
+    MethodInfo *MI;
 } SyncPinInfo;
 extern std::map<std::string, SyncPinInfo> syncPins;    // SyncFF items needed for PipeInSync instances
 extern int implementPrintf;

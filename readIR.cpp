@@ -256,6 +256,7 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
             }
             else if (checkItem("CALL")) {
                 bool isAction = checkItem("/Action");
+                bool isAsync = checkItem("/Async");
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *value = inputExpression(bufp), *subscript = nullptr, *param = nullptr;
@@ -294,13 +295,13 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                     value->operands.push_back(subscript);
                 if (param)
                     value->operands.push_back(param);
-                MI->callList.push_back(new CallListElement{value, cond, isAction});
+                MI->callList.push_back(new CallListElement{value, cond, isAction, isAsync});
             }
             else if (checkItem("PRINTF")) {
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *expr = inputExpression(bufp);
-                MI->printfList.push_back(new CallListElement{expr, cond, false});
+                MI->printfList.push_back(new CallListElement{expr, cond, false, false});
             }
             else if (checkItem("GENERATE")) {
                 ACCExpr *cond = getExpression(':');
@@ -472,22 +473,26 @@ interface, isStruct, isSerialize, ext);
                 IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, ""/*not param*/, false, false, false});
             }
             else if (checkItem("METHOD")) {
-                bool rule = false, action = false;
+                bool rule = false, action = false, async = false;
                 if (checkItem("/Rule"))
                     rule = true;
                 if (checkItem("/Action"))
                     action = true;
+                if (checkItem("/Async"))
+                    async = true;
                 std::string methodName = getToken();
                 if (!IR->isVerilog)
                     methodName = changeSeparator(methodName);
                 MethodInfo *MI = allocMethod(methodName), *MIRdy = nullptr;
                 MI->isRule = rule;
                 MI->action = action;
+                MI->async = async;
                 if (addMethod(IR, MI)) {
-                    std::string rdyName = getRdyName(methodName);
+                    std::string rdyName = getRdyName(methodName, MI->async);
                     MIRdy = allocMethod(rdyName);
                     addMethod(IR, MIRdy);
                     MIRdy->isRule = MI->isRule;
+                    MIRdy->async = async;
                     MIRdy->type = "Bit(1)";
                 }
                 readMethodInfo(IR, MI, MIRdy);

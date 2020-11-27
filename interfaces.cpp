@@ -114,11 +114,11 @@ static void processM2P(ModuleIR *IR)
             sourceParam->operands.push_back(allocExpr(paramPrefix + param.name));
         }
         ACCExpr *expr = makeIndication(target, counter, sourceParam, dataLength);
-        MInew->callList.push_back(new CallListElement{expr, nullptr, true});
+        MInew->callList.push_back(new CallListElement{expr, nullptr, true, false});
         if (generateTrace) {
             ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
                 allocExpr("\"DISPLAYM2P %x\""), allocExpr("{", sourceParam)));
-            MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
+            MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false, false});
         }
         counter++;
     }
@@ -156,7 +156,7 @@ static void processP2M(ModuleIR *IR)
     if (generateTrace) {
         ACCExpr *callExpr = allocExpr("printf", allocExpr(PARAMETER_MARKER,
             allocExpr("\"DISPLAYP2M %x\""), allocExpr(sourceParam)));
-        MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false});
+        MInew->printfList.push_back(new CallListElement{callExpr, nullptr, false, false});
     }
     int counter = 0;  // start method number at 0
     std::string paramLen = convertType("NOCDataH");
@@ -181,12 +181,12 @@ static void processP2M(ModuleIR *IR)
                  allocExpr("16'd" + autostr(counter)));
         ACCExpr *callExpr = allocExpr(target + PERIOD + methodName, allocExpr(PARAMETER_MARKER, paramList));
         if (isEnaName(methodName))
-            MInew->callList.push_back(new CallListElement{callExpr, cond, true});
+            MInew->callList.push_back(new CallListElement{callExpr, cond, true, false});
         else {
             if (MI->action) {
                 // when calling 'actionValue', guarded call needed
                 // need to call xxx__ENA function here!
-                //MInew->callList.push_back(new CallListElement{call, cond, true});
+                //MInew->callList.push_back(new CallListElement{call, cond, true, false});
             }
             // when calling 'value' or 'actionValue' method, enqueue return value
             int64_t dataLength = 16/*bitlength*/ + + atoi(convertType(instantiateType(MI->type, mapValue)).c_str());
@@ -194,7 +194,7 @@ static void processP2M(ModuleIR *IR)
             sourceParam->operands.push_back(allocExpr(callExpr->value));
             sourceParam->operands.push_back(allocExpr("16'd" + autostr(10/* bitlength*/)));
             ACCExpr *expr = makeIndication("returnInd$enq__ENA", counter, sourceParam, dataLength);
-            MInew->callList.push_back(new CallListElement{expr, cond, true});
+            MInew->callList.push_back(new CallListElement{expr, cond, true, false});
         }
         counter++;
     }

@@ -35,13 +35,15 @@ std::string baseMethodName(std::string pname)
     int ind = pname.find("__ENA[");
     if (ind == -1)
         ind = pname.find("__RDY[");
+    if (ind == -1)
+        ind = pname.find("__ACK[");
     if (ind > 0)
         pname = pname.substr(0, ind) + pname.substr(ind + 5);
-    if (endswith(pname, "__ENA") || endswith(pname, "__RDY"))
+    if (endswith(pname, "__ENA") || endswith(pname, "__RDY") || endswith(pname, "__ACK"))
         pname = pname.substr(0, pname.length()-5);
     return pname;
 }
-std::string getRdyName(std::string basename)
+std::string getRdyName(std::string basename, bool isAsync)
 {
     std::string base = baseMethodName(basename), sub;
     if (endswith(base, "]")) {
@@ -49,7 +51,7 @@ std::string getRdyName(std::string basename)
         sub = base.substr(ind);
         base = base.substr(0, ind);
     }
-    return base + "__RDY" + sub;
+    return base + (isAsync ? "__ACK" : "__RDY") + sub;
 }
 
 std::string getEnaName(std::string basename)
@@ -66,7 +68,8 @@ std::string getEnaName(std::string basename)
 bool isRdyName(std::string name)
 {
     std::string rname = getRdyName(name);
-    return name == rname;
+    std::string raname = getRdyName(name, true);
+    return name == rname || name == raname;
 }
 
 bool isEnaName(std::string name)
@@ -588,7 +591,7 @@ MethodInfo *allocMethod(std::string name)
 {
     MethodInfo *MI = new MethodInfo{nullptr/*guard*/,
         nullptr/*subscript*/, ""/*generateSection*/,
-        name/*name*/, false/*isRule*/, false/*action*/,
+        name/*name*/, false/*isRule*/, false/*action*/, false/*async*/,
         {}/*storeList*/, {}/*letList*/, {}/*assertList*/, {}/*callList*/, {}/*printfList*/,
         ""/*type*/, {}/*params*/, {}/*generateFor*/, {}/*instantiateFor*/,
         {}/*alloca*/, {}/*interfaceConnect*/, {{}}/*meta*/};
@@ -613,7 +616,14 @@ void dumpMethod(std::string name, MethodInfo *MI)
     if (!MI)
         return;
     std::string methodName = MI->name;
-    printf("%s    METHOD%s %s(", name.c_str(), MI->isRule ? "/Rule" : "", methodName.c_str());
+    std::string attr;
+    if (MI->isRule)
+        attr += "/Rule";
+    if (MI->action)
+        attr += "/Action";
+    if (MI->async)
+        attr += "/Async";
+    printf("%s    METHOD%s %s(", name.c_str(), attr.c_str(), methodName.c_str());
     std::string sep;
     for (auto param: MI->params) {
         printf("%s%s %s", sep.c_str(), param.type.c_str(), param.name.c_str());

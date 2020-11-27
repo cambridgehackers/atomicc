@@ -42,6 +42,7 @@ std::map<std::string, SyncPinInfo> syncPins;    // SyncFF items needed for PipeI
 std::map<std::string, AssignItem> assignList;
 std::map<std::string, std::map<std::string, AssignItem>> condAssignList; // used for 'generate' items
 std::map<std::string, std::map<std::string, MuxValueElement>> muxValueList; // used to calculate __phi for multiple assignments
+static std::map<std::string, ACCExpr *> methodCommitCondition;
 static std::map<std::string, std::map<std::string, MuxValueElement>> enableList;
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 static std::map<std::string, std::string> mapParam;
@@ -97,7 +98,7 @@ static void setAssign(std::string target, ACCExpr *value, std::string type)
     int sPin = refList[valStr].pin;
     if (trace_interface || trace_global)
         printf("%s: [%s/%d/%d]count[%d] = %s/%d/%d type '%s'\n", __FUNCTION__, target.c_str(), tDir, tPin, refList[target].count, valStr.c_str(), sDir, sPin, type.c_str());
-    if (sPin == PIN_OBJECT && tPin != PIN_OBJECT) {
+    if (sPin == PIN_OBJECT && tPin != PIN_OBJECT && assignList[valStr].type == "") {
         value = allocExpr(target);
         target = valStr;
     }
@@ -191,13 +192,15 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
 //printf("[%s:%d] IR %s instance %s pinpref %s methpref %s isLocal %d ptr %d isVerilog %d veccount %s\n", __FUNCTION__, __LINE__, IR->name.c_str(), instance.c_str(), pinPrefix.c_str(), methodPrefix.c_str(), isLocal, isPtr, isVerilog, vecCount.c_str());
     if (!localInterface || methodPrefix != "")
     for (auto MI: IR->methods) {
+        std::string name = methodPrefix + MI->name;
+        bool out = (instance != "") ^ isPtr;
+        if (MI->async && !localInterface)
+            syncPins[instance + name] = {"", instance, out != (MI->type != ""), MI};
         if (addInterface) {
             forceInterface = true;
             continue;
         }
-        std::string name = methodPrefix + MI->name;
-        bool out = (instance != "") ^ isPtr;
-        addModulePort(modParam, name, MI->type, out ^ (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, MI->action || isEnaName(name) || isRdyName(name));
+        addModulePort(modParam, name, MI->type, out != (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, MI->action || isEnaName(name) || isRdyName(name));
         if (MI->action && !isEnaName(name))
             addModulePort(modParam, name + "__ENA", "", out ^ (0), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, true);
         if (trace_ports)
@@ -253,20 +256,6 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
             updatedVecCount = item.vecCount;
         //printf("[%s:%d] name %s type %s veccc %s updated %s\n", __FUNCTION__, __LINE__, (methodPrefix + item.fldName + DOLLAR).c_str(), type.c_str(), item.vecCount.c_str(), updatedVecCount.c_str());
         bool localFlag = isLocal || item.isLocalInterface;
-        if (startswith(type, "PipeInSync")) {
-            type = IIR->interfaces.front().type;   // rewrite to PipeIn type
-            if (!localInterface) {
-                std::string itemname = methodPrefix + item.fldName;
-                std::string suffix = out ? "__RDY" : "__ENA";
-                std::string oldName = itemname + PERIOD "enq" + suffix;
-                std::string newName = LOCAL_VARIABLE_PREFIX + itemname + DOLLAR "enq" "S" + suffix;
-                printf("[%s:%d] PipeInSync oldname %s newname %s out %d isPtr %d instance %d\n", __FUNCTION__, __LINE__, oldName.c_str(), newName.c_str(), out, isPtr, (instance != ""));
-                setReference(newName, 4, "Bit(1)", false, false, PIN_OBJECT);
-                refList[oldName].count++;
-                refList[newName].count++;
-                syncPins[oldName] = {newName, instance != ""};
-            }
-        }
         collectInterfacePins(IIR, modParam, instance, pinPrefix + item.fldName, methodPrefix + item.fldName + DOLLAR, localFlag, imapValue, ptrFlag, updatedVecCount, localInterface, isVerilog, item.fldName != "" && !isVerilog, out, mapValue, type);
     }
     if (forceInterface) {
@@ -502,7 +491,7 @@ static void setAssignRefCount(ModuleIR *IR)
     for (auto &tcond : alwaysGroup.second.cond) {
         std::string methodName = tcond.first;
         walkRef(tcond.second.guard);
-        tcond.second.guard = cleanupBool(replaceAssign(tcond.second.guard));
+        tcond.second.guard = cleanupBool(replaceAssign(methodCommitCondition[methodName]));
         if (trace_assign)
             printf("[%s:%d] %s: guard %s\n", __FUNCTION__, __LINE__, methodName.c_str(), tree2str(tcond.second.guard).c_str());
         auto info = tcond.second.info;
@@ -566,10 +555,7 @@ static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACC
             CI.second.info.push_back(CondInfo{dest, value});
             return;
         }
-    ACCExpr * econd = allocExpr("&&", allocExpr(getRdyName(methodName)));
-    if (isEnaName(methodName))
-        econd->operands.push_back(allocExpr(methodName));
-    element.guard = cleanupBool(econd);
+    element.guard = nullptr;
     element.info[tree2str(cond)].cond = cond;
     element.info[tree2str(cond)].info.push_back(CondInfo{dest, value});
 }
@@ -613,8 +599,8 @@ static void connectTarget(ACCExpr *target, ACCExpr *source, std::string type, bo
     std::string tstr = tree2str(target), sstr = tree2str(source);
     std::string tif = tstr, sif = sstr;
     // TODO: need to update this to be 'has a return type' (i.e. handle value methods
-    bool tdir = getDirection(tif) ^ endswith(tstr, "__RDY");
-    bool sdir = getDirection(sif) ^ endswith(sstr, "__RDY");
+    bool tdir = getDirection(tif) ^ isRdyName(tstr);
+    bool sdir = getDirection(sif) ^ isRdyName(sstr);
     if (trace_assign || trace_connect || trace_interface || (!tdir && !sdir))
         printf("%s: IFCCC '%s'/%d/%d pin %d '%s'/%d/%d pin %d\n", __FUNCTION__, tstr.c_str(), tdir, refList[target->value].out, refList[tif].pin, sstr.c_str(), sdir, refList[source->value].out, refList[sif].pin);
     if (sdir) {
@@ -769,15 +755,46 @@ static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo
     if (MI->type == "Bit(1)") {
         guard = cleanupBool(guard);
     }
-    setAssign(methodName, guard, MI->type); // collect the text of the return value into a single 'assign'
+    std::string methodSignal = methodName;
+    if (MI->async && isRdyName(methodName)) {
+        std::string enaName = getEnaName(methodName);
+        methodSignal = getRdyName(enaName);   // __RDY for one-shot enable
+        std::string regname = "REGGTEMP_" + methodName;
+        setReference(methodSignal, 4, "Bit(1)", false, false, PIN_OBJECT);
+        setReference(regname, 4, "Bit(1)", false, false, PIN_REG); // persistent ACK register
+        appendLine(enaName, allocExpr("1"), allocExpr(regname), allocExpr("1")); // set persistent ACK in method instantiation (one shot)
+        // clear persistent ACK when enable falls
+        appendLine("", cleanupBool(allocExpr("&&", allocExpr(regname), allocExpr("!", allocExpr(enaName)))), allocExpr(regname), allocExpr("0"));
+        setAssign(methodName, cleanupBool(allocExpr("|", allocExpr(methodSignal), allocExpr(regname))), MI->type);
+        guard = allocExpr("&&", allocExpr("!", allocExpr(regname)), guard);    // make one shot
+    }
+    setAssign(methodSignal, guard, MI->type); // collect the text of the return value into a single 'assign'
     for (auto IC : MI->interfaceConnect)
         connectMethods(IR, IC.type, IC.target, IC.source, IC.isForward);
 }
+
+static std::string getAsyncControl(ACCExpr *value)
+{
+    std::string controlName = replacePeriod("__CONTROL_" + tree2str(value));
+    int ind = controlName.find_first_of("{" "[");
+    if (ind > 0)
+        controlName = controlName.substr(0, ind);
+printf("[%s:%d] %s\n", __FUNCTION__, __LINE__, controlName.c_str());
+    return controlName;
+}
+
 static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
 {
+    ACCExpr *commitCondition = nullptr;
     if (MI->subscript)      // from instantiateFor
         methodName += "[" + tree2str(MI->subscript) + "]";
     generateSection = MI->generateSection;
+    for (auto info: MI->callList) {
+        if (info->isAsync) {
+            std::string controlName = getAsyncControl(info->value) + DOLLAR;
+            commitCondition = allocExpr(controlName + "done");
+        }
+    }
     for (auto info: MI->storeList) {
         std::string dest = info->dest->value;
         ACCExpr *cond = info->cond;
@@ -822,7 +839,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         par.clear();
         par.push_back(param);
         ACCExpr *guard = nullptr;
-        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName))) {
+        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName, MI->async))) {
             guard = cleanupBool(MIRdy->guard);
         }
         ACCExpr *tempCond = guard ? allocExpr("&&", guard, cond) : cond;
@@ -831,22 +848,25 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         condLines[generateSection].assert.push_back(AssertVerilog{tempCond, value});
     }
     for (auto info: MI->callList) {
+        if (!info->isAction)
+            continue;
         ACCExpr *subscript = nullptr;
-        int ind = info->value->value.find("[");
+        std::string section = generateSection;
+        ACCExpr *cond = info->cond;
+        ACCExpr *value = info->value;
+        ACCExpr *param = nullptr;
+
+        int ind = value->value.find("[");
         if (ind > 0) {
-            std::string sub = info->value->value.substr(ind+1);
+            std::string sub = value->value.substr(ind+1);
             int rind = sub.find("]");
             if (rind > 0) {
-                info->value->value = info->value->value.substr(0, ind) + sub.substr(rind+1);
+                value->value = value->value.substr(0, ind) + sub.substr(rind+1);
                 sub = sub.substr(0, rind);
                 subscript = allocExpr(sub);
             }
         }
-        std::string section = generateSection;
-        ACCExpr *cond = info->cond;
-        ACCExpr *value = info->value;
         walkRead(MI, value, cond);
-        ACCExpr *param = nullptr;
         if (!(isIdChar(value->value[0]) && value->operands.size()
          && (param = value->operands.back()) && param->value == PARAMETER_MARKER)) {
             printf("[%s:%d] incorrectly formed call expression\n", __FUNCTION__, __LINE__);
@@ -864,12 +884,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             dumpExpr("CALL", value);
             exit(-1);
         }
-        if (!info->isAction)
-            continue;
-        ACCExpr *tempCond = cleanupBool(allocExpr("&&", allocExpr(methodName), //allocExpr(getRdyName(methodName)),
- cond));
-        tempCond = cleanupBool(replaceAssign(simpleReplace(tempCond), getRdyName(calledEna))); // remove __RDY before adding subscript!
-        walkRead(MI, tempCond, nullptr);
+        ACCExpr *tempCond = cond;
         if (subscript) {
             std::string sub, post;
             ACCExpr *var = allocExpr(GENVAR_NAME "1");
@@ -886,19 +901,40 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
                     post = post.substr(0, ind) + PERIOD + post.substr(ind+1);
             }
             calledEna += sub + post;
-            tempCond = allocExpr("&&", tempCond, allocExpr("==", subscript, var));
+            tempCond = allocExpr("&&", allocExpr("==", subscript, var, tempCond));
         }
 //printf("[%s:%d] CALLLLLL '%s' condition %s\n", __FUNCTION__, __LINE__, calledName.c_str(), tree2str(tempCond).c_str());
 //dumpExpr("CALLCOND", tempCond);
+        ACCExpr *callCommit = commitCondition;
+        if (info->isAsync || !callCommit)
+            callCommit = allocExpr(methodName);
+        tempCond = cleanupBool(allocExpr("&&", callCommit, tempCond));
+        tempCond = cleanupBool(replaceAssign(simpleReplace(tempCond), getRdyName(calledEna, MI->async))); // remove __RDY before adding subscript!
+        walkRead(MI, tempCond, nullptr);
         if (calledName == "__finish") {
             appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"));
-            break;
+            continue;
         }
-        if (!enableList[section][calledEna].phi) {
-            enableList[section][calledEna].phi = allocExpr("|");
-            enableList[section][calledEna].defaultValue = "1'd0";
+        std::string calledSignal = calledEna;
+        ACCExpr *callEnable = tempCond;
+        if (info->isAsync) {
+            std::string controlName = getAsyncControl(value) + DOLLAR;
+            setAssign(controlName + "CLK", allocExpr("CLK"), "Bit(1)");
+            setAssign(controlName + "nRST", allocExpr("nRST"), "Bit(1)");
+            setAssign(controlName + "start", cleanupBool(tempCond), "Bit(1)");
+            setAssign(controlName + "out", allocExpr(calledEna), "Bit(1)");
+            setAssign(controlName + "end", allocExpr(getRdyName(calledEna, info->isAsync)), "Bit(1)");
+            setAssign(controlName + "clear", commitCondition, "Bit(1)");
+            callEnable = allocExpr(controlName + "out");
+            tempCond = allocExpr(calledEna);
         }
-        enableList[section][calledEna].phi->operands.push_back(tempCond);
+
+        // Now generate the actual enable signal and pass parameters (both mux'ed)
+        if (!enableList[section][calledSignal].phi) {
+            enableList[section][calledSignal].phi = allocExpr("|");
+            enableList[section][calledSignal].defaultValue = "1'd0";
+        }
+        enableList[section][calledSignal].phi->operands.push_back(callEnable);
         auto AI = CI->params.begin();
         std::string pname = baseMethodName(calledEna) + DOLLAR;
         int argCount = CI->params.size();
@@ -914,6 +950,10 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
     if (!implementPrintf)
         for (auto info: MI->printfList)
             appendLine(methodName, info->cond, nullptr, info->value);
+    // set global commit condition
+    if (!commitCondition)
+        commitCondition = allocExpr("&&", allocExpr(getRdyName(methodName)), allocExpr(methodName));
+    methodCommitCondition[methodName] = commitCondition;
 }
 
 static void generateMethodGroup(ModuleIR *IR, void (*generateMethod)(ModuleIR *IR, std::string methodName, MethodInfo *MI))
@@ -954,8 +994,10 @@ static void interfaceAssign(std::string target, ACCExpr *source, std::string typ
     }
 }
 
-static void generateField(ModuleIR *IR, ModList &modLine, FieldElement &item)
+static void generateField(ModuleIR *IR, ModList &modLine, FieldElement item, bool addField)
 {
+    if (addField)
+        IR->fields.push_back(item);
     ModuleIR *itemIR = lookupIR(item.type);
     if (!itemIR || item.isPtr || itemIR->isStruct)
         setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount);
@@ -1005,8 +1047,7 @@ static ACCExpr *generateSubscriptReference(ModuleIR *IR, ModList &modLine, std::
         setReference(name_or, 99, type, false, false, PIN_WIRE, nameVec);
         setReference(name_or1, 99, type);
         std::string objectName = name_or + "CC";
-        IR->fields.push_back(FieldElement{objectName, "", "SelectIndex(width=" + convertType(type) + ",funnelWidth=" + nameVec + ")", false, false, false, false, "", false, false, false});
-        generateField(IR, modLine, IR->fields.back());
+        generateField(IR, modLine, FieldElement{objectName, "", "SelectIndex(width=" + convertType(type) + ",funnelWidth=" + nameVec + ")", false, false, false, false, "", false, false, false}, true);
         objectName += DOLLAR;
         setAssign(objectName + "out", allocExpr(name_or1), type);
         setAssign(objectName + "in", allocExpr(name_or), type);
@@ -1056,7 +1097,7 @@ static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
             ACCExpr *value = info->value->operands.front();
             value->value = "(";   // change from PARAMETER_MARKER
             if (implementPrintf)
-                MI->callList.push_back(new CallListElement{printfArgs(value), info->cond, true});
+                MI->callList.push_back(new CallListElement{printfArgs(value), info->cond, true, false});
             else {
                 ACCExpr *listp = value->operands.front();
                 assert(listp);
@@ -1088,7 +1129,7 @@ static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
         }
         // lift/hoist/gather guards from called method interfaces
         if (!isRdyName(methodName))
-        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName))) {
+        if (MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName, MI->async))) {
         typedef struct {
             ACCExpr    *cond;
             std::string method;
@@ -1129,7 +1170,8 @@ static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
             }
         }
         for (auto item: MI->callList)
-            appendGuard(item);
+            if (!item->isAsync)
+                appendGuard(item);
         for (auto item: MI->generateFor) {
             MethodInfo *MIb = IR->generateBody[item.body];
             assert(MIb);
@@ -1151,7 +1193,7 @@ static void prepareMethodGuards(ModuleIR *IR, ModList &modLine)
     }
 }
 
-static void fixupModuleInstantiations(ModList &modLine)
+static void fixupModuleInstantiations(ModuleIR *IR, ModList &modLine)
 {
     // last chance to optimize out single assigns to output ports
     std::map<std::string, std::string> mapPort;
@@ -1234,8 +1276,16 @@ static void fixupModuleInstantiations(ModList &modLine)
             else if (refList[val].count) {
                 val = tree2str(replaceAssign(allocExpr(val)));
             }
+            else if (refList[val].out && !refList[val].inout) {
+                if (endswith(mitem.value, DOLLAR "CLK"))
+                    val = "CLK";
+                else if (endswith(mitem.value, DOLLAR "nRST"))
+                    val = "nRST";
+                else
+                    val = (IR->name != "l_top") ? "0" : "";  // leave open slots in 'l_top' empty for use by linker
+            }
             else
-                val = (refList[val].out && !refList[val].inout) ? "0" : "";
+                val = "";
             if (oldVal != val)
                 refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
             if (trace_interface)
@@ -1321,8 +1371,7 @@ static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
     std::string head = depth.substr(ind + 1);
     depth = depth.substr(0, ind);
     std::string traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + depth + ",head=" + head + ", sensitivity=" + sensitivity + ")";
-    IR->fields.push_back(FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false});
-    generateField(IR, modLine, IR->fields.back());
+    generateField(IR, modLine, FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false}, true);
     std::string filename = IR->name;
     ind = filename.find("(");
     if (ind > 0)
@@ -1354,7 +1403,6 @@ printf("traceDataType %s\n", traceDataType.c_str());
     refList["__traceMemory$out"].count++;  // force allocation so that we can hierarchically reference later
     refList["__traceMemory$clear__ENA"].count++;  // force allocation so that we can hierarchically reference later
     refList["__traceMemory$clear__ENA"].done = true;  // prevent dummy assign to '0'
-    //return traceDataGather;
 }
 
 /*
@@ -1369,6 +1417,8 @@ static ModList modLine;
     assignList.clear();
     modNew.clear();
     condLines.clear();
+    methodCommitCondition.clear();
+    methodCommitCondition[""] = allocExpr("1");  // used for state updates not governed by a method/rule invocation
     genvarMap.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
     muxValueList.clear();
@@ -1395,19 +1445,37 @@ static ModList modLine;
     }
 
     for (auto &item: IR->fields) {
-        generateField(IR, modLine, item);
+        generateField(IR, modLine, item, false);
     }
-    for (auto item : syncPins) {
+    for (auto &item : syncPins) {
         std::string oldName = item.first;
-        std::string newName = item.second.name;
+        //std::string newName = item.second.name;
+        std::string suffix = oldName.substr(oldName.length()-5);
+        std::string newName = LOCAL_VARIABLE_PREFIX + oldName.substr(0, oldName.length()-5) + "S" + suffix;
+        item.second.name = newName;
+        refList[oldName].count++;
+        refList[newName].count++;
+printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %s instance %s new %s out %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), oldName.c_str(), item.second.instance.c_str(), newName.c_str(), item.second.out);
+        if (item.second.out) {
+            generateField(IR, modLine, FieldElement{newName, "", "Bit(1)", false, false, false, false, "", false, false, false}, true);
+        }
+        else {
+        setReference(newName, 4, "Bit(1)", false, false, PIN_OBJECT);
         modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, false, "", ""});
-        modLine.push_back(ModData{"out", item.second.instance ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, false, "", ""});
-        modLine.push_back(ModData{"in", item.second.instance ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, false, "", ""});
+        modLine.push_back(ModData{"out", item.second.instance != "" ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, false, "", ""});
+        modLine.push_back(ModData{"in", item.second.instance != "" ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, false, "", ""});
+        }
     }
 
     for (auto MI : IR->methods) { // walkRemoveParam depends on the iterField above
         for (auto item: MI->alloca) { // be sure to define local temps before walkRemoveParam
             setReference(item.first, 0, item.second.type, true, false, PIN_WIRE, convertType(item.second.type, 2));
+        }
+        for (auto item: MI->callList) {
+            if (item->isAsync) {
+                std::string calledName = getAsyncControl(item->value);
+                generateField(IR, modLine, FieldElement{calledName, "", "AsyncControl", false, false, false, false, "", false, false, false}, true);
+            }
         }
     }
     buildAccessible(IR);
@@ -1495,5 +1563,5 @@ static ModList modLine;
             item.second.phi = replaceAssign(item.second.phi);
 
     // process assignList replacements, mark referenced items
-    fixupModuleInstantiations(modLine);
+    fixupModuleInstantiations(IR, modLine);
 }

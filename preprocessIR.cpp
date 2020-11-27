@@ -113,12 +113,12 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
         newMI->callList.push_back(new CallListElement{
             walkToGeneric(item->value, paramMap),
             walkToGeneric(item->cond, paramMap),
-            item->isAction});
+            item->isAction, item->isAsync});
     for (auto item : MI->printfList)
         newMI->printfList.push_back(new CallListElement{
             walkToGeneric(item->value, paramMap),
             walkToGeneric(item->cond, paramMap),
-            item->isAction});
+            item->isAction, item->isAsync});
     for (auto item : MI->alloca)
         newMI->alloca[item.first] = AllocaItem{updateType(item.second.type, paramMap), item.second.noReplace};
     for (auto item : MI->generateFor)
@@ -258,7 +258,7 @@ void preprocessMethod(ModuleIR *IR, MethodInfo *MI, bool isGenerate)
         MethodInfo *MIb = IR->generateBody[item.body];
         std::string methodName = baseMethodName(MI->name) + PERIOD;
         assert(MIb);
-        MethodInfo *MIRdy = lookupMethod(IR, getRdyName(MI->name));
+        MethodInfo *MIRdy = lookupMethod(IR, getRdyName(MI->name, MI->async));
         assert(MIRdy);
         MIb->subscript = item.sub;     // make sure enable line is subscripted(body is in separate function!)
         MIb->generateSection = makeSection(item.var, item.init, item.limit, item.incr);

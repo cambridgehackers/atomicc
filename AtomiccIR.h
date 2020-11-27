@@ -88,6 +88,7 @@ typedef struct {
     ACCExpr *value;
     ACCExpr *cond;
     bool isAction;
+    bool isAsync;
 } CallListElement;
 
 typedef struct {
@@ -132,6 +133,7 @@ typedef struct {
     std::string                name;
     bool                       isRule;
     bool                       action;
+    bool                       async;
     std::list<StoreListElement *> storeList;
     std::list<LetListElement *> letList;
     std::list<AssertListElement *> assertList;

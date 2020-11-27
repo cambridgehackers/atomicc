@@ -116,7 +116,7 @@ static void generateVerilogInterface(std::string name, FILE *OStrVH)
     }
     for (auto MI: IR->methods) {
          std::string methodName = MI->name;
-         std::string rdyMethodName = getRdyName(methodName);
+         std::string rdyMethodName = getRdyName(methodName, MI->async);
          if (methodName == rdyMethodName)
              continue;
         std::string type = "logic";

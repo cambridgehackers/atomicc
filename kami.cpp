@@ -181,13 +181,14 @@ static void generateModule(FILE *OStrV, ModuleIR *IR)
          std::string methodName = MI->name;
          if (isRdyName(methodName))
              continue;
-         MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName));
+         MethodInfo *MIRdy = lookupMethod(IR, getRdyName(methodName, MI->async));
          fprintf(OStrV, "    %s %s instancePrefix--\"%s\" :=\n    (\n", sep.c_str(),
              MI->isRule ? "Rule" : "Method", methodName.c_str());
          for (auto pitem: MI->params) {
               fprintf(OStrV, "        Read %s_v: %s <- (instancePrefix--\"%s\") ;\n",
              pitem.name.c_str(), kamiType(pitem.type).c_str(), pitem.name.c_str());
          }
+         if (MIRdy)
          fprintf(OStrV, "        Assert(%s);\n", kamiValue(cleanupBool(MIRdy->guard), 1).c_str());
          int unusedNumber = 1;
          for (auto citem: MI->callList) {
