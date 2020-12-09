@@ -723,9 +723,10 @@ static void connectMethods(ModuleIR *IR, std::string ainterfaceName, ACCExpr *ta
         connectTarget(targetTree, sourceTree, interfaceName, isForward);
 }
 
-static void appendMux(std::string section, std::string name, ACCExpr *cond, ACCExpr *value, std::string defaultValue)
+static void appendMux(std::string section, std::string name, ACCExpr *cond, ACCExpr *value, std::string defaultValue, bool isParam)
 {
     ACCExpr *phi = muxValueList[section][name].phi;
+    muxValueList[section][name].isParam = isParam;
     if (!phi) {
         phi = allocExpr("__phi", allocExpr("("));
         muxValueList[section][name].phi = phi;
@@ -804,7 +805,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         updateWidth(value, convertType(refList[dest].type));
         if (isIdChar(dest[0]) && !info->dest->operands.size() && refList[dest].pin == PIN_WIRE) {
             cond = cleanupBool(allocExpr("&&", allocExpr(methodName), cond));
-            appendMux(generateSection, dest, cond, value, "0");
+            appendMux(generateSection, dest, cond, value, "0", false);
         }
         else
             appendLine(methodName, cleanupBool(cond), info->dest, value);
@@ -827,7 +828,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         walkRead(MI, cond, nullptr);
         walkRead(MI, value, cond);
         updateWidth(value, convertType(info->type));
-        appendMux(generateSection, dest, cond, value, "0");
+        appendMux(generateSection, dest, cond, value, "0", false);
     }
     for (auto info: MI->assertList) {
         ACCExpr *cond = info->cond;
@@ -923,7 +924,7 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
             setAssign(controlName + "nRST", allocExpr("nRST"), "Bit(1)");
             setAssign(controlName + "start", cleanupBool(tempCond), "Bit(1)");
             setAssign(controlName + "out", allocExpr(calledEna), "Bit(1)");
-            setAssign(controlName + "end", allocExpr(getRdyName(calledEna, info->isAsync)), "Bit(1)");
+            setAssign(controlName + "ack", allocExpr(getRdyName(calledEna, info->isAsync)), "Bit(1)");
             setAssign(controlName + "clear", commitCondition, "Bit(1)");
             callEnable = allocExpr(controlName + "out");
             tempCond = allocExpr(calledEna);
@@ -941,7 +942,7 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
         for (auto item: param->operands) {
             if(argCount-- > 0) {
                 std::string size; // = tree2str(cleanupInteger(cleanupExpr(str2tree(convertType(instantiateType(AI->type, mapValue)))))) + "'d";
-                appendMux(section, pname + AI->name, tempCond, item, size + "0");
+                appendMux(section, pname + AI->name, tempCond, item, size + "0", true);
                 AI++;
             }
         }
@@ -1508,6 +1509,11 @@ printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %
             else
                 item.second.phi = cleanupExpr(item.second.phi);
             if (item.second.phi && (!item.second.phi->operands.size() || item.second.phi->operands.front()->operands.size() < 2 || refList[item.first].type == "Bit(1)")) {
+                if (item.second.isParam) {
+                    ACCExpr *list = item.second.phi->operands.front();
+                    ACCExpr *first = getRHS(list->operands.front(), 1);
+                    item.second.phi = first;
+                }
                 //if (refList[item.first].type != "Bit(1)")
                 item.second.phi = cleanupExprBuiltin(item.second.phi, item.second.defaultValue);
                 setAssign(item.first, item.second.phi, refList[item.first].type);

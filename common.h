@@ -120,6 +120,7 @@ typedef struct {
 typedef struct {
     ACCExpr *phi;
     std::string defaultValue;
+    bool        isParam;
 } MuxValueElement;
 
 typedef ModuleIR *(^CBFun)(FieldElement &item);
