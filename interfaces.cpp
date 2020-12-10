@@ -27,6 +27,8 @@
 //////////////////HACKHACK /////////////////
 #define PRINTF_PORT 0x7fff
 
+#define MAX_METHOD_SERIALIZE_LENGTH 128
+
 static int printfNumber = 1;
 int trace_software;//= 1;
 int generateTrace;//=1;
@@ -63,6 +65,10 @@ static void processSerialize(ModuleIR *IR)
 static ACCExpr *makeIndication(std::string target, int counter, ACCExpr *sourceParam, int64_t dataLength)
 {
     dataLength += 32;     // include length of tag
+    if (dataLength > MAX_METHOD_SERIALIZE_LENGTH) {
+        printf("%s: max method serialize length exceeded %s\n", __FUNCTION__, tree2str(sourceParam).c_str());
+        exit(-1);
+    }
     uint64_t vecLength = (dataLength + 31) / 32;
     dataLength = vecLength * 32 - dataLength;
     if (dataLength)
@@ -195,6 +201,10 @@ static void processP2M(ModuleIR *IR)
             sourceParam->operands.push_back(allocExpr("16'd" + autostr(10/* bitlength*/)));
             ACCExpr *expr = makeIndication("returnInd$enq__ENA", counter, sourceParam, dataLength);
             MInew->callList.push_back(new CallListElement{expr, cond, true, false});
+        }
+        if (totalLength > MAX_METHOD_SERIALIZE_LENGTH) {
+            printf("%s: max method serialize length exceeded %s/%s\n", __FUNCTION__, IR->name.c_str(), methodName.c_str());
+            exit(-1);
         }
         counter++;
     }
