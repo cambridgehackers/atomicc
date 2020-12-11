@@ -545,11 +545,11 @@ static void setAssignRefCount(ModuleIR *IR)
     }
 }
 
-static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value)
+static void appendLine(std::string methodName, ACCExpr *cond, ACCExpr *dest, ACCExpr *value, std::string clockName)
 {
     dest = replaceAssign(dest);
     value = replaceAssign(value);
-    auto &element = condLines[generateSection].always[ALWAYS_CLOCKED].cond[methodName];
+    auto &element = condLines[generateSection].always[ALWAYS_CLOCKED + clockName + ")"].cond[methodName];
     for (auto &CI : element.info)
         if (matchExpr(cond, CI.second.cond)) {
             CI.second.info.push_back(CondInfo{dest, value});
@@ -743,6 +743,7 @@ static void appendMux(std::string section, std::string name, ACCExpr *cond, ACCE
 
 static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo *MI)
 {
+    std::string clockName = "CLK";
     if (MI->subscript)      // from instantiateFor
         methodName += "[" + tree2str(MI->subscript) + "]";
     generateSection = MI->generateSection;
@@ -763,9 +764,9 @@ static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo
         std::string regname = "REGGTEMP_" + methodName;
         setReference(methodSignal, 4, "Bit(1)", false, false, PIN_OBJECT);
         setReference(regname, 4, "Bit(1)", false, false, PIN_REG); // persistent ACK register
-        appendLine(enaName, allocExpr("1"), allocExpr(regname), allocExpr("1")); // set persistent ACK in method instantiation (one shot)
+        appendLine(enaName, allocExpr("1"), allocExpr(regname), allocExpr("1"), clockName); // set persistent ACK in method instantiation (one shot)
         // clear persistent ACK when enable falls
-        appendLine("", cleanupBool(allocExpr("&&", allocExpr(regname), allocExpr("!", allocExpr(enaName)))), allocExpr(regname), allocExpr("0"));
+        appendLine("", cleanupBool(allocExpr("&&", allocExpr(regname), allocExpr("!", allocExpr(enaName)))), allocExpr(regname), allocExpr("0"), clockName);
         setAssign(methodName, cleanupBool(allocExpr("|", allocExpr(methodSignal), allocExpr(regname))), MI->type);
         guard = allocExpr("&&", allocExpr("!", allocExpr(regname)), guard);    // make one shot
     }
@@ -808,7 +809,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
             appendMux(generateSection, dest, cond, value, "0", false);
         }
         else
-            appendLine(methodName, cleanupBool(cond), info->dest, value);
+            appendLine(methodName, cleanupBool(cond), info->dest, value, info->clockName);
     }
     for (auto info: MI->letList) {
         ACCExpr *cond = info->cond;
@@ -913,7 +914,8 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
         tempCond = cleanupBool(replaceAssign(simpleReplace(tempCond), getRdyName(calledEna, MI->async))); // remove __RDY before adding subscript!
         walkRead(MI, tempCond, nullptr);
         if (calledName == "__finish") {
-            appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"));
+            std::string clockName = "CLK";
+            appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"), clockName);
             continue;
         }
         std::string calledSignal = calledEna;
@@ -949,8 +951,10 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
         MI->meta[MetaInvoke][calledEna].insert(tree2str(cond));
     }
     if (!implementPrintf)
-        for (auto info: MI->printfList)
-            appendLine(methodName, info->cond, nullptr, info->value);
+        for (auto info: MI->printfList) {
+            std::string clockName = "CLK";
+            appendLine(methodName, info->cond, nullptr, info->value, clockName);
+        }
     // set global commit condition
     if (!commitCondition)
         commitCondition = allocExpr("&&", allocExpr(getRdyName(methodName)), allocExpr(methodName));
@@ -1048,7 +1052,7 @@ static ACCExpr *generateSubscriptReference(ModuleIR *IR, ModList &modLine, std::
         setReference(name_or, 99, type, false, false, PIN_WIRE, nameVec);
         setReference(name_or1, 99, type);
         std::string objectName = name_or + "CC";
-        generateField(IR, modLine, FieldElement{objectName, "", "SelectIndex(width=" + convertType(type) + ",funnelWidth=" + nameVec + ")", false, false, false, false, "", false, false, false}, true);
+        generateField(IR, modLine, FieldElement{objectName, "", "SelectIndex(width=" + convertType(type) + ",funnelWidth=" + nameVec + ")", "CLK", false, false, false, false, "", false, false, false}, true);
         objectName += DOLLAR;
         setAssign(objectName + "out", allocExpr(name_or1), type);
         setAssign(objectName + "in", allocExpr(name_or), type);
@@ -1372,7 +1376,7 @@ static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
     std::string head = depth.substr(ind + 1);
     depth = depth.substr(0, ind);
     std::string traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + depth + ",head=" + head + ", sensitivity=" + sensitivity + ")";
-    generateField(IR, modLine, FieldElement{"__traceMemory", "", traceDataType, false, false, false, false, "", false, false, false}, true);
+    generateField(IR, modLine, FieldElement{"__traceMemory", "", traceDataType, "CLK", false, false, false, false, "", false, false, false}, true);
     std::string filename = IR->name;
     ind = filename.find("(");
     if (ind > 0)
@@ -1458,7 +1462,7 @@ static ModList modLine;
         refList[newName].count++;
 printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %s instance %s new %s out %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), oldName.c_str(), item.second.instance.c_str(), newName.c_str(), item.second.out);
         if (item.second.out) {
-            generateField(IR, modLine, FieldElement{newName, "", "Bit(1)", false, false, false, false, "", false, false, false}, true);
+            generateField(IR, modLine, FieldElement{newName, "", "Bit(1)", "CLK", false, false, false, false, "", false, false, false}, true);
         }
         else {
         setReference(newName, 4, "Bit(1)", false, false, PIN_OBJECT);
@@ -1475,7 +1479,7 @@ printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %
         for (auto item: MI->callList) {
             if (item->isAsync) {
                 std::string calledName = getAsyncControl(item->value);
-                generateField(IR, modLine, FieldElement{calledName, "", "AsyncControl", false, false, false, false, "", false, false, false}, true);
+                generateField(IR, modLine, FieldElement{calledName, "", "AsyncControl", "CLK", false, false, false, false, "", false, false, false}, true);
             }
         }
     }
@@ -1511,8 +1515,10 @@ printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %
             if (item.second.phi && (!item.second.phi->operands.size() || item.second.phi->operands.front()->operands.size() < 2 || refList[item.first].type == "Bit(1)")) {
                 if (item.second.isParam) {
                     ACCExpr *list = item.second.phi->operands.front();
-                    ACCExpr *first = getRHS(list->operands.front(), 1);
-                    item.second.phi = first;
+                    if (list->operands.size()) {
+                        ACCExpr *first = getRHS(list->operands.front(), 1);
+                        item.second.phi = first;
+                    }
                 }
                 //if (refList[item.first].type != "Bit(1)")
                 item.second.phi = cleanupExprBuiltin(item.second.phi, item.second.defaultValue);

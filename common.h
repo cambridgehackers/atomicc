@@ -113,7 +113,7 @@ typedef struct {
     std::map<std::string, AlwaysGroup> always;  // index is 'always variety'
     std::list<AssertVerilog>         assert;
 } CondLineType;
-#define ALWAYS_CLOCKED  "always @( posedge CLK)"
+#define ALWAYS_CLOCKED  "always @( posedge "
 #define ALWAYS_STAR  "always @(*)"
 #define ALWAYS_COMB  "always_comb"
 

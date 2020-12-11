@@ -98,7 +98,7 @@ static void copyGenericMethod(ModuleIR *genericIR, MethodInfo *MI, std::list<PAR
         newMI->storeList.push_back(new StoreListElement{
             walkToGeneric(item->dest, paramMap),
             walkToGeneric(item->value, paramMap),
-            walkToGeneric(item->cond, paramMap)});
+            walkToGeneric(item->cond, paramMap), item->clockName});
     for (auto item : MI->letList)
         newMI->letList.push_back(new LetListElement{
             walkToGeneric(item->dest, paramMap),
@@ -184,7 +184,7 @@ static int counter;
     for (auto item : IR->fields)
         genericIR->fields.push_back(FieldElement{item.fldName,
             updateCount(item.vecCount, paramMap), updateType(item.type, paramMap),
-            item.isPtr, item.isInput, item.isOutput, item.isInout,
+            item.clockName, item.isPtr, item.isInput, item.isOutput, item.isInout,
             item.isParameter, item.isShared, item.isLocalInterface, item.isExternal});
     for (auto FI : IR->generateBody)
         copyGenericMethod(genericIR, FI.second, paramMap);
@@ -194,7 +194,7 @@ static int counter;
         std::string iname = updateType(item.type, paramMap);
         auto IIR = buildGeneric(lookupInterface(item.type), iname, paramMap, true);
         genericIR->interfaces.push_back(FieldElement{item.fldName,
-             updateCount(item.vecCount, paramMap), IIR->name, item.isPtr, item.isInput,
+             updateCount(item.vecCount, paramMap), IIR->name, item.clockName, item.isPtr, item.isInput,
              item.isOutput, item.isInout,
              item.isParameter, item.isShared, item.isLocalInterface, item.isExternal});
     }
@@ -387,9 +387,9 @@ skipLab:;
                 modName += PERIOD "PARAM";
             ModuleIR *paramIR = allocIR(modName, true);
             paramIR->isInterface = true;
-            genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, false, false, false, false, ""/*not param*/, false, false, false});
+            genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, "CLK", false, false, false, false, ""/*not param*/, false, false, false});
             for (auto item: pmap)
-                paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", false, false, false, false, item.value, false, false, false});
+                paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", "CLK", false, false, false, false, item.value, false, false, false});
             //printf("[%s:%d]BEGOREGEN %s/%p -> %s/%p\n", __FUNCTION__, __LINE__, modName.c_str(), IR, genericIR->name.c_str(), genericIR);
             //dumpModule("GENERIC", genericIR);
         }
@@ -409,7 +409,7 @@ skipLab:;
         for (auto MI: IR->methods)
             hasPrintf |= MI->printfList.size();
         if (hasPrintf)
-            IR->fields.push_back(FieldElement{"printfp", "", "Printf", false/*isPtr*/, false, false, false, ""/*not param*/, false, false, false});
+            IR->fields.push_back(FieldElement{"printfp", "", "Printf", "CLK", false/*isPtr*/, false, false, false, ""/*not param*/, false, false, false});
         std::map<std::string, int> localConnect;
         for (auto IC : IR->interfaceConnect) {
             if (!IC.isForward) {
@@ -478,7 +478,7 @@ static void hoistVerilog(ModuleIR *top, ModuleIR *current, std::string prefix)
     if (top != current)
     for (auto item: current->fields)
          top->fields.push_back(FieldElement{prefix + item.fldName, item.vecCount,
-             item.type, item.isPtr, item.isInput, item.isOutput, item.isInout,
+             item.type, item.clockName, item.isPtr, item.isInput, item.isOutput, item.isInout,
              item.isParameter, item.isShared, item.isLocalInterface, item.isExternal});
     for (auto item: current->interfaces)
          hoistVerilog(top, lookupInterface(item.type), prefix+item.fldName);

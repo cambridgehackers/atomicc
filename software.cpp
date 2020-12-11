@@ -130,16 +130,16 @@ exit(-1);
             ModuleIR *element = allocIR((outcall ? "___M2P" : "___P2M") + userTypeName);
             element->interfaceName = elementinterface->name;
 printf("[%s:%d] outcall %d usertname %s fieldname %s type %s\n", __FUNCTION__, __LINE__, outcall, userTypeName.c_str(), fieldName.c_str(), element->name.c_str());
-            elementinterface->interfaces.push_back(FieldElement{"method", "", userTypeName, !outcall, false, false, false, ""/*not param*/, false, false, false});
-            elementinterface->interfaces.push_back(FieldElement{"pipe", "", pipeName, outcall, false, false, false, ""/*not param*/, false, false, false});
-            IR->fields.push_back(FieldElement{fieldName, "", element->name, false, false, false, false, ""/*not param*/, false, false, false});
+            elementinterface->interfaces.push_back(FieldElement{"method", "", userTypeName, "CLK", !outcall, false, false, false, ""/*not param*/, false, false, false});
+            elementinterface->interfaces.push_back(FieldElement{"pipe", "", pipeName, "CLK", outcall, false, false, false, ""/*not param*/, false, false, false});
+            IR->fields.push_back(FieldElement{fieldName, "", element->name, "CLK", false, false, false, false, ""/*not param*/, false, false, false});
             IR->interfaceConnect.push_back(InterfaceConnectType{
                 allocExpr(localName + DOLLAR + userInterface),
                 allocExpr(fieldName + DOLLAR + "method"), userTypeName, true});
             if (!dutPresent[dutType]) {
                 dutPresent[dutType] = true;
-                IR->fields.push_back(FieldElement{localName, "", dutType, false, false, false, false, ""/*not param*/, false, false, false});
-                IRifc->interfaces.push_back(FieldElement{"request", "", pipeName, false/*in*/, false, false, false, ""/*not param*/, false, false, false});
+                IR->fields.push_back(FieldElement{localName, "", dutType, "CLK", false, false, false, false, ""/*not param*/, false, false, false});
+                IRifc->interfaces.push_back(FieldElement{"request", "", pipeName, "CLK", false/*in*/, false, false, false, ""/*not param*/, false, false, false});
             }
             if (outcall)
                 pipeUser.push_back(fieldName + DOLLAR + "pipe");
@@ -150,7 +150,7 @@ printf("[%s:%d] outcall %d usertname %s fieldname %s type %s\n", __FUNCTION__, _
                         if (!isRdyName(methodName) && !isEnaName(methodName)) {
                             // see if the request deserialization can generate an indication
                             // actionValue methods get a callback for value
-                            elementinterface->interfaces.push_back(FieldElement{"returnInd", "", pipeName, true, false, false, false, ""/*not param*/, false, false, false});
+                            elementinterface->interfaces.push_back(FieldElement{"returnInd", "", pipeName, "CLK", true, false, false, false, ""/*not param*/, false, false, false});
                             pipeUser.push_back(fieldName + DOLLAR + "returnInd");
                             break;
                         }
@@ -164,13 +164,13 @@ printf("[%s:%d] outcall %d usertname %s fieldname %s type %s\n", __FUNCTION__, _
         fprintf(OStrJ, "\n    ]\n}\n");
         fclose(OStrJ);
         if (int size = pipeUser.size()) {
-            IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, true/*out*/, false, false, false, ""/*not param*/, false, false, false});
+            IRifc->interfaces.push_back(FieldElement{"indication", "", pipeName, "CLK", true/*out*/, false, false, false, ""/*not param*/, false, false, false});
             if (size == 1)
                 IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr("indication"),
                     allocExpr(pipeUser.front()), pipeName, true});
             else {
                 IR->fields.push_back(FieldElement{"funnel", "", "FunnelBufferedBase(funnelWidth="
-                   + autostr(pipeUser.size()) + ",dataWidth=" + convertType("NOCDataH") + ")", false, false, false, false, ""/*not param*/, false, false, false});
+                   + autostr(pipeUser.size()) + ",dataWidth=" + convertType("NOCDataH") + ")", "CLK", false, false, false, false, ""/*not param*/, false, false, false});
                 int ind = 0;
                 for (auto inter: pipeUser) {
                     IR->interfaceConnect.push_back(InterfaceConnectType{allocExpr(inter),

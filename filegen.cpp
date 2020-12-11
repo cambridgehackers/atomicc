@@ -180,7 +180,7 @@ void generateVerilogOutput(FILE *OStr)
             if (item.second.vecCount == "") {
                 vecCountStr = "";
                 resetList.push_back(item.first);
-                (void) condLines[""].always[ALWAYS_CLOCKED].cond[""].guard;  // dummy to ensure 'always' generation loop is executed at least once
+                (void) condLines[""].always[ALWAYS_CLOCKED "CLK)" ].cond[""].guard;  // dummy to ensure 'always' generation loop is executed at least once
             }
             vecCountStr = item.first + vecCountStr;
             std::string inst = declareInstance(item.second.type, vecCountStr, ""); //std::string params; //IR->params[item.fldName]
@@ -393,7 +393,7 @@ next:;
     for (auto item: ctop.second.assert) {
         std::string sensitivity = ALWAYS_STAR;
         if (walkSearch(item.cond, "$past"))
-            sensitivity = ALWAYS_CLOCKED;
+            sensitivity = ALWAYS_CLOCKED "CLK)";
         fprintf(OStr, "    %s\n", sensitivity.c_str());
         std::string indent;
         std::string condStr = finishExpr(item.cond);

@@ -70,6 +70,7 @@ typedef struct {
     ACCExpr *dest;
     ACCExpr *value;
     ACCExpr *cond;
+    std::string clockName;
 } StoreListElement;
 
 typedef struct {
@@ -152,6 +153,7 @@ typedef struct {
     std::string fldName;
     std::string vecCount;
     std::string type;
+    std::string clockName;
     bool        isPtr;
     bool        isInput; // used for verilog interfaces
     bool        isOutput; // used for verilog interfaces

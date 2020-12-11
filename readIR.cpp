@@ -231,12 +231,15 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 MI->alloca[name] = AllocaItem{type, false};
             }
             else if (checkItem("STORE")) {
+                std::string clockName = "CLK";
+                if (checkItem("/Clock="))
+                    clockName = getToken();
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *dest = getExpression('=');
                 ParseCheck(checkItem("="), "store = missing");
                 ACCExpr *expr = inputExpression(bufp);
-                MI->storeList.push_back(new StoreListElement{dest, expr, cond});
+                MI->storeList.push_back(new StoreListElement{dest, expr, cond, clockName});
             }
             else if (checkItem("LET")) {
                 std::string type = getType();
@@ -442,6 +445,9 @@ interface, isStruct, isSerialize, ext);
             else if (checkItem("FIELD")) {
                 std::string vecCount;
                 bool        isPtr = checkItem("/Ptr");
+                std::string clockName = "CLK";
+                if (checkItem("/Clock="))
+                    clockName = getToken();
                 bool        isInput = checkItem("/input");
                 bool        isOutput = checkItem("/output");
                 bool        isInout = checkItem("/inout");
@@ -454,7 +460,7 @@ interface, isStruct, isSerialize, ext);
                 }
                 std::string type = getType();
                 std::string fldName = getToken();
-                IR->fields.push_back(FieldElement{fldName, vecCount, type, isPtr, isInput, isOutput, isInout, isParameter ? " " : "", isShared, false, isExternal});
+                IR->fields.push_back(FieldElement{fldName, vecCount, type, clockName, isPtr, isInput, isOutput, isInout, isParameter ? " " : "", isShared, false, isExternal});
             }
             else if (checkItem("PARAMS")) {
                 std::string fldName = getToken();
@@ -470,7 +476,7 @@ interface, isStruct, isSerialize, ext);
                 std::string fldName = getToken();
                 if (fldName == "_")
                     fldName = "";
-                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, isPtr, false, false, false, ""/*not param*/, false, false, false});
+                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, "CLK", isPtr, false, false, false, ""/*not param*/, false, false, false});
             }
             else if (checkItem("METHOD")) {
                 bool rule = false, action = false, async = false;
