@@ -387,9 +387,9 @@ skipLab:;
                 modName += PERIOD "PARAM";
             ModuleIR *paramIR = allocIR(modName, true);
             paramIR->isInterface = true;
-            genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, "CLK", false, false, false, false, ""/*not param*/, false, false, false});
+            genericIR->parameters.push_back(FieldElement{"", "", paramIR->name, "CLK:nRST", false, false, false, false, ""/*not param*/, false, false, false});
             for (auto item: pmap)
-                paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", "CLK", false, false, false, false, item.value, false, false, false});
+                paramIR->fields.push_back(FieldElement{item.name, "", "Bit(32)", "CLK:nRST", false, false, false, false, item.value, false, false, false});
             //printf("[%s:%d]BEGOREGEN %s/%p -> %s/%p\n", __FUNCTION__, __LINE__, modName.c_str(), IR, genericIR->name.c_str(), genericIR);
             //dumpModule("GENERIC", genericIR);
         }
@@ -409,7 +409,7 @@ skipLab:;
         for (auto MI: IR->methods)
             hasPrintf |= MI->printfList.size();
         if (hasPrintf)
-            IR->fields.push_back(FieldElement{"printfp", "", "Printf", "CLK", false/*isPtr*/, false, false, false, ""/*not param*/, false, false, false});
+            IR->fields.push_back(FieldElement{"printfp", "", "Printf", "CLK:nRST", false/*isPtr*/, false, false, false, ""/*not param*/, false, false, false});
         std::map<std::string, int> localConnect;
         for (auto IC : IR->interfaceConnect) {
             if (!IC.isForward) {

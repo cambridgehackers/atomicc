@@ -461,6 +461,7 @@ printf("[%s:%d]notfactor\n", __FUNCTION__, __LINE__);
 void generate_cpp()
 {
     std::map<std::string, bool> alreadyGenerated;
+    fprintf(outfile, "#include \"atomicc.h\"\n");
     // generate output file
     //std::string paramlist = "";
     //for (auto item : paramnames);

@@ -46,7 +46,6 @@ static std::map<std::string, ACCExpr *> methodCommitCondition;
 static std::map<std::string, std::map<std::string, MuxValueElement>> enableList;
 static std::string generateSection; // for 'generate' regions, this is the top level loop expression, otherwise ''
 static std::map<std::string, std::string> mapParam;
-static bool handleCLK;
 static ModList::iterator moduleParameter;
 
 static void traceZero(const char *label)
@@ -72,7 +71,7 @@ static void decRef(std::string name)
 }
 
 static void setReference(std::string target, int count, std::string type, bool out = false, bool inout = false,
-    int pin = PIN_WIRE, std::string vecCount = "", bool isArgument = false)
+    int pin = PIN_WIRE, std::string vecCount = "", bool isArgument = false, std::string clockArg = "CLK:nRST")
 {
     if (trace_global)
         printf("%s: target %s pin %d out %d inout %d type %s veccount %s count %d isArgument %d\n", __FUNCTION__, target.c_str(), pin, out, inout, type.c_str(), vecCount.c_str(), count, isArgument);
@@ -84,7 +83,7 @@ printf("[%s:%d]STRUCT %s type %s vecCount %s\n", __FUNCTION__, __LINE__, target.
         printf("[%s:%d] %s pin exists %d new %d\n", __FUNCTION__, __LINE__, target.c_str(), refList[target].pin, pin);
         exit(-1);
     }
-    refList[target] = RefItem{count, type, out, inout, pin, false, vecCount, isArgument};
+    refList[target] = RefItem{count, type, out, inout, pin, false, vecCount, isArgument, clockArg};
 }
 
 static void setAssign(std::string target, ACCExpr *value, std::string type)
@@ -169,9 +168,9 @@ static void addModulePort (ModList &modParam, std::string name, std::string type
     }
     if (!isLocal) {
         if (isparam != "")
-            modParam.insert(moduleParameter, ModData{name, instName, type, false, false, dir, inout, isTrigger, isparam, vecCount});
+            modParam.insert(moduleParameter, ModData{name, instName, type, false, "", dir, inout, isTrigger, isparam, vecCount});
         else {
-            modParam.push_back(ModData{name, instName, type, false, false, dir, inout, isTrigger, isparam, vecCount});
+            modParam.push_back(ModData{name, instName, type, false, "", dir, inout, isTrigger, isparam, vecCount});
             if (moduleParameter == modParam.end())
                 moduleParameter--;
         }
@@ -263,26 +262,26 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
     }
 }
 
-static void findCLK(ModuleIR *IR, std::string pinPrefix, bool isVerilog)
+static void findCLK(ModuleIR *IR, std::string pinPrefix, bool isVerilog, std::string &handleCLK)
 {
     if (pinPrefix == "" || !isVerilog)
     for (auto fld: IR->fields) {
         if (fld.isParameter == "") {
-            handleCLK = false;
+            handleCLK = "";
             return;
         }
     }
     for (FieldElement item : IR->interfaces) {
         ModuleIR *IIR = lookupInterface(item.type);
         if (item.fldName == "" || isVerilog)
-            findCLK(IIR, pinPrefix + item.fldName, isVerilog);
+            findCLK(IIR, pinPrefix + item.fldName, isVerilog, handleCLK);
     }
 }
 
 /*
  * Generate verilog module header for class definition or reference
  */
-static void generateModuleSignature(std::string moduleName, std::string instance, ModList &modParam, std::string moduleParams, std::string vecCount)
+static void generateModuleSignature(std::string moduleName, std::string instance, ModList &modParam, std::string moduleParams, std::string vecCount, std::string &handleCLK)
 {
     ModuleIR *IR = lookupIR(moduleName);
     assert(IR);
@@ -297,9 +296,8 @@ static void generateModuleSignature(std::string moduleName, std::string instance
         moduleInstantiation = moduleInstantiation.substr(0, ind);
     if (instance != "")
         moduleInstantiation = genericModuleParam(moduleName, moduleParams, nullptr);
-    handleCLK = true;
-    findCLK(implements, "", IR->isVerilog);
-    modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, !handleCLK, 0, false, false, ""/*not param*/, vecCount});
+    findCLK(implements, "", IR->isVerilog, handleCLK);
+    modParam.push_back(ModData{minst, moduleInstantiation, "", true/*moduleStart*/, handleCLK, 0, false, false, ""/*not param*/, vecCount});
     moduleParameter = modParam.end();
 
     MapNameValue mapValue, mapValueMod;
@@ -743,7 +741,7 @@ static void appendMux(std::string section, std::string name, ACCExpr *cond, ACCE
 
 static void generateMethodGuard(ModuleIR *IR, std::string methodName, MethodInfo *MI)
 {
-    std::string clockName = "CLK";
+    std::string clockName = "CLK:nRST";
     if (MI->subscript)      // from instantiateFor
         methodName += "[" + tree2str(MI->subscript) + "]";
     generateSection = MI->generateSection;
@@ -914,7 +912,7 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
         tempCond = cleanupBool(replaceAssign(simpleReplace(tempCond), getRdyName(calledEna, MI->async))); // remove __RDY before adding subscript!
         walkRead(MI, tempCond, nullptr);
         if (calledName == "__finish") {
-            std::string clockName = "CLK";
+            std::string clockName = "CLK:nRST";
             appendLine(methodName, tempCond, nullptr, allocExpr("$finish;"), clockName);
             continue;
         }
@@ -952,7 +950,7 @@ printf("[%s:%d] called %s ind %d\n", __FUNCTION__, __LINE__, calledEna.c_str(), 
     }
     if (!implementPrintf)
         for (auto info: MI->printfList) {
-            std::string clockName = "CLK";
+            std::string clockName = "CLK:nRST";
             appendLine(methodName, info->cond, nullptr, info->value, clockName);
         }
     // set global commit condition
@@ -1005,10 +1003,11 @@ static void generateField(ModuleIR *IR, ModList &modLine, FieldElement item, boo
         IR->fields.push_back(item);
     ModuleIR *itemIR = lookupIR(item.type);
     if (!itemIR || item.isPtr || itemIR->isStruct)
-        setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount);
+        setReference(item.fldName, item.isShared, item.type, false, false, item.isShared ? PIN_WIRE : PIN_REG, item.vecCount, false, item.clockName);
     else {
 //printf("[%s:%d] INSTANTIATEFIELD type %s fldName %s veccount %s\n", __FUNCTION__, __LINE__, item.type.c_str(), item.fldName.c_str(), item.vecCount.c_str());
-        generateModuleSignature(item.type, item.fldName + DOLLAR, modLine, "(" + IR->moduleParams[item.fldName] + ")", item.vecCount);
+        std::string handleCLK = item.clockName;
+        generateModuleSignature(item.type, item.fldName + DOLLAR, modLine, "(" + IR->moduleParams[item.fldName] + ")", item.vecCount, handleCLK);
     }
 }
 
@@ -1052,7 +1051,7 @@ static ACCExpr *generateSubscriptReference(ModuleIR *IR, ModList &modLine, std::
         setReference(name_or, 99, type, false, false, PIN_WIRE, nameVec);
         setReference(name_or1, 99, type);
         std::string objectName = name_or + "CC";
-        generateField(IR, modLine, FieldElement{objectName, "", "SelectIndex(width=" + convertType(type) + ",funnelWidth=" + nameVec + ")", "CLK", false, false, false, false, "", false, false, false}, true);
+        generateField(IR, modLine, FieldElement{objectName, "", "SelectIndex(width=" + convertType(type) + ",funnelWidth=" + nameVec + ")", "CLK:nRST", false, false, false, false, "", false, false, false}, true);
         objectName += DOLLAR;
         setAssign(objectName + "out", allocExpr(name_or1), type);
         setAssign(objectName + "in", allocExpr(name_or), type);
@@ -1224,11 +1223,14 @@ static void fixupModuleInstantiations(ModuleIR *IR, ModList &modLine)
     for (auto mitem: modLine) {
         std::string val = mitem.value;
         if (mitem.moduleStart) {
-            skipReplace = mitem.vecCount != "" || val == "SyncFF";
+            skipReplace = mitem.vecCount != "" || val == "SyncFF" || startswith(val, "ExternalPin#(");
             modname = mitem.value;
             mapParam.clear();
         }
-        else if (!skipReplace) {
+        else if (skipReplace) {
+            refList[val].count++;
+        }
+        else {
             ACCExpr *assignExpr = assignList[val].value;
             std::string assignValue = tree2str(assignExpr);
             std::string newValue = assignValue;
@@ -1261,6 +1263,7 @@ static void fixupModuleInstantiations(ModuleIR *IR, ModList &modLine)
                 }
             }
             std::string oldVal = val;
+            if (refList[val].count <= 1 || lookupInterface(refList[val].type)) {
             if (assignValue != "") {
                 val = assignValue;
                 decRef(mitem.value);
@@ -1291,12 +1294,13 @@ static void fixupModuleInstantiations(ModuleIR *IR, ModList &modLine)
             }
             else
                 val = "";
+            }
             if (oldVal != val)
                 refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
             if (trace_interface)
                 printf("[%s:%d] newval %s\n", __FUNCTION__, __LINE__, val.c_str());
         }
-        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.noDefaultClock, mitem.out, mitem.inout, mitem.trigger, ""/*not param*/, mitem.vecCount});
+        modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.clockValue, mitem.out, mitem.inout, mitem.trigger, ""/*not param*/, mitem.vecCount});
     }
 }
 static bool checkConstant(std::string name)
@@ -1376,7 +1380,7 @@ static void generateTrace(ModuleIR *IR, ModList &modLineTop, ModList &modLine)
     std::string head = depth.substr(ind + 1);
     depth = depth.substr(0, ind);
     std::string traceDataType = "Trace(width=(" + traceTotalLength + "), depth=" + depth + ",head=" + head + ", sensitivity=" + sensitivity + ")";
-    generateField(IR, modLine, FieldElement{"__traceMemory", "", traceDataType, "CLK", false, false, false, false, "", false, false, false}, true);
+    generateField(IR, modLine, FieldElement{"__traceMemory", "", traceDataType, "CLK:nRST", false, false, false, false, "", false, false, false}, true);
     std::string filename = IR->name;
     ind = filename.find("(");
     if (ind > 0)
@@ -1433,9 +1437,10 @@ static ModList modLine;
 
     printf("[%s:%d] STARTMODULE %s/%p\n", __FUNCTION__, __LINE__, IR->name.c_str(), (void *)IR);
     //dumpModule("START", IR);
-    generateModuleSignature(IR->name, "", modLineTop, "", "");
+    std::string handleCLK = "CLK:nRST";
+    generateModuleSignature(IR->name, "", modLineTop, "", "", handleCLK);
     bool hasCLK = false, hasnRST = false;
-    if (!handleCLK) {
+    if (handleCLK == "") {
         for (auto mitem: modLineTop)
             if (!mitem.moduleStart && mitem.isparam == "") {
                 if (mitem.value == "CLK")
@@ -1462,13 +1467,13 @@ static ModList modLine;
         refList[newName].count++;
 printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %s instance %s new %s out %d\n", __FUNCTION__, __LINE__, IR->name.c_str(), oldName.c_str(), item.second.instance.c_str(), newName.c_str(), item.second.out);
         if (item.second.out) {
-            generateField(IR, modLine, FieldElement{newName, "", "Bit(1)", "CLK", false, false, false, false, "", false, false, false}, true);
+            generateField(IR, modLine, FieldElement{newName, "", "Bit(1)", "CLK:nRST", false, false, false, false, "", false, false, false}, true);
         }
         else {
         setReference(newName, 4, "Bit(1)", false, false, PIN_OBJECT);
-        modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, false, false, false, false, "", ""});
-        modLine.push_back(ModData{"out", item.second.instance != "" ? oldName : newName, "Bit(1)", false, false, true/*out*/, false, false, "", ""});
-        modLine.push_back(ModData{"in", item.second.instance != "" ? newName : oldName, "Bit(1)", false, false, false /*out*/, false, false, "", ""});
+        modLine.push_back(ModData{replacePeriod(oldName) + "SyncFF", "SyncFF", "", true/*moduleStart*/, "CLK:nRST", false, false, false, "", ""});
+        modLine.push_back(ModData{"out", item.second.instance != "" ? oldName : newName, "Bit(1)", false, "", true/*out*/, false, false, "", ""});
+        modLine.push_back(ModData{"in", item.second.instance != "" ? newName : oldName, "Bit(1)", false, "", false /*out*/, false, false, "", ""});
         }
     }
 
@@ -1479,7 +1484,7 @@ printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %
         for (auto item: MI->callList) {
             if (item->isAsync) {
                 std::string calledName = getAsyncControl(item->value);
-                generateField(IR, modLine, FieldElement{calledName, "", "AsyncControl", "CLK", false, false, false, false, "", false, false, false}, true);
+                generateField(IR, modLine, FieldElement{calledName, "", "AsyncControl", "CLK:nRST", false, false, false, false, "", false, false, false}, true);
             }
         }
     }
@@ -1534,6 +1539,17 @@ printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %
         }
     }
     generateSection = "";
+
+    for (auto &item: IR->fields) {
+        std::string clockName = item.clockName, resetName;
+        int ind = clockName.find(":");
+        resetName = clockName.substr(ind+1);
+        clockName = clockName.substr(0,ind);
+        fixupAccessible(clockName);
+        fixupAccessible(resetName);
+        refList[clockName].count++; // Make sure that clock signals are also reference counted
+        refList[resetName].count++; // Make sure that reset signals are also reference counted
+    }
 
 #if 0
     for (auto item: assignList) {

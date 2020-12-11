@@ -39,10 +39,10 @@ static void processSerialize(ModuleIR *IR)
     std::string prefix = "__" + IR->name + "_";
     ModuleIR *implements = lookupInterface(IR->interfaceName);
     IR->fields.clear();
-    IR->fields.push_back(FieldElement{"len", "", "Bit(16)", "CLK", false, false, false, false, ""/*not param*/, false, false, false});
-    IR->fields.push_back(FieldElement{"tag", "", "Bit(16)", "CLK", false, false, false, false, ""/*not param*/, false, false, false});
+    IR->fields.push_back(FieldElement{"len", "", "Bit(16)", "CLK:nRST", false, false, false, false, ""/*not param*/, false, false, false});
+    IR->fields.push_back(FieldElement{"tag", "", "Bit(16)", "CLK:nRST", false, false, false, false, ""/*not param*/, false, false, false});
     ModuleIR *unionIR = allocIR(prefix + "UNION");
-    IR->fields.push_back(FieldElement{"data", "", unionIR->name, "CLK", false, false, false, false, ""/*not param*/, false, false, false});
+    IR->fields.push_back(FieldElement{"data", "", unionIR->name, "CLK:nRST", false, false, false, false, ""/*not param*/, false, false, false});
     uint64_t maxDataLength = 0;
     for (auto MI: implements->methods) {
         std::string methodName = MI->name;
@@ -53,13 +53,13 @@ static void processSerialize(ModuleIR *IR)
         unionIR->unionList.push_back(UnionItem{methodName, variant->name});
         uint64_t dataLength = 0;
         for (auto param: MI->params) {
-            variant->fields.push_back(FieldElement{param.name, "", instantiateType(param.type, mapValue), "CLK", false, false, false, false, ""/*not param*/, false, false, false});
+            variant->fields.push_back(FieldElement{param.name, "", instantiateType(param.type, mapValue), "CLK:nRST", false, false, false, false, ""/*not param*/, false, false, false});
             dataLength += atoi(convertType(instantiateType(param.type, mapValue)).c_str());
         }
         if (dataLength > maxDataLength)
             maxDataLength = dataLength;
     }
-    unionIR->fields.push_back(FieldElement{"data", "", "Bit(" + autostr(maxDataLength) + ")", "CLK", false, false, false, false, ""/*not param*/, false, false, false});
+    unionIR->fields.push_back(FieldElement{"data", "", "Bit(" + autostr(maxDataLength) + ")", "CLK:nRST", false, false, false, false, ""/*not param*/, false, false, false});
 }
 
 static ACCExpr *makeIndication(std::string target, int counter, ACCExpr *sourceParam, int64_t dataLength)

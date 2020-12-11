@@ -54,7 +54,7 @@ void generateModuleHeader(FILE *OStr, ModList &modLine, bool isTopModule)
         static const char *dirStr[] = {"input wire", "output wire"};
         if (mitem.moduleStart) {
             fprintf(OStr, "module %s ", mitem.value.c_str());
-            handleCLK = !mitem.noDefaultClock;
+            handleCLK = mitem.clockValue != "";
             if (handleCLK)
                 sep = "(";
             else
@@ -165,7 +165,7 @@ static bool walkSearch (ACCExpr *expr, std::string search)
 
 void generateVerilogOutput(FILE *OStr)
 {
-    std::list<std::string> resetList;
+    std::map<std::string, std::list<std::string>> resetList;
     // generate local state element declarations and wires
     refList["CLK"].done = false;
     refList["nRST"].done = false;
@@ -179,8 +179,10 @@ void generateVerilogOutput(FILE *OStr)
             std::string vecCountStr = " [" + item.second.vecCount + " - 1:0]";
             if (item.second.vecCount == "") {
                 vecCountStr = "";
-                resetList.push_back(item.first);
-                (void) condLines[""].always[ALWAYS_CLOCKED "CLK)" ].cond[""].guard;  // dummy to ensure 'always' generation loop is executed at least once
+                std::string alwaysName = ALWAYS_CLOCKED + item.second.clockName + ")";
+printf("[%s:%d] RESEEEEEEEEEEEEEEEEEEEEEEE %s clock %s\n", __FUNCTION__, __LINE__, item.first.c_str(), alwaysName.c_str());
+                resetList[alwaysName].push_back(item.first);
+                (void) condLines[""].always[alwaysName].cond[""].guard;  // dummy to ensure 'always' generation loop is executed at least once
             }
             vecCountStr = item.first + vecCountStr;
             std::string inst = declareInstance(item.second.type, vecCountStr, ""); //std::string params; //IR->params[item.fldName]
@@ -245,8 +247,13 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
             if (mitem.vecCount != "")
                 vecCountStr = " [" + mitem.vecCount + " - 1:0]";
             tempOutput.push_back("    " + mitem.value + " " + instName + vecCountStr + " (");
-            if (!mitem.noDefaultClock)
-                tempOutput.push_back(".CLK(CLK), .nRST(nRST),");
+            if (mitem.clockValue != "") {
+                std::string clockName = mitem.clockValue, resetName;
+                int ind = clockName.find(":");
+                resetName = clockName.substr(ind+1);
+                clockName = clockName.substr(0,ind);
+                tempOutput.push_back(".CLK(" + clockName + "), .nRST(" + resetName + "),");
+            }
             sep = "";
         }
         else {
@@ -338,10 +345,17 @@ next:;
         bool hasElse = false;
         if (ctop.first != "")
             fprintf(OStr, "\n    %s\n", finishString(ctop.first).c_str());
-        fprintf(OStr, "\n    %s begin\n      if (!nRST) begin\n", alwaysGroup.first.c_str());
-        for (auto item: resetList)
+        std::string alwaysClause = alwaysGroup.first, resetName;
+        int ind = alwaysClause.find(":");
+        if (ind > 0) {
+            resetName = alwaysClause.substr(0, alwaysClause.length()-1).substr(ind+1);
+            alwaysClause = alwaysClause.substr(0,ind) + ")";
+        }
+        fprintf(OStr, "\n    %s begin\n      if (!%s) begin\n", alwaysClause.c_str(), resetName.c_str());
+printf("[%s:%d]REEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEWWWWWWWWWWWW %s count %d\n", __FUNCTION__, __LINE__, alwaysGroup.first.c_str(), (int)resetList[alwaysGroup.first].size());
+        for (auto item: resetList[alwaysGroup.first])
             fprintf(OStr, "        %s <= 0;\n", item.c_str());
-        resetList.clear();
+        resetList[alwaysGroup.first].clear();
         fprintf(OStr, "      end // nRST\n");
         for (auto tcond: alwaysGroup.second.cond) {
             std::string methodName = tcond.first, endStr;

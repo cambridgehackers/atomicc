@@ -231,9 +231,9 @@ static void readMethodInfo(ModuleIR *IR, MethodInfo *MI, MethodInfo *MIRdy)
                 MI->alloca[name] = AllocaItem{type, false};
             }
             else if (checkItem("STORE")) {
-                std::string clockName = "CLK";
+                std::string clockName = "CLK:nRST";
                 if (checkItem("/Clock="))
-                    clockName = getToken();
+                    clockName = replacePeriod(getToken());
                 ACCExpr *cond = getExpression(':');
                 ParseCheck(checkItem(":"), "':' missing");
                 ACCExpr *dest = getExpression('=');
@@ -445,9 +445,9 @@ interface, isStruct, isSerialize, ext);
             else if (checkItem("FIELD")) {
                 std::string vecCount;
                 bool        isPtr = checkItem("/Ptr");
-                std::string clockName = "CLK";
+                std::string clockName = "CLK:nRST";
                 if (checkItem("/Clock="))
-                    clockName = getToken();
+                    clockName = replacePeriod(getToken());
                 bool        isInput = checkItem("/input");
                 bool        isOutput = checkItem("/output");
                 bool        isInout = checkItem("/inout");
@@ -476,7 +476,7 @@ interface, isStruct, isSerialize, ext);
                 std::string fldName = getToken();
                 if (fldName == "_")
                     fldName = "";
-                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, "CLK", isPtr, false, false, false, ""/*not param*/, false, false, false});
+                IR->interfaces.push_back(FieldElement{fldName, vecCount, type, "CLK:nRST", isPtr, false, false, false, ""/*not param*/, false, false, false});
             }
             else if (checkItem("METHOD")) {
                 bool rule = false, action = false, async = false;

@@ -46,7 +46,7 @@ typedef struct {
     std::string value;
     std::string type;
     bool        moduleStart;
-    bool        noDefaultClock;
+    std::string clockValue;
     int         out;
     bool        inout;
     bool        trigger;
@@ -77,6 +77,7 @@ typedef struct {
     bool        done;
     std::string vecCount;
     bool        isArgument;
+    std::string clockName;
 } RefItem;
 typedef struct {
     long        upper;
