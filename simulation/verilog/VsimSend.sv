@@ -20,19 +20,19 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-`ifndef __PipeInLast_DEF__
-`define __PipeInLast_DEF__
-interface PipeInLast#(width = 32);
-    logic enq__ENA;
-    logic [width - 1:0] enq$v;
-    logic  enq$last;
-    logic enq__RDY;
-    modport server (input  enq__ENA, enq$v, enq$last,
-                    output enq__RDY);
-    modport client (output enq__ENA, enq$v, enq$last,
-                    input  enq__RDY);
-endinterface
-`endif
+//`ifndef __PipeInLast_DEF__
+//`define __PipeInLast_DEF__
+//interface PipeInLast#(width = 32);
+//    logic enq__ENA;
+//    logic [width - 1:0] enq$v;
+//    logic  enq$last;
+//    logic enq__RDY;
+//    modport server (input  enq__ENA, enq$v, enq$last,
+//                    output enq__RDY);
+//    modport client (output enq__ENA, enq$v, enq$last,
+//                    input  enq__RDY);
+//endinterface
+//`endif
 module VsimSend #(parameter width = 32) (input CLK, input nRST, PipeInLast.server port);
     import "DPI-C" function void dpi_msgSend_enq(input int enq, input int last);
     assign port.enq__RDY = 1;

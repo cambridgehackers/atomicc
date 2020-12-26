@@ -97,11 +97,15 @@ static std::string modportNames(std::string first, StrList &inname, std::string 
     return ret;
 }
 
-static void generateVerilogInterface(std::string name, FILE *OStrVH)
+static void generateVerilogInterface(std::string name, std::string OutputDir, FILE *OStrVH)
 {
     StrList inname, outname, inoutname, fields;
     ModuleIR *IR = lookupInterface(name);
     name = cleanupModuleType(name);
+    std::string baseDir = OutputDir;
+    int ind = baseDir.rfind('/');
+    if (ind > 0)
+        baseDir = baseDir.substr(0, ind+1);
     for (auto fitem: IR->fields) {
         if (fitem.isParameter != "") {
             continue;
@@ -141,7 +145,7 @@ static void generateVerilogInterface(std::string name, FILE *OStrVH)
         int ind = name.find("(");
         if (ind > 0)
             name = name.substr(0, ind);
-        std::string defname = "__" + name + "_DEF__";
+        FILE *OStrV = fopen((baseDir + name + ".sv").c_str(), "w");
         if (mapValue.size()) {
             name += "#(";
             std::string sep;
@@ -154,17 +158,18 @@ static void generateVerilogInterface(std::string name, FILE *OStrVH)
             //dumpModule("paramet", IR);
             name += ")";
         }
-        fprintf(OStrVH, "`ifndef %s\n`define %s\ninterface %s;\n", defname.c_str(), defname.c_str(), name.c_str());
+        fprintf(OStrV, "interface %s;\n", name.c_str());
         for (auto item: fields)
-            fprintf(OStrVH, "    %s;\n", item.c_str());
+            fprintf(OStrV, "    %s;\n", item.c_str());
 #if 1 // yosys can't handle modport/inout
         inoutname.clear();
 #endif
         if (inname.size() + outname.size() + inoutname.size()) {
-        fprintf(OStrVH, "    modport server (%s);\n", modportNames("input ", inname, "output", outname, inoutname).c_str());
-        fprintf(OStrVH, "    modport client (%s);\n", modportNames("output", inname, "input ", outname, inoutname).c_str());
+        fprintf(OStrV, "    modport server (%s);\n", modportNames("input ", inname, "output", outname, inoutname).c_str());
+        fprintf(OStrV, "    modport client (%s);\n", modportNames("output", inname, "input ", outname, inoutname).c_str());
         }
-        fprintf(OStrVH, "endinterface\n`endif\n");
+        fprintf(OStrV, "endinterface\n");
+        fclose(OStrV);
     }
 }
 
@@ -249,8 +254,6 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     generateVerilog(irSeq, myName, OutputDir);
 
     FILE *OStrVH = fopen((OutputDir + ".vh").c_str(), "w");
-    std::string defname = myName + "_GENERATED_";
-    fprintf(OStrVH, "`ifndef __%s_VH__\n`define __%s_VH__\n", defname.c_str(), defname.c_str());
     fprintf(OStrVH, "`include \"atomicclib.vh\"\n\n");
     for (auto item: mapAllModule) {
         ModuleIR *IR = item.second;
@@ -284,11 +287,10 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
     }
 #if 1 // support of System Verilog structs
     for (auto item: interfaceList)
-        generateVerilogInterface(item, OStrVH);
+        generateVerilogInterface(item, OutputDir, OStrVH);
 #endif
     for (auto IR : irSeq)
         metaGenerateModule(IR, OStrVH); // now generate the verilog header file '.vh'
-    fprintf(OStrVH, "`endif\n");
     fclose(OStrVH);
     generateKami(irSeq, myName, OutputDir);
 
