@@ -3,52 +3,285 @@
 
 \rSec1[atomicc.background]{Background}
 
-Moore's Law improvements in manufacturing
-costs of hardware have driven dramatic increases in the variety and complexity
-of hardware systems that can be economically manufactured.
-Unfortunately, high costs of producing verified hardware designs limit
-deployment to devices that
-can amortize development costs over very high manufacturing volumes.
-We have seen dramatic improvements in general purpose processors
-and memory devices, but much more limited improvements in application
-specific devices.
+In contrast to the regular manufacturing cost gains
+from Moore's Law improvements, the design and verification productivity
+improvement has lagged.
+Cost containment
+for verification continues to be a challenge \cite{foster2013design},
+causing the amortized
+engineering cost to become an important component of product production cost.
+For products without high manufacturing volumes, this
+amortized burden becomes a major constraint on new product development.
 
-Deploying new versions of hardware designs can be quite expensive,
-placing extreme emphasis on gaining confidence of correct operation before
-manufacturing, causing the costs of testing to
-dominate product development costs.
-How can we make the development of 
-\textit{verified} designs more efficient and predictable?
+In software, the complexity and variety
+of new software products created every year is remarkable.  
+Continuous improvements in productivity allow small teams
+to reliably, rapidly deliver complex products and agilely
+adapt them to changing application demands.
 
-An ideal toolchain would contain enough checking
-that error-free compilation would guarantee correct runtime execution
-(well-formed programs are well-behaved when executed).
-Additionally, to make overall development costs scale efficently (proportional
-to length of new code, independent of complexity of reused modules), we need a
-toolchain that guarantees correct operation is preserved
-for pre-tested, reused modules.
+How can we improve hardware development methodology to scale well?
 
-Current practice is quite far from this ideal and learning to apply
-theorem provers to hardware designs can be confusing, difficult and
-often not complete enough to handle the design complexity.
-This work describes an development methodology allowing
-us to incrementally approach this goal, gaining experience and intuition
-as we proceed.
+\rSec2[atomicc.goal]{Goal}
 
-\rSec1[atomicc.approach]{Approach}
+Assertions, sprinkled more or less liberally in the program text,
+were used in development practice, not to prove correctness of
+programs, but rather to help detect and diagnose programming errors.
+They .. indicate the occurance of any error as close as possible
+to the place in the program where it actually occurred.
+Assertions are contracts between one module of a program
+and another.
 
-To reduce verification costs, we propose:
+Interest in software verification was triggered by the attack of the
+hacker, exploiting vulnerabilities that no reasonable test strategy
+could ever remove.
+
+A type system is not a goal in and of itself.  The goal is to give the programmer
+the tools to express programs simply and correctly with the help of the type system.
+Type systems are most effective if they reflect and validate the informal
+and intuitive reasoning that programmers do anyway (or they introduce a
+new way to think about programs).
+
+As part of the development process, we would like to ensure that a
+circuit (the structural implementation) behaves according to a given set
+of requirements (the declarative specification given as assertions).
+To verify correct operation of the design, we rely on an assertion-based
+methodology and property checking techniques.
+A property is a proposition of expected design behavior.
+This methodology benefits both dynamic verification (simulation) and
+static (formal) verification.
+
+Well-formed programs are well-behaved when executed
+(error-free compilation guarantees programs 
+correct runtime execution), lessening
+the reliance on verification.  Important properties to be maintained
+include concurrency control, safety and liveness as well as any
+algorithm specific invariants.
+
+To include program intent in static analysis, we use Linear Temporal Logic assertion
+about possible execution paths to be included.
+formalize the semantics of concurrent programs.
+nondeterministic; may loop forever.
+programs are not run for their final result but rather for maintaining some
+continuous behavior. (terminal state is meaningless)
+time dependent properties, those that relate two events at different instants.
+properties which depend on development in time.
+properties: accessibility and responsiveness.
+
+Reactive systems -> use SystemVerilog Assertions (LTL) to specify properties of the execution traces of a system.
+Unit tests because they are more compact.
+Also give a form for specifying timed concurrency.
+
+"Most programming environments exhibit a phase distinction between the static and
+dynamic phases of processing.  The static phase consists of parsing and type checking
+to ensure that the program is well-formed; the dynamic phase consists of execution of
+well-formed programs.  A language is said to be safe exactly when well-formed
+programs are well-behaved when executed."
+
+Formal methods for achieving correctness must support the intuitive
+judgement of programmers, not replace it.  Hoare
+
 \begin{itemize}
-\item Module reuse without reverification.
+\item Safety.
 \begin{itemize}
-\item A single Verilog module is generated for each defined AtomicC module.
-The generated Verilog is highly readable, giving designers confidence that
-intended operations are correctly realized.
-\item Module schedules calculated using only local information and are independent of module usage context.
-\item Parameterized generated code: propagation of module parameterization from
-source through to generated Verilog allows reuse without regeneration for each parameter instance.
-\item Stable generated Verilog: To minimize the reverification effort for ECOs,
+\setlength\itemsep{-0.5em}
+\item Refinement checking
+\item Invariant:  Basis.  Inductive step.
+\item Deadlock freedom
+\item Reachability
+\end{itemize}
+\item Liveness.
+\begin{itemize}
+\setlength\itemsep{-0.5em}
+\item Request-response properties
+\item real-time (system acts "in time")
+\end{itemize}
+\item Trace equivalence
+\end{itemize}
+
+\begin{itemize}
+
+\item Assertions
+\begin{itemize}
+\item Static: model checking
+\item Dynamic
+\begin{itemize}
+\item Simulator
+\item Runtime
+\end{itemize}
+\end{itemize}
+
+\item Testing
+\begin{itemize}
+\item Dynamic: transaction
+\item White box: check implementation
+\item Black box: check specification
+\item Error injection: check test coverage
+\end{itemize}
+
+\end{itemize}
+
+Reactive systems nonterminating so do not conform to Floyd-Hoare;
+non-deterministic, so not amenable to testing.
+
+Currently, FV only used for designs that are impossible to fully test: cache, ML, neural net,
+protocols, security, floating point.
+It is easy to implement the general design of cache coherency; the difficulty is in handling
+all the corner cases.
+To do traditional "functional testing", need transaction based framework.  (Difficult to
+get confidence from just ABV).
+
+Even with designer implemented "white box" testing, need separate verification team to
+do "black box" testing to ensure validation.
+
+Important problem for verification was not the synthesis problem but the
+problem of checking formulas on the finite methods.
+
+An abort on assertion failure is rarely the right response in embedded systems.
+In addition, in almost all cases, processing should also _not_ continue normally
+when an assertion fails.
+
+Introduce a bug and make sure assertion fails.
+
+\rSec2[atomicc.approach]{Approach}
+
+Compiler guarantees program runtime safety
+\begin{itemize}
+\item Through HDL structuring, guarantee the absence of dynamic concurrency interleaving errors in generated Verilog.
+\item When using interfaces of a module, automatically propagate and enforce
+runtime safety constraints so that modules can prevent unsafe usage by instantiators.
+\end{itemize}
+
+By guaranteeing
+safety (nothing "bad" happens throughout execution)
+and liveness (something "good" eventually does happen) of the design at compile time.
+we significantly reduce the dependency on runtime verification.
+Bounded liveness is a safety property.
+
+We propose the following additions to "well-formed":
+\begin{itemize}
+\item Static elaboration
+\item Group state update operations into transactions so that the compiler can
+guarantee isolated execution.  Each transaction has SSA assignments to state elements.
+\item Automated propagation and maintenance of safety checks to callers (direct and
+indirect) of methods.
+When a module invokes a service from another module, allow the supplying
+module a mechanism to guarantee internal safety by allowing it to
+hold off execution of the caller
+\item Assertion based verification.
+Compile-time bounded model checking to extend static checking and analysis.  
+\item Module reuse without reverification.  As a precondition,
+this requires module reuse be substantially possible without regeneration of verilog.
+To raise confidence in stability of designed components,
+incremental changes to source produce only incremental changes to generated verilog.
+parameterized generated code.
+\item A composition validator symbolically verifies that schedules
+are conflict free even after combining separately compiled modules.
+\item Support ATPG??
+\end{itemize}
+
+
+\rSec2[atomicc.concurrent]{Transactions}
+
+As designs the number and complexity of interactions scales with design
+complexity, the effort to manually manage consistent behavior over a large
+project gets difficult.  
+We need to automate the analysis to scalably improve confidence in the
+consistent runtime behavior of the design.
+
+To eliminate concurrency errors, all accesses to state elements are grouped into
+atomic \textit{transactions}.
+Compile time checking guarantees that
+each transaction execution is \textit{isolated}: each transaction executes
+as though it alone was running.
+
+Different transactions \textit{conflict} (i.e., have an execution ordering dependency) when:
+\begin{itemize}
+\item Both transactions read or write the same state element
+\item Not both are read accesses
+\end{itemize}
+
+We construct a directed \textit{precedence (or conflict) graph} such that the execution of
+any transaction with a 'read' access to a state element preceeds
+any transaction with a 'write' access. (since the new value of
+the state element will only be available after the
+clock cycle ends).
+To simplify the theory of correctness, we assume a restricted model of transactions:
+no transaction is allowed to write a state element
+unless it has also read it.
+
+An interleaved execution of several transactions is termed a \textit{schedule}.
+\cite[p.~8]{Papa86}
+
+A schedule is \textit{conflict serializable} iff the precedence graph is acyclic.
+Since all concurrent transactions occur in the same clock
+cycle, 
+a schedule is an \textit{imputed} serialization that
+compatible with the precedence graph.
+We need not compute the actual schedule, just verify that
+a compatible schedule exists.
+
+Since all accesses to state elements are limited to their
+containing module, we can symbolically elaborate the conditions
+when reads or writes occur and, by extension, derive when the
+precedence graph cannot have cycles.
+If it cannot be proved that the precedence graph is cycle-free,
+a weak fair scheduler is automatically generated so that
+transactions are not permanently shadowed.
+
+It is possible to extend the above theory to extend
+performance by allowing the synthesis of
+'chained transactions', where the write output of one is available
+as a read input to another that 'follows' in the imputed sequence.
+(referred to as EHRs)
+For performance, rule sequences can be 'chained' to form new atomic rules.
+Note that this does not change the precedence graph analysis.
+
+Multiple clock domains
+
+Need to describe multi-cycle rules and pipelining.
+
+Need to describe joining rules
+
+Need to have a way to support sequencing of operations
+
+\rSec2[atomicc.interfaces]{Interfaces}
+
+To prohibit invocation errors in interfaces: use guarded LI method calls.
+
+In hardware, we expose a 'ready'
+signal to the caller so that the caller can schedule a transaction for execution
+that is guaranteed to succeed. 
+
+To promote consistent use of modules: connection using interfaces.
+
+The unit of sharing between modules is 'abstract data type', a collection
+of methods.
+
+Method guards effectively enforce 'safety'; assertions verify 'liveness'.
+
+\rSec2[atomicc.module]{Modularization}
+
+As design complexity increases, we need techniques for design and verification
+that scale better,
+leveraging plug and play reuse of verified IP to reduce incremental development costs.
+
+Although modularization is well known to provide many benefits,
+it is critical that the modularization framework not only provide a
+simple way to partition the task, but can not only isolate implementation of
+modules from runtime errors in consumers, but also allow the effective
+modular reuse of verification results when verifying the
+aggregate system.
+
+A unitary Verilog module is generated for each defined AtomicC module.
+The generated Verilog is highly readable, giving designers 
+the ability to check that subtle design intent is translated correctly into Verilog.
+To minimize the reverification effort for ECOs,
 "local AtomicC source code changes (generally) should only cause local changes to generated Verilog".
+
+Module schedules calculated using only local information and are independent of module usage context.
+
+Parameterized generated code: propagation of module parameterization from
+source through to generated Verilog allows reuse without regeneration for each parameter instance.
 
 In hardware design, the design phase is followed by significant validation effort
 to ensure manufacturability.  Since the number of system parameters is
@@ -58,40 +291,85 @@ in the manufacturing process.
 By modular generation of Verilog code and by enforced runtime isolation
 of modules, ECOs are independent.
 
-\end{itemize}
+Additionally, to make overall development costs scale efficently (proportional
+to length of new code, independent of complexity of reused modules), we need a
+toolchain that guarantees correct operation is preserved
+for pre-tested, reused modules.
 
-\item Compiler guarantees program runtime safety
+
+\rSec2[atomicc.elaboration]{Static Elaboration}
+
+In software, data structures are dynamically constructed, responding to
+demands of the operating environment.  Although hardware cannot be
+constructed at runtime, we don't want to be forced to manually create every
+state element and their connections.  In AtomicC, we support static elaboration,
+a compilation phase after parsing and before code generation, which allows
+the programmatic construction of program elements
+
+\rSec2[atomicc.runtime]{Runtime}
+
+Most EDA systems built for chip fabrication.  What about FPGAs?
+{teaching, design teams desperate for faster simulation, Fast turnaround} -> prototype in FPGA.
+Need for a robust frontend framework that works with vendor supplied backend tooling.
+Open source tools that scale to industrial size problems.
+
+We cannot guarantee that all programs run correctly, some programs just have bugs.
+We can guarantee that if programs do not run correctly, the designer will be notified.
+
+To have a clearer grasp on "well-behaved", we propose the following:
 \begin{itemize}
-\item Through HDL structuring, guarantee the absence of dynamic concurrency interleaving errors in generated Verilog.
-\item When rules conflict, the compiler synthesizes fair arbitration, guaranteeing liveness between rules.
-\end{itemize}
-
-\item Assert statements used to specify invariants and liveness.
-When possible, the compiler attempts to verify them with model checking or proof tools.
-Since designing effective assert statements can be difficult, a standardized runtime
-is provided allowing access to assertion failures in synthesized logic as well
-as providing access to program trace information.
-
-By guaranteeing
-safety (nothing "bad" happens throughout execution)
-and liveness (something "good" eventually does happen) of the design at compile time.
-we significantly reduce the dependency on runtime verification.
-
-\item Standardized debug runtime
-\begin{itemize}
+\item Runtime environment for reporting errors, tracing.  Includes synthesizable
+support for LTL assertions.
 \item Display, trace and "assert" runtime support is provided, easing unit testing
 as modules are created.
-\item hardware/software interactions are facilitated by a NOC DMA to processor memory,
+\end{itemize}
+
+To speed edit/compilation/test cycles: link independent, incremental developed modules with a
+structured LI async interconnect.
+
+
+hardware/software interactions are facilitated by a NOC DMA to processor memory,
 smoothing interactions between high clock speed/narrow thread software and low clock
 speed/wide thread hardware.
-\item runtime support for scan-chain based testing
-\end{itemize}
-\item Integration with existing workflow
+
+runtime support for scan-chain based testing
+
+\rSec2[atomicc.workflow]{Workflow}
+
+Integration with existing workflow
+
+Existing Verilog modules can be called from and can call AtomicC generated modules.
+
+Standard Verilog backend tools are used to synthesize the resulting ASIC or FPGA.
+
+For NOC: allocate NOC like clock tree, after physical placement known.  Can do 
+method calls across NOC using credit.
+
+Physical partitioning is used to separate design into separately synthesized pieces, connected using
+"long distance" signalling.  Parallel synthesis; bitstreams combined.
+
+Incremental place and route for changes:
 \begin{itemize}
-\item Existing Verilog modules can be called from and can call AtomicC generated modules.
-\item Standard Verilog backend tools are used to synthesize the resulting ASIC or FPGA.
+\item Automated physical partitioning of the design into locally clocked logic islands
+connected through delay tolerant network on chip
+\item Quick edit/compile/test cycles minimize the time between making a change and
+seeing the effect, allowing the developer to remain "in context"
+\item By physically partitioning the design into connected, placed regions, only the
+logic block that has been actually changed needs to be recompiled.  Modular reuse through pre-placed modules
 \end{itemize}
+
+Timing closure -- simplifying retiming:
+\begin{itemize}
+\item timing closure issues
+can be separated to 2 groups: interblock and intrablock.
+By using self-timed interfaces intrablock, long timing closure paths can be eliminated
+\item simple decoration of source expression trees can be used to generate
+fifo pipelined implementation of transactions.
 \end{itemize}
+
+Coding FSMs as 'case' statements in Verilog (to integrate with verification tools).
+
+\eject
 
 \rSec1[atomicc.language]{AtomicC Language Overview}
 
@@ -103,6 +381,7 @@ with support for Guarded Atomic Actions
 \cite{Hoe:Thesis,HoeArvind:TRSSynthesis2,Dave2007}:
 Bluespec-style\cite{Bluespec:www}
 modules, rules, interfaces, and methods.
+C statements convey structural information, not sequential execution directives.
 
 
 The language is designed for
@@ -134,29 +413,6 @@ invocation conditions, it can guarantee that the generated code always executes
 in a Sequentially Consistent (SC) manner: concurrent execution of transactions is
 guaranteed to be isolated.  For conflicts, a fair schedule is generated.
 
-\item PSL \cite{PSL} support for assertions: assert, assume, restrict, cover.
-Assertions can be either state-based (causal dependency between events) or
-property-based (global).
-\begin{itemize}
-\item Safety.
-\begin{itemize}
-\setlength\itemsep{-0.5em}
-\item Refinement checking
-\item Invariant:  Basis.  Inductive step.
-\item Deadlock freedom
-\item Reachability
-\end{itemize}
-\item Liveness.
-\begin{itemize}
-\setlength\itemsep{-0.5em}
-\item Termination
-\item Response
-\item Request-response properties
-\item real-time (system acts "in time")
-\end{itemize}
-\item Trace equivalence
-\end{itemize}
-
 \item As with Connectal\cite{king2015software}, AtomicC designs may include both hardware and
 software components, using interfaces to specify type safe communication.
 The AtomicC compiler generates the code and transactors to pass
@@ -164,43 +420,51 @@ arguments between hardware and software.
 
 \end{itemize}
 
+\rSec2[atomicc.examples]{Examples}
+
+\begin{itemize}
+\item arbiter,
+credit flow,
+cache,
+reorder buffer,
+prefix match,
+axi,
+pci,
+riscv,
+cocotb,
+floating point,
+gcd,
+serial adder,
+async,
+fifo,
+jtag,
+fusesoc,
+assume/guarantee,
+proofs,
+partitioning,
+clock/power gating,
+video,
+h264,
+odfm
+\end{itemize}
+
+\rSec1[atomicc.outofscope]{Out of Scope}
+
+Users care more about "discover errors" than "prove correct" (already think it is correct).
+Theorem provers focus on providing a way to syntactically prove correct programs that are
+genuinely semantically correct.  If one fails in constructing a proof, is the program really
+correct but we have not been clever enough to prove it.  If the program is really 
+incorrect, proof systems do not cater for proving incorrectness.
+Since in practive programs contain bugs in the majority of cases, the inability
+to identify errors is a serious drawback of the proof-theoretic approach.
+"verification" -> establish correctness; "falsification" (refutation) -> detect error.
+
+Theorem provers enable us to verify a system even in the presence of parameters, instead
+of verifying just concrete instances.
+
+Unbounded liveness (Buchi automation and omega languages)
+
 \rSec1[atomicc.modfuture]{Future work}
-
-Multiple clock domains
-
-Need to describe multi-cycle rules and pipelining.
-
-Need to describe joining rules
-
-Need to have a way to support sequencing of operations
-
-For NOC: allocate NOC like clock tree, after physical placement known.  Can do 
-method calls across NOC using credit.
-
-Physical partitioning is used to separate design into separately synthesized pieces, connected using
-"long distance" signalling.  Parallel synthesis; bitstreams combined.
-
-Incremental place and route for changes:
-\begin{itemize}
-\item Automated physical partitioning of the design into locally clocked logic islands
-connected through delay tolerant network on chip
-\item Quick edit/compile/test cycles minimize the time between making a change and
-seeing the effect, allowing the developer to remain "in context"
-\item By physically partitioning the design into connected, placed regions, only the
-logic block that has been actually changed needs to be recompiled.  Modular reuse through pre-placed modules
-\end{itemize}
-
-Timing closure -- simplifying retiming:
-\begin{itemize}
-\item timing closure issues
-can be separated to 2 groups: interblock and intrablock.
-By using self-timed interfaces intrablock, long timing closure paths can be eliminated
-\item simple decoration of source expression trees can be used to generate
-fifo pipelined implementation of transactions.
-\end{itemize}
 
 Need to have a way to support model checking (say 'module B is a behavioral description of module A')
 Show example with diff eqn solver from Sharp thesis.
-
-Coding FSMs as 'case' statements in Verilog (to integrate with verification tools).
-
