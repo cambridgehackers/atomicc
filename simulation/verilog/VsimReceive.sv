@@ -20,27 +20,23 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//`ifndef __PipeInLast_DEF__
-//`define __PipeInLast_DEF__
-//interface PipeInLast#(width = 32);
-//    logic enq__ENA;
-//    logic [width - 1:0] enq$v;
-//    logic  enq$last;
-//    logic enq__RDY;
-//    modport server (input  enq__ENA, enq$v, enq$last,
-//                    output enq__RDY);
-//    modport client (output enq__ENA, enq$v, enq$last,
-//                    input  enq__RDY);
-//endinterface
-//`endif
+`ifdef YOSYS
+`define ReturnType integer
+`else
+`define ReturnType longint
+`ifndef BOARD_cvc
+`define __USE_AUTOMATIC__
+`endif
+`endif
 module VsimReceive #(parameter width = 32) (input CLK, input nRST, PipeInLast.client port);
     //output reg enq__ENA, input enq__RDY, output reg [width-1:0] enq$v, output reg enq$last);
 
-    import "DPI-C" function longint dpi_msgReceive_enq();
+`ifndef YOSYS
+    import "DPI-C" function `ReturnType dpi_msgReceive_enq();
     always @(posedge CLK) begin
         if (nRST != 0) begin
             if (port.enq__RDY) begin
-`ifndef BOARD_cvc
+`ifdef __USE_AUTOMATIC__
 	        automatic longint v = dpi_msgReceive_enq();
 	        port.enq$last = v[33];
 	        port.enq__ENA = v[32];
@@ -58,4 +54,5 @@ module VsimReceive #(parameter width = 32) (input CLK, input nRST, PipeInLast.cl
             end
         end
     end
+`endif // YOSYS
 endmodule

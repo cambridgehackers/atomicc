@@ -15,8 +15,6 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 #include <stdio.h>
-//#include <string.h>
-//#include <assert.h>
 #include "AtomiccIR.h"
 #include "common.h"
 
@@ -24,7 +22,7 @@ typedef std::list<std::string> StrList;
 static StrList interfaceList;
 static std::map<std::string, bool> interfaceSeen;
 
-static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir)
+static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, std::string OutputDir, std::string packageName)
 {
     std::string baseDir = OutputDir;
     int ind = baseDir.rfind('/');
@@ -44,11 +42,17 @@ static void generateVerilog(std::list<ModuleIR *> &irSeq, std::string myName, st
             printf("veriloggen: unable to open '%s'\n", (baseDir + name + ".sv").c_str());
             exit(-1);
         }
-        fprintf(OStrV, "`include \"%s.generated.vh\"\n\n", myName.c_str());
+        //fprintf(OStrV, "`include \"atomicclib.vh\"\n");
+        fprintf(OStrV, "`include \"atomicc.generated.vh\"\n");
+        if (packageName != "")
+            fprintf(OStrV, "`include \"%s.generated.vh\"\n", myName.c_str());
         fprintf(OStrV, "`default_nettype none\n");
         if (IR->isTopModule)
             fprintf(OStrV, "`include \"%s.linker.vh\"\n", name.c_str());
         generateModuleHeader(OStrV, modLineTop, IR->isTopModule);
+        //if (packageName != "")
+            //fprintf(OStrV, "import %s::*;\n", packageName.c_str());
+        //fprintf(OStrV, "import Package_atomicc::*;\n");
         generateVerilogOutput(OStrV);
         if (IR->isTopModule)
             fprintf(OStrV, "`TopAppendCode\n");
@@ -97,7 +101,7 @@ static std::string modportNames(std::string first, StrList &inname, std::string 
     return ret;
 }
 
-static void generateVerilogInterface(std::string name, std::string OutputDir, FILE *OStrVH)
+static void generateVerilogInterface(std::string name, std::string OutputDir, std::string packageName)
 {
     StrList inname, outname, inoutname, fields;
     ModuleIR *IR = lookupInterface(name);
@@ -173,7 +177,7 @@ static void generateVerilogInterface(std::string name, std::string OutputDir, FI
     }
 }
 
-static bool shouldNotOuput(ModuleIR *IR)
+static bool shouldNotOutput(ModuleIR *IR)
 {
     std::string source = IR->sourceFilename;
     if (source.find("lib/") != std::string::npos)
@@ -201,7 +205,7 @@ static void appendInterface(std::string orig, std::string params)
     interfaceSeen[shortName] = true;
     ModuleIR *IR = lookupInterface(orig);
     assert(IR);
-    if (shouldNotOuput(IR))
+    if (shouldNotOutput(IR))
         return;
     for (auto item: IR->interfaces) {
         MapNameValue mapValueInterface;
@@ -251,23 +255,35 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
         return ret;
     processInterfaces(irSeq);
     preprocessIR(irSeq);
-    generateVerilog(irSeq, myName, OutputDir);
 
-    FILE *OStrVH = fopen((OutputDir + ".vh").c_str(), "w");
-    fprintf(OStrVH, "`include \"atomicclib.vh\"\n\n");
+    FILE *OStrVH = nullptr;
+    std::string packageName;
+    std::string baseDir = OutputDir;
+    ind = baseDir.rfind('/');
+    if (ind > 0)
+        baseDir = baseDir.substr(0, ind+1);
     for (auto item: mapAllModule) {
         ModuleIR *IR = item.second;
-        if (shouldNotOuput(IR))
+        if (shouldNotOutput(IR))
             continue;
         if (IR->isStruct) {
-            std::string defname = "__" + IR->name + "_DEF__";
-            fprintf(OStrVH, "`ifndef %s\n`define %s\ntypedef struct packed {\n", defname.c_str(), defname.c_str());
+            if (packageName == "") {
+                std::string defname = "__" + IR->name + "_DEF__";
+                packageName = "Package_" + myName;
+                OStrVH = fopen((OutputDir + ".vh").c_str(), "w");
+                fprintf(OStrVH, "`ifndef %s\n", defname.c_str());
+                fprintf(OStrVH, "`ifndef YOSYS\n");
+                fprintf(OStrVH, "`define %s\n", defname.c_str());
+                fprintf(OStrVH, "`endif // YOSYS\n");
+                //fprintf(OStrVH, "package %s;\n", packageName.c_str());
+            }
+            fprintf(OStrVH, "typedef struct packed {\n");
             std::list<std::string> lineList;
             for (auto fitem: IR->fields) // reverse order of fields
                 lineList.push_front(typeDeclaration(fitem.type) + " " + fitem.fldName);
             for (auto item: lineList)
                 fprintf(OStrVH, "    %s;\n", item.c_str());
-            fprintf(OStrVH, "} %s;\n`endif\n", IR->name.c_str());
+            fprintf(OStrVH, "} %s;\n", IR->name.c_str());
         }
         else if (!IR->isInterface
          && !endswith(IR->name, "_UNION") && IR->name.find("_VARIANT_") == std::string::npos) {
@@ -285,13 +301,18 @@ printf("[%s:%d] VERILOGGGEN\n", __FUNCTION__, __LINE__);
             appendInterface(IR->interfaceName, params);
         }
     }
-#if 1 // support of System Verilog structs
+    if (packageName != "") {
+        //fprintf(OStrVH, "endpackage\n");
+        fprintf(OStrVH, "`endif\n");
+        fclose(OStrVH);
+    }
     for (auto item: interfaceList)
-        generateVerilogInterface(item, OutputDir, OStrVH);
-#endif
+        generateVerilogInterface(item, OutputDir, packageName);
+    generateVerilog(irSeq, myName, OutputDir, packageName);
+    FILE *OStrVM = fopen((OutputDir + ".meta").c_str(), "w");
     for (auto IR : irSeq)
-        metaGenerateModule(IR, OStrVH); // now generate the verilog header file '.vh'
-    fclose(OStrVH);
+        metaGenerateModule(IR, OStrVM); // now generate the verilog header file '.vh'
+    fclose(OStrVM);
     generateKami(irSeq, myName, OutputDir);
 
     if (!noVerilator) {

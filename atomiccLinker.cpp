@@ -172,6 +172,7 @@ printf("[%s:%d] atomiccLinker\n", __FUNCTION__, __LINE__);
     commandLine += " --atomicc -y " + dirName;
     commandLine += " -y " + getRelativePath(atomiccDir + "/../atomicc-examples/lib/generated/");
     commandLine += " -y " + getRelativePath(atomiccDir + "/../atomicc-examples/lib/verilog/");
+    commandLine += " -y " + getRelativePath(atomiccDir + "/simulation/verilog/");
     commandLine += " --top-module " + topModule + " " + topModule + ".sv";
     int ret = system(commandLine.c_str());
     printf("[%s:%d] return %d from running '%s'\n", __FUNCTION__, __LINE__, ret, commandLine.c_str());
