@@ -122,7 +122,7 @@ static const char *yosys_template =
     "mode bmc\n"
     "\n"
     "[engines]\n"
-    "smtbmc\n"
+    "btor pono\n"
     "\n"
     "[script]\n"
     "read_verilog -sv -formal ";
