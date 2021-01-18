@@ -26,7 +26,9 @@ SOURCES = main.cpp verilog.cpp util.cpp interfaces.cpp \
 KAMI_SOURCES = kmain.cpp kami.cpp util.cpp readIR.cpp expr.cpp preprocessIR.cpp
 LINKER_SOURCES = atomiccLinker.cpp util.cpp readIR.cpp expr.cpp
 IMPORT_SOURCES := atomiccImport.cpp util.cpp readIR.cpp expr.cpp
+DUMPJ_SOURCES := dumpJson.cpp
 CUDDINC = -I../cudd/cudd
+CJSONINC = -I../cJSON
 CUDDLIB = ../cudd/cudd/.libs/libcudd.a
 CFLAGS := -std=c++11 \
             -fblocks -fno-exceptions -fno-rtti -fvisibility-inlines-hidden -fPIC \
@@ -37,9 +39,9 @@ CFLAGS := -std=c++11 \
             -Wwrite-strings -Wcovered-switch-default -Wcast-qual \
             -Wmissing-field-initializers -Wstring-conversion    \
             -Wnon-virtual-dtor -Wdelete-non-virtual-dtor \
-            -I. $(CUDDINC) 
+            -I. $(CUDDINC) $(CJSONINC)
 
-all: veriloggen kamigen atomiccImport atomiccLinker
+all: veriloggen kamigen atomiccImport atomiccLinker dumpJson
 
 veriloggen: $(SOURCES) *.h
 	$(Q)clang++ -g -o veriloggen $(CFLAGS) $(SOURCES) -lBlocksRuntime $(CUDDLIB)
@@ -52,6 +54,9 @@ atomiccLinker: $(LINKER_SOURCES) *.h
 
 atomiccImport: $(IMPORT_SOURCES) *.h
 	$(Q)clang++ -g -o atomiccImport $(CFLAGS) $(IMPORT_SOURCES) $(CUDDLIB)
+
+dumpJson: $(DUMPJ_SOURCES) *.h
+	$(Q)clang++ -g -o dumpJson $(CFLAGS) $(DUMPJ_SOURCES)
 
 clean:
 	rm -f veriloggen atomiccImport
