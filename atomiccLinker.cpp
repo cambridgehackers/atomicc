@@ -120,9 +120,11 @@ static void generateYosys(std::string dirName, std::list<std::string> &fileList)
 static const char *yosys_template = 
     "[options]\n"
     "mode bmc\n"
+    //"mode prove\n"
     "\n"
     "[engines]\n"
     "btor pono\n"
+    //"smtbmc boolector\n",
     "\n"
     "[script]\n"
     "read_verilog -sv -formal ";

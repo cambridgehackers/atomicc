@@ -845,7 +845,7 @@ static void generateMethod(ModuleIR *IR, std::string methodName, MethodInfo *MI)
         ACCExpr *tempCond = guard ? allocExpr("&&", guard, cond) : cond;
         tempCond = cleanupBool(tempCond);
         std::string calledName = value->value, calledEna = getEnaName(calledName);
-        condLines[generateSection].assert.push_back(AssertVerilog{tempCond, value});
+        condLines[generateSection].assertList.push_back(AssertVerilog{tempCond, value});
     }
     for (auto info: MI->callList) {
         if (!info->isAction)
@@ -1517,7 +1517,11 @@ printf("[%s:%d]SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS %s: old %
                 item.second.phi = cleanupBool(item.second.phi);
             else
                 item.second.phi = cleanupExpr(item.second.phi);
-            if (item.second.phi && (!item.second.phi->operands.size() || item.second.phi->operands.front()->operands.size() < 2 || refList[item.first].type == "Bit(1)")) {
+            if (item.second.phi->value != "__phi") {
+                setAssign(item.first, item.second.phi, refList[item.first].type);
+                item.second.phi = nullptr;
+            }
+            else if ((!item.second.phi->operands.size() || item.second.phi->operands.front()->operands.size() < 2)) {
                 if (item.second.isParam) {
                     ACCExpr *list = item.second.phi->operands.front();
                     if (list->operands.size()) {

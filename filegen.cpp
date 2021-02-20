@@ -339,6 +339,7 @@ next:;
     }
 
     // generate clocked updates to state elements
+    std::list<std::string> initItemList;
     for (auto &ctop : condLines) { // process all generate sections
     for (auto &alwaysGroup: ctop.second.always) {
         std::list<std::string> alwaysLines;
@@ -353,8 +354,11 @@ next:;
         }
         fprintf(OStr, "\n    %s begin\n      if (!%s) begin\n", alwaysClause.c_str(), resetName.c_str());
 printf("[%s:%d]REEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEWWWWWWWWWWWW %s count %d\n", __FUNCTION__, __LINE__, alwaysGroup.first.c_str(), (int)resetList[alwaysGroup.first].size());
-        for (auto item: resetList[alwaysGroup.first])
-            fprintf(OStr, "        %s <= 0;\n", item.c_str());
+        for (auto item: resetList[alwaysGroup.first]) {
+            std::string initAssign = item + " <= 0";
+            fprintf(OStr, "        %s;\n", initAssign.c_str());
+            initItemList.push_back(initAssign);
+        }
         resetList[alwaysGroup.first].clear();
         fprintf(OStr, "      end // nRST\n");
         for (auto tcond: alwaysGroup.second.cond) {
@@ -402,11 +406,18 @@ printf("[%s:%d]REEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEWWWWWWWWWWWW %s count
         if (ctop.first != "")
             fprintf(OStr, "   end // end of forloop\n");
     }
-    if (ctop.second.assert.size())
+    if (ctop.second.assertList.size()) {
         fprintf(OStr, "`ifdef	FORMAL\n");
-    for (auto item: ctop.second.assert) {
+        if (initItemList.size()) {
+            fprintf(OStr, "    initial begin\n");
+            for (auto item: initItemList)
+                fprintf(OStr, "        %s;\n", item.c_str());
+            fprintf(OStr, "    end\n");
+        }
+    }
+    for (auto item: ctop.second.assertList) {
         std::string sensitivity = ALWAYS_STAR;
-        if (walkSearch(item.cond, "$past"))
+        if (walkSearch(item.cond, "$past") || walkSearch(item.value, "$past"))
             sensitivity = ALWAYS_CLOCKED "CLK)";
         fprintf(OStr, "    %s\n", sensitivity.c_str());
         std::string indent;
@@ -417,7 +428,7 @@ printf("[%s:%d]REEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEWWWWWWWWWWWW %s count
         }
         fprintf(OStr, "    %s\n", ("    " + indent + finishExpr(item.value) + ";").c_str());
     }
-    if (ctop.second.assert.size())
+    if (ctop.second.assertList.size())
         fprintf(OStr, "`endif\n");
     }
 }
