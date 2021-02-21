@@ -1019,7 +1019,7 @@ ACCExpr *cleanupExprBuiltin(ACCExpr *expr, std::string phiDefault, bool preserve
 std::string makeSection(std::string var, ACCExpr *init, ACCExpr *limit, ACCExpr *incr)
 {
     char tempBuf[1000];
-    snprintf(tempBuf, sizeof(tempBuf), "for(%s = %s; %s; %s = %s) begin",
+    snprintf(tempBuf, sizeof(tempBuf), "for(genvar %s = %s; %s; %s = %s) begin", // genvar not allowed for loops inside procedural blocks
         var.c_str(), tree2str(init).c_str(), tree2str(limit).c_str(), var.c_str(), tree2str(incr).c_str());
     return tempBuf;
 }

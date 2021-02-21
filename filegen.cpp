@@ -226,14 +226,6 @@ printf("[%s:%d] JJJJ outputwire %s\n", __FUNCTION__, __LINE__, item.first.c_str(
         fprintf(OStr, "%s", endStr.c_str());
         tempOutput.clear();
     };
-    if (genvarMap.size() > 0) {
-        const char *sep = "    genvar ";
-        for (auto gitem: genvarMap) {
-            fprintf(OStr, "%s%s", sep, gitem.first.c_str());
-            sep = ", ";
-        }
-        fprintf(OStr, ";\n");
-    }
     bool moduleSyncFF = false;
     for (auto mitem: modNew) {
         if (mitem.moduleStart) {
@@ -345,7 +337,7 @@ next:;
         std::list<std::string> alwaysLines;
         bool hasElse = false;
         if (ctop.first != "")
-            fprintf(OStr, "\n    %s\n", finishString(ctop.first).c_str());
+            fprintf(OStr, "\n    %s\n", finishString(ctop.first).c_str()); // generate 'for' line
         std::string alwaysClause = alwaysGroup.first, resetName;
         int ind = alwaysClause.find(":");
         if (ind > 0) {

@@ -969,13 +969,11 @@ static void generateMethodGroup(ModuleIR *IR, void (*generateMethod)(ModuleIR *I
         generateMethod(IR, MI->name, MI);
     for (auto MI : IR->methods) {
     for (auto item: MI->generateFor) {
-        genvarMap[item.var] = 1;
         MethodInfo *MIb = IR->generateBody[item.body];
         assert(MIb && "body item ");
         generateMethod(IR, MI->name, MIb);
     }
     for (auto item: MI->instantiateFor) {
-        genvarMap[item.var] = 1;
         MethodInfo *MIb = IR->generateBody[item.body];
         assert(MIb && "body item ");
         generateMethod(IR, MI->name, MIb);
@@ -1057,7 +1055,6 @@ static ACCExpr *generateSubscriptReference(ModuleIR *IR, ModList &modLine, std::
         setAssign(objectName + "in", allocExpr(name_or), type);
         setAssign(objectName + "index", subExpr, "Bit(32)");
         ACCExpr *var = allocExpr(GENVAR_NAME "1");
-        genvarMap[var->value] = 1;
         generateSection = makeSection(var->value, allocExpr("0"),
             allocExpr("<", var, allocExpr(nameVec)), allocExpr("+", var, allocExpr("1")));
         std::string newSub = "[" + var->value + "]";
@@ -1428,7 +1425,6 @@ static ModList modLine;
     condLines.clear();
     methodCommitCondition.clear();
     methodCommitCondition[""] = allocExpr("1");  // used for state updates not governed by a method/rule invocation
-    genvarMap.clear();
     // 'Mux' together parameter settings from all invocations of a method from this class
     muxValueList.clear();
     enableList.clear();

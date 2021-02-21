@@ -215,7 +215,6 @@ void generateModuleDef(ModuleIR *IR, ModList &modLineTop);
 void connectMethodList(ModuleIR *IIR, ACCExpr *targetTree, ACCExpr *sourceTree, bool isForward);
 
 // filegen.cpp
-extern std::map<std::string, int> genvarMap;
 void generateModuleHeader(FILE *OStr, ModList &modLine, bool isTopModule);
 void generateVerilogOutput(FILE *OStr);
 
