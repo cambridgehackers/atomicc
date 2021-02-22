@@ -32,13 +32,13 @@ module VcsProgram;
     always #1 CLK = ~CLK;
 
     initial begin
-        CLK = 0;
-        nRST = 0;
-        CLK_derivedClock = 0;
-        nRST_derivedReset = 0;
-        CLK_sys_clk = 0;
+        CLK = 1'b0;
+        nRST = 1'b0;
+        CLK_derivedClock = 1'b0;
+        nRST_derivedReset = 1'b0;
+        CLK_sys_clk = 1'b0;
         #10
-        nRST = 1;
+        nRST = 1'b1;
         #20
     	$display("VCSTOP starting");
         #9999999999

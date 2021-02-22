@@ -23,7 +23,7 @@
 module VsimSend #(parameter width = 32) (input CLK, input nRST, PipeInLast.server port);
 `ifndef YOSYS
     import "DPI-C" function void dpi_msgSend_enq(input int enq, input int last);
-    assign port.enq__RDY = 1;
+    assign port.enq__RDY = 1'b1;
     always @(posedge CLK) begin
         if (nRST != 0) begin
             if (port.enq__ENA) begin
