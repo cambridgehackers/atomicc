@@ -322,6 +322,7 @@ next:;
             fprintf(OStr, "    always_comb begin\n    %s = 0;\n    unique case(1'b1)\n", item.first.c_str());
             for (auto param: item.second.phi->operands.front()->operands)
                 fprintf(OStr, "    %s: %s = %s;\n", tree2str(getRHS(param, 0)).c_str(), item.first.c_str(), tree2str(getRHS(param, 1)).c_str());
+            fprintf(OStr, "    default:;\n"); // not all cases needed
             fprintf(OStr, "    endcase\n    end\n");
 #endif
             }
