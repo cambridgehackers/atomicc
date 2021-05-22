@@ -843,11 +843,12 @@ nextand:;
 
 void updateWidth(ACCExpr *expr, std::string clen)
 {
-    if (!expr || clen == "" || !isdigit(clen[0]) || clen == "0" || clen.find(" ") != std::string::npos)
+    if (!expr || clen == "" //|| !isdigit(clen[0]) 
+       || clen == "0" || clen.find(" ") != std::string::npos)
         return;
     if (isIdChar(expr->value[0]) && !expr->operands.size()) {
         if (refList[expr->value].pin == PIN_CONSTANT) {
-            expr->value = "(" + clen + "'(" + expr->value + "))";
+            expr->value = "((" + clen + ")'(" + expr->value + "))";
             return;
         }
     }
@@ -858,8 +859,10 @@ void updateWidth(ACCExpr *expr, std::string clen)
         printf("[%s:%d] len %d ilen %d tree %s\n", __FUNCTION__, __LINE__, len, ilen, tree2str(expr).c_str());
         exit(-1);
     }
-    if (len > 0 && plainInteger(expr->value))
-        expr->value = autostr(len) + "'d" + expr->value;
+    if ((!isdigit(clen[0]) || !isdigit(expr->value[0])) && plainInteger(expr->value))
+        expr->value = "(" + clen + ") ' ('d" + expr->value + ")";
+    else if (len > 0 && plainInteger(expr->value))
+        expr->value = clen + "'d" + expr->value;
     else if (isIdChar(expr->value[0])) {
         if (trace_expr)
             printf("[%s:%d] ID %s ilen %d len %d\n", __FUNCTION__, __LINE__, tree2str(expr).c_str(), ilen, len);

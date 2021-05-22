@@ -90,7 +90,7 @@ bool relationalOp(std::string s)
 
 static bool checkOperator(std::string s)
 {
-    return booleanBinop(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == "," || s == "!" || s == "." || s == "=";
+    return booleanBinop(s) || shiftOp(s) ||  arithOp(s) || relationalOp(s) || s == "," || s == "!" || s == "." || s == "=" || s == "'";
 }
 
 bool checkOperand(std::string s)
@@ -158,9 +158,10 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
     if (expr->value == "$past" && expr->operands.size()) { // runtime functions actually 'called' in generated code
         expr->operands.front()->value = "(";
     }
+    bool leftOpParen = (op == "'" && expr->operands.size() > 1);
     for (auto item: expr->operands) {
         ret += sep;
-        bool addParen = !topOp && !checkOperand(item->value) && item->value != "," && item->value != PERIOD && !isParen(item->value);
+        bool addParen = leftOpParen || (!topOp && !checkOperand(item->value) && item->value != "," && item->value != PERIOD && !isParen(item->value));
         if (addParen)
             ret += "(" + space;
         std::string val = tree2str(item, addSpaces);
@@ -175,6 +176,7 @@ std::string tree2str(ACCExpr *expr, bool addSpaces)
             sep = space + op + space;
         if (op == "?")
             op = ":";
+        //leftOpParen = false;
     }
     std::string post = treePost(orig);
     if (post != "")
@@ -320,7 +322,8 @@ static ACCExpr *get1Token(void)
         } while (lexChar == '=' || lexChar == '<' || lexChar == '>');
     else if (isParen(lexChar) || lexChar == '/' || lexChar == '%' || lexChar == '.'
         || lexChar == ']' || lexChar == '}' || lexChar == ')' || lexChar == '^'
-        || lexChar == ',' || lexChar == '?' || lexChar == ':' || lexChar == ';')
+        || lexChar == ',' || lexChar == '?' || lexChar == ':' || lexChar == ';'
+        || lexChar == '\'')
         getNext();
     else if (lexChar == '@') { // special 'escape' character for internal SUBSCRIPT_MARKER/PARAMETER_MARKER sequences
         getNext();
@@ -731,7 +734,7 @@ static ACCExpr *getExprList(ACCExpr *head, std::string terminator, bool repeatCu
 printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA '%s'\n", __FUNCTION__, __LINE__, val.c_str());
                     val = val.substr(1);
                 }
-                if ((val == "-" || val == "!" || bitOp(val) || val == "<<") && !tok->operands.size()) { // unary '-'
+                if ((val == "-" || val == "!" || bitOp(val) || val == "<<" || val == "'") && !tok->operands.size()) { // unary '-'
                     if (val != "!")
                         tok->value = "@" + tok->value;
                     unary = tok;
@@ -745,7 +748,7 @@ printf("[%s:%d]AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                     printf("[%s:%d] OPERAND CHECKFAILLLLLLLLLLLLLLL %s from %s\n", __FUNCTION__, __LINE__, tree2str(tok).c_str(), lexString.c_str());
                     exit(-1);
                 }
-                while (tnext && (tnext->value == PERIOD || isParen(tnext->value) || isIdChar(tnext->value[0]))) {
+                while (tnext && tok->value != "'" && (tnext->value == PERIOD || isParen(tnext->value) || isIdChar(tnext->value[0]))) {
                 while (tnext && tnext->value == PERIOD) {
                     if (!dotExpr)
                         dotExpr = tnext;

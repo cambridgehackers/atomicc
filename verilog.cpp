@@ -199,7 +199,10 @@ static void collectInterfacePins(ModuleIR *IR, ModList &modParam, std::string in
             forceInterface = true;
             continue;
         }
-        addModulePort(modParam, name, MI->type, out != (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, MI->action || isEnaName(name) || isRdyName(name));
+        std::string methodType = MI->type;
+        if (methodType == "")
+            methodType = "Bit(1)";
+        addModulePort(modParam, name, methodType, out != (MI->type != ""), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, MI->action || isEnaName(name) || isRdyName(name));
         if (MI->action && !isEnaName(name))
             addModulePort(modParam, name + "__ENA", "", out ^ (0), false, ""/*not param*/, isLocal, false/*isArgument*/, vecCount, mapValue, instance, false, true);
         if (trace_ports)
@@ -1296,6 +1299,11 @@ static void fixupModuleInstantiations(ModuleIR *IR, ModList &modLine)
                 refList[val].done = true;  // 'assign' line not needed; value is assigned by object inst
             if (trace_interface)
                 printf("[%s:%d] newval %s\n", __FUNCTION__, __LINE__, val.c_str());
+        }
+        if (isdigit(val[0])) {
+            ACCExpr *ival = allocExpr(val);
+            updateWidth(ival, convertType(mitem.type));
+            val = tree2str(ival);
         }
         modNew.push_back(ModData{mitem.argName, val, mitem.type, mitem.moduleStart, mitem.clockValue, mitem.out, mitem.inout, mitem.trigger, ""/*not param*/, mitem.vecCount});
     }

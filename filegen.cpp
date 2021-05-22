@@ -348,7 +348,9 @@ next:;
         fprintf(OStr, "\n    %s begin\n      if (!%s) begin\n", alwaysClause.c_str(), resetName.c_str());
 printf("[%s:%d]REEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEWWWWWWWWWWWW %s count %d\n", __FUNCTION__, __LINE__, alwaysGroup.first.c_str(), (int)resetList[alwaysGroup.first].size());
         for (auto item: resetList[alwaysGroup.first]) {
-            std::string initAssign = item + " <= 0";
+            ACCExpr *zero = allocExpr("0");
+            updateWidth(zero, convertType(refList[item].type));
+            std::string initAssign = item + " <= " + tree2str(zero);
             fprintf(OStr, "        %s;\n", initAssign.c_str());
             initItemList.push_back(initAssign);
         }
