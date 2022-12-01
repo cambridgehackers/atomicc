@@ -12,19 +12,19 @@ To build
     sudo apt-get install libffi-dev libblocksruntime-dev clang
     sudo apt-get install gcc-multilib g++-multilib cmake verilator
 0) On OSX:
-    git clone git://github.com/mackyle/blocksruntime.git
+    git clone git@github.com:mackyle/blocksruntime.git
     cd blocksruntime
     ./buildlib
     sudo ./installlib
 
 1) get sources
-    git clone git://github.com/cambridgehackers/atomicc
-    git clone git://github.com/cambridgehackers/atomicc-examples
-    git clone git://github.com/cambridgehackers/cudd
-    git clone git://github.com/cambridgehackers/llvm
-    git clone git://github.com/cambridgehackers/clang
-    git clone git://github.com/cambridgehackers/verilator
-    git clone git://github.com/cambridgehackers/connectal
+    git clone git@github.com:cambridgehackers/atomicc
+    git clone git@github.com:cambridgehackers/atomicc-examples
+    git clone git@github.com:cambridgehackers/cudd
+    git clone git@github.com:cambridgehackers/llvm
+    git clone git@github.com:cambridgehackers/clang
+    git clone git@github.com:cambridgehackers/verilator
+    git clone git@github.com:cambridgehackers/connectal
     cd clang; git checkout remotes/origin/release_50atomicc1 -b release_50atomicc1
     cd ../llvm; git checkout remotes/origin/release_50atomicc1 -b release_50atomicc1
     cd ../verilator; git checkout remotes/origin/atomicc1 -b atomicc1
